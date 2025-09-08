@@ -1,0 +1,51 @@
+# .readthedocs.yaml
+# Read the Docs configuration file for s3dgraphy
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+# Required
+version: 2
+
+# Set the OS, set of tools, and environment
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.11"
+  # Install dependencies in a virtual environment
+  # This is required to use local packages
+  jobs:
+    # Run before installing project dependencies
+    pre_create_environment:
+      - echo "Setting up environment for s3dgraphy documentation"
+    
+    # Run after installing project dependencies
+    post_install:
+      - echo "s3dgraphy documentation build environment ready"
+
+# Python configuration
+python:
+  install:
+    # Install the project in development mode
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
+    # Install additional requirements for documentation
+    - requirements: docs/requirements.txt
+
+# Build documentation with Sphinx
+sphinx:
+  configuration: docs/conf.py
+  fail_on_warning: false
+
+# Additional formats to build
+formats:
+  - pdf
+  - epub
+
+# Optional: specify submodules to include
+# submodules:
+#   include: all
+
+# Optional: set environment variables
+# env:
+#   DJANGO_SETTINGS_MODULE: myproject.settings

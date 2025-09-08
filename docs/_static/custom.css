@@ -1,0 +1,96 @@
+/* Custom CSS for s3dgraphy documentation */
+
+/* Improve code block appearance */
+.highlight {
+    background: #f8f8f8;
+    border: 1px solid #e1e4e5;
+    border-radius: 4px;
+    margin: 1em 0;
+}
+
+/* Add custom colors for archaeological context */
+.archaeological-node {
+    color: #8B4513;
+    font-weight: bold;
+}
+
+.stratigraphic-unit {
+    background-color: #F5DEB3;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+/* Improve table appearance */
+table.docutils {
+    border-collapse: collapse;
+    margin: 1em 0;
+}
+
+table.docutils th,
+table.docutils td {
+    border: 1px solid #e1e4e5;
+    padding: 8px 12px;
+}
+
+table.docutils th {
+    background-color: #f1f2f3;
+    font-weight: bold;
+}
+
+/* Improve admonition styling */
+.admonition {
+    margin: 1em 0;
+    padding: 12px;
+    border-left: 5px solid #ccc;
+    background-color: #f9f9f9;
+}
+
+.admonition.note {
+    border-left-color: #3498db;
+    background-color: #ebf3fd;
+}
+
+.admonition.warning {
+    border-left-color: #f39c12;
+    background-color: #fef4e7;
+}
+
+.admonition.important {
+    border-left-color: #e74c3c;
+    background-color: #fdeaea;
+}
+
+/* Archaeological workflow steps */
+.workflow-step {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 6px;
+    padding: 12px;
+    margin: 12px 0;
+    position: relative;
+}
+
+.workflow-step:before {
+    content: "→";
+    color: #28a745;
+    font-weight: bold;
+    font-size: 1.2em;
+    margin-right: 8px;
+}
+
+/* 3D visualization highlights */
+.blender-integration {
+    background-color: #fff3e0;
+    border: 2px solid #ff9800;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+}
+
+.blender-integration:before {
+    content: "🎨 Blender Integration";
+    display: block;
+    font-weight: bold;
+    color: #e65100;
+    margin-bottom: 8px;
+}
