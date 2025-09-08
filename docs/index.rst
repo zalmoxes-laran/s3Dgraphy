@@ -13,12 +13,10 @@ s3dgraphy Documentation
    :target: https://github.com/zalmoxes-laran/s3dgraphy/blob/main/LICENSE
    :alt: License
 
-
 **s3dgraphy** is a Python library that implements the Extended Matrix formal language 
 for archaeological stratigraphic documentation and virtual reconstruction processes. 
 It provides the core graph structure and node management system that powers the 
 Extended Matrix Framework (EMF).
-
 
 🎯 **Key Features**
 
@@ -156,16 +154,15 @@ Table of Contents
    
    installation
    quickstart
-   tutorial
+   core_concepts
 
 .. toctree::
    :maxdepth: 2
    :caption: User Guide
    
-   core_concepts
+   import_export
    graph_management
    node_types
-   import_export
    integration
 
 .. toctree::
@@ -195,6 +192,12 @@ Table of Contents
    architecture
    changelog
    roadmap
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Support
+   
+   troubleshooting
 
 .. toctree::
    :maxdepth: 1
