@@ -252,11 +252,31 @@ class S3dGraphyPublisher:
                 with open(self.pyproject_file, 'r') as f:
                     content = f.read()
                 
+                # More specific regex that only matches the version in [project] section
+                # Look for version = "..." in the [project] section specifically
                 new_content = re.sub(
-                    r'version\s*=\s*["\']([^"\']+)["\']',
-                    f'version = "{new_version}"',
-                    content
+                    r'(\[project\].*?)\nversion\s*=\s*["\']([^"\']+)["\']',
+                    rf'\1\nversion = "{new_version}"',
+                    content,
+                    flags=re.DOTALL
                 )
+                
+                # If the above doesn't work, try a more targeted approach
+                if new_content == content:
+                    # Split by sections and only update the project section
+                    lines = content.split('\n')
+                    in_project_section = False
+                    
+                    for i, line in enumerate(lines):
+                        if line.strip() == '[project]':
+                            in_project_section = True
+                        elif line.strip().startswith('[') and line.strip() != '[project]':
+                            in_project_section = False
+                        elif in_project_section and re.match(r'\s*version\s*=', line):
+                            lines[i] = f'version = "{new_version}"'
+                            break
+                    
+                    new_content = '\n'.join(lines)
                 
                 if new_content != content:
                     with open(self.pyproject_file, 'w') as f:
@@ -273,10 +293,12 @@ class S3dGraphyPublisher:
                 with open(self.setup_file, 'r') as f:
                     content = f.read()
                 
+                # More specific regex for setup.py - only in setup() call context
                 new_content = re.sub(
-                    r'version\s*=\s*["\']([^"\']+)["\']',
-                    f'version="{new_version}"',
-                    content
+                    r'(setup\s*\([^)]*?)version\s*=\s*["\']([^"\']+)["\']',
+                    rf'\1version="{new_version}"',
+                    content,
+                    flags=re.DOTALL
                 )
                 
                 if new_content != content:
