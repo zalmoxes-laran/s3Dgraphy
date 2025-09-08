@@ -13,9 +13,8 @@ license = {text = "GPL-3.0-or-later"}
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
-    "networkx>=2.8",
-    "pandas>=1.5.0",
-    "numpy>=1.21.0; python_version>='3.8'",
+    "pandas>=2.0.0",
+    "numpy>=1.21.0",
 ]
 keywords = ["archaeology", "stratigraphy", "graph", "3d", "heritage"]
 classifiers = [
@@ -44,7 +43,7 @@ Repository = "https://github.com/zalmoxes-laran/s3dgraphy.git"
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
-    "pytest-cov",
+    "pytest-cov", 
     "black",
     "flake8",
     "mypy",
@@ -56,20 +55,16 @@ docs = [
     "sphinx-rtd-theme",
     "myst-parser"
 ]
-blender = [
-    # Dipendenze aggiuntive per uso con Blender
-    # (numpy è escluso perché fornito da Blender)
+visualization = [
+    "networkx>=3.0"
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools.package-dir]
-s3dgraphy = "src/s3dgraphy"
-
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-target = ['py38']
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
