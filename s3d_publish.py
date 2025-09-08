@@ -9,6 +9,7 @@ Usage:
     python publish.py --dry-run          # Show what would be done
     python publish.py --version patch    # Auto-increment version
     python publish.py --force            # Skip safety checks
+    python publish.py --setup            # Setup virtual environment
 """
 
 import os
@@ -19,12 +20,143 @@ import argparse
 import re
 from pathlib import Path
 import json
+import venv
 
 class S3dGraphyPublisher:
     def __init__(self):
         self.root_dir = Path(__file__).parent
         self.pyproject_file = self.root_dir / "pyproject.toml"
         self.setup_file = self.root_dir / "setup.py"
+        self.venv_dir = self.root_dir / "publish_env"
+        
+    def setup_environment(self, force=False):
+        """Setup virtual environment for publishing"""
+        print("🔧 Setting up publishing environment...")
+        
+        # Check if venv already exists
+        if self.venv_dir.exists():
+            if not force:
+                print(f"✅ Virtual environment already exists at {self.venv_dir}")
+                print("   Use --force to recreate it")
+                return self._check_venv_dependencies()
+            else:
+                print(f"🗑️  Removing existing environment at {self.venv_dir}")
+                shutil.rmtree(self.venv_dir)
+        
+        # Create virtual environment
+        print(f"📦 Creating virtual environment at {self.venv_dir}")
+        try:
+            venv.create(self.venv_dir, with_pip=True)
+        except Exception as e:
+            print(f"❌ Failed to create virtual environment: {e}")
+            return False
+        
+        # Install required packages
+        pip_path = self._get_venv_pip()
+        if not pip_path:
+            print("❌ Could not find pip in virtual environment")
+            return False
+        
+        packages = ["twine>=4.0.0", "requests>=2.25.0", "build>=0.7.0"]
+        
+        print("📥 Installing required packages...")
+        for package in packages:
+            print(f"   Installing {package}...")
+            try:
+                result = subprocess.run([
+                    str(pip_path), "install", package
+                ], check=True, capture_output=True, text=True)
+                print(f"   ✅ {package} installed successfully")
+            except subprocess.CalledProcessError as e:
+                print(f"   ❌ Failed to install {package}: {e}")
+                print(f"      Error output: {e.stderr}")
+                return False
+        
+        print("✅ Publishing environment setup complete!")
+        print(f"   Location: {self.venv_dir}")
+        print(f"   Python: {self._get_venv_python()}")
+        print("   Packages installed: twine, requests, build")
+        
+        return True
+    
+    def _get_venv_python(self):
+        """Get path to Python executable in virtual environment"""
+        if os.name == 'nt':  # Windows
+            return self.venv_dir / "Scripts" / "python.exe"
+        else:  # Unix/Linux/macOS
+            return self.venv_dir / "bin" / "python"
+    
+    def _get_venv_pip(self):
+        """Get path to pip executable in virtual environment"""
+        if os.name == 'nt':  # Windows
+            return self.venv_dir / "Scripts" / "pip.exe"
+        else:  # Unix/Linux/macOS
+            return self.venv_dir / "bin" / "pip"
+    
+    def _check_venv_dependencies(self):
+        """Check if required dependencies are installed in venv"""
+        pip_path = self._get_venv_pip()
+        if not pip_path or not pip_path.exists():
+            print("❌ Virtual environment pip not found")
+            return False
+        
+        required_packages = ["twine", "requests", "build"]
+        missing_packages = []
+        
+        for package in required_packages:
+            try:
+                result = subprocess.run([
+                    str(pip_path), "show", package
+                ], check=True, capture_output=True, text=True)
+                print(f"   ✅ {package} is available")
+            except subprocess.CalledProcessError:
+                missing_packages.append(package)
+                print(f"   ❌ {package} is missing")
+        
+        if missing_packages:
+            print(f"⚠️  Missing packages: {', '.join(missing_packages)}")
+            print("   Run with --setup --force to reinstall environment")
+            return False
+        
+        return True
+    
+    def _use_venv_python(self):
+        """Check if we should use virtual environment Python"""
+        venv_python = self._get_venv_python()
+        if venv_python.exists():
+            return str(venv_python)
+        return sys.executable
+    
+    def check_dependencies(self):
+        """Check if required dependencies are available"""
+        print("🔍 Checking dependencies...")
+        
+        # If venv exists, check it
+        if self.venv_dir.exists():
+            print("📦 Using virtual environment")
+            return self._check_venv_dependencies()
+        
+        # Otherwise check system-wide
+        print("🌐 Checking system-wide packages")
+        required_packages = ["twine", "requests", "build"]
+        missing_packages = []
+        
+        for package in required_packages:
+            try:
+                result = subprocess.run([
+                    sys.executable, "-m", "pip", "show", package
+                ], check=True, capture_output=True, text=True)
+                print(f"   ✅ {package} is available")
+            except subprocess.CalledProcessError:
+                missing_packages.append(package)
+                print(f"   ❌ {package} is missing")
+        
+        if missing_packages:
+            print(f"⚠️  Missing packages: {', '.join(missing_packages)}")
+            print("   Run --setup to create isolated publishing environment")
+            return False
+        
+        return True
         
     def check_git_status(self, force=False):
         """Check if git working directory is clean"""
@@ -79,20 +211,35 @@ class S3dGraphyPublisher:
         """Increment version number"""
         try:
             parts = current_version.split('.')
-            major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+            if len(parts) < 3:
+                # Pad with zeros if needed
+                parts.extend(['0'] * (3 - len(parts)))
             
-            if increment_type == 'major':
-                return f"{major + 1}.0.0"
-            elif increment_type == 'minor':
-                return f"{major}.{minor + 1}.0"
-            elif increment_type == 'patch':
-                return f"{major}.{minor}.{patch + 1}"
+            major, minor, patch = [int(x) for x in parts[:3]]
+            
+            if increment_type == "major":
+                major += 1
+                minor = 0
+                patch = 0
+            elif increment_type == "minor":
+                minor += 1
+                patch = 0
+            elif increment_type == "patch":
+                patch += 1
             else:
-                print(f"❌ Invalid increment type: {increment_type}")
+                print(f"❌ Unknown increment type: {increment_type}")
                 return None
-                
-        except (ValueError, IndexError):
-            print(f"❌ Invalid version format: {current_version}")
+            
+            new_version = f"{major}.{minor}.{patch}"
+            
+            # Preserve any additional parts (like pre-release identifiers)
+            if len(parts) > 3:
+                new_version += "." + ".".join(parts[3:])
+            
+            return new_version
+            
+        except Exception as e:
+            print(f"❌ Could not increment version: {e}")
             return None
     
     def update_version(self, new_version):
@@ -106,7 +253,7 @@ class S3dGraphyPublisher:
                     content = f.read()
                 
                 new_content = re.sub(
-                    r'version\s*=\s*["\'][^"\']+["\']',
+                    r'version\s*=\s*["\']([^"\']+)["\']',
                     f'version = "{new_version}"',
                     content
                 )
@@ -114,20 +261,20 @@ class S3dGraphyPublisher:
                 if new_content != content:
                     with open(self.pyproject_file, 'w') as f:
                         f.write(new_content)
-                    print(f"✅ Updated version in pyproject.toml to {new_version}")
+                    print(f"✅ Updated version in pyproject.toml")
                     updated = True
                     
             except Exception as e:
-                print(f"❌ Could not update pyproject.toml: {e}")
+                print(f"⚠️  Could not update pyproject.toml: {e}")
         
-        # Update setup.py if it exists
+        # Update setup.py
         if self.setup_file.exists():
             try:
                 with open(self.setup_file, 'r') as f:
                     content = f.read()
                 
                 new_content = re.sub(
-                    r'version\s*=\s*["\'][^"\']+["\']',
+                    r'version\s*=\s*["\']([^"\']+)["\']',
                     f'version="{new_version}"',
                     content
                 )
@@ -135,107 +282,112 @@ class S3dGraphyPublisher:
                 if new_content != content:
                     with open(self.setup_file, 'w') as f:
                         f.write(new_content)
-                    print(f"✅ Updated version in setup.py to {new_version}")
+                    print(f"✅ Updated version in setup.py")
                     updated = True
                     
             except Exception as e:
-                print(f"❌ Could not update setup.py: {e}")
+                print(f"⚠️  Could not update setup.py: {e}")
         
         return updated
     
     def get_pypi_version(self, test=False):
-        """Get current version on PyPI"""
+        """Get latest version from PyPI"""
         try:
             import requests
+            
             url = "https://test.pypi.org/pypi/s3dgraphy/json" if test else "https://pypi.org/pypi/s3dgraphy/json"
             response = requests.get(url, timeout=10)
+            
             if response.status_code == 200:
                 data = response.json()
                 return data["info"]["version"]
             elif response.status_code == 404:
-                return None  # Package doesn't exist yet
+                return None  # Package not found
+            else:
+                print(f"⚠️  Could not check PyPI: HTTP {response.status_code}")
+                return "unknown"
+                
+        except ImportError:
+            print("⚠️  requests not available, cannot check PyPI version")
+            return "unknown"
         except Exception as e:
             print(f"⚠️  Could not check PyPI version: {e}")
-        return "unknown"
+            return "unknown"
     
     def clean_build_artifacts(self):
-        """Clean previous build artifacts"""
-        build_dirs = ["build", "dist", "*.egg-info"]
+        """Clean build artifacts"""
+        print("🧹 Cleaning build artifacts...")
         
-        for pattern in build_dirs:
-            for path in self.root_dir.glob(pattern):
-                if path.is_dir():
-                    print(f"🧹 Removing: {path}")
-                    shutil.rmtree(path)
-                elif path.is_file():
-                    print(f"🧹 Removing: {path}")
-                    path.unlink()
+        dirs_to_clean = ["build", "dist", "*.egg-info"]
+        
+        for pattern in dirs_to_clean:
+            if "*" in pattern:
+                # Use glob for patterns
+                from glob import glob
+                for path in glob(pattern):
+                    if os.path.isdir(path):
+                        shutil.rmtree(path)
+                        print(f"   Removed {path}")
+            else:
+                path = Path(pattern)
+                if path.exists():
+                    if path.is_dir():
+                        shutil.rmtree(path)
+                    else:
+                        path.unlink()
+                    print(f"   Removed {path}")
     
     def build_package(self):
-        """Build wheel and source distribution"""
-        print("🔨 Building distribution packages...")
+        """Build the package using the appropriate Python"""
+        print("🔨 Building package...")
         
-        # Try modern build first
-        build_commands = [
-            [sys.executable, "-m", "build"],
-            [sys.executable, "setup.py", "sdist", "bdist_wheel"]
-        ]
+        python_exec = self._use_venv_python()
         
-        for cmd in build_commands:
-            try:
-                result = subprocess.run(
-                    cmd, 
-                    cwd=self.root_dir,
-                    capture_output=True, 
-                    text=True, 
-                    check=True
-                )
-                print("✅ Package built successfully")
-                return True
-                
-            except subprocess.CalledProcessError as e:
-                print(f"⚠️  Build command failed: {' '.join(cmd)}")
-                print(f"   stdout: {e.stdout}")
-                print(f"   stderr: {e.stderr}")
-                continue
-            except FileNotFoundError:
-                print(f"⚠️  Command not found: {' '.join(cmd)}")
-                continue
-        
-        print("❌ All build commands failed!")
-        return False
+        try:
+            result = subprocess.run([
+                python_exec, "-m", "build"
+            ], cwd=self.root_dir, check=True, capture_output=True, text=True)
+            
+            print("✅ Package built successfully")
+            print("   Output:", result.stdout.strip())
+            return True
+            
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Build failed: {e}")
+            print(f"   Error output: {e.stderr}")
+            return False
     
     def check_build_artifacts(self):
-        """Check that build artifacts were created"""
+        """Check if build artifacts were created"""
         dist_dir = self.root_dir / "dist"
         
         if not dist_dir.exists():
-            print("❌ No dist directory found!")
+            print("❌ No dist/ directory found")
             return False
         
-        artifacts = list(dist_dir.glob("*"))
-        if not artifacts:
-            print("❌ No distribution artifacts found!")
+        files = list(dist_dir.glob("*"))
+        if not files:
+            print("❌ No files found in dist/")
             return False
         
-        print(f"📦 Found {len(artifacts)} distribution artifacts:")
-        for artifact in artifacts:
-            size_mb = artifact.stat().st_size / (1024 * 1024)
-            print(f"   - {artifact.name} ({size_mb:.2f} MB)")
+        print(f"✅ Build artifacts found:")
+        for file in files:
+            print(f"   📦 {file.name}")
         
         return True
     
     def upload_to_pypi(self, test=False, dry_run=False):
-        """Upload package to PyPI"""
-        target = "TestPyPI" if test else "PyPI"
-        
+        """Upload package to PyPI using the appropriate Python"""
         if dry_run:
-            print(f"🧪 DRY RUN: Would upload to {target}")
+            print("🔍 DRY RUN: Would upload to", "TestPyPI" if test else "PyPI")
             return True
         
-        print(f"📤 Uploading to {target}...")
+        print(f"📤 Uploading to {'TestPyPI' if test else 'PyPI'}...")
         
-        cmd = [sys.executable, "-m", "twine", "upload"]
+        python_exec = self._use_venv_python()
+        
+        # Build twine command
+        cmd = [python_exec, "-m", "twine", "upload"]
         
         if test:
             cmd.extend(["--repository", "testpypi"])
@@ -244,46 +396,42 @@ class S3dGraphyPublisher:
         
         try:
             result = subprocess.run(cmd, cwd=self.root_dir, check=True)
-            print(f"✅ Successfully uploaded to {target}!")
+            print("✅ Upload successful")
             return True
             
         except subprocess.CalledProcessError as e:
             print(f"❌ Upload failed: {e}")
-            print("\n💡 Common issues:")
-            print("   1. Install twine: pip install twine")
-            print("   2. Configure PyPI credentials")
-            print("   3. Version already exists on PyPI")
-            return False
-        except FileNotFoundError:
-            print("❌ twine not found! Install with: pip install twine")
             return False
     
     def create_git_tag(self, version, dry_run=False):
         """Create and push git tag"""
-        tag = f"v{version}"
-        
         if dry_run:
-            print(f"🧪 DRY RUN: Would create tag {tag}")
+            print(f"🔍 DRY RUN: Would create git tag v{version}")
             return True
+        
+        print(f"🏷️  Creating git tag v{version}...")
         
         try:
             # Create tag
-            subprocess.run(['git', 'tag', tag], cwd=self.root_dir, check=True)
-            print(f"🏷️  Created tag: {tag}")
+            subprocess.run(['git', 'tag', f'v{version}'], 
+                         cwd=self.root_dir, check=True)
             
             # Push tag
-            subprocess.run(['git', 'push', 'origin', tag], cwd=self.root_dir, check=True)
-            print(f"🚀 Pushed tag: {tag}")
+            subprocess.run(['git', 'push', 'origin', f'v{version}'], 
+                         cwd=self.root_dir, check=True)
             
+            print(f"✅ Git tag v{version} created and pushed")
             return True
             
         except subprocess.CalledProcessError as e:
             print(f"❌ Git tag failed: {e}")
             return False
     
-    def show_post_publish_info(self, version, test=False):
-        """Show information after successful publication"""
-        print(f"\n🎉 s3dgraphy v{version} published successfully!")
+    def show_success_message(self, version, test=False):
+        """Show success message with next steps"""
+        print("\n" + "="*50)
+        print("🎉 PUBLICATION SUCCESSFUL!")
+        print("="*50)
         
         if test:
             print("\n🧪 Test installation:")
@@ -366,52 +514,46 @@ class S3dGraphyPublisher:
         if not self.create_git_tag(new_version, dry_run):
             return False
         
-        # 9. Show post-publish information
+        # 9. Show success message
         if not dry_run:
-            self.show_post_publish_info(new_version, test)
+            self.show_success_message(new_version, test)
         
         return True
 
+
 def main():
-    parser = argparse.ArgumentParser(
-        description="Publish s3dgraphy to PyPI",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python publish.py                      # Interactive publication to PyPI
-  python publish.py --test               # Publish to TestPyPI
-  python publish.py --dry-run            # Show what would be done
-  python publish.py --version patch      # Auto-increment patch version
-  python publish.py --version minor      # Auto-increment minor version
-  python publish.py --force              # Skip safety checks
-  python publish.py --test --version patch  # Test with version bump
-        """
-    )
-    
-    parser.add_argument(
-        "--test", 
-        action="store_true",
-        help="Publish to TestPyPI instead of PyPI"
-    )
-    parser.add_argument(
-        "--dry-run", 
-        action="store_true",
-        help="Show what would be done without actually doing it"
-    )
-    parser.add_argument(
-        "--force", 
-        action="store_true",
-        help="Skip safety checks (git status, version conflicts)"
-    )
-    parser.add_argument(
-        "--version", 
-        choices=["patch", "minor", "major"],
-        help="Auto-increment version before publishing"
-    )
+    parser = argparse.ArgumentParser(description="s3dgraphy Publication Tool")
+    parser.add_argument("--test", action="store_true", 
+                       help="Publish to TestPyPI instead of PyPI")
+    parser.add_argument("--dry-run", action="store_true",
+                       help="Show what would be done without executing")
+    parser.add_argument("--force", action="store_true",
+                       help="Skip safety checks")
+    parser.add_argument("--version", choices=["patch", "minor", "major"],
+                       help="Auto-increment version before publishing")
+    parser.add_argument("--setup", action="store_true",
+                       help="Setup virtual environment for publishing")
     
     args = parser.parse_args()
     
     publisher = S3dGraphyPublisher()
+    
+    # Handle setup command
+    if args.setup:
+        success = publisher.setup_environment(force=args.force)
+        if success:
+            print("\n🎉 Setup complete! You can now run publication commands.")
+            print("   The virtual environment will be used automatically.")
+        else:
+            print("\n❌ Setup failed!")
+        sys.exit(0 if success else 1)
+    
+    # Check dependencies before proceeding
+    if not publisher.check_dependencies():
+        print("\n💡 Suggestion: Run --setup to create an isolated publishing environment")
+        sys.exit(1)
+    
+    # Continue with publication...
     success = publisher.publish(
         test=args.test,
         dry_run=args.dry_run,
@@ -420,6 +562,7 @@ Examples:
     )
     
     sys.exit(0 if success else 1)
+
 
 if __name__ == "__main__":
     main()
