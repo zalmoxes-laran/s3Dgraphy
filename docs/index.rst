@@ -182,6 +182,7 @@ Table of Contents
    api/importers
    api/exporters
    api/s3dgraphy_classes_reference
+   api/s3dgraphy_edges_reference
 
 .. toctree::
    :maxdepth: 2
