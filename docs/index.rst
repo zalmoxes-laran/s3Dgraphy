@@ -88,11 +88,11 @@ please refer to the `Extended Matrix Documentation
 
 The Extended Matrix documentation includes detailed explanations of:
 
-- **Stratigraphic and auxiliary node types** - Complete catalog of archaeological units
-- **Connector semantics and usage** - Temporal and logical relationships  
-- **Theoretical archaeological foundations** - Scientific methodology and best practices
-- **Canvas and visual representation guidelines** - Standardized notation system
-- **Formal language specification** - Grammar and syntax rules
+- **Stratigraphic and auxiliary node types** – Complete catalog of archaeological units
+- **Connector semantics and usage** – Temporal and logical relationships
+- **Theoretical archaeological foundations** – Scientific methodology and best practices
+- **Canvas and visual representation guidelines** – Standardized notation system
+- **Formal language specification** – Grammar and syntax rules
 
 This separation allows s3dgraphy to focus on technical implementation while the 
 Extended Matrix documentation provides the conceptual framework and human-readable 
@@ -112,7 +112,7 @@ s3dgraphy is particularly suited for:
 * **Paradata Management**: Track sources and analytical processes
 
 Integration with EMtools
--------------------------
+------------------------
 
 s3dgraphy is the core library powering `EMtools <https://github.com/zalmoxes-laran/EM-blender-tools>`_, 
 a Blender extension that brings the Extended Matrix methodology to 3D archaeological visualization.
@@ -160,10 +160,17 @@ Table of Contents
    :maxdepth: 2
    :caption: User Guide
    
-   import_export
+   s3dgraphy_import_export_complete
    graph_management
    node_types
    integration
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Advanced Guides
+   
+   guides/s3dgraphy_operators_guide
+   guides/s3dgraphy_caching_performance
 
 .. toctree::
    :maxdepth: 2
@@ -174,15 +181,23 @@ Table of Contents
    api/edges
    api/importers
    api/exporters
+   api/s3dgraphy_classes_reference
 
 .. toctree::
    :maxdepth: 2
-   :caption: Examples
+   :caption: Examples & Workflows
    
    examples/basic_usage
    examples/archaeological_workflow
    examples/blender_integration
    examples/data_migration
+   examples/s3dgraphy_workflow_examples
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials
+   
+   tutorials/basic_usage
 
 .. toctree::
    :maxdepth: 2
