@@ -84,7 +84,7 @@ Extended Matrix Language Reference
 s3dgraphy implements the Extended Matrix formal language. For a complete 
 understanding of EM concepts, node types, and theoretical foundations, 
 please refer to the `Extended Matrix Documentation 
-<https://github.com/zalmoxes-laran/ExtendedMatrix>`_.
+<https://docs.extendedmatrix.org/en/1.5.0dev/>`_.
 
 The Extended Matrix documentation includes detailed explanations of:
 
