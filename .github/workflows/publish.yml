@@ -1,0 +1,51 @@
+name: Publish to PyPI
+
+on:
+  # SOLO trigger manuale - più controllo
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Where to publish'
+        required: true
+        default: 'testpypi'
+        type: choice
+        options:
+        - testpypi
+        - pypi
+      version_tag:
+        description: 'Git tag to publish (e.g., v0.1.1)'
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout specific tag
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.inputs.version_tag }}
+        
+    - name: Confirm target
+      run: |
+        echo "🎯 Publishing to: ${{ github.event.inputs.target }}"
+        echo "🏷️ Using tag: ${{ github.event.inputs.version_tag }}"
+        
+    - name: Build package
+      run: |
+        python -m pip install --upgrade pip build twine
+        python -m build
+        
+    - name: Publish to TestPyPI
+      if: github.event.inputs.target == 'testpypi'
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        
+    - name: Publish to PyPI (PRODUCTION)
+      if: github.event.inputs.target == 'pypi'
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
