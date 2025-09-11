@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "s3dgraphy"
-version = "0.1.0"
+version = "0.1.1"
 description = "3D Stratigraphic Graph Management Library for archaeological and heritage applications"
 authors = [
     {name = "Emanuel Demetrescu", email = "emanuel.demetrescu@cnr.it"}
