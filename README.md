@@ -1,172 +1,194 @@
-# s3Dgraphy
+# s3dgraphy
 
 [![PyPI version](https://badge.fury.io/py/s3dgraphy.svg)](https://badge.fury.io/py/s3dgraphy)
-[![Python](https://img.shields.io/pypi/pyversions/s3dgraphy.svg)](https://pypi.org/project/s3dgraphy/)
+[![Python versions](https://img.shields.io/pypi/pyversions/s3dgraphy.svg)](https://pypi.org/project/s3dgraphy/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Downloads](https://pepy.tech/badge/s3dgraphy)](https://pepy.tech/project/s3dgraphy)
+[![Publish to PyPI](https://github.com/zalmoxes-laran/s3dgraphy/actions/workflows/publish.yml/badge.svg)](https://github.com/zalmoxes-laran/s3dgraphy/actions/workflows/publish.yml)
 
-**s3Dgraphy** is a Python library for creating and managing multitemporal, 3D knowledge graphs, with a focus on archaeological and heritage applications. It provides tools for stratigraphic data management, temporal modeling, and graph-based analysis of archaeological contexts.
+## 3D Stratigraphic Graph Management Library
 
-## 🚀 Features
+s3dgraphy is a Python library for creating and managing multitemporal, 3D knowledge graphs, with a focus on archaeological and heritage applications. It provides tools for stratigraphic data management, temporal modeling, and graph-based analysis of archaeological contexts.
 
-- **Multitemporal Graphs**: Handle temporal relationships and chronological sequences
-- **Stratigraphic Modeling**: Specialized nodes and edges for archaeological stratigraphy  
-- **Flexible Data Import**: Support for GraphML, XLSX, and custom formats
-- **Visual Layouts**: Generate 2D layouts for graph visualization (requires NetworkX)
-- **Extended Matrix Integration**: Native support for EM (Extended Matrix) methodology
-- **Blender Compatible**: Designed to work seamlessly with Blender 3D and EMtools
+Part of the [Extended Matrix Framework](https://www.extendedmatrix.org), s3dgraphy implements the formal language Extended Matrix (EM) for archaeological documentation and 3D reconstruction workflows.
 
-## 📦 Installation
+## 🚀 Installation
 
-### Standard Installation
 ```bash
+# From PyPI (stable releases)
 pip install s3dgraphy
-```
 
-### With Optional Dependencies
-```bash
-# For graph visualization layouts
-pip install s3dgraphy[networkx]
+# From TestPyPI (development versions)
+pip install --index-url https://test.pypi.org/simple/ s3dgraphy
 
-# For development
-pip install s3dgraphy[dev]
-
-# For documentation building  
-pip install s3dgraphy[docs]
+# With optional dependencies
+pip install s3dgraphy[visualization]  # For plotting features
+pip install s3dgraphy[full]          # All optional dependencies
 ```
 
 ## 🔧 Quick Start
 
-### Basic Graph Creation
 ```python
-from s3dgraphy import Graph, Node, Edge
+import s3dgraphy
 
-# Create a new graph
-graph = Graph("archaeological_site")
-graph.description = {"en": "Stratigraphic sequence from excavation"}
+# Create a new stratigraphic graph
+graph = s3dgraphy.Graph()
 
-# Add stratigraphic nodes
-layer1 = Node("US001", "Topsoil layer", "stratigraphic_unit") 
-layer2 = Node("US002", "Medieval layer", "stratigraphic_unit")
-layer3 = Node("US003", "Roman foundation", "stratigraphic_unit")
+# Add stratigraphic units
+us1 = graph.add_node("US001", node_type="US", 
+                     properties={"period": "Roman", "material": "pottery"})
+us2 = graph.add_node("US002", node_type="US", 
+                     properties={"period": "Medieval", "material": "stone"})
 
-graph.add_node(layer1)
-graph.add_node(layer2) 
-graph.add_node(layer3)
+# Add stratigraphic relationships
+graph.add_edge(us1, us2, edge_type="ABOVE", 
+               properties={"certainty": "high"})
 
-# Add temporal relationships (stratigraphic sequence)
-graph.add_edge("rel1", "US002", "US001", "is_before")  # US002 is before (older than) US001
-graph.add_edge("rel2", "US003", "US002", "is_before")  # US003 is before (older than) US002
+# Query the graph
+print(f"Graph contains {len(graph.nodes)} stratigraphic units")
+print(f"Relationships: {len(graph.edges)}")
 
-print(f"Graph has {len(graph.nodes)} nodes and {len(graph.edges)} edges")
+# Export to different formats
+graph.export_graphml("stratigraphy.graphml")
+graph.export_json("stratigraphy.json")
 ```
 
-### Loading from GraphML
-```python
-from s3dgraphy import load_graph_from_file
+## 📚 Core Features
 
-# Load existing GraphML file
-graph = load_graph_from_file("site_data.graphml", overwrite=True)
+### 🏛️ Archaeological Stratigraphic Modeling
+- **Stratigraphic Units (US)**: Physical layers and contexts
+- **Stratigraphic Volumes (USV)**: 3D spatial representations
+- **Surfaces (SF)**: Interface documentation
+- **Temporal Relationships**: Before/after, contemporary, uncertain
 
-# Access nodes and edges
-for node in graph.nodes:
-    print(f"Node: {node.name} (Type: {node.node_type})")
+### 🔗 Extended Matrix Integration
+- **EM Language Support**: Full implementation of Extended Matrix formal language
+- **Visual Rules**: JSON-based styling and visualization rules
+- **CIDOC-CRM Mapping**: Semantic web compatibility
+- **Connection Rules**: Automated relationship inference
 
-for edge in graph.edges:
-    print(f"Edge: {edge.edge_source} → {edge.edge_target} ({edge.edge_type})")
-```
+### 📊 Graph Operations
+- **Multitemporal Analysis**: Handle complex temporal sequences
+- **Graph Traversal**: Navigate stratigraphic relationships
+- **Filtering & Querying**: Find specific contexts and relationships
+- **Validation**: Check stratigraphic consistency
 
-### Visual Layout Generation
-```python
-from s3dgraphy.utils.visual_layout import generate_layout
+### 💾 Data Exchange
+- **GraphML Import/Export**: Industry standard graph format
+- **JSON/YAML Support**: Lightweight data exchange
+- **Excel Integration**: Tabular data import
+- **3D Model Integration**: GLTF/GLB support for 3D contexts
 
-# Generate 2D coordinates for visualization (requires NetworkX)
-try:
-    layout = generate_layout(graph)
-    for node_id, (x, y) in layout.items():
-        print(f"Node {node_id}: position ({x:.2f}, {y:.2f})")
-except ImportError:
-    print("NetworkX required for layout generation")
-```
+## 🎯 Use Cases
 
-## 🏛️ Archaeological Applications
+### Archaeological Projects
+- **Excavation Documentation**: Record stratigraphic sequences
+- **Site Analysis**: Understand temporal relationships
+- **3D Reconstruction**: Link physical evidence to 3D models
+- **Publication**: Generate stratigraphic matrices and diagrams
 
-s3Dgraphy is particularly suited for:
+### Heritage Applications
+- **Monument Analysis**: Document construction phases
+- **Conservation Planning**: Track intervention history
+- **Virtual Archaeology**: Create interactive 3D experiences
+- **Research Integration**: Connect archaeological data with other disciplines
 
-- **Stratigraphic Analysis**: Model archaeological layers and their relationships
-- **Temporal Sequences**: Track changes over time in archaeological contexts
-- **Site Documentation**: Create structured records of excavation data
-- **3D Integration**: Seamless integration with 3D modeling workflows (Blender)
-- **Data Exchange**: Standards-compliant data export for research collaboration
+## 📖 Documentation
 
-## 🔗 Integration with EMtools
+- **[User Guide](https://docs.extendedmatrix.org/projects/s3dgraphy/)** - Complete documentation
+- **[API Reference](https://docs.extendedmatrix.org/projects/s3dgraphy/api.html)** - Detailed API docs
+- **[Examples](https://github.com/zalmoxes-laran/s3dgraphy/tree/main/examples)** - Code examples and tutorials
+- **[Extended Matrix](https://www.extendedmatrix.org)** - Framework overview
 
-s3Dgraphy is the core library powering [EMtools](https://github.com/zalmoxes-laran/EM-blender-tools), a Blender extension for Extended Matrix methodology:
+## 🔧 Development
 
-```python
-# In Blender with EMtools
-import bpy
-from s3dgraphy import get_active_graph
-
-# Access the currently active graph in Blender
-graph = get_active_graph()
-if graph:
-    print(f"Working with: {graph.name}")
-```
-
-## 📚 Documentation
-
-- **Full Documentation**: [docs.extendedmatrix.org/projects/s3dgraphy](https://docs.extendedmatrix.org/projects/s3dgraphy/)
-- **API Reference**: [API Docs](https://docs.extendedmatrix.org/projects/s3dgraphy/en/latest/api.html)
-- **Examples**: See `examples/` directory in the repository
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md).
+### Setting up Development Environment
 
 ```bash
-# Development setup
+# Clone the repository
 git clone https://github.com/zalmoxes-laran/s3dgraphy.git
 cd s3dgraphy
+
+# Install in development mode
 pip install -e .[dev]
 
 # Run tests
 pytest
 
-# Format code
+# Run linting
 black src/
+flake8 src/
 ```
 
-## 📋 Requirements
+### Release Process
 
-- **Python**: 3.8 or higher
-- **Core**: pandas, networkx (optional), numpy
-- **Compatible**: Works with Blender 4.0+ Python environment
+```bash
+# Bump version and create tag
+bump2version patch  # or minor, major
+
+# Push to GitHub
+git push --follow-tags
+
+# Create release on GitHub to auto-publish to PyPI
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Areas for Contribution
+- **New Node Types**: Archaeological contexts, dating methods
+- **Import/Export Formats**: Additional data exchange formats  
+- **Visualization**: Enhanced 3D layouts and rendering
+- **Analysis Tools**: Statistical analysis, pattern recognition
+- **Documentation**: Examples, tutorials, case studies
+
+## 🏛️ Extended Matrix Ecosystem
+
+s3dgraphy is part of a larger ecosystem:
+
+- **[EM-tools for Blender](https://github.com/zalmoxes-laran/EM-blender-tools)** - 3D visualization and modeling
+- **[3D Survey Collection (3DSC)](https://docs.extendedmatrix.org/projects/3DSC/)** - 3D model preparation
+- **[ATON Framework](https://www.aton3d.org)** - Web-based 3D presentation
+- **[Extended Matrix Documentation](https://github.com/zalmoxes-laran/ExtendedMatrix)** - Formal language specification
 
 ## 📄 License
 
-This project is licensed under the GNU General Public License v3.0 - see [LICENSE](LICENSE) for details.
+This project is licensed under the **GNU General Public License v3.0** - see the [LICENSE](LICENSE) file for details.
 
-## 🏆 Credits
+The GPL-3.0 license ensures that s3dgraphy remains free and open source, promoting transparency and collaboration in archaeological research and heritage preservation.
 
-**Lead Developer**: Emanuel Demetrescu (CNR-ISPC)  
-**Project**: Extended Matrix Framework  
-**Institution**: CNR - Istituto di Scienze del Patrimonio Culturale
+## 🏛️ Citation
 
-## 🔗 Related Projects
+If you use s3dgraphy in your research, please cite:
 
-- [EMtools](https://github.com/zalmoxes-laran/EM-blender-tools) - Blender extension using s3Dgraphy
-- [Extended Matrix](https://www.extendedmatrix.org) - Official methodology website
-- [ATON Framework](https://github.com/phoenixbf/aton) - 3D web visualization platform
+```bibtex
+@software{s3dgraphy2024,
+  title={s3dgraphy: 3D Stratigraphic Graph Management Library},
+  author={Demetrescu, Emanuel},
+  year={2024},
+  url={https://github.com/zalmoxes-laran/s3dgraphy},
+  version={0.1.1},
+  institution={CNR-ISPC (National Research Council - Institute of Heritage Science)}
+}
+```
 
-## 📞 Support
+## 👥 Credits
 
-- 📧 **Email**: emanuel.demetrescu@cnr.it
-- 🐛 **Issues**: [GitHub Issues](https://github.com/zalmoxes-laran/s3dgraphy/issues)
-- 💬 **Community**: [Extended Matrix Telegram](https://t.me/UserGroupEM)
+**Author & Maintainer**: [Emanuel Demetrescu](https://github.com/zalmoxes-laran) (CNR-ISPC)
+
+**Institution**: National Research Council of Italy - Institute of Heritage Science (CNR-ISPC)
+
+**Funding**: This research has been supported by various archaeological and heritage preservation projects.
+
+## 🔗 Links
+
+- **GitHub Repository**: https://github.com/zalmoxes-laran/s3dgraphy
+- **PyPI Package**: https://pypi.org/project/s3dgraphy/
+- **Documentation**: https://docs.extendedmatrix.org/projects/s3dgraphy/
+- **Extended Matrix Website**: https://www.extendedmatrix.org
+- **Bug Reports**: https://github.com/zalmoxes-laran/s3dgraphy/issues
 
 ---
 
-<p align="center">
-  Part of the Extended Matrix Framework<br>
-  Made with ❤️ for the Cultural Heritage community
-</p>
+*s3dgraphy - Bringing archaeological stratigraphy into the digital age* 🏛️✨

@@ -6,23 +6,32 @@ build-backend = "setuptools.build_meta"
 name = "s3dgraphy"
 version = "0.1.1"
 description = "3D Stratigraphic Graph Management Library for archaeological and heritage applications"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "GPL-3.0-or-later"}
 authors = [
     {name = "Emanuel Demetrescu", email = "emanuel.demetrescu@cnr.it"}
 ]
-license = {text = "GPL-3.0-or-later"}
-readme = "README.md"
-requires-python = ">=3.8"
-dependencies = [
-    "pandas>=2.0.0",
-    "numpy>=1.21.0",
+maintainers = [
+    {name = "Emanuel Demetrescu", email = "emanuel.demetrescu@cnr.it"}
 ]
-keywords = ["archaeology", "stratigraphy", "graph", "3d", "heritage"]
+keywords = [
+    "archaeology", 
+    "stratigraphy", 
+    "graph", 
+    "3d", 
+    "heritage",
+    "temporal-modeling",
+    "knowledge-graph",
+    "extended-matrix"
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research", 
     "Intended Audience :: Education",
     "Topic :: Scientific/Engineering :: Information Analysis",
     "Topic :: Scientific/Engineering :: Visualization",
+    "Topic :: Database :: Database Engines/Servers",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
@@ -31,6 +40,13 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
+    "Environment :: Console",
+    "Natural Language :: English",
+]
+
+dependencies = [
+    "pandas>=2.0.0",
+    "numpy>=1.21.0",
 ]
 
 [project.urls]
@@ -38,7 +54,9 @@ Homepage = "https://github.com/zalmoxes-laran/s3dgraphy"
 Documentation = "https://docs.extendedmatrix.org/projects/s3dgraphy/"
 Repository = "https://github.com/zalmoxes-laran/s3dgraphy.git"
 "Bug Reports" = "https://github.com/zalmoxes-laran/s3dgraphy/issues"
+"Source Code" = "https://github.com/zalmoxes-laran/s3dgraphy"
 "Extended Matrix" = "https://www.extendedmatrix.org"
+Changelog = "https://github.com/zalmoxes-laran/s3dgraphy/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
@@ -48,7 +66,8 @@ dev = [
     "flake8",
     "mypy",
     "build",
-    "twine"
+    "twine",
+    "bump2version"
 ]
 docs = [
     "sphinx>=5.0",
@@ -56,15 +75,23 @@ docs = [
     "myst-parser"
 ]
 visualization = [
-    "networkx>=3.0"
+    "networkx>=3.0",
+    "matplotlib>=3.0",
+    "plotly>=5.0"
+]
+full = [
+    "s3dgraphy[dev,docs,visualization]"
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+s3dgraphy = ["*.json", "*.yaml", "data/*"]
+
 [tool.black]
 line-length = 88
-target-target = ['py38']
+target-version = ['py38']
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
