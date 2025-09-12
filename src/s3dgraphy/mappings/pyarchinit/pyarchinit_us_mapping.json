@@ -8,13 +8,13 @@
     },
     "column_mappings": {
         "us": {
-            "node_type": "StratigraphicUnit",
+            "node_type": "US",
             "is_id": true
         },
         "d_stratigrafica": {
-            "node_type": "StratigraphicUnit", 
+            "node_type": "US", 
             "is_description": true,
-            "target_id_column": "us"
+            "target_id_column": "US"
         },
         "d_interpretativa": {
             "node_type": "PropertyNode",
