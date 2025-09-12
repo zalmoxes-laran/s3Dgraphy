@@ -41,41 +41,30 @@ class BaseImporter(ABC):
         #self.graph = None
         self.warnings = []
 
-
     def _load_mapping(self, mapping_name: str) -> Dict[str, Any]:
-        """Load the JSON mapping file from the appropriate directory."""
+        """Load the JSON mapping file using the mapping registry."""
         if mapping_name is None:
             return None
             
         print(f"\nDebug - Loading mapping:")
         print(f"Mapping name: {mapping_name}")
         
-        mapping_paths = [
-            os.path.join(os.path.dirname(__file__), 'JSONmappings', f'{mapping_name}'),
-            os.path.join(os.path.dirname(__file__), '..', 'emdbjson', f'{mapping_name}'),
-            os.path.join(os.path.dirname(__file__), '..', '..', 'pyarchinit_mappings', f'{mapping_name}')
-        ]
+        # Import registry
+        from ..mappings import mapping_registry
         
-        for mapping_path in mapping_paths:
-            try:
-                print(f"Trying to load: {mapping_path}")
-                with open(mapping_path, 'r', encoding='utf-8') as f:
-                    mapping = json.load(f)
-                    print("Mapping loaded successfully:")
-                    print(f"Keys in mapping: {list(mapping.keys())}")
-                    print(f"Column mappings: {list(mapping.get('column_mappings', {}).keys())}")
-                    return mapping
-            except FileNotFoundError:
-                print(f"Not found at: {mapping_path}")
-                continue
-            except json.JSONDecodeError as e:
-                print(f"Error parsing JSON at {mapping_path}: {str(e)}")
-                continue
-            except Exception as e:
-                print(f"Unexpected error loading {mapping_path}: {str(e)}")
-                continue
-                
-        raise FileNotFoundError(f"Mapping file {mapping_name} not found in any of the expected locations")
+        # Try different mapping types in order
+        mapping_types = ['pyarchinit', 'emdb', 'generic']
+        
+        for mapping_type in mapping_types:
+            print(f"Trying mapping type: {mapping_type}")
+            mapping = mapping_registry.load_mapping(mapping_name, mapping_type)
+            if mapping:
+                print(f"Mapping loaded successfully from {mapping_type}:")
+                print(f"Keys in mapping: {list(mapping.keys())}")
+                print(f"Column mappings: {list(mapping.get('column_mappings', {}).keys())}")
+                return mapping
+        
+        raise FileNotFoundError(f"Mapping file {mapping_name} not found in any registered directories")
 
     @abstractmethod
     def parse(self) -> Graph:

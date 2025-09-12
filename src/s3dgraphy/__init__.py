@@ -40,6 +40,9 @@ from .utils import convert_shape2type
 
 from .indices import GraphIndices
 
+# Mapping system imports (aggiungi questa riga)
+from .mappings import mapping_registry, add_custom_mapping_directory, get_available_mappings, load_mapping_file
+
 # Visual layout (optional import of networkx is handled in visual_layout)
 #from .visual_layout import generate_layout
 
@@ -71,4 +74,8 @@ __all__ = [
     "GraphMLImporter",
     "convert_shape2type",
     "GraphIndices",
+    "mapping_registry",
+    "add_custom_mapping_directory", 
+    "get_available_mappings",
+    "load_mapping_file"
 ]
