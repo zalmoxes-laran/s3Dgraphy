@@ -15,7 +15,7 @@ class MappedXLSXImporter(BaseImporter):
             overwrite=overwrite,
             mode="3DGIS"
         )
-        self.mapping = self._load_mapping(mapping_name)
+        #self.mapping = self._load_mapping(mapping_name)
         self.graph = Graph(graph_id=f"{os.path.splitext(mapping_name)[0]}_graph")
 
     def parse(self) -> Graph:
@@ -80,20 +80,3 @@ class MappedXLSXImporter(BaseImporter):
         column_maps = self.mapping.get('column_mappings', {})
         if not any(cm.get('is_id', False) for cm in column_maps.values()):
             raise ValueError("No ID column specified in mapping")
-
-    def _load_mapping(self, mapping_name):
-        """Load the JSON mapping file from emdbjson directory."""
-        if not mapping_name:
-            return None
-            
-        mapping_path = os.path.join(
-            os.path.dirname(__file__), 
-            '..', 'emdbjson',
-            mapping_name
-        )
-        
-        try:
-            with open(mapping_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            raise ValueError(f"Mapping file {mapping_name} not found")
