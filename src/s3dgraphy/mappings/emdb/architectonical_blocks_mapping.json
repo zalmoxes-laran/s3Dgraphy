@@ -4,7 +4,7 @@
     "version": "1.5",
     "table_settings": {
         "format_type": "xlsx",
-        "sheet_name": "Blocks",
+        "sheet_name": "Scheda Blocco",
         "start_row": 3,
         "tutorial_row": 2
     },
