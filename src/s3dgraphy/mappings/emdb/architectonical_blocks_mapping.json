@@ -10,12 +10,12 @@
     },
     "column_mappings": {
         "ID": {
-            "node_type": "SpecialFindUnit",
+            "node_type": "SF",
             "is_id": true,
             "description": "NUMERO INVENTARIO/CODICE BLOCCO: Indicare numero di inventario Parco archeologico (se presente). Se non inventariato, indicare qui il codice blocco assegnato su base tipologica (se ci sono entrambi, dare priorità all'inventario)"
         },
         "DEFINITION": {
-            "node_type": "SpecialFindUnit",
+            "node_type": "SF",
             "is_description": true,
             "display_name": "Definition",
             "description": "DEFINIZIONE: Indicare definizione del blocco architettonico (es. capitello corinzio, base di colonna, ecc.)"
