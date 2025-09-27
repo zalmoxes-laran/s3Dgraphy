@@ -148,26 +148,35 @@ class BaseImporter(ABC):
         return 'US'
 
     def _is_invalid_id(self, value) -> bool:
-        """Check if an ID value is invalid (NaN, empty, etc.)"""
+        """Check if a value is invalid (NaN, None, empty string)."""
         import pandas as pd
         
-        # Controlla NaN
-        if pd.isna(value):
-            return True
-            
-        # Controlla None
         if value is None:
             return True
-            
-        # Controlla stringhe vuote o solo spazi
-        if isinstance(value, str) and value.strip() == '':
+        if pd.isna(value):
             return True
-            
-        # Controlla se è la stringa 'nan', 'null', 'none'
-        if isinstance(value, str) and value.lower() in ['nan', 'null', 'none']:
+        if str(value).strip() == '':
             return True
-            
+        if str(value).lower() in ['nan', 'null', 'none']:
+            return True
+        
         return False
+
+    def _clean_value_for_ui(self, value):
+        """Clean any value to be safe for Blender UI (always returns string)."""
+        import pandas as pd
+        
+        if value is None or pd.isna(value):
+            return ""
+        
+        # Convert to string and clean
+        str_value = str(value).strip()
+        
+        # Handle specific bad values
+        if str_value.lower() in ['nan', 'null', 'none']:
+            return ""
+            
+        return str_value
 
     def process_row(self, row_data: Dict[str, Any]) -> Optional[Node]:
         """Process a row using either mapping or automatic mode."""
@@ -196,9 +205,17 @@ class BaseImporter(ABC):
     def _process_row_mapped(self, row_data: Dict[str, Any]) -> Optional[Node]:
         """Process a row with explicit mapping configuration."""
         
-        # Get ID and target name
+        # Get ID and target name  
         id_column = self._get_id_column()
-        target_name = str(row_data[id_column])
+        raw_id = row_data[id_column]
+
+        # ✅ Clean ID value per UI
+        target_name = self._clean_value_for_ui(raw_id)
+
+        # ✅ Skip if ID è invalid dopo pulizia
+        if not target_name:
+            self.warnings.append(f"Row skipped: invalid ID value")
+            return None
         
         print(f"Processing row for ID: {target_name}")
         
@@ -324,6 +341,14 @@ class BaseImporter(ABC):
         if self._is_invalid_id(prop_value):
             logger.debug(f"Skipping property {prop_name} with invalid value: {prop_value}")
             return
+
+        # ✅ Clean property value per UI
+        clean_value = self._clean_value_for_ui(prop_value)
+        clean_name = self._clean_value_for_ui(prop_name)
+        
+        if not clean_value or not clean_name:
+            # Skip empty properties
+            return None        
             
         prop_id = f"{node_id}_{prop_name}"
         existing_prop = self.graph.find_node_by_id(prop_id)
