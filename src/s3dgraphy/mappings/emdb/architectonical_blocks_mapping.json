@@ -220,5 +220,6 @@
             "target_column": "SECONDARY_MODIFICATIONS",
             "edge_type": "has_property"
         }
-    ]
+    ],
+    "allowed_formats": ["jpg", "jpeg", "png", "tif", "tiff", "obj", "ply", "pdf", "doc", "docx"]
 }

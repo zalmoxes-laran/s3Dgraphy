@@ -62,5 +62,6 @@
             "target_column": "Materiale",
             "edge_type": "combines"
         }
-    ]
+    ],
+    "allowed_formats": ["jpg", "jpeg", "png", "pdf", "doc", "txt"]
 }
