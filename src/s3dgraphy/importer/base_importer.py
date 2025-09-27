@@ -10,6 +10,7 @@ from ..nodes.base_node import Node
 from ..nodes.property_node import PropertyNode
 from ..edges import Edge
 from ..utils.utils import get_stratigraphic_node_class
+from typing import Dict, Any, Optional
 
 # Configurazione logging opzionale per debug
 logger = logging.getLogger(__name__)
@@ -168,7 +169,7 @@ class BaseImporter(ABC):
             
         return False
 
-    def process_row(self, row_data: Dict[str, Any]) -> Node:
+    def process_row(self, row_data: Dict[str, Any]) -> Optional[Node]:
         """Process a row using either mapping or automatic mode."""
         try:
             # ✅ AGGIUNTA: Filtra valori NaN PRIMA del processing
@@ -192,47 +193,53 @@ class BaseImporter(ABC):
             logger.error(f"Row data: {row_data}")
             raise
 
-    def _process_row_mapped(self, row_data: Dict[str, Any]) -> Node:
+    def _process_row_mapped(self, row_data: Dict[str, Any]) -> Optional[Node]:
         """Process a row with explicit mapping configuration."""
         
-        # 🔧 FIX: Usa i metodi helper invece di accesso diretto alle chiavi
+        # Get ID and target name
         id_column = self._get_id_column()
-        description_column = self._get_description_column()
+        target_name = str(row_data[id_column])
         
-        # Get base attributes using helper methods
-        base_attrs = {
-            'node_id': str(row_data[id_column]),
-            'name': str(row_data[id_column]),  # Usa ID come name se non specificato
-            'description': str(row_data.get(description_column, '')) if description_column else ''
-        }
-
-        strat_type = self.mapping.get('stratigraphic_type', 'US')
-        node_class = get_stratigraphic_node_class(strat_type)
+        print(f"Processing row for ID: {target_name}")
         
-        # ✅ Try to find by name first (for existing graph enrichment)
-        existing_node = self._find_node_by_name(base_attrs['name'])
-
-        # If not found by name, try by ID (backward compatibility)
-        if not existing_node:
-            existing_node = self.graph.find_node_by_id(base_attrs['node_id'])        
+        # ✅ Check if we're working with existing graph (MappedXLSXImporter with existing_graph)
+        is_enriching_existing = hasattr(self, 'graph') and len(self.graph.nodes) > 0
+        
+        # ✅ Try to find existing node by name 
+        existing_node = self._find_node_by_name(target_name)
+        
         if existing_node:
-            if self.overwrite:
-                existing_node.name = base_attrs['name']
-                existing_node.description = base_attrs['description']
-                self.warnings.append(f"Updated existing node: {base_attrs['node_id']}")
-            strat_node = existing_node
+            print(f"Found existing node: {existing_node.name} (ID: {existing_node.node_id})")
+            # Process properties for existing node
+            self._process_properties(row_data, existing_node.node_id, existing_node)
+            return existing_node
+            
+        elif is_enriching_existing:
+            # We're enriching existing graph but node not found - SKIP this row
+            self.warnings.append(f"Node '{target_name}' not found in existing graph - SKIPPED")
+            print(f"SKIPPED: Node '{target_name}' not found in existing graph")
+            return None
+            
         else:
-            strat_node = node_class(
-                node_id=base_attrs['node_id'],
-                name=base_attrs['name'],
-                description=base_attrs['description']
+            # We're creating new graph - create new node
+            print(f"Creating new node: {target_name}")
+            
+            description_column = self._get_description_column()
+            description = str(row_data.get(description_column, '')) if description_column else ''
+            
+            strat_type = self.mapping.get('stratigraphic_type', 'US')
+            node_class = get_stratigraphic_node_class(strat_type)
+            
+            import uuid
+            new_node = node_class(
+                node_id=str(uuid.uuid4()),
+                name=target_name,
+                description=description
             )
-            self.graph.add_node(strat_node)
-
-        # Process properties
-        self._process_properties(row_data, base_attrs['node_id'], strat_node)
-
-        return strat_node
+            
+            self.graph.add_node(new_node)
+            self._process_properties(row_data, new_node.node_id, new_node)
+            return new_node
 
     def _process_row_automatic(self, row_data: Dict[str, Any]) -> Node:
         """Process a row creating properties for all non-ID columns."""

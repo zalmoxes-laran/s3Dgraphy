@@ -54,21 +54,29 @@ class MappedXLSXImporter(BaseImporter):
             
             columns = list(column_maps.keys())
             total_rows = successful_rows = 0
-            
+                        
+            skipped_rows = 0
+
             for _, row in df.iterrows():
                 total_rows += 1
                 try:
                     row_dict = dict(zip(columns, row))
-                    self.process_row(row_dict)
-                    successful_rows += 1
+                    result_node = self.process_row(row_dict)
+                    
+                    if result_node is not None:
+                        successful_rows += 1
+                    else:
+                        skipped_rows += 1
+                        
                 except Exception as e:
                     self.warnings.append(f"Error processing row {total_rows}: {str(e)}")
 
             self.warnings.extend([
                 f"\nImport summary:",
                 f"Total rows processed: {total_rows}",
-                f"Successful rows: {successful_rows}",
-                f"Failed rows: {total_rows - successful_rows}"
+                f"Successfully imported: {successful_rows}",
+                f"Skipped (not found in existing graph): {skipped_rows}",
+                f"Failed/errors: {total_rows - successful_rows - skipped_rows}"
             ])
                 
             return self.graph
