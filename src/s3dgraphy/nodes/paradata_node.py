@@ -12,6 +12,6 @@ class ParadataNode(Node):
     
     def __init__(self, node_id, name, description="", url=None):
         super().__init__(node_id, name, description)
-        self.url = url  # Aggiunge l'attributo url
+        self.url = str(url) if url is not None else ""  # Aggiunge l'attributo url
         self.data = {}  # Dizionario per dati aggiuntivi
 
