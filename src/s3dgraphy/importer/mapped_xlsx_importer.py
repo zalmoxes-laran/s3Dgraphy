@@ -3,20 +3,33 @@ import pandas as pd
 from ..graph import Graph
 import os
 import json
+from pathlib import Path
 
 class MappedXLSXImporter(BaseImporter):
-    def __init__(self, filepath: str, mapping_name: str, overwrite: bool = False):
-        #if mapping_name and not mapping_name.endswith('.json'):
-        #    mapping_name = f"{mapping_name}.json"
-            
+    def __init__(self, filepath: str, mapping_name: str, overwrite: bool = False, 
+                existing_graph=None):
+        """
+        Args:
+            existing_graph: Existing graph instance to enrich. If None, creates new graph.
+        """
         super().__init__(
             filepath=filepath, 
             mapping_name=mapping_name,
-            overwrite=overwrite,
-            mode="3DGIS"
+            overwrite=overwrite
         )
-        #self.mapping = self._load_mapping(mapping_name)
-        self.graph = Graph(graph_id=f"{os.path.splitext(mapping_name)[0]}_graph")
+        
+        if existing_graph:
+            # Use existing graph
+            self.graph = existing_graph
+            self.graph_id = existing_graph.graph_id
+            self._use_existing_graph = True
+            print(f"MappedXLSXImporter: Using existing graph {self.graph_id}")
+        else:
+            # Create new graph 
+            self.graph_id = f"imported_{Path(filepath).stem}"
+            self.graph = Graph(graph_id=self.graph_id)
+            self._use_existing_graph = False
+            print(f"MappedXLSXImporter: Created new graph {self.graph_id}")
 
     def parse(self) -> Graph:
         try:
@@ -80,3 +93,4 @@ class MappedXLSXImporter(BaseImporter):
         column_maps = self.mapping.get('column_mappings', {})
         if not any(cm.get('is_id', False) for cm in column_maps.values()):
             raise ValueError("No ID column specified in mapping")
+        

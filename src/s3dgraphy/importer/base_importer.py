@@ -20,7 +20,7 @@ class BaseImporter(ABC):
     Supports both mapped and automatic property creation modes.
     """
     def __init__(self, filepath: str, mapping_name: str = None, id_column: str = None, 
-                 overwrite: bool = False, mode: str = "EM_ADVANCED"):
+                overwrite: bool = False):        
         """
         Initialize the importer.
         
@@ -53,7 +53,6 @@ class BaseImporter(ABC):
         self.id_column = id_column
         self.mapping = self._load_mapping(mapping_name) if mapping_name else None
         self.overwrite = overwrite
-        self.mode = mode
 
         # ✅ AGGIUNTA: Cache l'ID column una sola volta
         self._cached_id_column = None
@@ -210,8 +209,12 @@ class BaseImporter(ABC):
         strat_type = self.mapping.get('stratigraphic_type', 'US')
         node_class = get_stratigraphic_node_class(strat_type)
         
-        existing_node = self.graph.find_node_by_id(base_attrs['node_id'])
-        
+        # ✅ Try to find by name first (for existing graph enrichment)
+        existing_node = self._find_node_by_name(base_attrs['name'])
+
+        # If not found by name, try by ID (backward compatibility)
+        if not existing_node:
+            existing_node = self.graph.find_node_by_id(base_attrs['node_id'])        
         if existing_node:
             if self.overwrite:
                 existing_node.name = base_attrs['name']
@@ -247,7 +250,12 @@ class BaseImporter(ABC):
         # Use default stratigraphic node class
         node_class = get_stratigraphic_node_class('US')
         
-        existing_node = self.graph.find_node_by_id(node_id)
+        # ✅ Try to find by name first (for existing graph enrichment)  
+        existing_node = self._find_node_by_name(node_id)
+
+        # If not found by name, try by ID (backward compatibility)
+        if not existing_node:
+            existing_node = self.graph.find_node_by_id(node_id)        
         
         if existing_node:
             if self.overwrite:
@@ -381,3 +389,15 @@ class BaseImporter(ABC):
             'id_column': self._get_id_column()
         }
         return stats
+
+    def _find_node_by_name(self, target_name: str):
+        """
+        Find existing node by name in current graph.
+        Used when working with existing graphs (node matching by name instead of ID).
+        """
+        for node in self.graph.nodes:
+            # Check both current name and original_name attribute  
+            original_name = getattr(node, 'attributes', {}).get('original_name')
+            if node.name == target_name or original_name == target_name:
+                return node
+        return None
