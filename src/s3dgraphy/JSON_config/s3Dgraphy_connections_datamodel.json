@@ -374,6 +374,21 @@
         "target": ["EmbargoNode"]
       }
     },
+    "has_documentation": {
+      "name": "has_documentation",
+      "label": "Has documnentation",
+      "description": "Indicates that the element has an associated documentation node.",
+      "mapping": {
+        "cidoc": "P104_is_subject_to",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": null,
+        "extension_name": null
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode", "SpecialFindUnit","VirtualStratigraphicUnit"],
+        "target": ["DocumentNode"]
+      }
+    },
     "generic_connection": {
       "name": "generic_connection",
       "label": "Generic Connection",
