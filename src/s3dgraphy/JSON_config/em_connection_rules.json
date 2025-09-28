@@ -208,6 +208,15 @@
         "source": ["LicenseNode"],
         "target": ["EmbargoNode"]
       }
+    },
+    {
+      "type": "has_documentation",
+      "label": "Has Documentation", 
+      "description": "Connects a stratigraphic unit to its documentation",
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["DocumentNode"]
+      }
     }
   ]
 }
