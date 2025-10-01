@@ -305,58 +305,102 @@ class BaseImporter(ABC):
     def _process_properties(self, row_data: Dict[str, Any], node_id: str, strat_node: Node):
         """Process properties based on mapping configuration."""
         
-        # 🔄 Supporta sia nuovo che vecchio formato, ma in modo semplice
+        # ✅ Supporta sia nuovo che vecchio formato mapping
         if 'column_mappings' in self.mapping:
-            # Formato nuovo: tutte le colonne che non sono speciali diventano proprietà
+            # ✅ FORMATO NUOVO: tutte le colonne che non sono speciali diventano proprietà
             id_column = self._get_id_column()
             description_column = self._get_description_column()
             
+            logger.debug(f"\nProcessing properties for node: {node_id}")
+            logger.debug(f"ID column: {id_column}, Description column: {description_column}")
+            logger.debug(f"Row data keys: {list(row_data.keys())}")
+            logger.debug(f"Column mappings: {list(self.mapping.get('column_mappings', {}).keys())}")
+            
+            properties_created = 0
+            properties_skipped = 0
+            
             for col_name, col_config in self.mapping.get('column_mappings', {}).items():
-                # Skip colonne speciali
+                # ✅ Skip colonne speciali (ID e Description)
                 if col_name in [id_column, description_column]:
-                    continue
-                if col_config.get('is_id', False) or col_config.get('is_description', False):
+                    logger.debug(f"  Skipping special column: {col_name}")
                     continue
                 
-                if col_name in row_data:
-                    prop_value = row_data[col_name]
-                    if not self._is_invalid_id(prop_value):
-                        # Usa display_name se disponibile
-                        prop_name = col_config.get('display_name', col_name)
-                        self._create_property(node_id, prop_name, prop_value)
+                if col_config.get('is_id', False) or col_config.get('is_description', False):
+                    logger.debug(f"  Skipping special config column: {col_name}")
+                    continue
+                
+                # ✅ Verifica che la colonna sia presente nei dati
+                if col_name not in row_data:
+                    logger.debug(f"  Column {col_name} not found in row_data")
+                    continue
+                
+                prop_value = row_data[col_name]
+                
+                # ✅ Skip SOLO se valore è veramente invalido (None, NaN)
+                # NON skippare valori come 0, False, "0" che sono validi!
+                if self._is_invalid_id(prop_value):
+                    logger.debug(f"  Skipping {col_name} with invalid value: {prop_value}")
+                    properties_skipped += 1
+                    continue
+                
+                # ✅ Usa display_name se disponibile, altrimenti usa il nome della colonna
+                prop_name = col_config.get('display_name', col_name)
+                
+                # ✅ Crea la proprietà
+                logger.debug(f"  Creating property: {prop_name} = {prop_value}")
+                result = self._create_property(node_id, prop_name, prop_value)
+                
+                if result is not None:
+                    properties_created += 1
+                    logger.debug(f"  ✅ Property created/updated: {prop_name}")
+                else:
+                    properties_skipped += 1
+                    logger.debug(f"  ⚠️ Property skipped: {prop_name}")
+            
+            logger.debug(f"\n✅ Properties summary for {node_id}:")
+            logger.debug(f"  Created/Updated: {properties_created}")
+            logger.debug(f"  Skipped: {properties_skipped}")
         
         elif 'property_columns' in self.mapping:
-            # Formato legacy
+            # ✅ FORMATO LEGACY (vecchio formato mapping)
+            logger.debug(f"\nUsing legacy property_columns format for node: {node_id}")
+            
             prop_columns = self.mapping.get('property_columns', {})
             for prop_name, col_name in prop_columns.items():
                 if col_name in row_data:
                     prop_value = row_data[col_name]
                     if not self._is_invalid_id(prop_value):
+                        logger.debug(f"  Creating legacy property: {prop_name} = {prop_value}")
                         self._create_property(node_id, prop_name, prop_value)
-
+        
+        else:
+            logger.warning(f"No property configuration found in mapping for node {node_id}")
 
     def _create_property(self, node_id: str, prop_name: str, prop_value: Any):
         """Create a property node and connect it to the parent node."""
         
-        # ✅ Skip se valore non valido
+        # ✅ STEP 1: Skip se valore non valido (NaN, None, ecc.)
         if self._is_invalid_id(prop_value):
             logger.debug(f"Skipping property {prop_name} with invalid value: {prop_value}")
-            return
+            return None
 
-        # ✅ Clean property value per UI
+        # ✅ STEP 2: Clean property value per UI
         clean_value = self._clean_value_for_ui(prop_value)
         clean_name = self._clean_value_for_ui(prop_name)
         
-        if not clean_value or not clean_name:
-            # Skip empty properties
-            return None        
+        # ✅ FIX CRITICO: Cambiato da "if not clean_value" a "if clean_value == ''"
+        # Questo permette valori come "0", 0, False che sono validi ma falsy in Python
+        if clean_value == "" or clean_name == "":
+            # Skip SOLO se VERAMENTE vuoto (stringa vuota)
+            logger.debug(f"Skipping property {prop_name} with empty string value")
+            return None
             
         prop_id = f"{node_id}_{prop_name}"
         
-        # ✅ FIX DUPLICATI: Prima cerca per ID
+        # ✅ STEP 3: FIX DUPLICATI - Prima cerca per ID
         existing_prop = self.graph.find_node_by_id(prop_id)
         
-        # ✅ FIX DUPLICATI: Se non trova per ID, cerca per nome tra le proprietà del nodo
+        # ✅ STEP 4: FIX DUPLICATI - Se non trova per ID, cerca per nome tra le proprietà del nodo
         if not existing_prop:
             parent_node = self.graph.find_node_by_id(node_id)
             if parent_node:
@@ -372,28 +416,29 @@ class BaseImporter(ABC):
 
         logger.debug(f"Processing property: {prop_name} = {prop_value}")
         
+        # ✅ STEP 5: Se esiste già, aggiorna il valore
         if existing_prop:
-            # ✅ FIX: Aggiorna SEMPRE il valore (non solo se overwrite=True)
-            # perché reimportare dovrebbe aggiornare i dati
-            existing_prop.value = str(prop_value)
-            existing_prop.description = str(prop_value)
+            existing_prop.value = str(clean_value)
+            existing_prop.description = str(clean_value)
             logger.debug(f"✅ Updated existing property: {prop_name}")
             return existing_prop
+        
+        # ✅ STEP 6: Crea nuovo nodo property solo se non esiste
         else:
-            # ✅ Crea nuovo nodo property solo se non esiste
             prop_node = PropertyNode(
                 node_id=prop_id,
-                name=prop_name,
-                description=str(prop_value),
-                value=str(prop_value),
-                property_type=prop_name,
+                name=clean_name,
+                description=str(clean_value),
+                value=str(clean_value),
+                property_type=clean_name,
                 data={},
                 url="",
             )
             
             self.graph.add_node(prop_node)
+            logger.debug(f"✅ Created new PropertyNode: {prop_id}")
 
-            # ✅ Crea edge solo se non esiste già
+            # ✅ STEP 7: Crea edge solo se non esiste già
             edge_id = f"{node_id}_has_property_{prop_id}"
             if not self.graph.find_edge_by_id(edge_id):
                 self.graph.add_edge(
@@ -402,8 +447,8 @@ class BaseImporter(ABC):
                     edge_target=prop_id,
                     edge_type="has_property"
                 )
+                logger.debug(f"✅ Created edge: {edge_id}")
             
-            logger.debug(f"✅ Created new property: {prop_name}")
             return prop_node
 
     def display_warnings(self):

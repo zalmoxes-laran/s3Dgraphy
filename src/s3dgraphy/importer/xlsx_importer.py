@@ -135,55 +135,81 @@ class XLSXImporter(BaseImporter):
         return cleaned_data
 
     def parse(self) -> Graph:
-        """
-        Parse the XLSX file and create nodes/edges in the graph.
-        
-        Returns:
-            Graph: The populated graph object
-            
-        Raises:
-            ImportError: If there's an error reading or parsing the file
-        """
+        """Parse the Excel file and create nodes in the graph."""
         try:
-            # Read Excel file
-            df = self._read_excel_file()
+            # ✅ Leggi configurazione tabella
+            table_settings = self.mapping.get('table_settings', {})
+            start_row = table_settings.get('start_row', 0)
+            sheet_name = table_settings.get('sheet_name', 0)
             
-            # Validate DataFrame
-            self._validate_dataframe(df)
+            # ✅ Leggi Excel con pandas
+            df = pd.read_excel(
+                self.filepath,
+                sheet_name=sheet_name,
+                skiprows=start_row - 1 if start_row > 0 else 0,
+                na_values=['', 'NA', 'N/A'],
+                keep_default_na=True
+            )
             
-            # Track statistics
+            if df.empty:
+                raise ValueError("Excel file is empty")
+            
+            column_maps = self.mapping.get('column_mappings', {})
+            if not column_maps:
+                raise ValueError("No column mappings found")
+            
+            # ✅ Statistiche import
             total_rows = 0
             successful_rows = 0
+            skipped_rows = 0
             
-            # Process each row
-            for idx, row in df.iterrows():
+            # ✅ FIX PRINCIPALE: Usa i nomi delle colonne del DataFrame, non l'ordine del JSON
+            for _, row in df.iterrows():
                 total_rows += 1
                 try:
-                    # Clean row data
-                    row_dict = self._clean_row_data(row)
+                    # STEP 1: Converti la riga in dizionario usando i NOMI delle colonne del DataFrame
+                    # Questo risolve il problema del disallineamento colonne
+                    row_dict = row.to_dict()
                     
-                    # Process row if it has valid data
-                    if row_dict:
-                        self.process_row(row_dict)
+                    # STEP 2: Filtra solo le colonne presenti nel mapping
+                    # Ignora colonne extra nell'Excel che non sono nel mapping
+                    filtered_row = {k: v for k, v in row_dict.items() if k in column_maps}
+                    
+                    # STEP 3: Opzionale - pulisci i valori NaN esplicitamente PRIMA del processing
+                    # Questo evita che NaN arrivino a _create_property
+                    import pandas as pd
+                    cleaned_row = {}
+                    for k, v in filtered_row.items():
+                        # Converti NaN in None per gestione consistente
+                        if pd.isna(v):
+                            cleaned_row[k] = None
+                        else:
+                            cleaned_row[k] = v
+                    
+                    # STEP 4: Processa la riga con i dati corretti
+                    result_node = self.process_row(cleaned_row)
+                    
+                    if result_node is not None:
                         successful_rows += 1
                     else:
-                        self.warnings.append(f"Skipping row {idx+1}: No valid data")
+                        skipped_rows += 1
                         
-                except KeyError as e:
-                    self.warnings.append(f"Skipping row {idx+1} due to missing required field: {str(e)}")
                 except Exception as e:
-                    self.warnings.append(f"Error processing row {idx+1}: {str(e)}")
-
-            # Add summary to warnings
-            self.warnings.append(f"\nImport summary:")
-            self.warnings.append(f"Total rows processed: {total_rows}")
-            self.warnings.append(f"Successful rows: {successful_rows}")
-            self.warnings.append(f"Failed/skipped rows: {total_rows - successful_rows}")
-
+                    self.warnings.append(f"Error processing row {total_rows}: {str(e)}")
+            
+            # ✅ Aggiungi summary alle warnings
+            self.warnings.extend([
+                f"\nImport summary:",
+                f"Total rows processed: {total_rows}",
+                f"Successfully imported: {successful_rows}",
+                f"Skipped rows: {skipped_rows}",
+                f"Failed/errors: {total_rows - successful_rows - skipped_rows}"
+            ])
+            
             return self.graph
-
+            
         except Exception as e:
-            raise ImportError(f"Error parsing XLSX file: {str(e)}")
+            raise ImportError(f"Error parsing mapped Excel file: {str(e)}")
 
     def _get_sheet_names(self) -> list:
         """
