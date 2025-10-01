@@ -334,6 +334,7 @@ class BaseImporter(ABC):
                     if not self._is_invalid_id(prop_value):
                         self._create_property(node_id, prop_name, prop_value)
 
+
     def _create_property(self, node_id: str, prop_name: str, prop_value: Any):
         """Create a property node and connect it to the parent node."""
         
@@ -351,17 +352,35 @@ class BaseImporter(ABC):
             return None        
             
         prop_id = f"{node_id}_{prop_name}"
+        
+        # ✅ FIX DUPLICATI: Prima cerca per ID
         existing_prop = self.graph.find_node_by_id(prop_id)
+        
+        # ✅ FIX DUPLICATI: Se non trova per ID, cerca per nome tra le proprietà del nodo
+        if not existing_prop:
+            parent_node = self.graph.find_node_by_id(node_id)
+            if parent_node:
+                # Cerca tra tutte le proprietà già collegate al nodo padre
+                for edge in self.graph.edges:
+                    if (edge.edge_source == node_id and 
+                        edge.edge_type == "has_property"):
+                        potential_prop = self.graph.find_node_by_id(edge.edge_target)
+                        if potential_prop and potential_prop.name == prop_name:
+                            existing_prop = potential_prop
+                            logger.debug(f"Found existing property by name: {prop_name}")
+                            break
 
-        logger.debug(f"Creating property: {prop_name}")
-        logger.debug(f"Property value: {prop_value}")
+        logger.debug(f"Processing property: {prop_name} = {prop_value}")
         
         if existing_prop:
-            if self.overwrite:
-                existing_prop.value = prop_value
-                self.warnings.append(f"Updated existing property: {prop_id}")
+            # ✅ FIX: Aggiorna SEMPRE il valore (non solo se overwrite=True)
+            # perché reimportare dovrebbe aggiornare i dati
+            existing_prop.value = str(prop_value)
+            existing_prop.description = str(prop_value)
+            logger.debug(f"✅ Updated existing property: {prop_name}")
+            return existing_prop
         else:
-            # Create new property
+            # ✅ Crea nuovo nodo property solo se non esiste
             prop_node = PropertyNode(
                 node_id=prop_id,
                 name=prop_name,
@@ -374,7 +393,7 @@ class BaseImporter(ABC):
             
             self.graph.add_node(prop_node)
 
-            # Create edge only if it doesn't exist
+            # ✅ Crea edge solo se non esiste già
             edge_id = f"{node_id}_has_property_{prop_id}"
             if not self.graph.find_edge_by_id(edge_id):
                 self.graph.add_edge(
@@ -383,6 +402,9 @@ class BaseImporter(ABC):
                     edge_target=prop_id,
                     edge_type="has_property"
                 )
+            
+            logger.debug(f"✅ Created new property: {prop_name}")
+            return prop_node
 
     def display_warnings(self):
         """Display all accumulated warnings."""

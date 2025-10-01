@@ -31,6 +31,7 @@ class MappedXLSXImporter(BaseImporter):
             self._use_existing_graph = False
             print(f"MappedXLSXImporter: Created new graph {self.graph_id}")
 
+
     def parse(self) -> Graph:
         try:
             table_settings = self.mapping.get('table_settings', {})
@@ -52,16 +53,21 @@ class MappedXLSXImporter(BaseImporter):
             if not column_maps:
                 raise ValueError("No column mappings found")
             
-            columns = list(column_maps.keys())
             total_rows = successful_rows = 0
-                        
             skipped_rows = 0
 
             for _, row in df.iterrows():
                 total_rows += 1
                 try:
-                    row_dict = dict(zip(columns, row))
-                    result_node = self.process_row(row_dict)
+                    # ✅ FIX: Usa i nomi delle colonne del DataFrame, non l'ordine del JSON
+                    row_dict = row.to_dict()
+                    
+                    # Filtra solo le colonne presenti nel mapping
+                    # (ignora colonne extra nell'Excel che non sono nel mapping)
+                    filtered_row = {k: v for k, v in row_dict.items() if k in column_maps}
+                    
+                    # Processa la riga con i dati corretti
+                    result_node = self.process_row(filtered_row)
                     
                     if result_node is not None:
                         successful_rows += 1
@@ -75,14 +81,13 @@ class MappedXLSXImporter(BaseImporter):
                 f"\nImport summary:",
                 f"Total rows processed: {total_rows}",
                 f"Successfully imported: {successful_rows}",
-                f"Skipped (not found in existing graph): {skipped_rows}",
-                f"Failed/errors: {total_rows - successful_rows - skipped_rows}"
+                f"Skipped rows: {skipped_rows}"
             ])
-                
+            
             return self.graph
             
         except Exception as e:
-            raise ImportError(f"Error parsing mapped Excel file: {str(e)}")
+            raise ImportError(f"Error parsing Excel file: {str(e)}")
 
     def validate_mapping(self):
 
