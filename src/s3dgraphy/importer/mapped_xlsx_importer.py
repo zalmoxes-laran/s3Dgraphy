@@ -4,7 +4,7 @@ from ..graph import Graph
 import os
 import json
 from pathlib import Path
-#test
+
 class MappedXLSXImporter(BaseImporter):
     def __init__(self, filepath: str, mapping_name: str, overwrite: bool = False, 
                 existing_graph=None):
@@ -19,11 +19,13 @@ class MappedXLSXImporter(BaseImporter):
         )
         
         if existing_graph:
+            # Use existing graph
             self.graph = existing_graph
             self.graph_id = existing_graph.graph_id
             self._use_existing_graph = True
             print(f"MappedXLSXImporter: Using existing graph {self.graph_id}")
         else:
+            # Create new graph 
             self.graph_id = f"imported_{Path(filepath).stem}"
             self.graph = Graph(graph_id=self.graph_id)
             self._use_existing_graph = False
@@ -32,31 +34,16 @@ class MappedXLSXImporter(BaseImporter):
     def parse(self) -> Graph:
         try:
             table_settings = self.mapping.get('table_settings', {})
-            start_row = table_settings.get('start_row', 1)
+            start_row = table_settings.get('start_row', 0)
             sheet_name = table_settings.get('sheet_name', 0)
-            tutorial_row = table_settings.get('tutorial_row', None)
-            
-            # ✅ FIX: Calcola skiprows correttamente
-            # header=0 usa SEMPRE la prima riga come header
-            # skiprows salta le righe DOPO l'header ma PRIMA dei dati
-            if tutorial_row is not None:
-                # Se c'è tutorial_row, skippa le righe tra header e start_row
-                skip_rows = list(range(1, start_row - 1)) if start_row > 1 else None
-            else:
-                # Altrimenti mantieni compatibilità vecchio formato
-                skip_rows = start_row - 1 if start_row > 1 else None
             
             df = pd.read_excel(
                 self.filepath,
                 sheet_name=sheet_name,
-                header=0,  # ✅ CRITICO: SEMPRE riga 0 come header
-                skiprows=skip_rows,
+                skiprows=start_row - 1 if start_row > 0 else 0,
                 na_values=['', 'NA', 'N/A'],
                 keep_default_na=True
             )
-            
-            # ✅ Normalizza nomi colonne
-            df.columns = df.columns.str.strip()
             
             if df.empty:
                 raise ValueError("Excel file is empty")
@@ -65,21 +52,16 @@ class MappedXLSXImporter(BaseImporter):
             if not column_maps:
                 raise ValueError("No column mappings found")
             
-            total_rows = 0
-            successful_rows = 0      
+            columns = list(column_maps.keys())
+            total_rows = successful_rows = 0
+                        
             skipped_rows = 0
 
             for _, row in df.iterrows():
                 total_rows += 1
                 try:
-                    # STEP 1: Converti riga in dizionario
-                    row_dict = row.to_dict()
-                    
-                    # STEP 2: Filtra solo colonne nel mapping
-                    filtered_row = {k: v for k, v in row_dict.items() if k in column_maps}
-                    
-                    # STEP 3: Processa la riga
-                    result_node = self.process_row(filtered_row)
+                    row_dict = dict(zip(columns, row))
+                    result_node = self.process_row(row_dict)
                     
                     if result_node is not None:
                         successful_rows += 1
@@ -103,6 +85,7 @@ class MappedXLSXImporter(BaseImporter):
             raise ImportError(f"Error parsing mapped Excel file: {str(e)}")
 
     def validate_mapping(self):
+
         if not self.mapping:
             raise ValueError("No mapping configuration provided")
             
@@ -118,3 +101,4 @@ class MappedXLSXImporter(BaseImporter):
         column_maps = self.mapping.get('column_mappings', {})
         if not any(cm.get('is_id', False) for cm in column_maps.values()):
             raise ValueError("No ID column specified in mapping")
+        
