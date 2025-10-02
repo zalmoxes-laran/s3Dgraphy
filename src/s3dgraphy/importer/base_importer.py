@@ -379,28 +379,29 @@ class BaseImporter(ABC):
     def _create_property(self, node_id: str, prop_name: str, prop_value: Any):
         """Create a property node and connect it to the parent node."""
         
-        # ✅ STEP 1: Skip se valore non valido (NaN, None, ecc.)
+        # STEP 1: Skip se valore è NaN, None, o invalido
+        # Questo gestisce celle vuote nel file Excel
         if self._is_invalid_id(prop_value):
             logger.debug(f"Skipping property {prop_name} with invalid value: {prop_value}")
-            return None
+            return None  # Non creare PropertyNode per celle vuote
 
-        # ✅ STEP 2: Clean property value per UI
+        # STEP 2: Clean property value per UI
         clean_value = self._clean_value_for_ui(prop_value)
         clean_name = self._clean_value_for_ui(prop_name)
         
-        # ✅ FIX CRITICO: Cambiato da "if not clean_value" a "if clean_value == ''"
-        # Questo permette valori come "0", 0, False che sono validi ma falsy in Python
+        # STEP 3: FIX CRITICO - usa == "" invece di "not"
+        # Questo permette valori come "0", 0, False che sono validi
         if clean_value == "" or clean_name == "":
-            # Skip SOLO se VERAMENTE vuoto (stringa vuota)
             logger.debug(f"Skipping property {prop_name} with empty string value")
-            return None
+            return None  # Non creare PropertyNode per stringhe vuote
             
+        # STEP 4: Genera ID per la proprietà
         prop_id = f"{node_id}_{prop_name}"
         
-        # ✅ STEP 3: FIX DUPLICATI - Prima cerca per ID
+        # STEP 5: Cerca proprietà esistente per evitare duplicati
         existing_prop = self.graph.find_node_by_id(prop_id)
         
-        # ✅ STEP 4: FIX DUPLICATI - Se non trova per ID, cerca per nome tra le proprietà del nodo
+        # STEP 6: Se non trovato per ID, cerca per nome tra le proprietà del nodo
         if not existing_prop:
             parent_node = self.graph.find_node_by_id(node_id)
             if parent_node:
@@ -416,14 +417,14 @@ class BaseImporter(ABC):
 
         logger.debug(f"Processing property: {prop_name} = {prop_value}")
         
-        # ✅ STEP 5: Se esiste già, aggiorna il valore
+        # STEP 7: Se esiste già, aggiorna il valore
         if existing_prop:
             existing_prop.value = str(clean_value)
             existing_prop.description = str(clean_value)
-            logger.debug(f"✅ Updated existing property: {prop_name}")
+            logger.debug(f"Updated existing property: {prop_name}")
             return existing_prop
         
-        # ✅ STEP 6: Crea nuovo nodo property solo se non esiste
+        # STEP 8: Crea nuovo PropertyNode solo se non esiste
         else:
             prop_node = PropertyNode(
                 node_id=prop_id,
@@ -436,9 +437,9 @@ class BaseImporter(ABC):
             )
             
             self.graph.add_node(prop_node)
-            logger.debug(f"✅ Created new PropertyNode: {prop_id}")
+            logger.debug(f"Created new PropertyNode: {prop_id}")
 
-            # ✅ STEP 7: Crea edge solo se non esiste già
+            # STEP 9: Crea edge solo se non esiste già
             edge_id = f"{node_id}_has_property_{prop_id}"
             if not self.graph.find_edge_by_id(edge_id):
                 self.graph.add_edge(
@@ -447,7 +448,7 @@ class BaseImporter(ABC):
                     edge_target=prop_id,
                     edge_type="has_property"
                 )
-                logger.debug(f"✅ Created edge: {edge_id}")
+                logger.debug(f"Created edge: {edge_id}")
             
             return prop_node
 
