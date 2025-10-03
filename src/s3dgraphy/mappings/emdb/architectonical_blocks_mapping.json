@@ -28,55 +28,55 @@
         },
         "MATERIAL": {
             "node_type": "PropertyNode",
-            "property_name": "Material",
-            "display_name": "Material",
+            "property_name": "material",
+            "display_name": "material",
             "description": "MATERIALE: Indicare il materiale del blocco"
         },
         "HEIGHT": {
             "node_type": "PropertyNode",
-            "property_name": "Height",
-            "display_name": "Height",
+            "property_name": "height",
+            "display_name": "height",
             "description": "ALTEZZA: indicare in cm"
         },
         "LENGTH": {
             "node_type": "PropertyNode", 
-            "property_name": "Length",
-            "display_name": "Length",
+            "property_name": "length",
+            "display_name": "length",
             "description": "LUNGHEZZA: indicare in cm"
         },
         "WIDTH": {
             "node_type": "PropertyNode",
-            "property_name": "Width", 
-            "display_name": "Width",
+            "property_name": "width", 
+            "display_name": "width",
             "description": "PROFONDITÀ: indicare in cm"
         },
         "UPPER_FACE_LENGTH": {
             "node_type": "PropertyNode",
-            "property_name": "UpperFaceLength",
+            "property_name": "upperFaceLength",
             "display_name": "Upper Face Length",
             "description": "LUNGHEZZA PIANO DI ATTESA: lunghezza del piano di attesa in cm"
         },
         "UPPER_FACE_WIDTH": {
             "node_type": "PropertyNode",
-            "property_name": "UpperFaceWidth",
+            "property_name": "upperFaceWidth",
             "display_name": "Upper Face Width",
             "description": "PROFONDITÀ PIANO DI ATTESA: profondità del piano di attesa in cm"
         },
         "BOTTOM_FACE_LENGTH": {
             "node_type": "PropertyNode",
-            "property_name": "BottomFaceLength",
+            "property_name": "bottomFaceLength",
             "display_name": "Bottom Face Length", 
             "description": "LARGHEZZA PIANO DI POSA: larghezza al piano di posa in cm"
         },
         "BOTTOM_FACE_WIDTH": {
             "node_type": "PropertyNode",
-            "property_name": "BottomFaceWidth",
+            "property_name": "bottomFaceWidth",
             "display_name": "Bottom Face Width",
             "description": "PROFONDITÀ PIANO DI POSA: profondità al piano di posa in cm"
         },
         "UPPER_DIAMETER": {
             "node_type": "PropertyNode",
-            "property_name": "UpperDiameter",
+            "property_name": "upperDiameter",
             "display_name": "Upper Diameter",
             "description": "DIAMETRO SUPERIORE: diametro superiore in cm (nei fusti corrisponde al diametro del piano di attesa)"
         },
