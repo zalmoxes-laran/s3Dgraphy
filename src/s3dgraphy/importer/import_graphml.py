@@ -286,14 +286,6 @@ class GraphMLImporter:
             # Aggiungi attributi di tracciamento
             stratigraphic_node.attributes['original_id'] = original_id
             stratigraphic_node.attributes['graph_id'] = self.graph.graph_id
-            
-            # Prefissa il nome con il codice del grafo se disponibile
-            graph_code = self.graph.attributes.get('graph_code')
-            if graph_code:
-                # Memorizza il nome originale prima di modificarlo
-                stratigraphic_node.attributes['original_name'] = nodename
-                # Creazione del nome prefissato
-                stratigraphic_node.name = f"{graph_code}.{nodename}"
 
             # Aggiunta di runtime properties
             stratigraphic_node.attributes['shape'] = nodeshape
@@ -346,12 +338,6 @@ class GraphMLImporter:
                 document_node.attributes['original_id'] = original_id
                 document_node.attributes['graph_id'] = self.graph.graph_id
                 
-                # Prefissa il nome
-                graph_code = self.graph.attributes.get('graph_code')
-                if graph_code:
-                    document_node.attributes['original_name'] = nodename
-                    document_node.name = f"{graph_code}.{nodename}"
-                
                 # Aggiungi al grafo e memorizza UUID
                 self.graph.add_node(document_node)
                 self.document_nodes_map[nodename] = uuid_id
@@ -375,12 +361,6 @@ class GraphMLImporter:
             property_node.attributes['original_id'] = original_id
             property_node.attributes['graph_id'] = self.graph.graph_id
 
-            # Prefissa il nome con il codice del grafo
-            graph_code = self.graph.attributes.get('graph_code')
-            if graph_code:
-                property_node.attributes['original_name'] = nodename
-                property_node.name = f"{graph_code}.{nodename}"
-
             self.graph.add_node(property_node)
 
         elif self.EM_check_node_extractor(node_element):
@@ -395,12 +375,6 @@ class GraphMLImporter:
             # Per extractor_node
             extractor_node.attributes['original_id'] = original_id
             extractor_node.attributes['graph_id'] = self.graph.graph_id
-
-            # Prefissa il nome con il codice del grafo
-            graph_code = self.graph.attributes.get('graph_code')
-            if graph_code:
-                extractor_node.attributes['original_name'] = nodename
-                extractor_node.name = f"{graph_code}.{nodename}"
 
             self.graph.add_node(extractor_node)
 
@@ -422,12 +396,6 @@ class GraphMLImporter:
             # Per combiner_node
             combiner_node.attributes['original_id'] = original_id
             combiner_node.attributes['graph_id'] = self.graph.graph_id
-
-            # Prefissa il nome con il codice del grafo
-            graph_code = self.graph.attributes.get('graph_code')
-            if graph_code:
-                combiner_node.attributes['original_name'] = nodename
-                combiner_node.name = f"{graph_code}.{nodename}"
 
             self.graph.add_node(combiner_node)
 
