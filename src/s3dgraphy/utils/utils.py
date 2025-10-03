@@ -231,3 +231,128 @@ def get_graph_code_from_node(node):
     # Altrimenti, cerca negli attributi
     return node.attributes.get('graph_code')
 
+def manage_id_prefix(name: str, graph_code: str = None, action: str = 'add', separator: str = '.') -> str:
+    """
+    Add or remove graph code prefix from element names.
+    
+    This utility is useful for managing unique names when working with multiple graphs,
+    especially when mapping to external systems with unique name constraints
+    (e.g., 3D object names in Blender, database primary keys, file systems).
+    
+    The function handles edge cases gracefully:
+    - Adding a prefix when one already exists (replaces old prefix)
+    - Removing prefix when none exists (returns name unchanged)
+    - Handling empty or None values
+    
+    Args:
+        name (str): The name to modify
+        graph_code (str, optional): The graph code to use as prefix. 
+                                   If None and action='remove', removes any existing prefix.
+                                   Defaults to None.
+        action (str): Operation to perform: 'add' or 'remove'. Defaults to 'add'.
+        separator (str): Character(s) between prefix and name. Defaults to '.'.
+    
+    Returns:
+        str: The modified name
+        
+    Raises:
+        ValueError: If action is not 'add' or 'remove'
+        
+    Examples:
+        >>> manage_id_prefix('US001', 'VDL16', 'add')
+        'VDL16.US001'
+        
+        >>> manage_id_prefix('VDL16.US001', 'VDL16', 'remove')
+        'US001'
+        
+        >>> manage_id_prefix('GT15.US001', None, 'remove')
+        'US001'
+        
+        >>> manage_id_prefix('GT15.US001', 'VDL16', 'add')
+        'VDL16.US001'
+        
+        >>> manage_id_prefix('US001', None, 'add')
+        'US001'
+        
+        >>> manage_id_prefix('', 'VDL16', 'add')
+        ''
+    """
+    # Validate action parameter
+    if action not in ['add', 'remove']:
+        raise ValueError(f"Invalid action '{action}'. Must be 'add' or 'remove'.")
+    
+    # Handle empty or None names
+    if not name or name.strip() == '':
+        return name
+    
+    # Remove action
+    if action == 'remove':
+        # If the name contains the separator, split and return the part after first separator
+        if separator in name:
+            parts = name.split(separator, 1)  # Split only on first occurrence
+            return parts[1] if len(parts) > 1 else name
+        # No separator found, return name as-is
+        return name
+    
+    # Add action
+    if action == 'add':
+        # If no graph_code provided, return name unchanged
+        if not graph_code or graph_code.strip() == '':
+            return name
+        
+        # Check if name already has a prefix
+        if separator in name:
+            # Remove existing prefix first
+            base_name = manage_id_prefix(name, None, 'remove', separator)
+            # Add new prefix
+            return f"{graph_code}{separator}{base_name}"
+        else:
+            # No existing prefix, just add it
+            return f"{graph_code}{separator}{name}"
+    
+    # Should never reach here due to validation above
+    return name
+
+
+def get_base_name(name: str, separator: str = '.') -> str:
+    """
+    Convenience function to extract base name without prefix.
+    
+    This is a wrapper around manage_id_prefix with action='remove'.
+    
+    Args:
+        name (str): The name potentially containing a prefix
+        separator (str): Character(s) between prefix and name. Defaults to '.'.
+    
+    Returns:
+        str: The base name without prefix
+        
+    Examples:
+        >>> get_base_name('VDL16.US001')
+        'US001'
+        
+        >>> get_base_name('US001')
+        'US001'
+    """
+    return manage_id_prefix(name, None, 'remove', separator)
+
+
+def add_graph_prefix(name: str, graph_code: str, separator: str = '.') -> str:
+    """
+    Convenience function to add graph code prefix to a name.
+    
+    This is a wrapper around manage_id_prefix with action='add'.
+    
+    Args:
+        name (str): The name to add prefix to
+        graph_code (str): The graph code to use as prefix
+        separator (str): Character(s) between prefix and name. Defaults to '.'.
+    
+    Returns:
+        str: The name with prefix added
+        
+    Examples:
+        >>> add_graph_prefix('US001', 'VDL16')
+        'VDL16.US001'
+    """
+    return manage_id_prefix(name, graph_code, 'add', separator)

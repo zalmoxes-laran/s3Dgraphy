@@ -36,7 +36,7 @@ from .multigraph import MultiGraphManager, load_graph_from_file, get_graph, get_
 from .importer import GraphMLImporter
 
 # Utility imports
-from .utils import convert_shape2type
+from .utils import convert_shape2type, manage_id_prefix, get_base_name, add_graph_prefix
 
 from .indices import GraphIndices
 
@@ -77,5 +77,8 @@ __all__ = [
     "mapping_registry",
     "add_custom_mapping_directory", 
     "get_available_mappings",
-    "load_mapping_file"
+    "load_mapping_file",
+    "manage_id_prefix",
+    "get_base_name",
+    "add_graph_prefix"
 ]
