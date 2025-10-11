@@ -104,7 +104,7 @@
             "display_name": "Bibliography",
             "description": "BIBLIOGRAFIA: bibliografia del pezzo se già edito"
         },
-        "2D-3D_DOCUMENTS": {
+        "DOCUMENTS_2D_3D": {
             "node_type": "PropertyNode",
             "property_name": "Documentation",
             "display_name": "Documentation",
