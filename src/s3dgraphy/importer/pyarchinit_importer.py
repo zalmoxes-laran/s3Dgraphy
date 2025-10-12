@@ -12,7 +12,8 @@ from ..utils.utils import get_stratigraphic_node_class
 from ..multigraph.multigraph import multi_graph_manager  
 
 class PyArchInitImporter(BaseImporter):
-    def __init__(self, filepath: str, mapping_name: str, overwrite: bool = False):
+    def __init__(self, filepath: str, mapping_name: str, overwrite: bool = False,
+                existing_graph=None):
         """
         Initialize pyArchInit importer with mapping configuration.
         
@@ -20,27 +21,33 @@ class PyArchInitImporter(BaseImporter):
             filepath: Path to the SQLite database
             mapping_name: Name of the JSON mapping file to use
             overwrite: If True, overwrites existing nodes
+            existing_graph: Existing graph instance to enrich. If None, creates new graph for 3DGIS.
         """
+        
         super().__init__(
             filepath=filepath, 
             mapping_name=mapping_name,
-            overwrite=overwrite,
-            mode="3DGIS"
+            overwrite=overwrite
         )
 
-        # Inizializzazione del grafo per modalità 3DGIS
-        self.graph_id = "3dgis_graph"
-        self.graph = Graph(graph_id=self.graph_id)
-
-        # Debug print
-        print(f"\nDebug - Graph Initialization:")
-        print(f"Creating graph with ID: {self.graph_id}")
-
-        # Registra il grafo nel MultiGraphManager
-        multi_graph_manager.graphs[self.graph_id] = self.graph
-        print(f"\nDebug - Graph Registration:")
-        print(f"Registering graph with ID: {self.graph_id}")
-        print(f"Current registered graphs: {list(multi_graph_manager.graphs.keys())}")
+        # Pattern come MappedXLSXImporter
+        if existing_graph:
+            # Use existing graph (EM_ADVANCED mode)
+            self.graph = existing_graph
+            self.graph_id = existing_graph.graph_id
+            self._use_existing_graph = True
+            print(f"PyArchInitImporter: Using existing graph {self.graph_id}")
+        else:
+            # Create new graph (3DGIS mode)
+            self.graph_id = "3dgis_graph"
+            self.graph = Graph(graph_id=self.graph_id)
+            self._use_existing_graph = False
+            print(f"PyArchInitImporter: Created new graph {self.graph_id}")
+            
+            # Registra il grafo nel MultiGraphManager solo se nuovo
+            multi_graph_manager.graphs[self.graph_id] = self.graph
+            print(f"PyArchInitImporter: Registered graph {self.graph_id}")
+            print(f"Current registered graphs: {list(multi_graph_manager.graphs.keys())}")
 
         self.validate_mapping()
 
