@@ -23,7 +23,6 @@ class PyArchInitImporter(BaseImporter):
             overwrite: If True, overwrites existing nodes
             existing_graph: Existing graph instance to enrich. If None, creates new graph for 3DGIS.
         """
-        
         super().__init__(
             filepath=filepath, 
             mapping_name=mapping_name,
@@ -51,73 +50,112 @@ class PyArchInitImporter(BaseImporter):
 
         self.validate_mapping()
 
-    def process_row(self, row_dict: Dict[str, Any]) -> Node:
+    def process_row(self, row_dict: Dict[str, Any]) -> Optional[Node]:
         """Process a row from pyArchInit database"""
         try:
-            # Get ID column and convert if numeric
+            # 1️⃣ Get ID column and convert if numeric
             id_column = self._get_id_column()
             if isinstance(row_dict.get(id_column), (int, float)):
                 row_dict[id_column] = str(row_dict[id_column])
                 
-            node_id = str(row_dict[id_column])
+            node_name = str(row_dict[id_column])  # Es: "1001"
             
-            # Get description from mapping or default
-            desc_column = self._get_description_column()
-            description = row_dict.get(desc_column) if desc_column else "pyarchinit element"
-
-            # Create or update stratigraphic node
-            base_attrs = {
-                'node_id': f"pyarchinit_{node_id}",
-                'name': str(row_dict[id_column]),
-                'description': str(description)
-            }
-
-            # Get node type from id column mapping
-            id_col_config = self.mapping['column_mappings'][id_column]
-            strat_type = id_col_config.get('node_type', 'US')
-            node_class = get_stratigraphic_node_class(strat_type)
+            print(f"\n=== Processing pyArchInit row ===")
+            print(f"Node name from DB: {node_name}")
             
-            print(f"\nProcessing stratigraphic node:")
-            print(f"ID: {base_attrs['node_id']}")
-            print(f"Name: {base_attrs['name']}")
-            print(f"Description: {base_attrs['description']}")
-            print(f"Type: {strat_type}")
-
-            # Create or update stratigraphic node            
-            existing_node = self.graph.find_node_by_id(base_attrs['node_id'])
+            # 2️⃣ Check if we're enriching existing graph
+            is_enriching_existing = self._use_existing_graph and len(self.graph.nodes) > 0
+            print(f"Enriching existing graph: {is_enriching_existing}")
+            
+            # 3️⃣ Try to find existing node by NAME (not ID!)
+            existing_node = self._find_node_by_name(node_name)
+            
             if existing_node:
-                if self.overwrite:
-                    existing_node.name = base_attrs['name']
-                    existing_node.description = base_attrs['description']
-                    self.warnings.append(f"Updated existing node: {base_attrs['node_id']}")
-                strat_node = existing_node
-            else:
-                strat_node = node_class(
-                    node_id=base_attrs['node_id'],
-                    name=base_attrs['name'],
-                    description=base_attrs['description']
-                )
-                self.graph.add_node(strat_node)
-
-            # Process other columns as properties
-            print("\nProcessing property nodes:")
-            for col_name, col_config in self.mapping.get('column_mappings', {}).items():
-                # Skip ID and description columns
-                if col_config.get('is_id', False) or col_config.get('is_description', False):
-                    continue
-                    
-                print(f"\nChecking column: {col_name}")
-                print(f"Column config: {col_config}")
+                # ✅ Node found in existing graph: only add properties
+                print(f"✓ Found existing node: {existing_node.name} (ID: {existing_node.node_id})")
+                print(f"  → Adding properties to existing node")
                 
-                if col_config.get('property_name'):
-                    # Create property node
-                    value = row_dict.get(col_name, '')
-                    print(f"Property value: {value}")
+                # Get description from mapping
+                desc_column = self._get_description_column()
+                description = row_dict.get(desc_column) if desc_column else None
+                
+                # Update description if overwrite is enabled
+                if self.overwrite and description:
+                    existing_node.description = str(description)
+                
+                # Process properties for existing node
+                self._process_pyarchinit_properties(row_dict, existing_node)
+                return existing_node
+                
+            elif is_enriching_existing:
+                # ❌ Enriching mode but node not found → SKIP this row
+                warning_msg = f"Node '{node_name}' not found in existing graph - SKIPPED"
+                self.warnings.append(warning_msg)
+                print(f"⊘ {warning_msg}")
+                return None
+                
+            else:
+                # ✅ Creating new graph → create new stratigraphic node
+                print(f"✓ Creating new stratigraphic node: {node_name}")
+                
+                # Get description from mapping
+                desc_column = self._get_description_column()
+                description = row_dict.get(desc_column) if desc_column else "pyarchinit element"
+                
+                # Get node type from id column mapping
+                id_col_config = self.mapping['column_mappings'][id_column]
+                strat_type = id_col_config.get('node_type', 'US')
+                node_class = get_stratigraphic_node_class(strat_type)
+                
+                # Create new node with UUID
+                import uuid
+                new_node = node_class(
+                    node_id=str(uuid.uuid4()),
+                    name=node_name,
+                    description=str(description)
+                )
+                
+                self.graph.add_node(new_node)
+                print(f"  → Node created with ID: {new_node.node_id}")
+                
+                # Process properties for new node
+                self._process_pyarchinit_properties(row_dict, new_node)
+                return new_node
+
+        except KeyError as e:
+            self.warnings.append(f"Missing required column: {str(e)}")
+            raise
+
+    def _process_pyarchinit_properties(self, row_dict: Dict[str, Any], strat_node: Node):
+        """
+        Process property columns for a stratigraphic node.
+        Only creates properties if they have non-empty values.
+        """
+        print(f"\n  Processing properties for node: {strat_node.name}")
+        
+        for col_name, col_config in self.mapping.get('column_mappings', {}).items():
+            # Skip ID and description columns
+            if col_config.get('is_id', False) or col_config.get('is_description', False):
+                continue
+                
+            if col_config.get('property_name'):
+                value = row_dict.get(col_name, '')
+                
+                # ✅ IMPORTANTE: Crea proprietà SOLO se valore esiste e non è vuoto
+                if value and str(value).strip():
+                    property_id = f"{strat_node.node_id}_{col_config['property_name']}"
                     
-                    if value:  # Only create property if value exists
-                        property_id = f"{base_attrs['node_id']}_{col_config['property_name']}"
-                        print(f"Creating property node: {property_id}")
-                        
+                    # Check if property already exists
+                    existing_prop = self.graph.find_node_by_id(property_id)
+                    
+                    if existing_prop:
+                        # Update existing property if overwrite enabled
+                        if self.overwrite:
+                            existing_prop.value = str(value)
+                            existing_prop.description = str(value)
+                            print(f"    ↻ Updated property: {col_config['property_name']} = '{value}'")
+                    else:
+                        # Create new property node
                         property_node = PropertyNode(
                             node_id=property_id,
                             name=col_config['property_name'],
@@ -126,23 +164,20 @@ class PyArchInitImporter(BaseImporter):
                             property_type=col_config['property_name']
                         )
                         self.graph.add_node(property_node)
+                        print(f"    + Created property: {col_config['property_name']} = '{value}'")
                         
                         # Create edge between stratigraphic node and property
-                        edge_id = f"{base_attrs['node_id']}_has_property_{property_id}"
+                        edge_id = f"{strat_node.node_id}_has_property_{property_id}"
                         if not self.graph.find_edge_by_id(edge_id):
-                            print(f"Creating property edge: {edge_id}")
                             self.graph.add_edge(
                                 edge_id=edge_id,
-                                edge_source=base_attrs['node_id'],
+                                edge_source=strat_node.node_id,
                                 edge_target=property_id,
                                 edge_type="has_property"
                             )
-
-            return strat_node
-
-        except KeyError as e:
-            self.warnings.append(f"Missing required column: {str(e)}")
-            raise
+                else:
+                    # Valore vuoto o mancante - non creare proprietà
+                    print(f"    ⊘ Skipped property: {col_config['property_name']} (empty value)")
 
     def _get_description_column(self) -> Optional[str]:
         """Get description column from mapping"""
@@ -169,70 +204,65 @@ class PyArchInitImporter(BaseImporter):
             table_name = table_settings.get('table_name')
             
             if not table_name:
-                raise ValueError("Table name not specified in mapping")
+                raise ValueError("Table name not specified in mapping configuration")
             
-            # Get column mappings
-            column_maps = self.mapping.get('column_mappings', {})
-            if not column_maps:
-                raise ValueError("No column mappings found")
-                
-            # Find ID column
-            id_column = self._get_id_column()
-            desc_column = self._get_description_column()
-                    
-            print(f"\nID column identified: {id_column}")
-            print(f"Description column identified: {desc_column or 'None'}")
+            print(f"\nReading from table: {table_name}")
             
-            columns = list(column_maps.keys())
-            print(f"Columns to query: {columns}")
-            query = f'SELECT {",".join(columns)} FROM {table_name}'
-            print(f"Query: {query}")
+            # Query all rows from table
+            cursor.execute(f"SELECT * FROM {table_name}")
+            columns = [description[0] for description in cursor.description]
+            print(f"Columns found: {columns}")
             
-            total_rows = 0
+            rows = cursor.fetchall()
+            print(f"Total rows to process: {len(rows)}")
+            
             successful_rows = 0
+            skipped_rows = 0
+            error_rows = 0
             
-            for row in cursor.execute(query):
-                total_rows += 1
+            # Process each row
+            for idx, row in enumerate(rows, 1):
                 try:
-                    # Convert row to dict with column names
+                    # Convert row to dictionary
                     row_dict = dict(zip(columns, row))
-                    print(f"\nProcessing row {total_rows}:")
-                    print(f"Row data: {row_dict}")
                     
-                    # Process row using this class's method
-                    self.process_row(row_dict)
-                    successful_rows += 1
+                    # Process the row
+                    result = self.process_row(row_dict)
                     
+                    if result is not None:
+                        successful_rows += 1
+                        if (successful_rows % 10) == 0:
+                            print(f"Processed {successful_rows} rows...")
+                    else:
+                        skipped_rows += 1
+                        
                 except Exception as e:
-                    self.warnings.append(f"Error processing row {total_rows}: {str(e)}")
-                    print(f"Error processing row {total_rows}: {str(e)}")
-
-            # Add import summary
-            self.warnings.append(f"\nImport summary:")
-            self.warnings.append(f"Total rows processed: {total_rows}")
-            self.warnings.append(f"Successful rows: {successful_rows}")
-            self.warnings.append(f"Failed rows: {total_rows - successful_rows}")
-                
+                    error_rows += 1
+                    error_msg = f"Error processing row {idx}: {str(e)}"
+                    self.warnings.append(error_msg)
+                    print(f"❌ {error_msg}")
+            
             conn.close()
+            
+            # Summary
+            print(f"\n=== Import Summary ===")
+            print(f"Total rows: {len(rows)}")
+            print(f"✓ Successfully imported: {successful_rows}")
+            print(f"⊘ Skipped: {skipped_rows}")
+            print(f"✗ Errors: {error_rows}")
+            print(f"Final graph size: {len(self.graph.nodes)} nodes, {len(self.graph.edges)} edges")
+            
+            # Add to warnings for UI
+            self.warnings.append(f"\nImport summary:")
+            self.warnings.append(f"Successfully imported: {successful_rows}/{len(rows)}")
+            if skipped_rows > 0:
+                self.warnings.append(f"Skipped rows (not in graph): {skipped_rows}")
+            if error_rows > 0:
+                self.warnings.append(f"Errors: {error_rows}")
+            
             return self.graph
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             raise ImportError(f"Error parsing pyArchInit database: {str(e)}")
-
-    def validate_mapping(self):
-        """Validate the mapping configuration."""
-        if not self.mapping:
-            raise ValueError("No mapping configuration provided")
-            
-        required_sections = ['table_settings', 'column_mappings']
-        missing = [s for s in required_sections if s not in self.mapping]
-        if missing:
-            raise ValueError(f"Missing required sections in mapping: {', '.join(missing)}")
-            
-        table_settings = self.mapping.get('table_settings', {})
-        if not table_settings.get('table_name'):
-            raise ValueError("Table name not specified in mapping")
-            
-        column_maps = self.mapping.get('column_mappings', {})
-        if not any(cm.get('is_id', False) for cm in column_maps.values()):
-            raise ValueError("No ID column specified in mapping")
