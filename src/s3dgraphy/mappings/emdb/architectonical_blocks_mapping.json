@@ -22,10 +22,16 @@
         },
         "MORPHOLOGY": {
             "node_type": "PropertyNode",
-            "property_name": "Morphology",
-            "display_name": "Morphology",
+            "property_name": "morphology",
+            "display_name": "morphology",
             "description": "MORFOLOGIA: scegliere la morfologia specifica del pezzo (es. capitello corinzio, dorico, ionico, ecc.)"
         },
+        "LONG_DESCRIPTION": {
+            "node_type": "PropertyNode",
+            "property_name": "description",
+            "display_name": "description",
+            "description": "MATERIALE: Indicare il materiale del blocco"
+        },        
         "MATERIAL": {
             "node_type": "PropertyNode",
             "property_name": "material",
