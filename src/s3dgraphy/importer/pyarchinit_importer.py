@@ -21,7 +21,10 @@ class PyArchInitImporter(BaseImporter):
             filepath: Path to the SQLite database
             mapping_name: Name of the JSON mapping file to use
             overwrite: If True, overwrites existing nodes
-            existing_graph: Existing graph instance to enrich. If None, creates new graph for 3DGIS.
+            existing_graph: Existing graph instance to use.
+                        If None, creates new unregistered graph with temporary ID.
+                        The caller (EM-tools) is responsible for setting proper graph_id
+                        and registering it in MultiGraphManager.
         """
         super().__init__(
             filepath=filepath, 
@@ -29,24 +32,18 @@ class PyArchInitImporter(BaseImporter):
             overwrite=overwrite
         )
 
-        # Pattern come MappedXLSXImporter
         if existing_graph:
-            # Use existing graph (EM_ADVANCED mode)
+            # Use provided graph (EM_ADVANCED mode)
             self.graph = existing_graph
             self.graph_id = existing_graph.graph_id
             self._use_existing_graph = True
-            print(f"PyArchInitImporter: Using existing graph {self.graph_id}")
+            print(f"PyArchInitImporter: Using provided graph '{self.graph_id}'")
         else:
-            # Create new graph (3DGIS mode)
-            self.graph_id = "3dgis_graph"
-            self.graph = Graph(graph_id=self.graph_id)
+            # Create new UNREGISTERED graph (3DGIS mode)
+            # Caller must set proper graph_id and register it
+            self.graph = Graph(graph_id="temp_graph")
             self._use_existing_graph = False
-            print(f"PyArchInitImporter: Created new graph {self.graph_id}")
-            
-            # Registra il grafo nel MultiGraphManager solo se nuovo
-            multi_graph_manager.graphs[self.graph_id] = self.graph
-            print(f"PyArchInitImporter: Registered graph {self.graph_id}")
-            print(f"Current registered graphs: {list(multi_graph_manager.graphs.keys())}")
+            print(f"PyArchInitImporter: Created new unregistered graph (caller must register)")
 
         self.validate_mapping()
 

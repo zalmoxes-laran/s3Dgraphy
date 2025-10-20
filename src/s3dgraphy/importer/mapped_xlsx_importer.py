@@ -10,7 +10,10 @@ class MappedXLSXImporter(BaseImporter):
                 existing_graph=None):
         """
         Args:
-            existing_graph: Existing graph instance to enrich. If None, creates new graph.
+            existing_graph: Existing graph instance to use. 
+                        If None, creates new unregistered graph with temporary ID.
+                        The caller (EM-tools) is responsible for setting proper graph_id 
+                        and registering it in MultiGraphManager.
         """
         super().__init__(
             filepath=filepath, 
@@ -19,17 +22,17 @@ class MappedXLSXImporter(BaseImporter):
         )
         
         if existing_graph:
-            # Use existing graph
+            # Use provided graph (EM_ADVANCED mode)
             self.graph = existing_graph
             self.graph_id = existing_graph.graph_id
             self._use_existing_graph = True
-            print(f"MappedXLSXImporter: Using existing graph {self.graph_id}")
+            print(f"MappedXLSXImporter: Using provided graph '{self.graph_id}'")
         else:
-            # Create new graph 
-            self.graph_id = f"imported_{Path(filepath).stem}"
-            self.graph = Graph(graph_id=self.graph_id)
+            # Create new UNREGISTERED graph (3DGIS mode)
+            # Caller must set proper graph_id and register it
+            self.graph = Graph(graph_id="temp_graph")
             self._use_existing_graph = False
-            print(f"MappedXLSXImporter: Created new graph {self.graph_id}")
+            print(f"MappedXLSXImporter: Created new unregistered graph (caller must register)")
             
     def parse(self) -> Graph:
         """

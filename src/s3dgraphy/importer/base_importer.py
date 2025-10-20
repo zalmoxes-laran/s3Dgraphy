@@ -220,7 +220,7 @@ class BaseImporter(ABC):
         print(f"Processing row for ID: {target_name}")
         
         # ✅ Check if we're working with existing graph (MappedXLSXImporter with existing_graph)
-        is_enriching_existing = hasattr(self, 'graph') and len(self.graph.nodes) > 0
+        is_enriching_existing = getattr(self, '_use_existing_graph', False)
         
         # ✅ Try to find existing node by name 
         existing_node = self._find_node_by_name(target_name)
