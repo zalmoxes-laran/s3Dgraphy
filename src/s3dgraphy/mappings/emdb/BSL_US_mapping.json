@@ -1,5 +1,5 @@
 {
-    "name": "Stratigraphic Unit Mapping (Basilica)",
+    "name": "Stratigraphic Unit Mapping (US Basilica)",
     "description": "Mapping format for stratigraphic unit catalog using EM Data Model edge definitions.",
     "version": "1.5",
     "table_settings": {
@@ -77,6 +77,13 @@
             "property_name": "excavation_square",
             "display_name": "Square of the Excavation",
             "description": "Square of the excavation where the stratigraphic unit is located."
+        },
+
+        "PHOTOS": {
+            "node_type": "PropertyNode",
+            "property_name": "photos",
+            "display_name": "Photos",
+            "description": "URLs of photographic documentation related to the SU (field photos, details, context views)."
         },
 
         "ELEVATION": {
@@ -414,7 +421,7 @@
             "display_name": "Plans",
             "description": "URLs of plans where the SU appears (one or more specific files)."
         },
-        "ELEVATIONS": {
+        "ELEVATION_DOCUMENTS": {
             "node_type": "PropertyNode",
             "property_name": "elevations",
             "display_name": "Elevations",
@@ -800,6 +807,11 @@
             "source_column": "ID",
             "target_column": "DATE_OF_THE_ANALYSIS_OF_ARCHIVAL_DOCUMENTATION",
             "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "PHOTOS",
+            "edge_type": "has_property"
         }
     ],
     "allowed_formats": [
@@ -812,6 +824,12 @@
         "obj",
         "ply",
         "docx",
-        "xlsx"
+        "xlsx",
+        "csv",
+        "txt",
+        "gltf",
+        "glb",
+        "usd",
+        "blend"
     ]
 }

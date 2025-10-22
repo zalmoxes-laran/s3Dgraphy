@@ -1,5 +1,5 @@
 {
-    "name": "Wall Stratigraphic Unit Mapping (USM)",
+    "name": "Wall Stratigraphic Unit Mapping (USM Basilica)",
     "description": "Mapping for Wall Stratigraphic Units (USM). All columns are PropertyNodes except ID (StratigraphicNode). Uses EM topological edges and temporal operators.",
     "version": "1.5",
     "table_settings": {
@@ -358,6 +358,21 @@
     ],
 
     "allowed_formats": [
-        "jpg", "jpeg", "png", "tif", "tiff", "pdf", "obj", "ply", "docx", "xlsx"
+        "jpg", 
+        "jpeg", 
+        "png", 
+        "tif", 
+        "tiff", 
+        "pdf", 
+        "obj", 
+        "ply", 
+        "docx", 
+        "xlsx",
+        "csv",
+        "txt",
+        "gltf",
+        "glb",
+        "usd",
+        "blend"
     ]
 }
