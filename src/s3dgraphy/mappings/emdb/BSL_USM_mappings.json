@@ -1,0 +1,363 @@
+{
+    "name": "Wall Stratigraphic Unit Mapping (USM)",
+    "description": "Mapping for Wall Stratigraphic Units (USM). All columns are PropertyNodes except ID (StratigraphicNode). Uses EM topological edges and temporal operators.",
+    "version": "1.5",
+    "table_settings": {
+    "format_type": "xlsx",
+    "sheet_name": "Scheda_USM",
+    "start_row": 3,
+    "tutorial_row": 2
+    },
+
+    "column_mappings": {
+        "ID": {
+            "node_type": "StratigraphicNode", 
+            "is_id": true, 
+            "display_name": "Wall Stratigraphic Unit (USM) ID", 
+            "description": "Unique identifier for the Wall Stratigraphic Unit." 
+        },
+        "YEAR": {
+            "node_type": "PropertyNode", 
+            "property_name": "year", 
+            "display_name": "Year", 
+            "description": "Year of investigation, recording, or reference." 
+        },
+        "RESPONSIBLE_ENTITY": { 
+            "node_type": "PropertyNode", 
+            "property_name": "responsibleEntity", 
+            "display_name": "Responsible Entity", 
+            "description": "Institution or entity responsible for the USM." 
+        },
+        "COMPETENT_OFFICE": { 
+            "node_type": "PropertyNode", 
+            "property_name": "competentOffice", 
+            "display_name": "Competent Office", 
+            "description": "Competent MIC office or authority in charge." 
+        },
+        "IDENTIFICATION_OF_THE_STRATIGRAPHIC_TRENCH_BUILDING_STRUCTURE_FUNERARY_DEPOSIT": { 
+            "node_type": "PropertyNode", 
+            "property_name": "referenceContext", 
+            "display_name": "Reference Context Identification", 
+            "description": "ID of the stratigraphic trench / building / structure / funerary deposit to which the USM refers." 
+        },
+        "SITE": { 
+            "node_type": "PropertyNode", 
+            "property_name": "site", 
+            "display_name": "Site", 
+            "description": "Locality or site name." 
+        },
+        "AREA_BUILDING_STRUCTURE": { 
+            "node_type": "PropertyNode", 
+            "property_name": "areaBuildingStructure", 
+            "display_name": "Area / Building / Structure", 
+            "description": "Area, building, or structure identifier." 
+        },
+        "TRENCH": { 
+            "node_type": "PropertyNode", 
+            "property_name": "trench", 
+            "display_name": "Trench", 
+            "description": "Stratigraphic trench identifier." 
+        },
+        "ROOM_FUNCTIONAL_UNIT": { 
+            "node_type": "PropertyNode", 
+            "property_name": "roomFunctionalUnit", 
+            "display_name": "Room / Functional Unit", 
+            "description": "Functional subdivision: e.g., CA, CF, PG, PP, UF, SO, EA." 
+        },
+        "POSITION": { 
+            "node_type": "PropertyNode", 
+            "property_name": "position", 
+            "display_name": "Position", 
+            "description": "Relative position of the USM in the recorded context." 
+        },
+        "SECTOR": { 
+            "node_type": "PropertyNode", 
+            "property_name": "sector", 
+            "display_name": "Sector(s)", 
+            "description": "Sector identifier(s) within the context." 
+        },
+        "QUADRANT": { 
+            "node_type": "PropertyNode", 
+            "property_name": "quadrant", 
+            "display_name": "Quadrant(s)", 
+            "description": "Grid square(s) / quadrant(s) identifiers." 
+        },
+        "ELEVATION": { 
+            "node_type": "PropertyNode", 
+            "property_name": "elevation", 
+            "display_name": "Elevation", 
+            "description": "Minimum and maximum elevations of the USM." 
+        },
+        "DEFINITION": { 
+            "node_type": "PropertyNode", 
+            "property_name": "definition", 
+            "display_name": "Definition", 
+            "description": "Define the nature and function of the Wall Stratigraphic Unit (USM)." 
+        },
+        "MEASURES": { 
+            "node_type": "PropertyNode", 
+            "property_name": "measures", 
+            "display_name": "Measures", 
+            "description": "Overall dimensions (length, height, thickness, etc.). Specify units." 
+        },
+
+        "ANALYSED_SURFACE": { 
+            "node_type": "PropertyNode", 
+            "property_name": "analysedSurface", 
+            "display_name": "Analysed Surface", 
+            "description": "Extent of wall surface analysed." 
+        },
+
+        "BUILDING_TECHNIQUE_FACING": { 
+            "node_type": "PropertyNode", 
+            "property_name": "buildingTechniqueFacing", 
+            "display_name": "Building Technique (Facing)", 
+            "description": "External facing building technique." 
+        },
+        "BUILDING_TECHNIQUE_CORE": { 
+            "node_type": "PropertyNode", 
+            "property_name": "buildingTechniqueCore", 
+            "display_name": "Building Technique (Core)", 
+            "description": "Internal core building technique." 
+        },
+
+        "WALL_SECTION": { 
+            "node_type": "PropertyNode", 
+            "property_name": "wallSection", 
+            "display_name": "Wall Section", 
+            "description": "Wall section description." 
+        },
+        "WALL_SECTION_TYPE": { 
+            "node_type": "PropertyNode", 
+            "property_name": "wallSectionType", 
+            "display_name": "Wall Section – Type", 
+            "description": "Typology of the wall section." 
+        },
+        "WALL_SECTION_THICKNESS": { 
+            "node_type": "PropertyNode", 
+            "property_name": "wallSectionThickness",
+            "display_name": "Wall Section – Thickness", 
+            "description": "Thickness of the wall section." 
+        },
+        "WALL_SECTION_SPECIFICATIONS": { 
+            "node_type": "PropertyNode", 
+            "property_name": "wallSectionSpecifications", 
+            "display_name": "Wall Section – Specifications", 
+            "description": "Additional specifications for the wall section." 
+        },
+
+        "ORIENTATION": { 
+            "node_type": "PropertyNode", 
+            "property_name": "orientation", 
+            "display_name": "Orientation", 
+            "description": "Orientation / azimuth of the wall." 
+        },
+        "STRUCTURAL_FUNCTION": { 
+            "node_type": "PropertyNode", 
+            "property_name": "structuralFunction", 
+            "display_name": "Structural Function", 
+            "description": "Structural role of the wall (e.g., load-bearing, partition)." 
+        },
+        "MORPHOLOGY": { 
+            "node_type": "PropertyNode", 
+            "property_name": "morphology", 
+            "display_name": "Morphology", 
+            "description": "Morphological description of the wall or its elements." 
+        },
+
+        "FACING_BUILDING_MATERIALS": { 
+            "node_type": "PropertyNode", 
+            "property_name": "facingMaterials", 
+            "display_name": "Facing – Building Materials", 
+            "description": "Materials used in the external facing." 
+        },
+        "FACING_ORIGIN_OF_MATERIALS": { 
+            "node_type": "PropertyNode", 
+            "property_name": "facingMaterialsOrigin", 
+            "display_name": "Facing – Origin of Materials", 
+            "description": "Origin/provenance of facing materials." 
+        },
+        "FACING_PROCESSING_OF_BUILDING_MATERIALS": { 
+            "node_type": "PropertyNode", 
+            "property_name": "facingMaterialsProcessing", 
+            "display_name": "Facing – Processing of Materials",
+            "description": "Processing/working of facing materials." 
+        },
+        "FACING_SHAPE_OF_BUILDING_MATERIALS": { "node_type": "PropertyNode", "property_name": "facingMaterialsShape", "display_name": "Facing – Shape of Materials", "description": "Shape/format of facing elements." },
+
+        "FACING_COLOUR_OF_TERRACOTTA_ELEMENTS": { "node_type": "PropertyNode", "property_name": "facingTerracottaColour", "display_name": "Facing – Colour (Terracotta)", "description": "Colour of terracotta elements in the facing." },
+        "FACING_CONSISTENCY_OF_TERRACOTTA_ELEMENTS": { "node_type": "PropertyNode", "property_name": "facingTerracottaConsistency", "display_name": "Facing – Consistency (Terracotta)", "description": "Consistency/mechanical behaviour of terracotta elements in the facing." },
+        "FACING_CLAY_MIX_OF_TERRACOTTA_ELEMENTS_": { "node_type": "PropertyNode", "property_name": "facingTerracottaClayMix", "display_name": "Facing – Clay Mix (Terracotta)", "description": "Clay mixture / paste of terracotta elements in the facing." },
+
+        "FACING_LAYOUT_OF_BUILDING_MATERIALS": { "node_type": "PropertyNode", "property_name": "facingLayout", "display_name": "Facing – Layout of Materials", "description": "Bonding pattern / layout of facing materials." },
+        "FACING_MORTAR_TYPE": { "node_type": "PropertyNode", "property_name": "facingMortarType", "display_name": "Facing – Mortar Type", "description": "Mortar (binder) type used in the facing." },
+        "FACING_MORTAR_COLOUR": { "node_type": "PropertyNode", "property_name": "facingMortarColour", "display_name": "Facing – Mortar Colour", "description": "Colour of the facing mortar." },
+        "FACING_MORTAR_CONSISTENCY": { "node_type": "PropertyNode", "property_name": "facingMortarConsistency", "display_name": "Facing – Mortar Consistency", "description": "Consistency of the facing mortar." },
+        "FACING_MORTAR_AGGREGATES": { "node_type": "PropertyNode", "property_name": "facingMortarAggregates", "display_name": "Facing – Mortar Aggregates", "description": "Aggregates of the facing mortar." },
+
+        "JOINTS_THICKNESS": { "node_type": "PropertyNode", "property_name": "jointsThickness", "display_name": "Joints – Thickness", "description": "Average thickness of mortar joints." },
+        "JOINTS_FINISHING": { "node_type": "PropertyNode", "property_name": "jointsFinishing", "display_name": "Joints – Finishing", "description": "Finishing of mortar joints." },
+        "MASONRY_FINISHING_AND_SPECIFIC_FEATURES": { "node_type": "PropertyNode", "property_name": "masonryFinishingFeatures", "display_name": "Masonry Finishing & Specific Features", "description": "Surface finishes and distinctive features of the masonry." },
+
+        "CORE_CAEMENTA": { "node_type": "PropertyNode", "property_name": "coreCaementa", "display_name": "Core – Caementa (Inclusions)", "description": "Stone/rubble inclusions used in the core (caementa)." },
+        "CORE_MORTAR_AGGREGATES": { "node_type": "PropertyNode", "property_name": "coreMortarAggregates", "display_name": "Core – Mortar Aggregates", "description": "Aggregates within the core mortar." },
+        "CORE_MORTARCONSISTENCY": { "node_type": "PropertyNode", "property_name": "coreMortarConsistency", "display_name": "Core – Mortar Consistency", "description": "Consistency of the core mortar." },
+        "CORE_MORTAR_COLOUR": { "node_type": "PropertyNode", "property_name": "coreMortarColour", "display_name": "Core – Mortar Colour", "description": "Colour of the core mortar." },
+        "CORE_CONSTRUCTION_METHOD": { "node_type": "PropertyNode", "property_name": "coreConstructionMethod", "display_name": "Core – Construction Method", "description": "Construction method / laying of the core." },
+
+        "EQUAL_TO": { "node_type": "PropertyNode", "property_name": "equalTo", "display_name": "Equal To", "description": "USMs considered physically the same entity/continuous fabric." },
+        "BONDED_TO": { "node_type": "PropertyNode", "property_name": "bondedTo", "display_name": "Bonded To", "description": "USMs physically bonded (masonry bonding)." },
+        "COVERS": { "node_type": "PropertyNode", "property_name": "covers", "display_name": "Covers", "description": "This USM covers (overlies) another USM." },
+        "COVERED_BY": { "node_type": "PropertyNode", "property_name": "coveredBy", "display_name": "Covered By", "description": "This USM is covered (overlain) by another USM." },
+        "ABUTS": { "node_type": "PropertyNode", "property_name": "abuts", "display_name": "Abuts", "description": "This USM abuts another USM." },
+        "ABUTTED_BY": { "node_type": "PropertyNode", "property_name": "abuttedBy", "display_name": "Abutted By", "description": "This USM is abutted by another USM." },
+        "CUTS": { "node_type": "PropertyNode", "property_name": "cuts", "display_name": "Cuts", "description": "This USM cuts another USM." },
+        "CUT_BY": { "node_type": "PropertyNode", "property_name": "cutBy", "display_name": "Cut By", "description": "This USM is cut by another USM." },
+        "FILLS": { "node_type": "PropertyNode", "property_name": "fills", "display_name": "Fills", "description": "This USM fills another USM." },
+        "FILLED_BY": { "node_type": "PropertyNode", "property_name": "filledBy", "display_name": "Filled By", "description": "This USM is filled by another USM." },
+
+        "EARLIER_THAN": { "node_type": "PropertyNode", "property_name": "earlierThan", "display_name": "Earlier Than", "description": "USMs earlier than this in the sequence." },
+        "LATER_THAN": { "node_type": "PropertyNode", "property_name": "laterThan", "display_name": "Later Than", "description": "USMs later than this in the sequence." },
+        "CONTEMPORARY_TO": { "node_type": "PropertyNode", "property_name": "contemporaryTo", "display_name": "Contemporary To", "description": "USMs contemporaneous with this one." },
+
+        "INDIRECT_RELATIONSHIP_IDENTITY": { "node_type": "PropertyNode", "property_name": "indirectIdentity", "display_name": "Indirect Relationship – Identity", "description": "Indirect relation between physically separate but identical USMs (e.g., a wall split across its height)." },
+        "INDIRECT_RELATIONSHIP_TYPOLOGY": { "node_type": "PropertyNode", "property_name": "indirectTypology", "display_name": "Indirect Relationship – Typology", "description": "Indirect relation among USMs grouped by typology (e.g., a series of identical windows made simultaneously)." },
+        "INDIRECT_RELATIONSHIP_FUNCTION": { "node_type": "PropertyNode", "property_name": "indirectFunction", "display_name": "Indirect Relationship – Function", "description": "Indirect relation among USMs grouped by function (e.g., a series of putlog holes from the same building campaign)." },
+
+        "DESCRIPTION": { "node_type": "PropertyNode", "property_name": "description", "display_name": "Description", "description": "Comprehensive description of the USM (morphology, construction details, materials, arrangement, etc.)." },
+        "NOTES": { "node_type": "PropertyNode", "property_name": "notes", "display_name": "Notes", "description": "Additional observations not covered elsewhere." },
+        "INTERPRETATION": { "node_type": "PropertyNode", "property_name": "interpretation", "display_name": "Interpretation", "description": "Interpretation of formation, use, transformations in spatial and chronological terms." },
+        "CHRONOLOGY": { "node_type": "PropertyNode", "property_name": "chronology", "display_name": "Dating (Absolute)", "description": "Absolute dating where available." },
+        "PERIOD": { "node_type": "PropertyNode", "property_name": "period", "display_name": "Period", "description": "Period within the recognized periodization scheme." },
+        "PHASE": { "node_type": "PropertyNode", "property_name": "phase", "display_name": "Phase", "description": "Phase within the recognized periodization." },
+        "ACTIVITY": { "node_type": "PropertyNode", "property_name": "activity", "display_name": "Activity", "description": "Activity to which the USM belongs (if activities are recognized groups of USMs)." },
+        "DATING_ELEMENTS": { "node_type": "PropertyNode", "property_name": "datingElements", "display_name": "Dating Elements", "description": "Basis for absolute/relative dating (e.g., most recent finds providing terminus post quem)." },
+        "STRATIGRAPHIC_RELIABILITY": { "node_type": "PropertyNode", "property_name": "stratigraphicReliability", "display_name": "Stratigraphic Reliability", "description": "Assessment of the USM’s stratigraphic reliability and disturbances." },
+        "STATE_OF_PRESERVATON": { "node_type": "PropertyNode", "property_name": "stateOfPreservation", "display_name": "State of Preservation", "description": "Conservation state; deviations from original condition due to human/natural agents." },
+
+        "SAMPLING_STONE_MATERIALS": { "node_type": "PropertyNode", "property_name": "samplingStone", "display_name": "Sampling – Stone Materials", "description": "Sampling events/data for stone materials." },
+        "SAMPLING_BRICKS": { "node_type": "PropertyNode", "property_name": "samplingBricks", "display_name": "Sampling – Bricks", "description": "Sampling events/data for brick elements." },
+        "SAMPLING_MORTAR": { "node_type": "PropertyNode", "property_name": "samplingMortar", "display_name": "Sampling – Mortar", "description": "Sampling events/data for mortar." },
+
+        "URL": { "node_type": "PropertyNode", "property_name": "url", "display_name": "URL", "description": "Main URL reference for this USM." },
+        "DOCUMENTATION_2D": { "node_type": "PropertyNode", "property_name": "documentation2D", "display_name": "2D Documentation", "description": "URL to a folder or files with 2D documentation (drawings, photos, etc.)." },
+        "3D_DOCUMENTATION": { "node_type": "PropertyNode", "property_name": "documentation3D", "display_name": "3D Documentation", "description": "URL/references to 3D documentation files." },
+        "PLANS": { "node_type": "PropertyNode", "property_name": "plans", "display_name": "Plans", "description": "URLs of plan drawings referencing the USM." },
+        "ELEVATIONS": { "node_type": "PropertyNode", "property_name": "elevations", "display_name": "Elevations", "description": "URLs of elevation drawings referencing the USM." },
+        "SECTIONS": { "node_type": "PropertyNode", "property_name": "sections", "display_name": "Sections", "description": "URLs of section drawings referencing the USM." },
+        "PHOTOS": { "node_type": "PropertyNode", "property_name": "photos", "display_name": "Photos", "description": "URLs of photographic documentation." },
+
+        "SCIENTIFIC_RESPONSIBLE_FOR_THE_INVESTIGATION": { "node_type": "PropertyNode", "property_name": "scientificResponsible", "display_name": "Scientific Responsible for Investigations", "description": "Person responsible for the investigations affecting the USM." },
+        "DATE_OF_FIELD_RECORDING": { "node_type": "PropertyNode", "property_name": "dateOfFieldRecording", "display_name": "Date of Field Recording", "description": "Date of the initial field compilation." },
+        "RESPONSIBLE_FOR_FIELD_RECORDING": { "node_type": "PropertyNode", "property_name": "responsibleForFieldRecording", "display_name": "Responsible for Field Recording", "description": "Compiler responsible for field recording." },
+        "DATE_OF_REVISION": { "node_type": "PropertyNode", "property_name": "dateOfRevision", "display_name": "Date of Revision", "description": "Date of subsequent revision (if any)." },
+        "RESPONSIBLE_FOR_REVISION": { "node_type": "PropertyNode", "property_name": "responsibleForRevision", "display_name": "Responsible for Revision", "description": "Person responsible for the revision (if any)." }
+    },
+
+    "relations": [
+        {"source_column": "ID", "target_column": "YEAR", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "RESPONSIBLE_ENTITY", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "COMPETENT_OFFICE", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "IDENTIFICATION_OF_THE_STRATIGRAPHIC_TRENCH_BUILDING_STRUCTURE_FUNERARY_DEPOSIT", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "SITE", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "AREA_BUILDING_STRUCTURE", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "TRENCH", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "ROOM_FUNCTIONAL_UNIT", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "POSITION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "SECTOR", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "QUADRANT", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "ELEVATION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "DEFINITION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "MEASURES", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "ANALYSED_SURFACE", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "BUILDING_TECHNIQUE_FACING", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "BUILDING_TECHNIQUE_CORE", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "WALL_SECTION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "WALL_SECTION_TYPE", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "WALL_SECTION_THICKNESS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "WALL_SECTION_SPECIFICATIONS", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "ORIENTATION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "STRUCTURAL_FUNCTION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "MORPHOLOGY", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "FACING_BUILDING_MATERIALS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "FACING_ORIGIN_OF_MATERIALS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "FACING_PROCESSING_OF_BUILDING_MATERIALS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "FACING_SHAPE_OF_BUILDING_MATERIALS", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "FACING_COLOUR_OF_TERRACOTTA_ELEMENTS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "FACING_CONSISTENCY_OF_TERRACOTTA_ELEMENTS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "FACING_CLAY_MIX_OF_TERRACOTTA_ELEMENTS_", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "FACING_LAYOUT_OF_BUILDING_MATERIALS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "FACING_MORTAR_TYPE", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "FACING_MORTAR_COLOUR", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "FACING_MORTAR_CONSISTENCY", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "FACING_MORTAR_AGGREGATES", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "JOINTS_THICKNESS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "JOINTS_FINISHING", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "MASONRY_FINISHING_AND_SPECIFIC_FEATURES", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "CORE_CAEMENTA", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "CORE_MORTAR_AGGREGATES", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "CORE_MORTARCONSISTENCY", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "CORE_MORTAR_COLOUR", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "CORE_CONSTRUCTION_METHOD", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "EQUAL_TO", "edge_type": "is_physically_equal_to"},
+        {"source_column": "ID", "target_column": "BONDED_TO", "edge_type": "is_bonded_to"},
+        {"source_column": "ID", "target_column": "COVERS", "edge_type": "overlies"},
+        {"source_column": "ID", "target_column": "COVERED_BY", "edge_type": "is_overlain_by"},
+        {"source_column": "ID", "target_column": "ABUTS", "edge_type": "abuts"},
+        {"source_column": "ID", "target_column": "ABUTTED_BY", "edge_type": "is_abutted_by"},
+        {"source_column": "ID", "target_column": "CUTS", "edge_type": "cuts"},
+        {"source_column": "ID", "target_column": "CUT_BY", "edge_type": "is_cut_by"},
+        {"source_column": "ID", "target_column": "FILLS", "edge_type": "fills"},
+        {"source_column": "ID", "target_column": "FILLED_BY", "edge_type": "is_filled_by"},
+
+        {"source_column": "ID", "target_column": "EARLIER_THAN", "edge_type": "is_before"},
+        {"source_column": "ID", "target_column": "LATER_THAN", "edge_type": "is_after"},
+        {"source_column": "ID", "target_column": "CONTEMPORARY_TO", "edge_type": "has_same_time"},
+
+        {"source_column": "ID", "target_column": "INDIRECT_RELATIONSHIP_IDENTITY", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "INDIRECT_RELATIONSHIP_TYPOLOGY", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "INDIRECT_RELATIONSHIP_FUNCTION", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "DESCRIPTION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "NOTES", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "INTERPRETATION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "CHRONOLOGY", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "PERIOD", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "PHASE", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "ACTIVITY", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "DATING_ELEMENTS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "STRATIGRAPHIC_RELIABILITY", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "STATE_OF_PRESERVATON", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "SAMPLING_STONE_MATERIALS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "SAMPLING_BRICKS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "SAMPLING_MORTAR", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "URL", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "DOCUMENTATION_2D", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "3D_DOCUMENTATION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "PLANS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "ELEVATIONS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "SECTIONS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "PHOTOS", "edge_type": "has_property"},
+
+        {"source_column": "ID", "target_column": "SCIENTIFIC_RESPONSIBLE_FOR_THE_INVESTIGATION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "DATE_OF_FIELD_RECORDING", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "RESPONSIBLE_FOR_FIELD_RECORDING", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "DATE_OF_REVISION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "RESPONSIBLE_FOR_REVISION", "edge_type": "has_property"}
+    ],
+
+    "allowed_formats": [
+        "jpg", "jpeg", "png", "tif", "tiff", "pdf", "obj", "ply", "docx", "xlsx"
+    ]
+}

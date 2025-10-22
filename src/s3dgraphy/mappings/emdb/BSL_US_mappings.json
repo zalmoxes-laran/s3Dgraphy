@@ -1,0 +1,817 @@
+{
+    "name": "Stratigraphic Unit Mapping (Basilica)",
+    "description": "Mapping format for stratigraphic unit catalog using EM Data Model edge definitions.",
+    "version": "1.5",
+    "table_settings": {
+        "format_type": "xlsx",
+        "sheet_name": "Scheda_US",
+        "start_row": 3,
+        "tutorial_row": 2
+    },
+
+    "column_mappings": {
+        "ID": {
+            "node_type": "StratigraphicNode",
+            "is_id": true,
+            "display_name": "Stratigraphic Unit ID",
+            "description": "Enter the unique identifier (US number) for the stratigraphic unit."
+        },
+
+        "RESPONSIBLE_ENTITY": { 
+            "node_type": "PropertyNode", 
+            "property_name": "responsibleEntity", 
+            "display_name": "Responsible Entity", 
+            "description": "Institution or entity responsible for the USM." 
+        },
+
+        "COMPETENT_OFFICE": { 
+            "node_type": "PropertyNode", 
+            "property_name": "competentOffice", 
+            "display_name": "Competent Office", 
+            "description": "Competent MIC office or authority in charge." 
+        },
+
+        "SITE": {
+            "node_type": "PropertyNode",
+            "property_name": "site",
+            "display_name": "Site",
+            "description": "Textual location or site/area code for the stratigraphic unit."
+        },
+
+        "AREA_BUILDING_STRUCTURE": {
+            "node_type": "PropertyNode",
+            "property_name": "area_building_structure",
+            "display_name": "Area / Building / Structure",
+            "description": "Textual identification of the area, building, or structure where the stratigraphic unit is located."
+        },
+        "TRENCH": {
+            "node_type": "PropertyNode",
+            "property_name": "trench",
+            "display_name": "Trench",
+            "description": "Identification of the trench or excavation unit where the stratigraphic unit is found."
+        },
+
+        "ROOM_OR_FUNCTIONAL_UNIT": {
+            "node_type": "PropertyNode",
+            "property_name": "room_or_functional_unit",
+            "display_name": "Room or Functional Unit",
+            "description": "Identification of the specific room or functional unit associated with the stratigraphic unit."
+        },
+
+        "POSITION": {
+            "node_type": "PropertyNode",
+            "property_name": "relative_position",
+            "display_name": "Relative Position",
+            "description": "Relative Position within the excavation (e.g., north wall, central area, south-east corner, etc.)."
+        },
+
+        "SECTOR": {
+            "node_type": "PropertyNode",
+            "property_name": "excavation_sector",
+            "display_name": "Sector of the Excavation",
+            "description": "Sector of the excavation where the stratigraphic unit is located."
+        },
+
+        "QUADRANT": {
+            "node_type": "PropertyNode",
+            "property_name": "excavation_square",
+            "display_name": "Square of the Excavation",
+            "description": "Square of the excavation where the stratigraphic unit is located."
+        },
+
+        "ELEVATION": {
+            "node_type": "PropertyNode",
+            "property_name": "elevation",
+            "display_name": "Elevation",
+            "description": "Enter minimum and maximum elevations of the stratigraphic unit."
+        },
+        "FORMATION_PROCESS_CAUSE": {
+            "node_type": "PropertyNode",
+            "property_name": "formation",
+            "display_name": "Cause of Formation",
+            "description": "Specify whether the formation is natural (e.g., fluvial sedimentation, aeolian deposit) or anthropic (e.g., built structure, dug pit)."
+        },
+        "POSITIVE_NEGATIVE": {
+            "node_type": "PropertyNode",
+            "property_name": "positiveNegative",
+            "display_name": "Positive / Negative",
+            "description": "Indicate whether the SU is positive or negative."
+        },
+        "DATA_PROVENANCE": {
+            "node_type": "PropertyNode",
+            "property_name": "dataProvenance",
+            "display_name": "Origin of Data",
+            "description": "E.g., excavation by the compiler; complete/partial autoptic verification; analysis of archival documentation; etc."
+        },
+        "DEFINITION": {
+            "node_type": "PropertyNode",
+            "property_name": "definition",
+            "display_name": "Definition",
+            "description": "Define the SU based on its formation mode and function (e.g., deposit, pit, accumulation, collapse, foundation, wall, hearth)."
+        },
+        "DISTINCTION_CRITERIA": {
+            "node_type": "PropertyNode",
+            "property_name": "distinctionCriteria",
+            "display_name": "Distinction Criteria",
+            "description": "Criteria distinguishing the SU from others (e.g., color, consistency) and the reasons enabling its recognition."
+        },
+        "FORMATION_PROCESS_MODE": {
+            "node_type": "PropertyNode",
+            "property_name": "formationProcess",
+            "display_name": "Formation Mode",
+            "description": "Further specify the formation mode if possible (e.g., aeolian deposit, fluvial erosion). Not required if already implicit in the definition (e.g., wall, tomb). If possible, indicate whether formation was instantaneous or prolonged over time."
+        },
+        "INORGANIC_COMPONENTS": {
+            "node_type": "PropertyNode",
+            "property_name": "inorganicComponents",
+            "display_name": "Inorganic Components",
+            "description": "List recognizable inorganic components in the SU."
+        },
+        "ORGANIC_COMPONENTS": {
+            "node_type": "PropertyNode",
+            "property_name": "organicComponents",
+            "display_name": "Organic Components",
+            "description": "List recognizable organic components in the SU."
+        },
+        "CONSISTENCY": {
+            "node_type": "PropertyNode",
+            "property_name": "consistency",
+            "display_name": "Consistency",
+            "description": "For soil-like units: non-coherent, friable, compact, hard, plastic, etc."
+        },
+        "COLOUR": {
+            "node_type": "PropertyNode",
+            "property_name": "colour",
+            "display_name": "Colour",
+            "description": "General color of the SU (for soils and similar). If possible, use the Munsell system."
+        },
+        "MEASURES": {
+            "node_type": "PropertyNode",
+            "property_name": "measures",
+            "display_name": "Measures",
+            "description": "Overall dimensions of the SU (length, width, thickness, etc.). Specify the unit of measure."
+        },
+
+        "EQUAL_TO": {
+            "node_type": "PropertyNode",
+            "property_name": "equalTo",
+            "display_name": "Equal To",
+            "description": "Indicate equivalence relationships: SUs interpreted as the same entity."
+        },
+        "BONDED_TO": {
+            "node_type": "PropertyNode",
+            "property_name": "bondedTo",
+            "display_name": "Bonded To",
+            "description": "Indicate SUs physically bonded to this one (e.g., masonry bonding)."
+        },
+        "ABUTTED_BY": {
+            "node_type": "PropertyNode",
+            "property_name": "abuttedBy",
+            "display_name": "Abutted By",
+            "description": "Indicate SUs that abut against this SU."
+        },
+        "ABUTS": {
+            "node_type": "PropertyNode",
+            "property_name": "abuts",
+            "display_name": "Abuts",
+            "description": "Indicate SUs that this SU abuts against."
+        },
+        "OVERLAIN_BY": {
+            "node_type": "PropertyNode",
+            "property_name": "overlainBy",
+            "display_name": "Overlain By",
+            "description": "Indicate SUs that rest on top of this SU."
+        },
+        "OVERLIES": {
+            "node_type": "PropertyNode",
+            "property_name": "overlies",
+            "display_name": "Overlies",
+            "description": "Indicate SUs that this SU lies upon."
+        },
+        "CUT_BY": {
+            "node_type": "PropertyNode",
+            "property_name": "cutBy",
+            "display_name": "Cut By",
+            "description": "Indicate SUs that cut this SU."
+        },
+        "CUTS": {
+            "node_type": "PropertyNode",
+            "property_name": "cuts",
+            "display_name": "Cuts",
+            "description": "Indicate SUs that are cut by this SU."
+        },
+        "FILLED_BY": {
+            "node_type": "PropertyNode",
+            "property_name": "filledBy",
+            "display_name": "Filled By",
+            "description": "Indicate SUs that fill this SU (e.g., fills in a pit)."
+        },
+        "FILLS": {
+            "node_type": "PropertyNode",
+            "property_name": "fills",
+            "display_name": "Fills",
+            "description": "Indicate SUs that this SU fills."
+        },
+        "EARLIER_THAN": {
+            "node_type": "PropertyNode",
+            "property_name": "earlierThan",
+            "display_name": "Earlier Than",
+            "description": "SUs that are earlier than this SU in the stratigraphic sequence."
+        },
+        "LATER_THAN": {
+            "node_type": "PropertyNode",
+            "property_name": "laterThan",
+            "display_name": "Later Than",
+            "description": "SUs that are later than this SU in the stratigraphic sequence."
+        },
+
+        "DESCRIPTION": {
+            "node_type": "PropertyNode",
+            "property_name": "description",
+            "display_name": "Description",
+            "description": "Provide a thorough description adapted to the SU nature: surface configuration (horizontal, undulated, inclined, etc.), thickness and variations, boundary definition with adjacent SUs, morphology, size and arrangement of components and artifacts, presence/orientation of patches, structural type, building materials, decorative elements, etc."
+        },
+        "NOTES": {
+            "node_type": "PropertyNode",
+            "property_name": "notes",
+            "display_name": "Notes",
+            "description": "Indicate whether the SU was only identified, partially/fully excavated, etc. Add any information not covered by other fields."
+        },
+        "INTERPRETATION": {
+            "node_type": "PropertyNode",
+            "property_name": "interpretation",
+            "display_name": "Interpretation",
+            "description": "Provide an interpretation of the SU regarding its formation, life, and transformation dynamics in spatial and chronological terms."
+        },
+        "CHRONOLOGY": {
+            "node_type": "PropertyNode",
+            "property_name": "chronology",
+            "display_name": "Dating (Absolute)",
+            "description": "Indicate absolute dating where available."
+        },
+        "PERIOD": {
+            "node_type": "PropertyNode",
+            "property_name": "period",
+            "display_name": "Period",
+            "description": "Use when period and phase articulation has been recognized in the archaeological context."
+        },
+        "PHASE": {
+            "node_type": "PropertyNode",
+            "property_name": "phase",
+            "display_name": "Phase",
+            "description": "Phase within the recognized periodization scheme."
+        },
+        "ACTIVITY": {
+            "node_type": "PropertyNode",
+            "property_name": "activity",
+            "display_name": "Activity",
+            "description": "Activity the SU belongs to (use when activities have been recognized as groups of SUs)."
+        },
+        "DATING_ELEMENTS": {
+            "node_type": "PropertyNode",
+            "property_name": "datingElements",
+            "display_name": "Dating Elements",
+            "description": "Basis for absolute/relative dating. For finds, indicate the most recent items providing the terminus post quem."
+        },
+        "STRATIGRAPHIC_RELIABILITY": {
+            "node_type": "PropertyNode",
+            "property_name": "stratigraphicReliability",
+            "display_name": "Stratigraphic Reliability",
+            "description": "Assess the SU’s stratigraphic reliability, noting disturbances that may have compromised it."
+        },
+        "STATE_OF_PRESERVATON": {
+            "node_type": "PropertyNode",
+            "property_name": "stateOfPreservation",
+            "display_name": "State of Preservation",
+            "description": "Describe conservation state and deviations from the original condition due to human or natural agents (roots, animals, landslides, etc.). If none, indicate intact."
+        },
+        "FINDS_QUANTITATIVE_DATA": {
+            "node_type": "PropertyNode",
+            "property_name": "findsQuantitativeData",
+            "display_name": "Finds Quantitative Data",
+            "description": "Totals of finds collected (and catalogued in materials tables)."
+        },
+        "SAMPLING": {
+            "node_type": "PropertyNode",
+            "property_name": "sampling",
+            "display_name": "Sampling",
+            "description": "Indicate whether sampling was carried out and provide sample numbers."
+        },
+        "FLOATATION": {
+            "node_type": "PropertyNode",
+            "property_name": "floatation",
+            "display_name": "Flotation",
+            "description": "Specify whether flotation was executed and whether fully or partially."
+        },
+        "SIEVING": {
+            "node_type": "PropertyNode",
+            "property_name": "sieving",
+            "display_name": "Sieving",
+            "description": "Specify whether sieving was executed and whether fully or partially."
+        },
+        "SPECIAL_FINDS": {
+            "node_type": "PropertyNode",
+            "property_name": "specialFinds",
+            "display_name": "Special Finds",
+            "description": "URL links to architectural blocks or special finds recovered in this SU."
+        },
+        "LOCATION_OF_FINDS": {
+            "node_type": "PropertyNode",
+            "property_name": "locationOfFinds",
+            "display_name": "Location of Finds",
+            "description": "Textual location or link to external repositories (e.g., SIGECweb/MIC) if available."
+        },
+
+        "DATE_AND_SCIENTIFIC_RESPONSIBLE_FOR_THE_INVESTIGATION": {
+            "node_type": "PropertyNode",
+            "property_name": "investigationDateAndResponsible",
+            "display_name": "Date & Scientific Responsible for Investigations",
+            "description": "Enter date and scientific responsible of excavations affecting the SU. For multiple investigations, separate with semicolons (e.g., P. Rosa 1880; L. Fabbrini 1960–1963; T. Ismaelli 2021)."
+        },
+        "FORMER_NUMBER_OF_SU": {
+            "node_type": "PropertyNode",
+            "property_name": "formerSUNumber",
+            "display_name": "Former SU Number",
+            "description": "Any previous numbers assigned by different excavators."
+        },
+        "REFERENCE_TO_ARCHIVAL_DOCUMENTATION": {
+            "node_type": "PropertyNode",
+            "property_name": "archivalReferences",
+            "display_name": "Reference to Archival Documentation",
+            "description": "References to archival sources citing the SU (e.g., notebooks, photo collections)."
+        },
+        "ARCHIVAL_DOCUMENTATION_PLANS": {
+            "node_type": "PropertyNode",
+            "property_name": "archivalPlans",
+            "display_name": "Archival Plans",
+            "description": "Links to plan drawings (one or more specific files)."
+        },
+        "ARCHIVAL_DOCUMENTATION_ELEVATIONS": {
+            "node_type": "PropertyNode",
+            "property_name": "archivalElevations",
+            "display_name": "Archival Elevations",
+            "description": "Links to elevation drawings (one or more specific files)."
+        },
+        "ARCHIVAL_DOCUMENTATION_SECTIONS": {
+            "node_type": "PropertyNode",
+            "property_name": "archivalSections",
+            "display_name": "Archival Sections",
+            "description": "Links to section drawings (one or more specific files)."
+        },
+        "ARCHIVAL_DOCUMENTATION_PHOTOS": {
+            "node_type": "PropertyNode",
+            "property_name": "archivalPhotos",
+            "display_name": "Archival Photos",
+            "description": "Links to archival photographs (one or more specific files)."
+        },
+        "ADDITIONAL_GRAPHIC_DOCUMENTATION": {
+            "node_type": "PropertyNode",
+            "property_name": "additionalGraphicDocumentation",
+            "display_name": "Additional Graphic Documentation",
+            "description": "Other graphic documentation not covered above."
+        },
+        "ARCHIVAL_TEXTUAL_DOCUMENTATION_SCANS": {
+            "node_type": "PropertyNode",
+            "property_name": "archivalTextScans",
+            "display_name": "Archival Textual Documentation – Scans",
+            "description": "Links to complete PDFs or folders of scanned pages. Consider how to keep scans and transcriptions of the same document linked."
+        },
+        "ARCHIVAL_TEXTUAL_DOCUMENTATION_TRANSCRIPTIONS": {
+            "node_type": "PropertyNode",
+            "property_name": "archivalTextTranscriptions",
+            "display_name": "Archival Textual Documentation – Transcriptions",
+            "description": "Links to one or more files with transcriptions of textual documents."
+        },
+
+        "NOTES_ARCHIVAL": {
+            "node_type": "PropertyNode",
+            "property_name": "archivalNotes",
+            "display_name": "Notes (Archival Section)",
+            "description": "Any additional information for the archival documentation section not covered by other fields."
+        },
+        "INTERPRETATION_LEGACY": {
+            "node_type": "PropertyNode",
+            "property_name": "archivalInterpretation",
+            "display_name": "Interpretation (Archival Section)",
+            "description": "Excavator/archival compiler’s interpretation of the SU, if different from the main interpretation."
+        },
+
+        "DOCUMENTATION_2D": {
+            "node_type": "PropertyNode",
+            "property_name": "documentation2D",
+            "display_name": "2D Documentation",
+            "description": "URL to a folder containing specific documentation for the SU (drawings, photos, 3D model, etc.)."
+        },
+        "DOCUMENTATION_3D": {
+            "node_type": "PropertyNode",
+            "property_name": "documentation3D",
+            "display_name": "3D Documentation",
+            "description": "URL or references to 3D documentation files."
+        },
+        "PLANS": {
+            "node_type": "PropertyNode",
+            "property_name": "plans",
+            "display_name": "Plans",
+            "description": "URLs of plans where the SU appears (one or more specific files)."
+        },
+        "ELEVATIONS": {
+            "node_type": "PropertyNode",
+            "property_name": "elevations",
+            "display_name": "Elevations",
+            "description": "URLs of elevations where the SU appears (one or more specific files)."
+        },
+        "SECTIONS": {
+            "node_type": "PropertyNode",
+            "property_name": "sections",
+            "display_name": "Sections",
+            "description": "URLs of sections where the SU appears (one or more specific files)."
+        },
+        "REFERNCE_TO_MATERIALS_TABLES": {
+            "node_type": "PropertyNode",
+            "property_name": "referenceToMaterialsTables",
+            "display_name": "Reference to Materials Tables",
+            "description": "Reference to materials tables and to RA/N (numismatics) records if applicable."
+        },
+        "RESPONSIBLE_FOR_FIELD_RECORDING": {
+            "node_type": "PropertyNode",
+            "property_name": "responsibleForFieldRecording",
+            "display_name": "Field Recording Responsible",
+            "description": "Person responsible for the initial field compilation."
+        },
+        "DATE_OF_FIELD_RECORDING": {
+            "node_type": "PropertyNode",
+            "property_name": "dateOfFieldRecording",
+            "display_name": "Date of Field Recording",
+            "description": "Date of the initial field compilation."
+        },
+        "RESPONSIBLE_FOR_REVISION": {
+            "node_type": "PropertyNode",
+            "property_name": "responsibleForRevision",
+            "display_name": "Responsible for Revision",
+            "description": "Fill only if a revision was conducted after the first compilation."
+        },
+        "DATE_OF_REVISION": {
+            "node_type": "PropertyNode",
+            "property_name": "dateOfRevision",
+            "display_name": "Date of Revision",
+            "description": "Fill only if a revision was conducted after the first compilation."
+        },
+        "RESPONSIBLE_FOR_THE_ANALYSIS_OF_ARCHIVAL_DOCUMENTATION": {
+            "node_type": "PropertyNode",
+            "property_name": "responsibleForArchivalAnalysis",
+            "display_name": "Responsible for Archival Analysis",
+            "description": "Fill only for SUs for which archival documentation was analyzed. Use even if the same person as above."
+        },
+        "DATE_OF_THE_ANALYSIS_OF_ARCHIVAL_DOCUMENTATION": {
+            "node_type": "PropertyNode",
+            "property_name": "dateOfArchivalAnalysis",
+            "display_name": "Date of Archival Analysis",
+            "description": "Fill only for SUs for which archival documentation was analyzed."
+        }
+    },
+
+    "relations": [
+        {
+            "source_column": "ID",
+            "target_column": "DATI_AMMINISTRATIVI",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "SITE",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ELEVATION",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "FORMATION",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "POSITIVE_NEGATIVE",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "DATA_PROVENANCE",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "DEFINITION",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "DISTINCTION_CRITERIA",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "FORMATION_PROCESS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "INORGANIC_COMPONENTS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ORGANIC_COMPONENTS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "CONSISTENCY",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "COLOUR",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "MEASURES",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "EQUAL_TO",
+            "edge_type": "is_physically_equal_to"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "BONDED_TO",
+            "edge_type": "is_bonded_to"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ABUTTED_BY",
+            "edge_type": "is_abutted_by"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ABUTS",
+            "edge_type": "abuts"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "OVERLAIN_BY",
+            "edge_type": "is_overlain_by"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "OVERLIES",
+            "edge_type": "overlies"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "CUT_BY",
+            "edge_type": "is_cut_by"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "CUTS",
+            "edge_type": "cuts"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "FILLED_BY",
+            "edge_type": "is_filled_by"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "FILLS",
+            "edge_type": "fills"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "EARLIER_THAN",
+            "edge_type": "is_before"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "LATER_THAN",
+            "edge_type": "is_after"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "DESCRIPTION",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "NOTES",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "INTERPRETATION",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "CHRONOLOGY",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "PERIOD",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "PHASE",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ACTIVITY",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "DATING_ELEMENTS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "STRATIGRAPHIC_RELIABILITY",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "STATE_OF_PRESERVATON",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "FINDS_QUANTITATIVE_DATA",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "SAMPLING",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "FLOATATION",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "SIEVING",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "SPECIAL_FINDS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "LOCATION_OF_FINDS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "DATE_AND_SCIENTIFIC_RESPONSIBLE_FOR_THE_INVESTIGATION",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "FORMER_NUMBER_OF_SU",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "REFERENCE_TO_ARCHIVAL_DOCUMENTATION",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ARCHIVAL_DOCUMENTATION_PLANS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ARCHIVAL_DOCUMENTATION_ELEVATIONS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ARCHIVAL_DOCUMENTATION_SECTIONS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ARCHIVAL_DOCUMENTATION_PHOTOS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ADDITIONAL_GRAPHIC_DOCUMENTATION",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ARCHIVAL_TEXTUAL_DOCUMENTATION_SCANS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ARCHIVAL_TEXTUAL_DOCUMENTATION_TRANSCRIPTIONS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "NOTES_2",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "INTERPRETATION_2",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "DOCUMENTATION_2D",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "DOCUMENTATION_3D",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "PLANS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "ELEVATIONS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "SECTIONS",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "REFERNCE_TO_MATERIALS_TABLES",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "RESPONSIBLE_FOR_FIELD_RECORDING",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "DATE_OF_FIELD_RECORDING",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "RESPONSIBLE_FOR_REVISION",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "DATE_OF_REVISION",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "RESPONSIBLE_FOR_THE_ANALYSIS_OF_ARCHIVAL_DOCUMENTATION",
+            "edge_type": "has_property"
+        },
+        {
+            "source_column": "ID",
+            "target_column": "DATE_OF_THE_ANALYSIS_OF_ARCHIVAL_DOCUMENTATION",
+            "edge_type": "has_property"
+        }
+    ],
+    "allowed_formats": [
+        "jpg",
+        "jpeg",
+        "png",
+        "tif",
+        "tiff",
+        "pdf",
+        "obj",
+        "ply",
+        "docx",
+        "xlsx"
+    ]
+}

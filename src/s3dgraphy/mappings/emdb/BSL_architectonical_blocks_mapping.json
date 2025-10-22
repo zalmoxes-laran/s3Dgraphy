@@ -1,5 +1,5 @@
 {
-    "name": "Architectural Block Format",
+    "name": "Architectural Block Format (Basilica)",
     "description": "Mapping format for architectural blocks from Excel catalog",
     "version": "1.5",
     "table_settings": {

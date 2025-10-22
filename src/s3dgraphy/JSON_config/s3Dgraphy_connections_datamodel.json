@@ -1,5 +1,5 @@
 {
-  "s3Dgraphy_connections_model_version": "1.5.1",
+  "s3Dgraphy_connections_model_version": "1.5.2",
   "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings",
   "components": [
     "CIDOC-CRM",
@@ -19,6 +19,21 @@
         "cidoc": "P120_occurs_before",
         "cidoc_extension": "CIDOC-CRM",
         "extension_mapping": "AP28_occurs_before (was_occurred_after)",
+        "extension_name": "CRMarchaeo"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
+    "is_after": {
+      "name": "is_after",
+      "label": "Chronological Sequence (after)",
+      "description": "Indicates a temporal sequence where one item occurs after another.",
+      "mapping": {
+        "cidoc": "P120_occurs_after",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "AP28_occurs_after",
         "extension_name": "CRMarchaeo"
       },
       "allowed_connections": {
@@ -56,6 +71,176 @@
         "target": ["StratigraphicNode"]
       }
     },
+    "abuts": {
+      "name": "abuts",
+      "label": "Physical Relation: abuts",
+      "description": "This stratigraphic unit abuts against the target stratigraphic unit.",
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "abuts"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
+
+    "is_abutted_by": {
+      "name": "is_abutted_by",
+      "label": "Physical Relation: is abutted by",
+      "description": "This stratigraphic unit is abutted by the target stratigraphic unit.",
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "is abutted by"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
+
+    "cuts": {
+      "name": "cuts",
+      "label": "Physical Relation: cuts",
+      "description": "This stratigraphic unit cuts the target stratigraphic unit.",
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "cuts"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
+
+    "is_cut_by": {
+      "name": "is_cut_by",
+      "label": "Physical Relation: is cut by",
+      "description": "This stratigraphic unit is cut by the target stratigraphic unit.",
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "is cut by"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
+
+    "fills": {
+      "name": "fills",
+      "label": "Physical Relation: fills",
+      "description": "This stratigraphic unit fills the target stratigraphic unit (e.g., a deposit filling a cut).",
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "fills"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
+
+    "is_filled_by": {
+      "name": "is_filled_by",
+      "label": "Physical Relation: is filled by",
+      "description": "This stratigraphic unit is filled by the target stratigraphic unit.",
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "is filled by"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
+
+    "overlies": {
+      "name": "overlies",
+      "label": "Physical Relation: overlies",
+      "description": "This stratigraphic unit overlies (covers) the target stratigraphic unit.",
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "overlies"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
+
+    "is_overlain_by": {
+      "name": "is_overlain_by",
+      "label": "Physical Relation: is overlain by",
+      "description": "This stratigraphic unit is overlain (covered) by the target stratigraphic unit.",
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "is overlain by"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
+
+    "is_bonded_to": {
+      "name": "is_bonded_to",
+      "label": "Physical Relation: is bonded to",
+      "description": "This stratigraphic unit is physically bonded to the target stratigraphic unit (e.g., masonry bonding).",
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "is bonded to"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
+
+    "is_physically_equal_to": {
+      "name": "is_physically_equal_to",
+      "label": "Physical Relation: equals (physical)",
+      "description": "Two stratigraphic units are considered physically the same entity or continuous fabric.",
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "equals"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
+
     "has_data_provenance": {
       "name": "has_data_provenance",
       "label": "Data Provenance",
