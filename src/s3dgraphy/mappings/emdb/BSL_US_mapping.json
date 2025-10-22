@@ -286,7 +286,7 @@
             "display_name": "Stratigraphic Reliability",
             "description": "Assess the SU’s stratigraphic reliability, noting disturbances that may have compromised it."
         },
-        "STATE_OF_PRESERVATON": {
+        "STATE_OF_PRESERVATION": {
             "node_type": "PropertyNode",
             "property_name": "stateOfPreservation",
             "display_name": "State of Preservation",
@@ -433,7 +433,7 @@
             "display_name": "Sections",
             "description": "URLs of sections where the SU appears (one or more specific files)."
         },
-        "REFERNCE_TO_MATERIALS_TABLES": {
+        "REFERENCE_TO_MATERIALS_TABLES": {
             "node_type": "PropertyNode",
             "property_name": "referenceToMaterialsTables",
             "display_name": "Reference to Materials Tables",
@@ -478,11 +478,7 @@
     },
 
     "relations": [
-        {
-            "source_column": "ID",
-            "target_column": "DATI_AMMINISTRATIVI",
-            "edge_type": "has_property"
-        },
+
         {
             "source_column": "ID",
             "target_column": "SITE",
@@ -493,11 +489,7 @@
             "target_column": "ELEVATION",
             "edge_type": "has_property"
         },
-        {
-            "source_column": "ID",
-            "target_column": "FORMATION",
-            "edge_type": "has_property"
-        },
+
         {
             "source_column": "ID",
             "target_column": "POSITIVE_NEGATIVE",
@@ -518,11 +510,7 @@
             "target_column": "DISTINCTION_CRITERIA",
             "edge_type": "has_property"
         },
-        {
-            "source_column": "ID",
-            "target_column": "FORMATION_PROCESS",
-            "edge_type": "has_property"
-        },
+
         {
             "source_column": "ID",
             "target_column": "INORGANIC_COMPONENTS",
@@ -655,7 +643,7 @@
         },
         {
             "source_column": "ID",
-            "target_column": "STATE_OF_PRESERVATON",
+            "target_column": "STATE_OF_PRESERVATION",
             "edge_type": "has_property"
         },
         {
@@ -740,16 +728,6 @@
         },
         {
             "source_column": "ID",
-            "target_column": "NOTES_2",
-            "edge_type": "has_property"
-        },
-        {
-            "source_column": "ID",
-            "target_column": "INTERPRETATION_2",
-            "edge_type": "has_property"
-        },
-        {
-            "source_column": "ID",
             "target_column": "DOCUMENTATION_2D",
             "edge_type": "has_property"
         },
@@ -765,17 +743,12 @@
         },
         {
             "source_column": "ID",
-            "target_column": "ELEVATIONS",
-            "edge_type": "has_property"
-        },
-        {
-            "source_column": "ID",
             "target_column": "SECTIONS",
             "edge_type": "has_property"
         },
         {
             "source_column": "ID",
-            "target_column": "REFERNCE_TO_MATERIALS_TABLES",
+            "target_column": "REFERENCE_TO_MATERIALS_TABLES",
             "edge_type": "has_property"
         },
         {
@@ -812,7 +785,21 @@
             "source_column": "ID",
             "target_column": "PHOTOS",
             "edge_type": "has_property"
-        }
+        },
+        {"source_column":"ID","target_column":"AREA_BUILDING_STRUCTURE","edge_type":"has_property"},
+        {"source_column":"ID","target_column":"COMPETENT_OFFICE","edge_type":"has_property"},
+        {"source_column":"ID","target_column":"ELEVATION_DOCUMENTS","edge_type":"has_property"},
+        {"source_column":"ID","target_column":"FORMATION_PROCESS_CAUSE","edge_type":"has_property"},
+        {"source_column":"ID","target_column":"FORMATION_PROCESS_MODE","edge_type":"has_property"},
+        {"source_column":"ID","target_column":"INTERPRETATION_LEGACY","edge_type":"has_property"},
+        {"source_column":"ID","target_column":"NOTES_ARCHIVAL","edge_type":"has_property"},
+        {"source_column":"ID","target_column":"POSITION","edge_type":"has_property"},
+        {"source_column":"ID","target_column":"QUADRANT","edge_type":"has_property"},
+        {"source_column":"ID","target_column":"RESPONSIBLE_ENTITY","edge_type":"has_property"},
+        {"source_column":"ID","target_column":"ROOM_OR_FUNCTIONAL_UNIT","edge_type":"has_property"},
+        {"source_column":"ID","target_column":"SECTOR","edge_type":"has_property"},
+        {"source_column":"ID","target_column":"TRENCH","edge_type":"has_property"}
+
     ],
     "allowed_formats": [
         "jpg",

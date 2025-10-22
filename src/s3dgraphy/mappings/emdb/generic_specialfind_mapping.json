@@ -1,6 +1,6 @@
 {
-    "name": "Special Finds Format",
-    "description": "Mapping format for Special Finds",
+    "name": "Generic Special Finds Format",
+    "description": "Generic Mapping format for Special Finds",
     "version": "1.5",
     "table_settings": {
         "format_type": "xlsx",

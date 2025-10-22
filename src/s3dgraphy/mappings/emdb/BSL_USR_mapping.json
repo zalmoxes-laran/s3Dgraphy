@@ -259,37 +259,37 @@
       "description": "Additional notes for preparatory layer 3."
     },
 
-    "LAYER__COLOUR": {
+    "LAYER_COLOUR": {
       "node_type": "PropertyNode",
       "property_name": "layerColour",
       "display_name": "Layer  Colour",
       "description": "Colour of the visible (finish) layer."
     },
-    "LAYER__THICKNESS": {
+    "LAYER_THICKNESS": {
       "node_type": "PropertyNode",
       "property_name": "layerThickness",
       "display_name": "Layer  Thickness",
       "description": "Thickness of the visible (finish) layer."
     },
-    "LAYER__ORGANIC_COMPONENTS": {
+    "LAYER_ORGANIC_COMPONENTS": {
       "node_type": "PropertyNode",
       "property_name": "layerOrganic",
       "display_name": "Layer  Organic Components",
       "description": "Organic components in the finish layer."
     },
-    "LAYER__INORGANIC_COMPONENTS": {
+    "LAYER_INORGANIC_COMPONENTS": {
       "node_type": "PropertyNode",
       "property_name": "layerInorganic",
       "display_name": "Layer  Inorganic Components",
       "description": "Inorganic components in the finish layer."
     },
-    "LAYER__REAR_SIDE": {
+    "LAYER_REAR_SIDE": {
       "node_type": "PropertyNode",
       "property_name": "layerRear",
       "display_name": "Layer  Rear Side",
       "description": "Rear imprint (only for detached fragments)."
     },
-    "LAYER__PREPARATORY_DRAWINGS": {
+    "LAYER_PREPARATORY_DRAWINGS": {
       "node_type": "PropertyNode",
       "property_name": "layerPrepDrawings",
       "display_name": "Layer  Preparatory Drawings",
@@ -339,7 +339,7 @@
       "display_name": "Description",
       "description": "Comprehensive description (morphology, technique, materials, arrangement, iconography, etc.)."
     },
-    "INSCRIPTIONS,_GRAFFITI,_TABULAE_LUSORIAE": {
+    "INSCRIPTIONS_GRAFFITI_TABULAE_LUSORIAE": {
       "node_type": "PropertyNode",
       "property_name": "inscriptionsGraffitiTabulae",
       "display_name": "Inscriptions, Graffiti, Tabulae Lusoriae",
@@ -488,7 +488,7 @@
       "display_name": "Dating (Absolute)",
       "description": "Absolute dating where available."
     },
-    "STILISTIC_PHASE": {
+    "STYLISTIC_PHASE": {
       "node_type": "PropertyNode",
       "property_name": "stylisticPhase",
       "display_name": "Stylistic Phase",
@@ -725,12 +725,12 @@
     { "source_column": "ID", "target_column": "PREPARATORY_LAYER_3_PREPARATORY_DRAWINGS", "edge_type": "has_property" },
     { "source_column": "ID", "target_column": "PREPARATORY_LAYER_3_NOTES", "edge_type": "has_property" },
 
-    { "source_column": "ID", "target_column": "LAYER__COLOUR", "edge_type": "has_property" },
-    { "source_column": "ID", "target_column": "LAYER__THICKNESS", "edge_type": "has_property" },
-    { "source_column": "ID", "target_column": "LAYER__ORGANIC_COMPONENTS", "edge_type": "has_property" },
-    { "source_column": "ID", "target_column": "LAYER__INORGANIC_COMPONENTS", "edge_type": "has_property" },
-    { "source_column": "ID", "target_column": "LAYER__REAR_SIDE", "edge_type": "has_property" },
-    { "source_column": "ID", "target_column": "LAYER__PREPARATORY_DRAWINGS", "edge_type": "has_property" },
+    { "source_column": "ID", "target_column": "LAYER_COLOUR", "edge_type": "has_property" },
+    { "source_column": "ID", "target_column": "LAYER_THICKNESS", "edge_type": "has_property" },
+    { "source_column": "ID", "target_column": "LAYER_ORGANIC_COMPONENTS", "edge_type": "has_property" },
+    { "source_column": "ID", "target_column": "LAYER_INORGANIC_COMPONENTS", "edge_type": "has_property" },
+    { "source_column": "ID", "target_column": "LAYER_REAR_SIDE", "edge_type": "has_property" },
+    { "source_column": "ID", "target_column": "LAYER_PREPARATORY_DRAWINGS", "edge_type": "has_property" },
     { "source_column": "ID", "target_column": "LAYER_NOTES", "edge_type": "has_property" },
 
     { "source_column": "ID", "target_column": "SURFACE", "edge_type": "has_property" },
@@ -740,7 +740,7 @@
     { "source_column": "ID", "target_column": "SURFACE_NOTES", "edge_type": "has_property" },
 
     { "source_column": "ID", "target_column": "DESCRIPTION", "edge_type": "has_property" },
-    { "source_column": "ID", "target_column": "INSCRIPTIONS,_GRAFFITI,_TABULAE_LUSORIAE", "edge_type": "has_property" },
+    { "source_column": "ID", "target_column": "INSCRIPTIONS_GRAFFITI_TABULAE_LUSORIAE", "edge_type": "has_property" },
 
     { "source_column": "ID", "target_column": "STONE_SLABS_COLOURS", "edge_type": "has_property" },
     { "source_column": "ID", "target_column": "STONE_SLABS_MATERIALS", "edge_type": "has_property" },
@@ -769,7 +769,7 @@
     { "source_column": "ID", "target_column": "NOTES", "edge_type": "has_property" },
     { "source_column": "ID", "target_column": "DATING_ELEMENTS", "edge_type": "has_property" },
     { "source_column": "ID", "target_column": "CHRONOLOGY", "edge_type": "has_property" },
-    { "source_column": "ID", "target_column": "STILISTIC_PHASE", "edge_type": "has_property" },
+    { "source_column": "ID", "target_column": "STYLISTIC_PHASE", "edge_type": "has_property" },
     { "source_column": "ID", "target_column": "PERIOD", "edge_type": "has_property" },
     { "source_column": "ID", "target_column": "STRATIGRAPHIC_PHASE", "edge_type": "has_property" },
     { "source_column": "ID", "target_column": "BIBLIOGRAPHY", "edge_type": "has_property" },
