@@ -1,4 +1,4 @@
-__version__ = "0.1.13"
+__version__ = "0.1.14"
 
 # s3Dgraphy/__init__.py
 
