@@ -1,7 +1,7 @@
 s3dgraphy Documentation
 ========================
 
-.. image:: https://img.shields.io/badge/version-0.1.0-blue.svg
+.. image:: https://img.shields.io/badge/version-0.1.13-blue.svg
    :target: https://pypi.org/project/s3dgraphy/
    :alt: Version
 
@@ -18,34 +18,66 @@ for archaeological stratigraphic documentation and virtual reconstruction proces
 It provides the core graph structure and node management system that powers the 
 Extended Matrix Framework (EMF).
 
-🎯 **Key Features**
+🎯 What is s3dgraphy?
+---------------------
+
+s3dgraphy is the **core graph library** for Extended Matrix, providing:
+
+- **Graph data structures** for archaeological documentation
+- **Node and edge types** specific to stratigraphy and paradata
+- **Import capabilities** from GraphML, XLSX, and SQLite databases
+- **Export to JSON** for web visualization platforms
+- **CIDOC-CRM mappings** for semantic interoperability
+- **Integration with EM-tools** for Blender 3D visualization
+
+Key Features
+------------
 
 🔗 **Graph-Based Architecture**
    Native support for complex archaeological relationships and temporal sequences
 
 📊 **Stratigraphic Modeling**
-   Specialized node types for archaeological units, documentation, and interpretation
+   Specialized node types for stratigraphic units, documentation, and interpretation:
+   
+   - Physical units (US, SF, USD)
+   - Virtual reconstructions (USV, VSF)
+   - Documentation (DOC)
+   - Paradata chains (EXT, COMB, PROP)
 
 🔄 **Format Interoperability**
-   Import/export support for GraphML, JSON, and archaeological data formats
+   Import from multiple formats:
+   
+   - **GraphML** - Primary format for Extended Matrix graphs
+   - **XLSX** - Excel files with JSON mapping configurations
+   - **SQLite** - pyArchInit database support
+
+📤 **Export to JSON**
+   Export graphs to JSON for web platforms (Heriverse, ATON)
 
 🏛️ **Archaeological Standards**
-   Built-in support for CIDOC-CRM mapping and archaeological best practices
+   Built-in support for CIDOC-CRM mapping with extensions:
+   
+   - CIDOC-CRM (core)
+   - CRMarchaeo (archaeological)
+   - CRMdig (digital provenance)
+   - CRMgeo (geographic)
+   - CRMinf (argumentation)
+   - CIDOC-S3D (Extended Matrix custom)
 
-⚡ **Extensible Design**
-   Easy to extend with custom node types and relationship definitions
-
-📤 **Multiple Export Formats**
-   Export to GraphML, JSON, and standards-compliant formats
+⚡ **Performance Optimized**
+   Graph indexing system for efficient queries on large datasets
 
 🔄 **Blender Integration**
-   Direct integration with EMtools for 3D archaeological visualization
+   Direct integration with EM-tools for 3D archaeological visualization
 
-📖 **Rich Documentation**
-   Comprehensive guides, tutorials, and API reference
+📖 **Comprehensive Documentation**
+   Detailed guides, tutorials, and API reference
 
 Quick Start
 -----------
+
+Installation
+~~~~~~~~~~~~
 
 Install s3dgraphy using pip:
 
@@ -53,7 +85,18 @@ Install s3dgraphy using pip:
 
    pip install s3dgraphy
 
-Create your first archaeological graph:
+Or from source:
+
+.. code-block:: bash
+
+   git clone https://github.com/zalmoxes-laran/s3dgraphy.git
+   cd s3dgraphy
+   pip install -e .
+
+Basic Usage
+~~~~~~~~~~~
+
+Create and populate a graph:
 
 .. code-block:: python
 
@@ -61,89 +104,316 @@ Create your first archaeological graph:
    from s3dgraphy.nodes import StratigraphicNode, DocumentNode
    
    # Create a new graph
-   graph = Graph("my_site")
+   graph = Graph("pompeii_house_vii")
    
    # Add a stratigraphic unit
    us001 = StratigraphicNode("US001", node_type="US")
-   us001.set_attribute("description", "Stone wall foundation")
+   us001.name = "US001"
+   us001.description = "Mosaic floor, main atrium"
+   us001.set_attribute("material", "tesserae")
+   us001.set_attribute("dating", "1st century CE")
    graph.add_node(us001)
    
    # Add documentation
-   doc001 = DocumentNode("DOC001", "site_plan.pdf")
+   doc001 = DocumentNode("DOC001")
+   doc001.name = "DOC001"
+   doc001.description = "Floor photograph"
+   doc001.set_attribute("type", "photograph")
    graph.add_node(doc001)
    
    # Create relationship
-   graph.add_edge(us001.node_id, doc001.node_id, "documented_by")
+   graph.add_edge("edge_001", "US001", "DOC001", "has_documentation")
    
-   # Export to GraphML
-   graph.export_graphml("my_site.graphml")
+   print(f"Graph contains {len(graph.nodes)} nodes and {len(graph.edges)} edges")
 
-Extended Matrix Language Reference
-==================================
+Import from GraphML
+~~~~~~~~~~~~~~~~~~~
 
-s3dgraphy implements the Extended Matrix formal language. For a complete 
-understanding of EM concepts, node types, and theoretical foundations, 
-please refer to the `Extended Matrix Documentation 
-<https://docs.extendedmatrix.org/en/1.5.0dev/>`_.
+.. code-block:: python
 
-The Extended Matrix documentation includes detailed explanations of:
+   from s3dgraphy.importer import GraphMLImporter
+   from s3dgraphy import Graph
+   
+   # Create graph
+   graph = Graph("my_excavation")
+   
+   # Import GraphML file
+   importer = GraphMLImporter("excavation_data.graphml")
+   graph = importer.parse()
+   
+   print(f"Imported {len(graph.nodes)} nodes")
+   
+   # Check for warnings
+   if graph.warnings:
+       print("Import warnings:")
+       for warning in graph.warnings:
+           print(f"  - {warning}")
 
-- **Stratigraphic and auxiliary node types** – Complete catalog of archaeological units
-- **Connector semantics and usage** – Temporal and logical relationships
-- **Theoretical archaeological foundations** – Scientific methodology and best practices
-- **Canvas and visual representation guidelines** – Standardized notation system
-- **Formal language specification** – Grammar and syntax rules
+Export to JSON
+~~~~~~~~~~~~~~
 
-This separation allows s3dgraphy to focus on technical implementation while the 
-Extended Matrix documentation provides the conceptual framework and human-readable 
-explanations of the methodology.
+.. code-block:: python
 
-Archaeological Applications
----------------------------
+   from s3dgraphy.exporter import JSONExporter
+   
+   # Create exporter
+   exporter = JSONExporter("output/project.json")
+   
+   # Export all graphs
+   exporter.export_graphs()
+   
+   print("Export completed")
 
-s3dgraphy is particularly suited for:
+Import from XLSX
+~~~~~~~~~~~~~~~~
 
-* **Stratigraphic Analysis**: Model archaeological layers and their temporal relationships
-* **Site Documentation**: Create structured records of excavation data
-* **3D Visualization**: Integration with Blender for immersive archaeological presentations
-* **Data Exchange**: Standards-compliant export for research collaboration
-* **Temporal Modeling**: Track changes over time in archaeological contexts
-* **Virtual Reconstruction**: Document hypotheses and reconstruction processes
-* **Paradata Management**: Track sources and analytical processes
+.. code-block:: python
 
-Integration with EMtools
-------------------------
+   from s3dgraphy.importer import MappedXLSXImporter
+   from s3dgraphy import Graph
+   
+   # Create graph
+   graph = Graph("xlsx_import")
+   
+   # Import with predefined mapping
+   importer = MappedXLSXImporter(
+       filepath="stratigraphic_units.xlsx",
+       mapping_name="emdb_basic",
+       graph=graph
+   )
+   
+   graph = importer.parse()
+   print(f"Imported {len(graph.nodes)} nodes from XLSX")
 
-s3dgraphy is the core library powering `EMtools <https://github.com/zalmoxes-laran/EM-blender-tools>`_, 
-a Blender extension that brings the Extended Matrix methodology to 3D archaeological visualization.
+Architecture Overview
+---------------------
 
-The integration provides:
+Core Components
+~~~~~~~~~~~~~~~
 
-- **Real-time 3D annotation** of stratigraphic units
-- **Visual graph management** within Blender's interface  
-- **Export capabilities** to ATON 3, Heriverse, and other platforms
-- **3D paradata visualization** for reconstruction documentation
+**Graph Class**
+   Central container managing nodes and edges with indexing for performance
+
+**Node Types**
+   Specialized classes for different archaeological entities:
+   
+   - StratigraphicNode (US, USV, SF, VSF, USD)
+   - ParadataNode (DOC, EXT, COMB, PROP)
+   - GroupNode (Paradata groups, time branches, activities)
+   - RepresentationModelNode (3D models)
+   - ReferenceNode (GEO, LINK, EP, AUTH)
+
+**Edge Types**
+   Defined relationships with CIDOC-CRM mappings:
+   
+   - Temporal (is_before, has_same_time, changed_from)
+   - Physical (abuts, fills, cuts, covers, rests_on)
+   - Documentation (has_documentation, extracted_from)
+   - Properties (has_property)
+   - Paradata (has_paradata_nodegroup)
+   - Epochs (has_first_epoch, survive_in_epoch)
+
+**Import System**
+   Modular importers for GraphML, XLSX, SQLite with JSON mapping support
+
+**Export System**
+   JSON exporter for web visualization platforms
+
+**Multi-Graph Manager**
+   Manage multiple graphs within a single project
+
+JSON Configuration Files
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+s3dgraphy uses three core JSON configuration files:
+
+1. **s3Dgraphy_node_datamodel.json** (v1.5.2)
+   
+   - Defines all node types and properties
+   - CIDOC-CRM mappings for each node type
+   - Node hierarchy and inheritance
+
+2. **s3Dgraphy_connections_datamodel.json** (v1.5.2)
+   
+   - Defines all edge types
+   - CIDOC-CRM mappings for relationships
+   - Allowed source/target node combinations
+
+3. **em_visual_rules.json**
+   
+   - Visual representation rules for Blender
+   - 3D models, 2D icons, colors, styles
+
+See :doc:`s3dgraphy_json_config` for detailed documentation.
+
+Use Cases
+---------
+
+Archaeological Documentation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create comprehensive stratigraphic documentation:
+
+.. code-block:: python
+
+   # Document stratigraphic sequence
+   graph = Graph("excavation_area_a")
+   
+   # Add units
+   wall = StratigraphicNode("US001", node_type="US")
+   wall.description = "Stone wall foundation"
+   
+   floor = StratigraphicNode("US002", node_type="US")
+   floor.description = "Mosaic floor"
+   
+   # Add temporal relationship
+   graph.add_node(wall)
+   graph.add_node(floor)
+   graph.add_edge("e1", "US001", "US002", "is_before")
+
+Virtual Reconstruction
+~~~~~~~~~~~~~~~~~~~~~~
+
+Document 3D reconstruction processes:
+
+.. code-block:: python
+
+   # Virtual unit
+   usv = StratigraphicNode("USV001", node_type="USVs")
+   usv.description = "Reconstructed upper wall"
+   
+   # Link to documentation
+   doc = DocumentNode("DOC001")
+   doc.description = "Archaeological parallels"
+   
+   # Extraction process
+   ext = ExtractorNode("EXT001")
+   ext.source = "Comparative analysis"
+   
+   graph.add_node(usv)
+   graph.add_node(doc)
+   graph.add_node(ext)
+   
+   # Create paradata chain
+   graph.add_edge("e1", "EXT001", "DOC001", "extracted_from")
+   graph.add_edge("e2", "USV001", "EXT001", "has_paradata_nodegroup")
+
+Data Integration
+~~~~~~~~~~~~~~~~
+
+Import from multiple sources:
+
+.. code-block:: python
+
+   # Import GraphML base structure
+   importer1 = GraphMLImporter("base_stratigraphy.graphml")
+   graph = importer1.parse()
+   
+   # Add data from Excel
+   importer2 = MappedXLSXImporter(
+       filepath="additional_data.xlsx",
+       mapping_name="emdb_basic",
+       graph=graph
+   )
+   graph = importer2.parse()
+   
+   # Export combined data
+   from s3dgraphy.exporter import export_to_json
+   export_to_json("combined_data.json", [graph.graph_id])
 
 Extended Matrix Ecosystem
 --------------------------
 
 s3dgraphy is part of the broader Extended Matrix Framework:
 
-* **EM-tools for Blender** - 3D visualization and annotation
-* **Extended Matrix Documentation** - Formal language reference and tutorials
-* **3D Survey Collection (3DSC)** - High-quality 3D model preparation
-* **ATON 3 Framework** - Web-based archaeological visualization
-* **Heriverse Platform** - Virtual heritage experiences
+**EM-tools for Blender**
+   3D visualization and annotation using s3dgraphy as core library
+
+**Extended Matrix Documentation**
+   Formal language reference and tutorials
+
+**3D Survey Collection (3DSC)**
+   High-quality 3D model preparation
+
+**ATON 3 Framework**
+   Web-based archaeological visualization
+
+**Heriverse Platform**
+   Virtual heritage experiences and visualization
+
+Repository and Resources
+------------------------
+
+**GitHub Repository**
+   https://github.com/zalmoxes-laran/s3dgraphy
+
+**PyPI Package**
+   https://pypi.org/project/s3dgraphy/
+
+**EM-tools for Blender**
+   https://github.com/zalmoxes-laran/EM-blender-tools
+
+**Extended Matrix Project**
+   https://www.extendedmatrix.org
+
+**Issue Tracker**
+   https://github.com/zalmoxes-laran/s3dgraphy/issues
 
 Community & Support
---------------------
+-------------------
 
-* **GitHub Repository**: https://github.com/zalmoxes-laran/s3dgraphy
-* **Issue Tracker**: https://github.com/zalmoxes-laran/s3dgraphy/issues
-* **Extended Matrix Project**: https://www.extendedmatrix.org
-* **Telegram Group**: https://t.me/UserGroupEM
-* **Facebook Group**: https://www.facebook.com/groups/extendedmatrix
-* **Contact**: emanuel.demetrescu@cnr.it
+**Telegram Group**
+   https://t.me/UserGroupEM
+
+**Facebook Group**
+   https://www.facebook.com/groups/extendedmatrix
+
+**Email Contact**
+   emanuel.demetrescu@cnr.it
+
+Current Status
+--------------
+
+**Version**: 0.1.13
+
+**Status**: Active development
+
+**Python**: 3.8+
+
+**License**: GPL-3.0
+
+Roadmap
+-------
+
+Completed Features
+~~~~~~~~~~~~~~~~~~
+
+✅ Core graph structure with indexing
+✅ Node type system with CIDOC-CRM mappings
+✅ GraphML import
+✅ XLSX import with mapping system
+✅ SQLite/pyArchInit import
+✅ JSON export
+✅ Multi-graph management
+✅ Integration with EM-tools for Blender
+
+Planned Features
+~~~~~~~~~~~~~~~~
+
+**Near-term** (next releases):
+
+- GraphML export functionality
+- Enhanced validation system
+- Performance optimizations for very large graphs
+- Additional CIDOC-CRM mapping refinements
+
+**Long-term**:
+
+- GeoJSON export for GIS integration
+- RDF/TTL export for semantic web
+- Neo4j export for graph databases
+- Command-line interface (CLI)
+- Standalone GUI application
 
 Table of Contents
 =================
@@ -160,17 +430,12 @@ Table of Contents
    :maxdepth: 2
    :caption: User Guide
    
-   s3dgraphy_import_export_complete
+   s3dgraphy_import_export
+   s3dgraphy_mapping_system
+   s3dgraphy_json_config
+   s3dgraphy_integration_emtools
    graph_management
    node_types
-   integration
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Advanced Guides
-   
-   guides/s3dgraphy_operators_guide
-   guides/s3dgraphy_caching_performance
 
 .. toctree::
    :maxdepth: 2
@@ -192,13 +457,6 @@ Table of Contents
    examples/archaeological_workflow
    examples/blender_integration
    examples/data_migration
-   examples/s3dgraphy_workflow_examples
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Tutorials
-   
-   tutorials/basic_usage
 
 .. toctree::
    :maxdepth: 2
@@ -214,12 +472,22 @@ Table of Contents
    :caption: Support
    
    troubleshooting
+   faq
 
-.. toctree::
-   :maxdepth: 1
-   :caption: Legacy Documentation
-   
-   introduction
+Citation
+--------
+
+If you use s3dgraphy in your research, please cite:
+
+.. code-block:: bibtex
+
+   @software{s3dgraphy,
+     title = {s3dgraphy: Core Graph Library for Extended Matrix},
+     author = {Demetrescu, Emanuel},
+     year = {2024},
+     url = {https://github.com/zalmoxes-laran/s3dgraphy},
+     version = {0.1.13}
+   }
 
 Indices and Tables
 ==================
