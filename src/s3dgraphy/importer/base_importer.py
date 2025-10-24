@@ -48,8 +48,8 @@ class BaseImporter(ABC):
             logger.debug(f"Converted filepath using os.path.abspath: {filepath} -> {self.filepath}")
         
         # Verifica che il file esista
-        if not os.path.exists(self.filepath):
-            raise FileNotFoundError(f"File not found: {self.filepath} (original path: {filepath})")
+        #if not os.path.exists(self.filepath):
+        #    raise FileNotFoundError(f"File not found: {self.filepath} (original path: {filepath})")
             
         self.id_column = id_column
         self.mapping = self._load_mapping(mapping_name) if mapping_name else None
