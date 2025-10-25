@@ -5,6 +5,12 @@ import os
 import json
 from pathlib import Path
 
+
+import io
+import tempfile
+import shutil
+import platform
+
 class MappedXLSXImporter(BaseImporter):
     def __init__(self, filepath: str, mapping_name: str, overwrite: bool = False, 
                 existing_graph=None):
@@ -33,13 +39,17 @@ class MappedXLSXImporter(BaseImporter):
             self.graph = Graph(graph_id="temp_graph")
             self._use_existing_graph = False
             print(f"MappedXLSXImporter: Created new unregistered graph (caller must register)")
-            
+                
     def parse(self) -> Graph:
         """
         Parse Excel file with column name normalization.
         Handles differences between Excel column names (with spaces) and mapping names (with underscores).
         """
+        temp_file_path = None
+        file_content = None
+        
         try:
+            
             # Get settings from mapping
             table_settings = self.mapping.get('table_settings', {})
             start_row = table_settings.get('start_row', 0)
@@ -49,16 +59,114 @@ class MappedXLSXImporter(BaseImporter):
             print(f"File: {self.filepath}")
             print(f"Sheet: {sheet_name}")
             print(f"Start row: {start_row}")
+            print(f"Platform: {platform.system()}")
+            
+            # ✅ STRATEGIA DOPPIA: Buffer su macOS/Linux, copia temp su Windows
+            is_windows = platform.system() == "Windows"
+            
+            if is_windows:
+                # ✅ WINDOWS: Copia il file in temp
+                print(f"Windows detected - using temporary file copy...")
+                                
+                try:
+                    temp_dir = tempfile.gettempdir()
+                    temp_filename = f"em_mapped_{os.path.basename(self.filepath)}"
+                    temp_file_path = os.path.join(temp_dir, temp_filename)
+                    
+                    print(f"Copying to: {temp_file_path}")
+                    
+                    # ✅ Strategia 1: Prova con mmap (accesso memoria condivisa)
+                    try:
+                        import mmap
+                        print(f"Attempting mmap read...")
+                        
+                        with open(self.filepath, 'rb') as f:
+                            with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                                file_bytes = mm[:]
+                        
+                        print(f"✅ File read via mmap ({len(file_bytes)} bytes)")
+                        
+                    except (PermissionError, OSError, ValueError) as mmap_error:
+                        print(f"mmap failed: {mmap_error}, trying pathlib...")
+                        
+                        # ✅ Strategia 2: Prova con pathlib (lettura diretta veloce)
+                        try:
+                            from pathlib import Path
+                            file_bytes = Path(self.filepath).read_bytes()
+                            print(f"✅ File read via pathlib ({len(file_bytes)} bytes)")
+                            
+                        except PermissionError as path_error:
+                            print(f"pathlib failed: {path_error}, trying buffering=0...")
+                            
+                            # ✅ Strategia 3: Prova con buffering disabilitato
+                            try:
+                                with open(self.filepath, 'rb', buffering=0) as f:
+                                    file_bytes = f.read()
+                                print(f"✅ File read with buffering=0 ({len(file_bytes)} bytes)")
+                                
+                            except PermissionError as buffer_error:
+                                # ✅ Strategia 4: Ultimo tentativo - retry con sleep
+                                print(f"All methods failed, trying retry with delay...")
+                                
+                                import time
+                                last_error = None
+                                for attempt in range(3):
+                                    try:
+                                        time.sleep(0.5)  # Aspetta mezzo secondo
+                                        with open(self.filepath, 'rb') as f:
+                                            file_bytes = f.read()
+                                        print(f"✅ File read on retry attempt {attempt + 1}")
+                                        break
+                                    except PermissionError as e:
+                                        last_error = e
+                                        if attempt < 2:
+                                            print(f"Retry {attempt + 1}/3 failed, waiting...")
+                                else:
+                                    # Tutti i tentativi falliti
+                                    raise ImportError(
+                                        f"⚠️ CANNOT ACCESS FILE ⚠️\n\n"
+                                        f"The file appears to be locked by Excel or another application.\n\n"
+                                        f"Solutions:\n"
+                                        f"1. Close Excel and try again\n"
+                                        f"2. Save a copy of the file and import that\n"
+                                        f"3. Use 'File > Save As' in Excel to create a new version\n\n"
+                                        f"File: {os.path.basename(self.filepath)}\n"
+                                        f"Location: {os.path.dirname(self.filepath)}\n\n"
+                                        f"Technical error: {str(last_error)}"
+                                    )
+                    
+                    # ✅ Se siamo arrivati qui, abbiamo i bytes! Scriviamoli nel file temp
+                    with open(temp_file_path, 'wb') as f:
+                        f.write(file_bytes)
+                    
+                    print(f"✅ Temporary file created successfully")
+                    working_path = temp_file_path
+                    
+                except Exception as e:
+                    raise ImportError(f"Error accessing file: {str(e)}")
+                    
+            else:
+                # ✅ macOS/Linux: Usa buffer in memoria
+                print(f"macOS/Linux detected - using memory buffer...")
+                
+                try:
+                    with open(self.filepath, 'rb') as f:
+                        file_content = io.BytesIO(f.read())
+                    print(f"✅ File loaded in memory ({len(file_content.getvalue())} bytes)")
+                    working_path = file_content
+                except Exception as e:
+                    raise ImportError(f"Error reading file: {str(e)}")
             
             # Read Excel file
             # IMPORTANTE: header=0 dice a pandas che le intestazioni sono alla riga 0
             # Poi usiamo iloc per prendere solo i dati dalla riga start_row in poi
             df_full = pd.read_excel(
-                self.filepath,
+                working_path,  # ✅ Usa working_path invece di self.filepath
                 sheet_name=sheet_name,
                 header=0,  # Le intestazioni sono SEMPRE alla prima riga (indice 0)
                 na_values=['', 'NA', 'N/A'],
-                keep_default_na=True
+                keep_default_na=True,
+                engine='openpyxl'
             )
             
             print(f"Full DataFrame shape: {df_full.shape}")
@@ -296,6 +404,27 @@ class MappedXLSXImporter(BaseImporter):
             import traceback
             traceback.print_exc()
             raise
+        
+        finally:
+            # ✅ CLEANUP: Chiudi buffer se necessario
+            if file_content is not None:
+                try:
+                    file_content.close()
+                    print("Memory buffer closed")
+                except:
+                    pass
+            
+            # ✅ CLEANUP: Rimuovi file temporaneo su Windows
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.remove(temp_file_path)
+                    print(f"Temporary file removed: {temp_file_path}")
+                except Exception as e:
+                    print(f"Warning: Could not remove temp file: {e}")
+            
+            # Garbage collection
+            import gc
+            gc.collect()
 
     def validate_mapping(self):
 
