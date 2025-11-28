@@ -389,7 +389,7 @@ class BaseImporter(ABC):
         if self.warnings:
             print("\nWarnings during import:")
             for warning in self.warnings:
-                #print(f"- {warning}")
+                print(f"- {warning}")
 
     def validate_mapping(self):
         """Validate the mapping configuration if present."""
