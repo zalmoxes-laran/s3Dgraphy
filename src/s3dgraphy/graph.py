@@ -195,7 +195,7 @@ class Graph:
         self._indices_dirty = True  # ← Aggiunto per invalidare gli indici
         return edge
 
-    def connect_paradatagroup_propertynode_to_stratigraphic(self, verbose=True):
+    def connect_paradatagroup_propertynode_to_stratigraphic(self, verbose=False):
         """
         Identifica le relazioni tra unità stratigrafiche e ParadataNodeGroup,
         poi collega direttamente le unità stratigrafiche ai PropertyNode 

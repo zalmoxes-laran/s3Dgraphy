@@ -217,7 +217,7 @@ class BaseImporter(ABC):
             self.warnings.append(f"Row skipped: invalid ID value")
             return None
         
-        print(f"Processing row for ID: {target_name}")
+        #print(f"Processing row for ID: {target_name}")
         
         # ✅ Check if we're working with existing graph (MappedXLSXImporter with existing_graph)
         is_enriching_existing = getattr(self, '_use_existing_graph', False)
@@ -226,7 +226,7 @@ class BaseImporter(ABC):
         existing_node = self._find_node_by_name(target_name)
         
         if existing_node:
-            print(f"Found existing node: {existing_node.name} (ID: {existing_node.node_id})")
+            #print(f"Found existing node: {existing_node.name} (ID: {existing_node.node_id})")
             # Process properties for existing node
             self._process_properties(row_data, existing_node.node_id, existing_node)
             return existing_node
@@ -234,12 +234,12 @@ class BaseImporter(ABC):
         elif is_enriching_existing:
             # We're enriching existing graph but node not found - SKIP this row
             self.warnings.append(f"Node '{target_name}' not found in existing graph - SKIPPED")
-            print(f"SKIPPED: Node '{target_name}' not found in existing graph")
+            #print(f"SKIPPED: Node '{target_name}' not found in existing graph")
             return None
             
         else:
             # We're creating new graph - create new node
-            print(f"Creating new node: {target_name}")
+            #print(f"Creating new node: {target_name}")
             
             description_column = self._get_description_column()
             description = str(row_data.get(description_column, '')) if description_column else ''
@@ -389,7 +389,7 @@ class BaseImporter(ABC):
         if self.warnings:
             print("\nWarnings during import:")
             for warning in self.warnings:
-                print(f"- {warning}")
+                #print(f"- {warning}")
 
     def validate_mapping(self):
         """Validate the mapping configuration if present."""

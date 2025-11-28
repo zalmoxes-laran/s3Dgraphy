@@ -63,12 +63,12 @@ class GraphMLImporter:
                     # Extract ID if present in vocabulary
                     if 'ID' in vocabolario:
                         graph_code = vocabolario['ID']
-                        print(f"Found graph code from vocabulary: {graph_code}")
+                        #print(f"Found graph code from vocabulary: {graph_code}")
                     
                     # If there's a specific ID in the vocabulary, use it
                     if 'graph_id' in vocabolario:
                         graph_id = vocabolario['graph_id']
-                        print(f"Found specific graph ID: {graph_id}")
+                        #print(f"Found specific graph ID: {graph_id}")
                     
                     break
                 except Exception as e:
@@ -77,12 +77,12 @@ class GraphMLImporter:
         # If we didn't find a graph_code, use MISSINGCODE
         if not graph_code or graph_code == "site_id":
             graph_code = "MISSINGCODE"
-            print(f"Using fallback graph code: {graph_code}")
+            #print(f"Using fallback graph code: {graph_code}")
         
         # If we don't have a graph_id, generate a UUID
         if not graph_id:
             graph_id = str(uuid.uuid4())
-            print(f"Generated graph ID from UUID: {graph_id}")
+            #print(f"Generated graph ID from UUID: {graph_id}")
         
         return graph_id, graph_code
 
@@ -120,7 +120,7 @@ class GraphMLImporter:
 
         # Aggiungi qui la nuova funzionalità per collegare PropertyNode dai ParadataNodeGroup
         # Impostare verbose=True per avere output dettagliati durante il debug
-        stats = self.graph.connect_paradatagroup_propertynode_to_stratigraphic(verbose=True)
+        stats = self.graph.connect_paradatagroup_propertynode_to_stratigraphic(verbose=False)
         if stats["connections_created"] > 0:
             print(f"\nCreati {stats['connections_created']} nuovi collegamenti diretti tra unità stratigrafiche e PropertyNode")
 
@@ -128,7 +128,7 @@ class GraphMLImporter:
         self.connect_nodes_to_epochs()
         
         br_nodes = [n for n in self.graph.nodes if hasattr(n, 'node_type') and n.node_type == "BR"]
-        print(f"\nTotal BR nodes included in the graph: {len(br_nodes)}")
+        #print(f"\nTotal BR nodes included in the graph: {len(br_nodes)}")
         for node in br_nodes:
             print(f"  BR Node: UUID={node.node_id}, Original ID={node.attributes.get('original_id', 'Unknown')}, y_pos={node.attributes.get('y_pos', 'Unknown')}")
 
@@ -157,7 +157,7 @@ class GraphMLImporter:
         # Registra i nodi con più occorrenze
         duplicate_ids = {node_id for node_id, count in all_node_ids.items() if count > 1}
         if duplicate_ids:
-            print(f"Attenzione: rilevati {len(duplicate_ids)} ID di nodi duplicati nel file GraphML:")
+            #print(f"Attenzione: rilevati {len(duplicate_ids)} ID di nodi duplicati nel file GraphML:")
             for node_id in duplicate_ids:
                 print(f"  - {node_id}")
         
@@ -176,7 +176,7 @@ class GraphMLImporter:
         Esegue il parsing degli archi dal file GraphML.
         """
         alledges = tree.findall('.//{http://graphml.graphdrawing.org/xmlns}edge')
-        print(f"Found {len(alledges)} edges in GraphML")
+        #print(f"Found {len(alledges)} edges in GraphML")
         
         # Prima traccia tutti gli ID originali e le loro relazioni
         edge_original_mappings = []
@@ -189,10 +189,10 @@ class GraphMLImporter:
             
             # Gestisci gli ID duplicati
             if original_source_id in self.duplicate_id_map:
-                print(f"Remapping source: {original_source_id} -> {self.duplicate_id_map[original_source_id]}")
+                #print(f"Remapping source: {original_source_id} -> {self.duplicate_id_map[original_source_id]}")
                 original_source_id = self.duplicate_id_map[original_source_id]
             if original_target_id in self.duplicate_id_map:
-                print(f"Remapping target: {original_target_id} -> {self.duplicate_id_map[original_target_id]}")
+                #print(f"Remapping target: {original_target_id} -> {self.duplicate_id_map[original_target_id]}")
                 original_target_id = self.duplicate_id_map[original_target_id]
             
             # Salva le mappature originali
@@ -618,7 +618,7 @@ class GraphMLImporter:
             epoch_node.max_y = y_max
             self.graph.add_node(epoch_node)
             epoch_nodes.append(epoch_node)
-            print(f"Creato nodo epoca {i}: ID orig: {original_id}, UUID: {uuid_id}")
+            #print(f"Creato nodo epoca {i}: ID orig: {original_id}, UUID: {uuid_id}")
 
         # Aggiorna i nomi e i colori delle epoche
         print(f"Aggiornamento nomi epoche...")
@@ -632,7 +632,7 @@ class GraphMLImporter:
                     # Ottieni il colore se presente
                     e_color = nodelabel.attrib.get('backgroundColor', "#BCBCBC")
                     
-                    print(f"Processando etichetta con ID orig: {original_id}")
+                    #print(f"Processando etichetta con ID orig: {original_id}")
                     
                     # Cerca l'UUID corrispondente
                     uuid_id = self.id_mapping.get(original_id)
@@ -671,12 +671,12 @@ class GraphMLImporter:
                         
                         epoch_node.set_start_time(start_value)
                         epoch_node.set_end_time(end_value)
-                        print(f"Aggiornato nodo epoca: '{stringa_pulita}' (start={start_value}, end={end_value})")
+                        #print(f"Aggiornato nodo epoca: '{stringa_pulita}' (start={start_value}, end={end_value})")
                     except Exception as e:
                         epoch_node.set_name(label_text)
                         print(f"Fallback al nome completo: {label_text}: {str(e)}")                    
                     epoch_node.set_color(e_color)
-                    print(f"Impostato colore: {e_color}")
+                    #print(f"Impostato colore: {e_color}")
             except Exception as e:
                 print(f"ERROR durante l'elaborazione dell'etichetta: {e}")
 
@@ -1220,7 +1220,8 @@ class GraphMLImporter:
             nodedescription = ''
             
         if nodedescription == "_continuity":
-            print(f"Extracting continuity node: ID={node_id}, y_pos={node_y_pos}")
+            #print(f"Extracting continuity node: ID={node_id}, y_pos={node_y_pos}")
+            pass
             
         return nodedescription, node_y_pos, node_id
 

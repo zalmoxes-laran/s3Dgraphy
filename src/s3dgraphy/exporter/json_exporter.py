@@ -73,7 +73,7 @@ class JSONExporter:
             if graph and hasattr(graph, 'graph_id'):
                 # Usa l'ID effettivo del grafo come chiave
                 actual_id = graph.graph_id  # 
-                print(f"Exporting graph with ID: {actual_id}")
+                #print(f"Exporting graph with ID: {actual_id}")
                 export_data["graphs"][actual_id] = self._process_graph(graph)
                 
         with open(self.output_path, 'w', encoding='utf-8') as f:
@@ -82,10 +82,10 @@ class JSONExporter:
     def _process_graph(self, graph: Graph) -> Dict[str, Any]:
         """Process a single graph into its JSON representation."""
         
-        print(f"\nProcessing graph for JSON export:")
-        print(f"Graph name: {graph.name}")
-        print(f"Graph description: {graph.description}")
-        print(f"Graph data: {graph.data}")
+        #print(f"\nProcessing graph for JSON export:")
+        #print(f"Graph name: {graph.name}")
+        #print(f"Graph description: {graph.description}")
+        #print(f"Graph data: {graph.data}")
 
         # Raccogli gli ID degli autori dal grafo
         authors = graph.data.get('authors', [])
@@ -97,7 +97,7 @@ class JSONExporter:
                         author_node = graph.find_node_by_id(edge.edge_source)
                         if author_node and author_node.node_type == 'author':
                             authors.append(edge.edge_source)
-                            print(f"Found author from edge: {edge.edge_source}")
+                            #print(f"Found author from edge: {edge.edge_source}")
 
         result = {
             "name": graph.name.get('default', ''),
@@ -112,10 +112,10 @@ class JSONExporter:
             "edges": self._process_edges(graph)
         }
         
-        print(f"\nJSON output for graph metadata:")
-        print(f"Name: {result['name']}")
-        print(f"Description: {result['description']}")
-        print(f"Defaults: {result['defaults']}")
+        #print(f"\nJSON output for graph metadata:")
+        #print(f"Name: {result['name']}")
+        #print(f"Description: {result['description']}")
+        #print(f"Defaults: {result['defaults']}")
         
         return result
 
@@ -157,7 +157,7 @@ class JSONExporter:
                         "url": target_node.data.get("url", "") if hasattr(target_node, "data") else "",
                         "url_type": target_node.data.get("url_type", "") if hasattr(target_node, "data") else ""
                     })
-                    print(f"Found link relationship: {source_node.node_id} -> {target_node.node_id}")
+                    #print(f"Found link relationship: {source_node.node_id} -> {target_node.node_id}")
         
         # Ora elabora tutti i nodi
         for node in graph.nodes:
@@ -208,7 +208,7 @@ class JSONExporter:
             elif node.node_type == "link":
                 node_data = self._prepare_node_data(node)
                 nodes["links"][node.node_id] = node_data
-                print(f"Added link node to JSON: {node.node_id}")
+                #print(f"Added link node to JSON: {node.node_id}")
                 
             elif node.node_type == "geo_position":
                 node_data = self._prepare_node_data(node)
