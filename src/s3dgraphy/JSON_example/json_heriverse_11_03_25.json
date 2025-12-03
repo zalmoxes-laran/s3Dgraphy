@@ -491,7 +491,7 @@
             },
             "epochs": {
               "row_2": {
-                "type": "epoch",
+                "type": "EpochNode",
                 "name": "Humus",
                 "description": "",
                 "data": {
@@ -503,7 +503,7 @@
                 }
               },
               "row_4": {
-                "type": "epoch",
+                "type": "EpochNode",
                 "name": "XX sec",
                 "description": "",
                 "data": {
@@ -515,7 +515,7 @@
                 }
               },
               "row_0": {
-                "type": "epoch",
+                "type": "EpochNode",
                 "name": "Post antiquity",
                 "description": "",
                 "data": {
@@ -527,7 +527,7 @@
                 }
               },
               "row_1": {
-                "type": "epoch",
+                "type": "EpochNode",
                 "name": "II A.D.",
                 "description": "",
                 "data": {
@@ -539,7 +539,7 @@
                 }
               },
               "row_3": {
-                "type": "epoch",
+                "type": "EpochNode",
                 "name": "Geologic",
                 "description": "",
                 "data": {

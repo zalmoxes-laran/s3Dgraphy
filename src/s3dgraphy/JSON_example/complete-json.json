@@ -103,7 +103,7 @@
                 },
                 "epochs": {
                     "epoch_republican": {
-                        "type": "epoch",
+                        "type": "EpochNode",
                         "name": "Fase repubblicana della domus",
                         "description": "Prima fase costruttiva dell'edificio",
                         "data": {
@@ -113,7 +113,7 @@
                         }
                     },
                     "epoch_imperial": {
-                        "type": "epoch",
+                        "type": "EpochNode",
                         "name": "Fase imperiale della domus",
                         "description": "Ristrutturazione di età augustea",
                         "data": {
