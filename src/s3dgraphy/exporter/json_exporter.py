@@ -170,7 +170,7 @@ class JSONExporter:
                 node_data = self._prepare_node_data(node)
                 nodes["stratigraphic"][node.node_type][node.node_id] = node_data
                 
-            elif node.node_type == "epoch":
+            elif node.node_type == "EpochNode":
                 node_data = {
                     "type": node.node_type,
                     "name": node.name,

@@ -464,7 +464,7 @@ EpochNode
        """
        
        def __init__(self, node_id: str, name: str, start_time: int, end_time: int):
-           super().__init__(node_id, "epoch")
+           super().__init__(node_id, "EpochNode")
            self.name = name
            self.start_time = start_time
            self.end_time = end_time

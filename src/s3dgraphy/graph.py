@@ -488,19 +488,19 @@ class Graph:
             if (edge.edge_source == node.node_id and edge.edge_type == edge_type):
                 #print("Ho trovato un edge corretto per il mio nodo")
                 target_node = self.find_node_by_id(edge.edge_target)
-                if target_node and target_node.node_type == "epoch":
+                if target_node and target_node.node_type == "EpochNode":
                     #print(f"Found connected EpochNode '{target_node.node_id}' via edge type '{edge_type}'.")
                     return target_node
                 else:
                     print(f"NOT found any epochnode for {node.name} con id {node.node_id}")
             elif (edge.edge_target == node.node_id and edge.edge_type == edge_type):
                 source_node = self.find_node_by_id(edge.edge_source)
-                if source_node and source_node.node_type == "epoch":
+                if source_node and source_node.node_type == "EpochNode":
                     #print(f"Found connected EpochNode '{source_node.node_id}' via edge type '{edge_type}'.")
                     return source_node
                 else:
                     print(f"NOT found any epochnode for {node.name} con id {node.id}")
-            
+
         return None
 
 

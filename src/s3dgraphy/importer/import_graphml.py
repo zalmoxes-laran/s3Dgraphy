@@ -803,7 +803,7 @@ class GraphMLImporter:
         list_of_physical_stratigraphic_nodes = ["US", "serSU"]
 
         # Crea indici per accesso rapido
-        epochs = [n for n in self.graph.nodes if hasattr(n, 'node_type') and n.node_type == "epoch"]
+        epochs = [n for n in self.graph.nodes if hasattr(n, 'node_type') and n.node_type == "EpochNode"]
 
         print(f"Numero totale di epoche trovate: {len(epochs)}")
         if len(epochs) == 0:

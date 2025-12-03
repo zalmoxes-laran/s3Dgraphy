@@ -1065,7 +1065,7 @@ Blender Integration
            blender_data["stratigraphic_units"].append(unit_data)
        
        # Export temporal phases
-       epochs = graph.get_nodes_by_type("epoch")
+       epochs = graph.get_nodes_by_type("EpochNode")
        for epoch in epochs:
            phase_data = {
                "id": epoch.node_id,

@@ -800,7 +800,7 @@ s3dg:lastModified a owl:DatatypeProperty ;
 #   "node_id": "EPOCH_001",
 #   "name": "Epoca romana",
 #   "description": "Periodo romano", 
-#   "node_type": "epoch",
+#   "node_type": "EpochNode",
 #   "start_time": -27,
 #   "end_time": 476,
 #   "color": "#800020"
