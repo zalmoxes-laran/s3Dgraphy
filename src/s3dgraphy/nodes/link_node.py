@@ -34,13 +34,23 @@ class LinkNode(Node):
             description (str, opzionale): Descrizione del collegamento. Defaults to "No description".
         """
         super().__init__(node_id=node_id, name=name)
-        
+
         # Dati del collegamento
         self.data = {
             "url": url,
             "url_type": url_type or self._determine_url_type(url),
             "description": description or f"Link to {name}"
         }
+
+    @property
+    def url(self):
+        """Property for convenient access to URL from data dict"""
+        return self.data.get("url", "")
+
+    @url.setter
+    def url(self, value):
+        """Property setter for URL"""
+        self.data["url"] = value
 
 
     def _determine_url_type(self, url):
