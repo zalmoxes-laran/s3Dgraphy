@@ -387,9 +387,10 @@ class BaseImporter(ABC):
     def display_warnings(self):
         """Display all accumulated warnings."""
         if self.warnings:
-            print("\nWarnings during import:")
+            # print("\nWarnings during import:")
             for warning in self.warnings:
-                print(f"- {warning}")
+                pass
+                # print(f"- {warning}")
 
     def validate_mapping(self):
         """Validate the mapping configuration if present."""

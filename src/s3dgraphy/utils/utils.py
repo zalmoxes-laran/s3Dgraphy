@@ -38,46 +38,47 @@ def debug_graph_structure(graph, node_id=None, max_depth=5, current_depth=0):
     """
     # Prevent infinite recursion
     if current_depth >= max_depth:
-        print(f"Limite di profondità ricorsiva ({max_depth}) raggiunto.")
+        # print(f"Limite di profondità ricorsiva ({max_depth}) raggiunto.")
         return
         
     
     
     if node_id:
-        print("\n=== DEBUG NODE STRUCTURE ===")
+        # print("\n=== DEBUG NODE STRUCTURE ===")
         node = graph.find_node_by_id(node_id)
         if node:
-            print(f"\nNode details {node_id} ({node.node_type}):")
-            print(f"  Nome: {node.name}")
+            # print(f"\nNode details {node_id} ({node.node_type}):")
+            # print(f"  Nome: {node.name}")
             
             out_edges = [e for e in graph.edges if e.edge_source == node_id]
             in_edges = [e for e in graph.edges if e.edge_target == node_id]
             
-            print(f"  Outgoing Edges: {len(out_edges)}")
+            # print(f"  Outgoing Edges: {len(out_edges)}")
             for e in out_edges:
                 target = graph.find_node_by_id(e.edge_target)
                 target_type = target.node_type if target else "Unknown"
-                print(f"    -> {e.edge_target} ({target_type}) via {e.edge_type}")
+                # print(f"    -> {e.edge_target} ({target_type}) via {e.edge_type}")
             
-            print(f"  Ingoing Edges: {len(in_edges)}")
+            # print(f"  Ingoing Edges: {len(in_edges)}")
             for e in in_edges:
                 source = graph.find_node_by_id(e.edge_source)
                 source_type = source.node_type if source else "Unknown"
-                print(f"    <- {e.edge_source} ({source_type}) via {e.edge_type}")
+                # print(f"    <- {e.edge_source} ({source_type}) via {e.edge_type}")
             
     else:
-        print("\n=== DEBUG GRAPH STRUCTURE ===")
+        # print("\n=== DEBUG GRAPH STRUCTURE ===")
         node_types = {}
         for node in graph.nodes:
             if node.node_type not in node_types:
                 node_types[node.node_type] = []
             node_types[node.node_type].append(node)
         
-        print(f"Total number of nodes: {len(graph.nodes)}")
+        # print(f"Total number of nodes: {len(graph.nodes)}")
         for ntype, nodes in node_types.items():
-            print(f"  - {ntype}: {len(nodes)} nodes")
+            pass
+            # print(f"  - {ntype}: {len(nodes)} nodes")
         
-        print(f"\nTotal number of edges: {len(graph.edges)}")
+        # print(f"\nTotal number of edges: {len(graph.edges)}")
         edge_types = {}
         for edge in graph.edges:
             if edge.edge_type not in edge_types:
@@ -85,8 +86,9 @@ def debug_graph_structure(graph, node_id=None, max_depth=5, current_depth=0):
             edge_types[edge.edge_type] += 1
         
         for etype, count in edge_types.items():
-            print(f"  - {etype}: {count} edges")
-    print("=== END DEBUG ===\n")
+            pass
+            # print(f"  - {etype}: {count} edges")
+    # print("=== END DEBUG ===\n")
 
 def convert_shape2type(yedtype, border_style):
     """
@@ -118,7 +120,7 @@ def convert_shape2type(yedtype, border_style):
     elif yedtype == "roundrectangle":
         nodetype = ("USD", "Documentary Stratigraphic Unit")
     else:
-        print(f"Unrecognized node type and style: yedtype='{yedtype}', border_style='{border_style}'")
+        # print(f"Unrecognized node type and style: yedtype='{yedtype}', border_style='{border_style}'")
         nodetype = ("unknown", "Unrecognized node")
         
     return nodetype

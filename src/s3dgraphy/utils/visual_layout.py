@@ -60,4 +60,5 @@ if __name__ == "__main__":
 
     # Print node positions
     for node_id, coordinates in layout.items():
-        print(f"Node {node_id}: {coordinates}")
+        pass
+        # print(f"Node {node_id}: {coordinates}")

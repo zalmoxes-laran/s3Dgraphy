@@ -37,13 +37,13 @@ class PyArchInitImporter(BaseImporter):
             self.graph = existing_graph
             self.graph_id = existing_graph.graph_id
             self._use_existing_graph = True
-            print(f"PyArchInitImporter: Using provided graph '{self.graph_id}'")
+            # print(f"PyArchInitImporter: Using provided graph '{self.graph_id}'")
         else:
             # Create new UNREGISTERED graph (3DGIS mode)
             # Caller must set proper graph_id and register it
             self.graph = Graph(graph_id="temp_graph")
             self._use_existing_graph = False
-            print(f"PyArchInitImporter: Created new unregistered graph (caller must register)")
+            # print(f"PyArchInitImporter: Created new unregistered graph (caller must register)")
 
         self.validate_mapping()
 
@@ -57,20 +57,20 @@ class PyArchInitImporter(BaseImporter):
                 
             node_name = str(row_dict[id_column])  # Es: "1001"
             
-            print(f"\n=== Processing pyArchInit row ===")
-            print(f"Node name from DB: {node_name}")
+            # print(f"\n=== Processing pyArchInit row ===")
+            # print(f"Node name from DB: {node_name}")
             
             # 2️⃣ Check if we're enriching existing graph
             is_enriching_existing = self._use_existing_graph and len(self.graph.nodes) > 0
-            print(f"Enriching existing graph: {is_enriching_existing}")
+            # print(f"Enriching existing graph: {is_enriching_existing}")
             
             # 3️⃣ Try to find existing node by NAME (not ID!)
             existing_node = self._find_node_by_name(node_name)
             
             if existing_node:
                 # ✅ Node found in existing graph: only add properties
-                print(f"✓ Found existing node: {existing_node.name} (ID: {existing_node.node_id})")
-                print(f"  → Adding properties to existing node")
+                # print(f"✓ Found existing node: {existing_node.name} (ID: {existing_node.node_id})")
+                # print(f"  → Adding properties to existing node")
                 
                 # Get description from mapping
                 desc_column = self._get_description_column()
@@ -88,12 +88,12 @@ class PyArchInitImporter(BaseImporter):
                 # ❌ Enriching mode but node not found → SKIP this row
                 warning_msg = f"Node '{node_name}' not found in existing graph - SKIPPED"
                 self.warnings.append(warning_msg)
-                print(f"⊘ {warning_msg}")
+                # print(f"⊘ {warning_msg}")
                 return None
                 
             else:
                 # ✅ Creating new graph → create new stratigraphic node
-                print(f"✓ Creating new stratigraphic node: {node_name}")
+                # print(f"✓ Creating new stratigraphic node: {node_name}")
                 
                 # Get description from mapping
                 desc_column = self._get_description_column()
@@ -113,7 +113,7 @@ class PyArchInitImporter(BaseImporter):
                 )
                 
                 self.graph.add_node(new_node)
-                print(f"  → Node created with ID: {new_node.node_id}")
+                # print(f"  → Node created with ID: {new_node.node_id}")
                 
                 # Process properties for new node
                 self._process_pyarchinit_properties(row_dict, new_node)
@@ -128,7 +128,7 @@ class PyArchInitImporter(BaseImporter):
         Process property columns for a stratigraphic node.
         Only creates properties if they have non-empty values.
         """
-        print(f"\n  Processing properties for node: {strat_node.name}")
+        # print(f"\n  Processing properties for node: {strat_node.name}")
         
         for col_name, col_config in self.mapping.get('column_mappings', {}).items():
             # Skip ID and description columns
@@ -150,7 +150,7 @@ class PyArchInitImporter(BaseImporter):
                         if self.overwrite:
                             existing_prop.value = str(value)
                             existing_prop.description = str(value)
-                            print(f"    ↻ Updated property: {col_config['property_name']} = '{value}'")
+                            # print(f"    ↻ Updated property: {col_config['property_name']} = '{value}'")
                     else:
                         # Create new property node
                         property_node = PropertyNode(
@@ -161,7 +161,7 @@ class PyArchInitImporter(BaseImporter):
                             property_type=col_config['property_name']
                         )
                         self.graph.add_node(property_node)
-                        print(f"    + Created property: {col_config['property_name']} = '{value}'")
+                        # print(f"    + Created property: {col_config['property_name']} = '{value}'")
                         
                         # Create edge between stratigraphic node and property
                         edge_id = f"{strat_node.node_id}_has_property_{property_id}"
@@ -173,8 +173,9 @@ class PyArchInitImporter(BaseImporter):
                                 edge_type="has_property"
                             )
                 else:
+                    pass
                     # Valore vuoto o mancante - non creare proprietà
-                    print(f"    ⊘ Skipped property: {col_config['property_name']} (empty value)")
+                    # print(f"    ⊘ Skipped property: {col_config['property_name']} (empty value)")
 
     def _get_description_column(self) -> Optional[str]:
         """Get description column from mapping"""
@@ -186,15 +187,15 @@ class PyArchInitImporter(BaseImporter):
     def parse(self) -> Graph:
         """Parse pyArchInit database using mapping configuration"""
         try:
-            print("\n=== Starting PyArchInit Import ===")
+            # print("\n=== Starting PyArchInit Import ===")
             conn = sqlite3.connect(self.filepath)
             cursor = conn.cursor()
             
             # Debug del mapping
-            print(f"\nMapping configuration:")
-            print(f"Filepath: {self.filepath}")
-            print(f"Table settings: {self.mapping.get('table_settings', {})}")
-            print(f"Column mappings: {self.mapping.get('column_mappings', {})}")
+            # print(f"\nMapping configuration:")
+            # print(f"Filepath: {self.filepath}")
+            # print(f"Table settings: {self.mapping.get('table_settings', {})}")
+            # print(f"Column mappings: {self.mapping.get('column_mappings', {})}")
             
             # Get table name from mapping
             table_settings = self.mapping.get('table_settings', {})
@@ -203,15 +204,15 @@ class PyArchInitImporter(BaseImporter):
             if not table_name:
                 raise ValueError("Table name not specified in mapping configuration")
             
-            print(f"\nReading from table: {table_name}")
+            # print(f"\nReading from table: {table_name}")
             
             # Query all rows from table
             cursor.execute(f"SELECT * FROM {table_name}")
             columns = [description[0] for description in cursor.description]
-            print(f"Columns found: {columns}")
+            # print(f"Columns found: {columns}")
             
             rows = cursor.fetchall()
-            print(f"Total rows to process: {len(rows)}")
+            # print(f"Total rows to process: {len(rows)}")
             
             successful_rows = 0
             skipped_rows = 0
@@ -229,7 +230,8 @@ class PyArchInitImporter(BaseImporter):
                     if result is not None:
                         successful_rows += 1
                         if (successful_rows % 10) == 0:
-                            print(f"Processed {successful_rows} rows...")
+                            pass
+                            # print(f"Processed {successful_rows} rows...")
                     else:
                         skipped_rows += 1
                         
@@ -237,17 +239,17 @@ class PyArchInitImporter(BaseImporter):
                     error_rows += 1
                     error_msg = f"Error processing row {idx}: {str(e)}"
                     self.warnings.append(error_msg)
-                    print(f"❌ {error_msg}")
+                    # print(f"❌ {error_msg}")
             
             conn.close()
             
             # Summary
-            print(f"\n=== Import Summary ===")
-            print(f"Total rows: {len(rows)}")
-            print(f"✓ Successfully imported: {successful_rows}")
-            print(f"⊘ Skipped: {skipped_rows}")
-            print(f"✗ Errors: {error_rows}")
-            print(f"Final graph size: {len(self.graph.nodes)} nodes, {len(self.graph.edges)} edges")
+            # print(f"\n=== Import Summary ===")
+            # print(f"Total rows: {len(rows)}")
+            # print(f"✓ Successfully imported: {successful_rows}")
+            # print(f"⊘ Skipped: {skipped_rows}")
+            # print(f"✗ Errors: {error_rows}")
+            # print(f"Final graph size: {len(self.graph.nodes)} nodes, {len(self.graph.edges)} edges")
             
             # Add to warnings for UI
             self.warnings.append(f"\nImport summary:")

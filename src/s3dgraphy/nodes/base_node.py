@@ -21,7 +21,7 @@ def load_json_mapping(filename):
         with open(mapping_path, 'r') as file:
             return json.load(file)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Error loading mapping file: {e}")
+        # print(f"Error loading mapping file: {e}")
         return {}
 
 class Node:
