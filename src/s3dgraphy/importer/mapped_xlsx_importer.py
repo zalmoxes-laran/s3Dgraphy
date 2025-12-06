@@ -121,6 +121,7 @@ class MappedXLSXImporter(BaseImporter):
                                         last_error = e
                                         if attempt < 2:
                                             # print(f"Retry {attempt + 1}/3 failed, waiting...")
+                                            pass
                                 else:
                                     # Tutti i tentativi falliti
                                     raise ImportError(
@@ -256,6 +257,7 @@ class MappedXLSXImporter(BaseImporter):
                     json_to_excel_mapping[json_col] = actual_excel_col
                     if len(json_to_excel_mapping) <= 10:  # Mostra solo i primi 10 match
                         # print(f"  ✓ Matched: '{json_col}' -> '{actual_excel_col}'")
+                        pass
                 else:
                     # Nessuna corrispondenza trovata
                     unmapped_json_cols.append(json_col)
@@ -360,6 +362,7 @@ class MappedXLSXImporter(BaseImporter):
                     # Debug info for errors
                     if error_rows <= 3:  # Show details for first 3 errors
                         # print(f"    Row data sample: {list(row_dict.items())[:3]}")
+                        pass
 
             # Summary
             # print(f"\n=== Import Summary ===")

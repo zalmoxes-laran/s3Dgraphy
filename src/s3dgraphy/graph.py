@@ -253,10 +253,10 @@ class Graph:
             for edge in self.edges:
                 if edge.edge_target == group.node_id and edge.edge_type == "is_in_paradata_nodegroup":
                     source_node = self.find_node_by_id(edge.edge_source)
-                        if source_node and hasattr(source_node, 'node_type') and source_node.node_type == "property":
-                            property_nodes.append(source_node)
-                            if verbose:
-                                pass
+                    if source_node and hasattr(source_node, 'node_type') and source_node.node_type == "property":
+                        property_nodes.append(source_node)
+                        if verbose:
+                            pass
             
             stats["property_nodes_found"] += len(property_nodes)
             

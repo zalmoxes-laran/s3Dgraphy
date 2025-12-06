@@ -21,7 +21,7 @@ class MultiGraphManager:
         Returns:
             str: L'ID del grafo caricato
         """
-        print(f"Loading graph: {filepath}, graph_id: {graph_id}, overwrite: {overwrite}")
+        # print(f"Loading graph: {filepath}, graph_id: {graph_id}, overwrite: {overwrite}")
         
         # ID temporaneo basato sul file se non specificato
         original_id = graph_id if graph_id else os.path.splitext(os.path.basename(filepath))[0]
@@ -39,7 +39,7 @@ class MultiGraphManager:
         # IMPORTANTE: Aggiungi il grafo sia con l'ID originale che con quello nuovo
         # Questo crea una "mappa di alias" senza duplicare i grafi
         if final_id != original_id:
-            print(f"INFO: Graph ID changed during parsing: {original_id} -> {final_id}")
+            # print(f"INFO: Graph ID changed during parsing: {original_id} -> {final_id}")
             
             # Aggiungi il grafo con l'ID finale
             self.graphs[final_id] = graph
@@ -71,7 +71,7 @@ class MultiGraphManager:
                 return next(iter(self.graphs.values()))
             else:
                 # Invece di lanciare un errore, restituisci None o un valore di default
-                print("Attenzione: Più grafi caricati, specificare un 'graph_id'.")
+                # print("Attenzione: Più grafi caricati, specificare un 'graph_id'.")
                 return None  # Opzione 1: Restituisci None
                 # return list(self.graphs.values())[0]  # Opzione 2: Restituisci il primo grafo
         
@@ -83,7 +83,7 @@ class MultiGraphManager:
     def remove_graph(self, graph_id):
         if graph_id in self.graphs:
             del self.graphs[graph_id]
-            print(f"Graph '{graph_id}' removed successfully.")
+            # print(f"Graph '{graph_id}' removed successfully.")
 
     def update_graph_metadata(self, current_graph_id, new_graph_id=None, new_name=None):
         """
@@ -109,17 +109,17 @@ class MultiGraphManager:
             # Remove old entry and add new entry with updated ID
             self.graphs[new_graph_id] = self.graphs.pop(current_graph_id)
             graph.graph_id = new_graph_id
-            print(f"Graph ID updated from '{current_graph_id}' to '{new_graph_id}'.")
+            # print(f"Graph ID updated from '{current_graph_id}' to '{new_graph_id}'.")
 
         # Update graph name if specified
         if new_name is not None:
             graph.name = new_name
-            print(f"Graph '{new_graph_id or current_graph_id}' name updated to '{new_name}'.")
+            # print(f"Graph '{new_graph_id or current_graph_id}' name updated to '{new_name}'.")
 
 multi_graph_manager = MultiGraphManager()
 
 def load_graph_from_file(filepath, graph_id=None, overwrite=False):
-    print(f"Loading graph: {filepath}, graph_id: {graph_id}, overwrite: {overwrite}")
+    # print(f"Loading graph: {filepath}, graph_id: {graph_id}, overwrite: {overwrite}")
     return multi_graph_manager.load_graph(filepath, graph_id, overwrite)
 
 def get_graph(graph_id=None):
