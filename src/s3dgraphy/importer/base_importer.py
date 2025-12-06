@@ -260,15 +260,20 @@ class BaseImporter(ABC):
 
     def _process_row_automatic(self, row_data: Dict[str, Any]) -> Node:
         """Process a row creating properties for all non-ID columns."""
-        
+
         id_column = self._get_id_column()
         node_id = str(row_data[id_column])
-        
+
+        # ✅ Check if Description column exists and use it
+        description = f"Automatically imported node {node_id}"  # Default
+        if 'Description' in row_data and not self._is_invalid_id(row_data['Description']):
+            description = str(row_data['Description'])
+
         # Create basic node
         base_attrs = {
             'node_id': node_id,
             'name': node_id,  # Use ID as name in automatic mode
-            'description': f"Automatically imported node {node_id}"
+            'description': description
         }
         
         # Use default stratigraphic node class
@@ -295,9 +300,9 @@ class BaseImporter(ABC):
             )
             self.graph.add_node(strat_node)
         
-        # Create properties for all non-ID columns
+        # Create properties for all non-ID and non-Description columns
         for col_name, col_value in row_data.items():
-            if col_name != id_column and not self._is_invalid_id(col_value):
+            if col_name not in [id_column, 'Description'] and not self._is_invalid_id(col_value):
                 self._create_property(node_id, col_name, col_value)
         
         return strat_node
