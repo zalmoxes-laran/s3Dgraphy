@@ -32,13 +32,13 @@ class MappedXLSXImporter(BaseImporter):
             self.graph = existing_graph
             self.graph_id = existing_graph.graph_id
             self._use_existing_graph = True
-            print(f"MappedXLSXImporter: Using provided graph '{self.graph_id}'")
+            # print(f"MappedXLSXImporter: Using provided graph '{self.graph_id}'")
         else:
             # Create new UNREGISTERED graph (3DGIS mode)
             # Caller must set proper graph_id and register it
             self.graph = Graph(graph_id="temp_graph")
             self._use_existing_graph = False
-            print(f"MappedXLSXImporter: Created new unregistered graph (caller must register)")
+            # print(f"MappedXLSXImporter: Created new unregistered graph (caller must register)")
                 
     def parse(self) -> Graph:
         """
@@ -55,58 +55,58 @@ class MappedXLSXImporter(BaseImporter):
             start_row = table_settings.get('start_row', 0)
             sheet_name = table_settings.get('sheet_name', 0)
             
-            print(f"\n=== Starting Mapped XLSX Import ===")
-            print(f"File: {self.filepath}")
-            print(f"Sheet: {sheet_name}")
-            print(f"Start row: {start_row}")
-            print(f"Platform: {platform.system()}")
+            # print(f"\n=== Starting Mapped XLSX Import ===")
+            # print(f"File: {self.filepath}")
+            # print(f"Sheet: {sheet_name}")
+            # print(f"Start row: {start_row}")
+            # print(f"Platform: {platform.system()}")
             
             # ✅ STRATEGIA DOPPIA: Buffer su macOS/Linux, copia temp su Windows
             is_windows = platform.system() == "Windows"
             
             if is_windows:
                 # ✅ WINDOWS: Copia il file in temp
-                print(f"Windows detected - using temporary file copy...")
+                # print(f"Windows detected - using temporary file copy...")
                                 
                 try:
                     temp_dir = tempfile.gettempdir()
                     temp_filename = f"em_mapped_{os.path.basename(self.filepath)}"
                     temp_file_path = os.path.join(temp_dir, temp_filename)
                     
-                    print(f"Copying to: {temp_file_path}")
+                    # print(f"Copying to: {temp_file_path}")
                     
                     # ✅ Strategia 1: Prova con mmap (accesso memoria condivisa)
                     try:
                         import mmap
-                        print(f"Attempting mmap read...")
+                        # print(f"Attempting mmap read...")
                         
                         with open(self.filepath, 'rb') as f:
                             with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
                                 file_bytes = mm[:]
                         
-                        print(f"✅ File read via mmap ({len(file_bytes)} bytes)")
+                        # print(f"✅ File read via mmap ({len(file_bytes)} bytes)")
                         
                     except (PermissionError, OSError, ValueError) as mmap_error:
-                        print(f"mmap failed: {mmap_error}, trying pathlib...")
+                        # print(f"mmap failed: {mmap_error}, trying pathlib...")
                         
                         # ✅ Strategia 2: Prova con pathlib (lettura diretta veloce)
                         try:
                             from pathlib import Path
                             file_bytes = Path(self.filepath).read_bytes()
-                            print(f"✅ File read via pathlib ({len(file_bytes)} bytes)")
+                            # print(f"✅ File read via pathlib ({len(file_bytes)} bytes)")
                             
                         except PermissionError as path_error:
-                            print(f"pathlib failed: {path_error}, trying buffering=0...")
+                            # print(f"pathlib failed: {path_error}, trying buffering=0...")
                             
                             # ✅ Strategia 3: Prova con buffering disabilitato
                             try:
                                 with open(self.filepath, 'rb', buffering=0) as f:
                                     file_bytes = f.read()
-                                print(f"✅ File read with buffering=0 ({len(file_bytes)} bytes)")
+                                # print(f"✅ File read with buffering=0 ({len(file_bytes)} bytes)")
                                 
                             except PermissionError as buffer_error:
                                 # ✅ Strategia 4: Ultimo tentativo - retry con sleep
-                                print(f"All methods failed, trying retry with delay...")
+                                # print(f"All methods failed, trying retry with delay...")
                                 
                                 import time
                                 last_error = None
@@ -115,12 +115,12 @@ class MappedXLSXImporter(BaseImporter):
                                         time.sleep(0.5)  # Aspetta mezzo secondo
                                         with open(self.filepath, 'rb') as f:
                                             file_bytes = f.read()
-                                        print(f"✅ File read on retry attempt {attempt + 1}")
+                                        # print(f"✅ File read on retry attempt {attempt + 1}")
                                         break
                                     except PermissionError as e:
                                         last_error = e
                                         if attempt < 2:
-                                            print(f"Retry {attempt + 1}/3 failed, waiting...")
+                                            # print(f"Retry {attempt + 1}/3 failed, waiting...")
                                 else:
                                     # Tutti i tentativi falliti
                                     raise ImportError(
@@ -139,7 +139,7 @@ class MappedXLSXImporter(BaseImporter):
                     with open(temp_file_path, 'wb') as f:
                         f.write(file_bytes)
                     
-                    print(f"✅ Temporary file created successfully")
+                    # print(f"✅ Temporary file created successfully")
                     working_path = temp_file_path
                     
                 except Exception as e:
@@ -147,12 +147,12 @@ class MappedXLSXImporter(BaseImporter):
                     
             else:
                 # ✅ macOS/Linux: Usa buffer in memoria
-                print(f"macOS/Linux detected - using memory buffer...")
+                # print(f"macOS/Linux detected - using memory buffer...")
                 
                 try:
                     with open(self.filepath, 'rb') as f:
                         file_content = io.BytesIO(f.read())
-                    print(f"✅ File loaded in memory ({len(file_content.getvalue())} bytes)")
+                    # print(f"✅ File loaded in memory ({len(file_content.getvalue())} bytes)")
                     working_path = file_content
                 except Exception as e:
                     raise ImportError(f"Error reading file: {str(e)}")
@@ -169,8 +169,8 @@ class MappedXLSXImporter(BaseImporter):
                 engine='openpyxl'
             )
             
-            print(f"Full DataFrame shape: {df_full.shape}")
-            print(f"Column names found: {list(df_full.columns)[:10]}")
+            # print(f"Full DataFrame shape: {df_full.shape}")
+            # print(f"Column names found: {list(df_full.columns)[:10]}")
             
             # Se start_row è specificato, prendi solo i dati da quella riga in poi
             # (escludendo righe tutorial o esempi)
@@ -179,12 +179,12 @@ class MappedXLSXImporter(BaseImporter):
                 # E sottrai ancora 1 perché la riga 0 è già stata usata per le intestazioni
                 actual_start_idx = start_row - 2
                 df = df_full.iloc[actual_start_idx:].reset_index(drop=True)
-                print(f"Skipping first {actual_start_idx} data rows (tutorial/examples)")
-                print(f"Data DataFrame shape after skipping: {df.shape}")
+                # print(f"Skipping first {actual_start_idx} data rows (tutorial/examples)")
+                # print(f"Data DataFrame shape after skipping: {df.shape}")
             else:
                 df = df_full
             
-            print(f"First data row sample: {df.iloc[0].to_dict() if not df.empty else 'No data'}")
+            # print(f"First data row sample: {df.iloc[0].to_dict() if not df.empty else 'No data'}")
             
             if df.empty:
                 raise ValueError("Excel file is empty")
@@ -197,8 +197,8 @@ class MappedXLSXImporter(BaseImporter):
             # ✅ NORMALIZZAZIONE: Crea dizionario per mappare nomi Excel -> nomi JSON
             # Converte spazi in underscore e tutto in maiuscolo per matching case-insensitive
             excel_columns_normalized = {}
-            print(f"\n=== Normalizing Excel columns ===")
-            print(f"Raw Excel columns: {list(df.columns)}")
+            # print(f"\n=== Normalizing Excel columns ===")
+            # print(f"Raw Excel columns: {list(df.columns)}")
             
             for excel_col in df.columns:
                 # Converti prima in stringa per gestire nomi numerici
@@ -215,14 +215,14 @@ class MappedXLSXImporter(BaseImporter):
                 normalized = normalized.strip('_')
                 
                 excel_columns_normalized[normalized] = excel_col
-                print(f"  Excel: '{excel_col_str}' -> Normalized: '{normalized}'")
+                # print(f"  Excel: '{excel_col_str}' -> Normalized: '{normalized}'")
             
             # Crea mapping inverso per JSON -> Excel column names
             json_to_excel_mapping = {}
             unmapped_json_cols = []
             
-            print(f"\n=== Matching JSON mappings to Excel columns ===")
-            print(f"JSON mapping columns: {list(column_maps.keys())}")
+            # print(f"\n=== Matching JSON mappings to Excel columns ===")
+            # print(f"JSON mapping columns: {list(column_maps.keys())}")
             
             for json_col in column_maps.keys():
                 # Converti in stringa e normalizza nome JSON allo stesso modo
@@ -237,17 +237,17 @@ class MappedXLSXImporter(BaseImporter):
                 # Rimuovi underscore iniziali e finali
                 json_normalized = json_normalized.strip('_')
                 
-                print(f"  JSON '{json_col}' -> Normalized: '{json_normalized}'")
+                # print(f"  JSON '{json_col}' -> Normalized: '{json_normalized}'")
                 
                 if json_normalized in excel_columns_normalized:
                     # Trovata corrispondenza!
                     actual_excel_col = excel_columns_normalized[json_normalized]
                     json_to_excel_mapping[json_col] = actual_excel_col
-                    print(f"    ✓ MATCHED to Excel column: '{actual_excel_col}'")
+                    # print(f"    ✓ MATCHED to Excel column: '{actual_excel_col}'")
                 else:
                     # Nessuna corrispondenza trovata
                     unmapped_json_cols.append(json_col)
-                    print(f"    ✗ NO MATCH FOUND in Excel")
+                    # print(f"    ✗ NO MATCH FOUND in Excel")
                 
                 
                 if json_normalized in excel_columns_normalized:
@@ -255,16 +255,16 @@ class MappedXLSXImporter(BaseImporter):
                     actual_excel_col = excel_columns_normalized[json_normalized]
                     json_to_excel_mapping[json_col] = actual_excel_col
                     if len(json_to_excel_mapping) <= 10:  # Mostra solo i primi 10 match
-                        print(f"  ✓ Matched: '{json_col}' -> '{actual_excel_col}'")
+                        # print(f"  ✓ Matched: '{json_col}' -> '{actual_excel_col}'")
                 else:
                     # Nessuna corrispondenza trovata
                     unmapped_json_cols.append(json_col)
             
             # Log risultati del matching
-            print(f"\n=== Column Matching Results ===")
-            print(f"Excel columns (original): {[str(c) for c in df.columns]}")
-            print(f"Mapping columns (JSON): {list(column_maps.keys())}")
-            print(f"\nSuccessfully matched: {len(json_to_excel_mapping)} columns")
+            # print(f"\n=== Column Matching Results ===")
+            # print(f"Excel columns (original): {[str(c) for c in df.columns]}")
+            # print(f"Mapping columns (JSON): {list(column_maps.keys())}")
+            # print(f"\nSuccessfully matched: {len(json_to_excel_mapping)} columns")
             
             if unmapped_json_cols:
                 print(f"\n⚠️ WARNING: {len(unmapped_json_cols)} columns from mapping NOT found in Excel:")
@@ -303,7 +303,7 @@ class MappedXLSXImporter(BaseImporter):
             if not id_column_excel:
                 raise ValueError(f"ID column not found in Excel after normalization")
             
-            print(f"\nUsing ID column: '{id_column_json}' (JSON) -> '{id_column_excel}' (Excel)")
+            # print(f"\nUsing ID column: '{id_column_json}' (JSON) -> '{id_column_excel}' (Excel)")
             
             # Process rows
             total_rows = 0
@@ -311,7 +311,7 @@ class MappedXLSXImporter(BaseImporter):
             skipped_rows = 0
             error_rows = 0
             
-            print(f"\nProcessing {len(df)} rows...")
+            # print(f"\nProcessing {len(df)} rows...")
             
             for idx, row in df.iterrows():
                 total_rows += 1
@@ -335,14 +335,11 @@ class MappedXLSXImporter(BaseImporter):
                     # Verifica che l'ID sia presente
                     if id_column_json not in row_dict:
                         skipped_rows += 1
-                        print(f"  Row {idx+1}: Skipped (missing ID)")
                         continue
                     
                     # Debug per prime righe
                     if successful_rows < 3:
-                        print(f"\n  Row {idx+1} sample data:")
-                        for k, v in list(row_dict.items())[:5]:
-                            print(f"    {k}: {v}")
+                        pass
                     
                     # Process the row
                     result_node = self.process_row(row_dict)
@@ -350,7 +347,7 @@ class MappedXLSXImporter(BaseImporter):
                     if result_node is not None:
                         successful_rows += 1
                         if (successful_rows % 10) == 0:
-                            print(f"  Processed {successful_rows} rows...")
+                            pass
                     else:
                         skipped_rows += 1
                         
@@ -362,15 +359,15 @@ class MappedXLSXImporter(BaseImporter):
                     
                     # Debug info for errors
                     if error_rows <= 3:  # Show details for first 3 errors
-                        print(f"    Row data sample: {list(row_dict.items())[:3]}")
+                        # print(f"    Row data sample: {list(row_dict.items())[:3]}")
 
             # Summary
-            print(f"\n=== Import Summary ===")
-            print(f"Total rows processed: {total_rows}")
-            print(f"✓ Successfully imported: {successful_rows}")
-            print(f"⊘ Skipped (no data/ID): {skipped_rows}")
-            print(f"✗ Errors: {error_rows}")
-            print(f"Columns matched: {len(json_to_excel_mapping)}/{len(column_maps)}")
+            # print(f"\n=== Import Summary ===")
+            # print(f"Total rows processed: {total_rows}")
+            # print(f"✓ Successfully imported: {successful_rows}")
+            # print(f"⊘ Skipped (no data/ID): {skipped_rows}")
+            # print(f"✗ Errors: {error_rows}")
+            # print(f"Columns matched: {len(json_to_excel_mapping)}/{len(column_maps)}")
             
             # Add to warnings for UI
             self.warnings.append(f"\nImport summary:")
@@ -383,7 +380,7 @@ class MappedXLSXImporter(BaseImporter):
             if self.warnings:
                 self.display_warnings()
             
-            print(f"\nGraph now contains {len(self.graph.nodes)} nodes and {len(self.graph.edges)} edges")
+            # print(f"\nGraph now contains {len(self.graph.nodes)} nodes and {len(self.graph.edges)} edges")
             
             return self.graph
             
@@ -410,7 +407,7 @@ class MappedXLSXImporter(BaseImporter):
             if file_content is not None:
                 try:
                     file_content.close()
-                    print("Memory buffer closed")
+                    # print("Memory buffer closed")
                 except:
                     pass
             
@@ -418,7 +415,7 @@ class MappedXLSXImporter(BaseImporter):
             if temp_file_path and os.path.exists(temp_file_path):
                 try:
                     os.remove(temp_file_path)
-                    print(f"Temporary file removed: {temp_file_path}")
+                    # print(f"Temporary file removed: {temp_file_path}")
                 except Exception as e:
                     print(f"Warning: Could not remove temp file: {e}")
             
