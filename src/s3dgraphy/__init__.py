@@ -1,4 +1,5 @@
-__version__ = "0.1.19"
+__version__ = "0.1.20"
+__datamodel_version__ = "1.5.3"  # s3Dgraphy connections datamodel version
 
 # s3Dgraphy/__init__.py
 
@@ -6,8 +7,11 @@ __version__ = "0.1.19"
 Main initialization for the s3Dgraphy library.
 
 s3Dgraphy is a Python library for creating and managing multitemporal, 3D knowledge graphs.
-It includes functionality for graph creation, stratigraphic data management, edge definitions, 
+It includes functionality for graph creation, stratigraphic data management, edge definitions,
 node types, visual layout generation, and graph import/export operations.
+
+Datamodel v1.5.3: Introduces canonical/reverse edge directionality pattern
+for cleaner schema and precise socket labeling in node editors.
 
 Author: Emanuel Demetrescu, 2024
 License: GNU-GPL 3.0

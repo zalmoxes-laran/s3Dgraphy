@@ -12,10 +12,10 @@ from ..nodes.property_node import PropertyNode
 from ..nodes.epoch_node import EpochNode
 from ..nodes.group_node import GroupNode, ParadataNodeGroup, ActivityNodeGroup, TimeBranchNodeGroup
 from ..nodes.link_node import *
-from ..edges.edge import Edge
+from ..edges.edge import Edge, EDGE_TYPES
+from ..edges import get_connections_datamodel
 from ..utils.utils import convert_shape2type, get_stratigraphic_node_class
 import re
-from ..edges.edge import EDGE_TYPES
 import uuid
 
 class GraphMLImporter:
@@ -34,6 +34,8 @@ class GraphMLImporter:
         self.document_nodes_map = {}  # nome documento -> node_id
         self.duplicate_id_map = {}    # id originale -> id deduplicated
         self.id_mapping = {}          # id originale -> uuid
+        # Get connections datamodel for edge validation
+        self._connections_datamodel = get_connections_datamodel()
 
     def extract_graph_id_and_code(self, tree):
         """
@@ -1289,7 +1291,11 @@ class GraphMLImporter:
     def EM_extract_edge_type(self, edge):
         """
         Extracts the basic semantic type of the edge from the GraphML line style.
-        
+
+        Note: For stratigraphic relations, "is_before" is used during import.
+        In v1.5.3+, "is_before" is the reverse of the canonical "is_after" edge.
+        The connections datamodel handles both directions correctly.
+
         Args:
             edge_element (Element): XML element for the edge.
 
@@ -1306,6 +1312,8 @@ class GraphMLImporter:
                 style_type = line_style.attrib.get("type")
                 # Map each graphical style to its semantic meaning
                 if style_type == "line":
+                    # Legacy GraphML files use "is_before" for stratigraphic relations
+                    # v1.5.3 datamodel defines this as reverse of canonical "is_after"
                     edge_type = "is_before"
                 elif style_type == "double_line":
                     edge_type = "has_same_time"

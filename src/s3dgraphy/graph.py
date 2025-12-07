@@ -11,16 +11,14 @@ from .nodes.epoch_node import EpochNode
 from .nodes.stratigraphic_node import StratigraphicNode
 from .nodes.property_node import PropertyNode
 from .nodes.geo_position_node import GeoPositionNode
-from .edges import Edge
+from .edges import Edge, get_connections_datamodel
 from typing import List
 from .indices import GraphIndices
 
 
-# Load the connection rules JSON
-rules_path = os.path.join(os.path.dirname(__file__), "./JSON_config/em_connection_rules.json")
-with open(rules_path) as f:
-    connection_rules = json.load(f)["rules"]
-    # print('s3Dgraphy rules are correctly loaded.')
+# Load the connections datamodel (v1.5.3+)
+_connections_datamodel = get_connections_datamodel()
+# print(f's3Dgraphy connections datamodel v{_connections_datamodel.get_version()} loaded.')
 
 class Graph:
     """
@@ -108,6 +106,8 @@ class Graph:
         """
         Validates if a connection type between two nodes is allowed by the rules.
 
+        Uses the v1.5.3 connections datamodel for validation.
+
         Args:
             source_node_type (str): The type of the source node.
             target_node_type (str): The type of the target node.
@@ -116,32 +116,34 @@ class Graph:
         Returns:
             bool: True if the connection is allowed, False otherwise.
         """
-
+        # Get node classes from the node_type_map
         source_class = Node.node_type_map.get(source_node_type)
         target_class = Node.node_type_map.get(target_node_type)
 
         if source_class is None or target_class is None:
-            return False  # O gestisci l'errore come preferisci
+            return False
 
-        for rule in connection_rules:
-            if rule["type"] == edge_type:
-                allowed_sources = rule["allowed_connections"]["source"]
-                allowed_targets = rule["allowed_connections"]["target"]
+        # Get allowed connections from the datamodel
+        edge_def = _connections_datamodel.get_edge_definition(edge_type)
+        if edge_def is None:
+            return False
 
-                
-                source_allowed = any(
-                    issubclass(source_class, Node.node_type_map.get(allowed_source, object))
-                    for allowed_source in allowed_sources
-                )
+        allowed_sources = edge_def['allowed_connections']['source']
+        allowed_targets = edge_def['allowed_connections']['target']
 
-                target_allowed = any(
-                    issubclass(target_class, Node.node_type_map.get(allowed_target, object))
-                    for allowed_target in allowed_targets
-                )
+        # Check if source and target node types are allowed
+        # This uses issubclass to support inheritance (e.g., StratigraphicUnit is a StratigraphicNode)
+        source_allowed = any(
+            issubclass(source_class, Node.node_type_map.get(allowed_source, object))
+            for allowed_source in allowed_sources
+        )
 
-                return source_allowed and target_allowed    
+        target_allowed = any(
+            issubclass(target_class, Node.node_type_map.get(allowed_target, object))
+            for allowed_target in allowed_targets
+        )
 
-        return False
+        return source_allowed and target_allowed
 
     def add_warning(self, message):
         """Adds a warning message to the warnings list."""

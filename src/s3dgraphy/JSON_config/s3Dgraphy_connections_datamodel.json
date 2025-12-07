@@ -1,6 +1,6 @@
 {
-  "s3Dgraphy_connections_model_version": "1.5.2",
-  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings",
+  "s3Dgraphy_connections_model_version": "1.5.3",
+  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. Version 1.5.3 introduces canonical/reverse directionality with verb-based labels for clear socket identification in node editors.",
   "components": [
     "CIDOC-CRM",
     "CRMarchaeo",
@@ -11,10 +11,14 @@
     "CRMs3D"
   ],
   "edge_types": {
-    "is_before": {
-      "name": "is_before",
-      "label": "Chronological Sequence",
-      "description": "Indicates a temporal sequence where one item occurs before another.",
+    "is_after": {
+      "name": "is_after",
+      "label": "Is after",
+      "description": "Indicates a temporal sequence where one item occurs after another. This is the canonical direction in Extended Matrix (from more recent to more ancient stratigraphic units).",
+      "reverse": {
+        "name": "is_before",
+        "label": "Is before"
+      },
       "mapping": {
         "cidoc": "P120_occurs_before",
         "cidoc_extension": "CIDOC-CRM",
@@ -26,40 +30,14 @@
         "target": ["StratigraphicNode"]
       }
     },
-    "is_after": {
-      "name": "is_after",
-      "label": "Chronological Sequence (after)",
-      "description": "Indicates a temporal sequence where one item occurs after another.",
-      "mapping": {
-        "cidoc": "P120_occurs_after",
-        "cidoc_extension": "CIDOC-CRM",
-        "extension_mapping": "AP28_occurs_after",
-        "extension_name": "CRMarchaeo"
-      },
-      "allowed_connections": {
-        "source": ["StratigraphicNode"],
-        "target": ["StratigraphicNode"]
-      }
-    },
-    "has_same_time": {
-      "name": "has_same_time",
-      "label": "Contemporaneous Elements",
-      "description": "Indicates that two elements are contemporaneous.",
-      "mapping": {
-        "cidoc": "P114_is_equal_in_time_to",
-        "cidoc_extension": "CIDOC-CRM",
-        "extension_mapping": "AP22_is_equal_in_time_to",
-        "extension_name": "CRMarchaeo"
-      },
-      "allowed_connections": {
-        "source": ["StratigraphicNode"],
-        "target": ["StratigraphicNode"]
-      }
-    },
     "changed_from": {
       "name": "changed_from",
-      "label": "Temporal Transformation",
-      "description": "Represents an object that changes over time.",
+      "label": "Changed from",
+      "description": "Represents an object that changes over time, indicating temporal transformation.",
+      "reverse": {
+        "name": "changed_to",
+        "label": "Changed to"
+      },
       "mapping": {
         "cidoc": "P123_resulted_from",
         "cidoc_extension": "CIDOC-CRM",
@@ -73,8 +51,12 @@
     },
     "abuts": {
       "name": "abuts",
-      "label": "Physical Relation: abuts",
+      "label": "Abuts",
       "description": "This stratigraphic unit abuts against the target stratigraphic unit.",
+      "reverse": {
+        "name": "is_abutted_by",
+        "label": "Is abutted by"
+      },
       "mapping": {
         "cidoc": "",
         "cidoc_extension": "CRMarchaeo",
@@ -87,28 +69,14 @@
         "target": ["StratigraphicNode"]
       }
     },
-
-    "is_abutted_by": {
-      "name": "is_abutted_by",
-      "label": "Physical Relation: is abutted by",
-      "description": "This stratigraphic unit is abutted by the target stratigraphic unit.",
-      "mapping": {
-        "cidoc": "",
-        "cidoc_extension": "CRMarchaeo",
-        "extension_mapping": "AP11_has_physical_relation",
-        "extension_name": "CRMarchaeo",
-        "type_tag": "is abutted by"
-      },
-      "allowed_connections": {
-        "source": ["StratigraphicNode"],
-        "target": ["StratigraphicNode"]
-      }
-    },
-
     "cuts": {
       "name": "cuts",
-      "label": "Physical Relation: cuts",
+      "label": "Cuts",
       "description": "This stratigraphic unit cuts the target stratigraphic unit.",
+      "reverse": {
+        "name": "is_cut_by",
+        "label": "Is cut by"
+      },
       "mapping": {
         "cidoc": "",
         "cidoc_extension": "CRMarchaeo",
@@ -121,28 +89,14 @@
         "target": ["StratigraphicNode"]
       }
     },
-
-    "is_cut_by": {
-      "name": "is_cut_by",
-      "label": "Physical Relation: is cut by",
-      "description": "This stratigraphic unit is cut by the target stratigraphic unit.",
-      "mapping": {
-        "cidoc": "",
-        "cidoc_extension": "CRMarchaeo",
-        "extension_mapping": "AP11_has_physical_relation",
-        "extension_name": "CRMarchaeo",
-        "type_tag": "is cut by"
-      },
-      "allowed_connections": {
-        "source": ["StratigraphicNode"],
-        "target": ["StratigraphicNode"]
-      }
-    },
-
     "fills": {
       "name": "fills",
-      "label": "Physical Relation: fills",
+      "label": "Fills",
       "description": "This stratigraphic unit fills the target stratigraphic unit (e.g., a deposit filling a cut).",
+      "reverse": {
+        "name": "is_filled_by",
+        "label": "Is filled by"
+      },
       "mapping": {
         "cidoc": "",
         "cidoc_extension": "CRMarchaeo",
@@ -155,28 +109,14 @@
         "target": ["StratigraphicNode"]
       }
     },
-
-    "is_filled_by": {
-      "name": "is_filled_by",
-      "label": "Physical Relation: is filled by",
-      "description": "This stratigraphic unit is filled by the target stratigraphic unit.",
-      "mapping": {
-        "cidoc": "",
-        "cidoc_extension": "CRMarchaeo",
-        "extension_mapping": "AP11_has_physical_relation",
-        "extension_name": "CRMarchaeo",
-        "type_tag": "is filled by"
-      },
-      "allowed_connections": {
-        "source": ["StratigraphicNode"],
-        "target": ["StratigraphicNode"]
-      }
-    },
-
     "overlies": {
       "name": "overlies",
-      "label": "Physical Relation: overlies",
+      "label": "Overlies",
       "description": "This stratigraphic unit overlies (covers) the target stratigraphic unit.",
+      "reverse": {
+        "name": "is_overlain_by",
+        "label": "Is overlain by"
+      },
       "mapping": {
         "cidoc": "",
         "cidoc_extension": "CRMarchaeo",
@@ -189,28 +129,11 @@
         "target": ["StratigraphicNode"]
       }
     },
-
-    "is_overlain_by": {
-      "name": "is_overlain_by",
-      "label": "Physical Relation: is overlain by",
-      "description": "This stratigraphic unit is overlain (covered) by the target stratigraphic unit.",
-      "mapping": {
-        "cidoc": "",
-        "cidoc_extension": "CRMarchaeo",
-        "extension_mapping": "AP11_has_physical_relation",
-        "extension_name": "CRMarchaeo",
-        "type_tag": "is overlain by"
-      },
-      "allowed_connections": {
-        "source": ["StratigraphicNode"],
-        "target": ["StratigraphicNode"]
-      }
-    },
-
     "is_bonded_to": {
       "name": "is_bonded_to",
-      "label": "Physical Relation: is bonded to",
-      "description": "This stratigraphic unit is physically bonded to the target stratigraphic unit (e.g., masonry bonding).",
+      "label": "Is bonded to",
+      "description": "This stratigraphic unit is physically bonded to the target stratigraphic unit (e.g., masonry bonding). This is a symmetric relation.",
+      "reverse": null,
       "mapping": {
         "cidoc": "",
         "cidoc_extension": "CRMarchaeo",
@@ -223,11 +146,11 @@
         "target": ["StratigraphicNode"]
       }
     },
-
     "is_physically_equal_to": {
       "name": "is_physically_equal_to",
-      "label": "Physical Relation: equals (physical)",
-      "description": "Two stratigraphic units are considered physically the same entity or continuous fabric.",
+      "label": "Is physically equal to",
+      "description": "Two stratigraphic units are considered physically the same entity or continuous fabric. This is a symmetric relation.",
+      "reverse": null,
       "mapping": {
         "cidoc": "",
         "cidoc_extension": "CRMarchaeo",
@@ -240,11 +163,30 @@
         "target": ["StratigraphicNode"]
       }
     },
-
+    "has_same_time": {
+      "name": "has_same_time",
+      "label": "Has same time",
+      "description": "Indicates that two elements are contemporaneous. This is a symmetric relation.",
+      "reverse": null,
+      "mapping": {
+        "cidoc": "P114_is_equal_in_time_to",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "AP22_is_equal_in_time_to",
+        "extension_name": "CRMarchaeo"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
     "has_data_provenance": {
       "name": "has_data_provenance",
-      "label": "Data Provenance",
+      "label": "Has data provenance",
       "description": "Indicates the provenance of data, often linking to source nodes.",
+      "reverse": {
+        "name": "is_data_provenance_of",
+        "label": "Is data provenance of"
+      },
       "mapping": {
         "cidoc": "P70i_is_documented_in",
         "cidoc_extension": "CIDOC-CRM",
@@ -258,8 +200,9 @@
     },
     "contrasts_with": {
       "name": "contrasts_with",
-      "label": "Contrasting Properties",
-      "description": "Represents contrasting or mutually exclusive properties.",
+      "label": "Contrasts with",
+      "description": "Represents contrasting or mutually exclusive properties. This is a symmetric relation.",
+      "reverse": null,
       "mapping": {
         "cidoc": "P15_was_influenced_by",
         "cidoc_extension": "CIDOC-CRM",
@@ -273,8 +216,12 @@
     },
     "has_first_epoch": {
       "name": "has_first_epoch",
-      "label": "Has First Epoch",
+      "label": "Has first epoch",
       "description": "Indicates the initial epoch associated with a node.",
+      "reverse": {
+        "name": "is_first_epoch_of",
+        "label": "Is first epoch of"
+      },
       "mapping": {
         "cidoc": "P82a_begin_of_the_begin",
         "cidoc_extension": "CIDOC-CRM",
@@ -288,8 +235,12 @@
     },
     "survive_in_epoch": {
       "name": "survive_in_epoch",
-      "label": "Survives In Epoch",
+      "label": "Survives in epoch",
       "description": "Indicates that a node continues to exist in a given epoch.",
+      "reverse": {
+        "name": "contains_surviving",
+        "label": "Contains surviving"
+      },
       "mapping": {
         "cidoc": "P10_falls_within",
         "cidoc_extension": "CIDOC-CRM",
@@ -303,8 +254,12 @@
     },
     "is_in_activity": {
       "name": "is_in_activity",
-      "label": "Part of Activity",
+      "label": "Is in activity",
       "description": "Indicates that a node is part of a specific activity.",
+      "reverse": {
+        "name": "includes_in_activity",
+        "label": "Includes in activity"
+      },
       "mapping": {
         "cidoc": "P9_consists_of",
         "cidoc_extension": "CIDOC-CRM",
@@ -318,8 +273,12 @@
     },
     "has_property": {
       "name": "has_property",
-      "label": "Has Property",
+      "label": "Has property",
       "description": "Connects a node to one of its properties.",
+      "reverse": {
+        "name": "is_property_of",
+        "label": "Is property of"
+      },
       "mapping": {
         "cidoc": "P43_has_dimension",
         "cidoc_extension": "CIDOC-CRM",
@@ -333,8 +292,12 @@
     },
     "extracted_from": {
       "name": "extracted_from",
-      "label": "Extracted From",
+      "label": "Extracted from",
       "description": "Indicates that information is derived from a particular source.",
+      "reverse": {
+        "name": "is_source_for_extraction",
+        "label": "Is source for extraction"
+      },
       "mapping": {
         "cidoc": "P67_refers_to",
         "cidoc_extension": "CIDOC-CRM",
@@ -350,6 +313,10 @@
       "name": "combines",
       "label": "Combines",
       "description": "Indicates that a node combines information from various sources.",
+      "reverse": {
+        "name": "is_combined_by",
+        "label": "Is combined by"
+      },
       "mapping": {
         "cidoc": "P16_used_specific_object",
         "cidoc_extension": "CIDOC-CRM",
@@ -363,8 +330,12 @@
     },
     "is_in_timebranch": {
       "name": "is_in_timebranch",
-      "label": "Included in Timebranch",
+      "label": "Is in timebranch",
       "description": "Indicates that a node belongs to a specific time branch.",
+      "reverse": {
+        "name": "contains_in_timebranch",
+        "label": "Contains in timebranch"
+      },
       "mapping": {
         "cidoc": "P67_refers_to",
         "cidoc_extension": "CIDOC-CRM",
@@ -378,8 +349,12 @@
     },
     "has_timebranch": {
       "name": "has_timebranch",
-      "label": "Connected to a Timebranch",
+      "label": "Has timebranch",
       "description": "Indicates that a node is connected to a specific time branch.",
+      "reverse": {
+        "name": "is_timebranch_of",
+        "label": "Is timebranch of"
+      },
       "mapping": {
         "cidoc": "P67_refers_to",
         "cidoc_extension": "CIDOC-CRM",
@@ -395,6 +370,10 @@
       "name": "has_author",
       "label": "Has author",
       "description": "Represents the connection of a node with its author.",
+      "reverse": {
+        "name": "is_author_of",
+        "label": "Is author of"
+      },
       "mapping": {
         "cidoc": "P94_has_created",
         "cidoc_extension": "CIDOC-CRM",
@@ -409,7 +388,11 @@
     "has_geoposition": {
       "name": "has_geoposition",
       "label": "Has geoposition",
-      "description": "Represents a connection with the geoposition node of a given node",
+      "description": "Represents a connection with the geoposition node of a given node.",
+      "reverse": {
+        "name": "is_geoposition_of",
+        "label": "Is geoposition of"
+      },
       "mapping": {
         "cidoc": "P53_has_former_or_current_location",
         "cidoc_extension": "CIDOC-CRM",
@@ -423,8 +406,12 @@
     },
     "has_linked_resource": {
       "name": "has_linked_resource",
-      "label": "Has Link",
-      "description": "Connects a node to its linked resource(s)",
+      "label": "Has linked resource",
+      "description": "Connects a node to its linked resource(s).",
+      "reverse": {
+        "name": "is_linked_resource_of",
+        "label": "Is linked resource of"
+      },
       "mapping": {
         "cidoc": "P67_refers_to",
         "cidoc_extension": "CIDOC-CRM",
@@ -438,8 +425,12 @@
     },
     "has_representation_model": {
       "name": "has_representation_model",
-      "label": "Has Representation Model",
+      "label": "Has representation model",
       "description": "Connects epochs with their representation models in 3D space.",
+      "reverse": {
+        "name": "is_representation_model_of",
+        "label": "Is representation model of"
+      },
       "mapping": {
         "cidoc": "P138i_has_representation",
         "cidoc_extension": "CIDOC-CRM",
@@ -447,15 +438,18 @@
         "extension_name": "CIDOC-S3D"
       },
       "allowed_connections": {
-        "source": ["EpochNode","StratigraphicNode"],
+        "source": ["EpochNode", "StratigraphicNode"],
         "target": ["RepresentationModelNode"]
       }
     },
-
     "has_representation_model_doc": {
       "name": "has_representation_model_doc",
-      "label": "Has Document Representation Model",
+      "label": "Has document representation model",
       "description": "Connects extractors, combiners and documents node to their representation model in 3D space.",
+      "reverse": {
+        "name": "is_doc_representation_model_of",
+        "label": "Is doc representation model of"
+      },
       "mapping": {
         "cidoc": "P138i_has_representation",
         "cidoc_extension": "CIDOC-CRM",
@@ -467,11 +461,14 @@
         "target": ["RepresentationModelDocNode", "RepresentationModelSpecialFindNode"]
       }
     },
-
     "has_representation_model_sf": {
-      "name": "has_representation_model_doc",
-      "label": "Has Document Representation Model",
-      "description": "Connects extractors, combiners and documents node to their representation model in 3D space.",
+      "name": "has_representation_model_sf",
+      "label": "Has special find representation model",
+      "description": "Connects special find units to their representation model in 3D space.",
+      "reverse": {
+        "name": "is_sf_representation_model_of",
+        "label": "Is special find representation model of"
+      },
       "mapping": {
         "cidoc": "P138i_has_representation",
         "cidoc_extension": "CIDOC-CRM",
@@ -483,11 +480,14 @@
         "target": ["RepresentationModelSpecialFindNode"]
       }
     },
-
     "has_semantic_shape": {
       "name": "has_semantic_shape",
-      "label": "Has Semantic Shape",
+      "label": "Has semantic shape",
       "description": "Connects any node to its semantic shape representation in 3D space.",
+      "reverse": {
+        "name": "is_semantic_shape_of",
+        "label": "Is semantic shape of"
+      },
       "mapping": {
         "cidoc": "P138i_has_representation",
         "cidoc_extension": "CIDOC-CRM",
@@ -501,8 +501,12 @@
     },
     "is_in_paradata_nodegroup": {
       "name": "is_in_paradata_nodegroup",
-      "label": "Belongs to a Paradata Node Group",
+      "label": "Is in paradata nodegroup",
       "description": "Indicates that a node is included into a paradata node group.",
+      "reverse": {
+        "name": "contains_paradata_node",
+        "label": "Contains paradata node"
+      },
       "mapping": {
         "cidoc": "P106_is_composed_of",
         "cidoc_extension": "CIDOC-CRM",
@@ -510,14 +514,18 @@
         "extension_name": "CIDOC-S3D"
       },
       "allowed_connections": {
-        "source": ["PropertyNode","DocumentNode", "ExtractorNode", "CombinerNode", "ParadataNode"],
+        "source": ["ProperrtyNOde","DocumentNode", "ExtractorNode", "CombinerNode", "ParadataNode"],
         "target": ["ParadataNodeGroup"]
       }
     },
     "has_paradata_nodegroup": {
       "name": "has_paradata_nodegroup",
-      "label": "Is connected to a Paradata Node Group",
+      "label": "Has paradata nodegroup",
       "description": "Indicates that a node belongs to a paradata node group.",
+      "reverse": {
+        "name": "is_paradata_nodegroup_of",
+        "label": "Is paradata nodegroup of"
+      },
       "mapping": {
         "cidoc": "P70_documents",
         "cidoc_extension": "CIDOC-CRM",
@@ -531,8 +539,12 @@
     },
     "has_license": {
       "name": "has_license",
-      "label": "Has License",
+      "label": "Has license",
       "description": "Indicates that a resource is subject to a specific license.",
+      "reverse": {
+        "name": "is_license_of",
+        "label": "Is license of"
+      },
       "mapping": {
         "cidoc": "P104_is_subject_to",
         "cidoc_extension": "CIDOC-CRM",
@@ -546,8 +558,12 @@
     },
     "has_embargo": {
       "name": "has_embargo",
-      "label": "Has Embargo",
+      "label": "Has embargo",
       "description": "Indicates that a license has a temporal embargo associated.",
+      "reverse": {
+        "name": "is_embargo_of",
+        "label": "Is embargo of"
+      },
       "mapping": {
         "cidoc": "P104_is_subject_to",
         "cidoc_extension": "CIDOC-CRM",
@@ -561,8 +577,12 @@
     },
     "has_documentation": {
       "name": "has_documentation",
-      "label": "Has documnentation",
+      "label": "Has documentation",
       "description": "Indicates that the element has an associated documentation node.",
+      "reverse": {
+        "name": "is_documentation_of",
+        "label": "Is documentation of"
+      },
       "mapping": {
         "cidoc": "P104_is_subject_to",
         "cidoc_extension": "CIDOC-CRM",
@@ -570,14 +590,15 @@
         "extension_name": null
       },
       "allowed_connections": {
-        "source": ["StratigraphicNode", "SpecialFindUnit","VirtualStratigraphicUnit"],
+        "source": ["StratigraphicNode", "SpecialFindUnit", "VirtualStratigraphicUnit"],
         "target": ["DocumentNode"]
       }
     },
     "generic_connection": {
       "name": "generic_connection",
-      "label": "Generic Connection",
-      "description": "Represents a non-specific connection between two nodes.",
+      "label": "Generic connection",
+      "description": "Represents a non-specific connection between two nodes. This is a symmetric relation.",
+      "reverse": null,
       "mapping": {
         "cidoc": "P130_shows_features_of",
         "cidoc_extension": "CIDOC-CRM",
