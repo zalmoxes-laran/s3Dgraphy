@@ -229,7 +229,7 @@
         "extension_name": "CRMarchaeo"
       },
       "allowed_connections": {
-        "source": ["StratigraphicNode", "RepresentationModelNode", "RepresentationModelDocNode", "RepresentationModelSpecialFindNode"],
+        "source": ["StratigraphicNode", "RepresentationModelNode", "RepresentationModelDocNode", "RepresentationModelSpecialFindNode", "ParadataNodeGroup", "ParadataNode", "ActivityNodeGroup"],
         "target": ["EpochNode"]
       }
     },
@@ -419,7 +419,7 @@
         "extension_name": "CRMdig"
       },
       "allowed_connections": {
-        "source": ["StratigraphicNode", "ParadataNode", "RepresentationModelNode", "RepresentationModelDocNode", "RepresentationModelSpecialFindNode"],
+        "source": ["StratigraphicNode", "ParadataNode", "DocumentNode", "RepresentationModelNode", "RepresentationModelDocNode", "RepresentationModelSpecialFindNode"],
         "target": ["LinkNode"]
       }
     },
