@@ -1273,19 +1273,31 @@ class GraphMLImporter:
         
         # Post-processing per generic_connection
         elif edge_type == "generic_connection":
+            # ✅ v1.5.3: StratigraphicNode -> DocumentNode = has_documentation
+            if (source_type in stratigraphic_types and
+                isinstance(target_node, DocumentNode)):
+                edge_type = "has_documentation"
+                # print(f"Enhanced to has_documentation: {source_type} -> DocumentNode")
+
+            # ✅ v1.5.3: DocumentNode -> StratigraphicNode = is_documentation_of (reverse)
+            elif (isinstance(source_node, DocumentNode) and
+                  target_type in stratigraphic_types):
+                edge_type = "is_documentation_of"
+                # print(f"Enhanced to is_documentation_of: DocumentNode -> {target_type}")
+
             # Nodi ParadataNode (e sottoclassi) collegati a ParadataNodeGroup
-            if (isinstance(source_node, (DocumentNode, ExtractorNode, CombinerNode, ParadataNode)) and 
+            elif (isinstance(source_node, (DocumentNode, ExtractorNode, CombinerNode, ParadataNode)) and
                 target_type == "ParadataNodeGroup"):
                 edge_type = "is_in_paradata_nodegroup"
                 # print(f"Enhanced to is_in_paradata_nodegroup: {source_type} -> ParadataNodeGroup")
-            
+
             # ParadataNodeGroup collegato a ActivityNodeGroup
             elif source_type == "ParadataNodeGroup" and target_type == "ActivityNodeGroup":
                 edge_type = "has_paradata_nodegroup"
                 # print(f"Enhanced to has_paradata_nodegroup: ParadataNodeGroup -> ActivityNodeGroup")
-            
+
             # Puoi aggiungere altre regole specifiche qui
-        
+
         return edge_type
 
     def EM_extract_edge_type(self, edge):
