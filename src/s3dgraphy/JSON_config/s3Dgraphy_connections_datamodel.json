@@ -510,7 +510,7 @@
         "extension_name": "CIDOC-S3D"
       },
       "allowed_connections": {
-        "source": ["DocumentNode", "ExtractorNode", "CombinerNode", "ParadataNode"],
+        "source": ["PropertyNode","DocumentNode", "ExtractorNode", "CombinerNode", "ParadataNode"],
         "target": ["ParadataNodeGroup"]
       }
     },
