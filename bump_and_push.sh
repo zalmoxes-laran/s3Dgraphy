@@ -52,6 +52,7 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
 fi
 
 # Check if working directory is clean
+ALLOW_DIRTY=0
 if ! git diff --quiet || ! git diff --cached --quiet; then
     echo -e "${YELLOW}⚠️  Warning: Working directory has uncommitted changes${NC}"
     read -p "Continue anyway? (y/N): " -n 1 -r
@@ -60,6 +61,7 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
         echo "Aborted."
         exit 1
     fi
+    ALLOW_DIRTY=1
 fi
 
 # Ensure virtual environment with bump2version
@@ -81,6 +83,11 @@ fi
 VENV_BIN="$VENV_DIR/bin"
 VENV_PYTHON="$VENV_BIN/python"
 BUMP_CMD="$VENV_BIN/bump2version"
+BUMP_ARGS=()
+
+if [ "$ALLOW_DIRTY" -eq 1 ]; then
+    BUMP_ARGS+=("--allow-dirty")
+fi
 
 # Install bump2version if missing in venv
 if ! "$VENV_PYTHON" -m pip show bump2version > /dev/null 2>&1; then
@@ -95,7 +102,7 @@ echo -e "Current version: ${GREEN}$CURRENT_VERSION${NC}"
 
 # Perform version bump
 echo -e "${BLUE}🔢 Bumping $BUMP_TYPE version...${NC}"
-if "$BUMP_CMD" "$BUMP_TYPE"; then
+if "$BUMP_CMD" "${BUMP_ARGS[@]}" "$BUMP_TYPE"; then
     echo -e "${GREEN}✅ Version bump successful${NC}"
 else
     echo -e "${RED}❌ Version bump failed${NC}"
