@@ -893,6 +893,109 @@ class Graph:
         
         return result
 
+    def refine_edge_types(self, verbose=False):
+        """
+        Refines placeholder edge types to more specific semantic types
+        based on the types of connected nodes.
+
+        This method applies the same logic as the GraphML importer's enhance_edge_type()
+        to edges that are already in memory, transforming placeholders into
+        semantic edge types according to the s3Dgraphy datamodel.
+
+        Refines both:
+        - 'has_data_provenance' (placeholder for GraphML 'dashed' edges)
+        - 'generic_connection' (placeholder for runtime-created edges)
+
+        Args:
+            verbose (bool): If True, prints details about refined edges
+
+        Returns:
+            int: Number of edges that were refined
+        """
+        from .nodes.document_node import DocumentNode
+        from .nodes.extractor_node import ExtractorNode
+        from .nodes.combiner_node import CombinerNode
+        from .nodes.paradata_node import ParadataNode
+
+        # Stratigraphic node types
+        stratigraphic_types = ['US', 'USVs', 'USVn', 'VSF', 'SF', 'USD', 'serSU',
+                              'serUSVn', 'serUSVs', 'TSU', 'SE', 'BR', 'unknown']
+
+        refined_count = 0
+
+        for edge in self.edges:
+            # Only process placeholder edge types
+            if edge.edge_type not in ("has_data_provenance", "generic_connection"):
+                continue
+
+            # Find source and target nodes
+            source_node = self.find_node_by_id(edge.edge_source)
+            target_node = self.find_node_by_id(edge.edge_target)
+
+            if not source_node or not target_node:
+                continue
+
+            source_type = source_node.node_type if hasattr(source_node, 'node_type') else ""
+            target_type = target_node.node_type if hasattr(target_node, 'node_type') else ""
+
+            original_type = edge.edge_type
+            new_type = None
+
+            # Refinement rules (same as import_graphml.py enhance_edge_type)
+
+            if edge.edge_type == "has_data_provenance":
+                # StratigraphicNode -> PropertyNode
+                if source_type in stratigraphic_types and target_type == "property":
+                    new_type = "has_property"
+                # StratigraphicNode -> ParadataNodeGroup
+                elif source_type in stratigraphic_types and target_type == "ParadataNodeGroup":
+                    new_type = "has_paradata_nodegroup"
+                # ExtractorNode -> DocumentNode
+                elif isinstance(source_node, ExtractorNode) and isinstance(target_node, DocumentNode):
+                    new_type = "extracted_from"
+                # CombinerNode -> ExtractorNode
+                elif isinstance(source_node, CombinerNode) and isinstance(target_node, ExtractorNode):
+                    new_type = "combines"
+                # ✅ StratigraphicNode -> DocumentNode = has_documentation
+                elif source_type in stratigraphic_types and isinstance(target_node, DocumentNode):
+                    new_type = "has_documentation"
+                # ✅ DocumentNode -> StratigraphicNode = is_documentation_of
+                elif isinstance(source_node, DocumentNode) and target_type in stratigraphic_types:
+                    new_type = "is_documentation_of"
+
+            elif edge.edge_type == "generic_connection":
+                # ✅ StratigraphicNode -> DocumentNode = has_documentation
+                if source_type in stratigraphic_types and isinstance(target_node, DocumentNode):
+                    new_type = "has_documentation"
+                # ✅ DocumentNode -> StratigraphicNode = is_documentation_of (reverse)
+                elif isinstance(source_node, DocumentNode) and target_type in stratigraphic_types:
+                    new_type = "is_documentation_of"
+                # ParadataNode (and subclasses) -> ParadataNodeGroup
+                elif isinstance(source_node, (DocumentNode, ExtractorNode, CombinerNode, ParadataNode)) and target_type == "ParadataNodeGroup":
+                    new_type = "is_in_paradata_nodegroup"
+                # ParadataNodeGroup -> ActivityNodeGroup
+                elif source_type == "ParadataNodeGroup" and target_type == "ActivityNodeGroup":
+                    new_type = "has_paradata_nodegroup"
+
+            # Apply refinement if a rule matched
+            if new_type:
+                edge.edge_type = new_type
+                refined_count += 1
+                if verbose:
+                    print(f"✅ Refined edge {edge.edge_id}: {original_type} -> {new_type} ({source_type} -> {target_type})")
+
+        if verbose and refined_count > 0:
+            print(f"\n🔄 Total edges refined: {refined_count}")
+        elif verbose:
+            print("ℹ️  No placeholder edges found to refine")
+
+        return refined_count
+
+    # Legacy alias for backwards compatibility
+    def refine_generic_connections(self, verbose=False):
+        """Deprecated: Use refine_edge_types() instead."""
+        return self.refine_edge_types(verbose=verbose)
+
 
 '''
 Esempio di utilizzo:

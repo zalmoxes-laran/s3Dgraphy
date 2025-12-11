@@ -264,26 +264,50 @@ class JSONExporter:
     def _process_edges(self, graph: Graph) -> Dict[str, List[Dict[str, Any]]]:
         """Process all edges in the graph, organizing them by type."""
         edges = {
+            # Stratigraphic temporal relations
             "is_before": [],
+            "is_after": [],
             "has_same_time": [],
             "changed_from": [],
+            # Physical relations
+            "abuts": [],
+            "cuts": [],
+            "fills": [],
+            "overlies": [],
+            "is_bonded_to": [],
+            "is_physically_equal_to": [],
+            # Data provenance and documentation
             "has_data_provenance": [],
+            "has_documentation": [],
             "has_author": [],
+            # Time and epochs
             "contrasts_with": [],
             "has_first_epoch": [],
             "survive_in_epoch": [],
+            # Activities and properties
             "is_in_activity": [],
             "has_property": [],
+            # Time branches
             "has_timebranch": [],
             "is_in_timebranch": [],
+            # Document relations
             "extracted_from": [],
             "combines": [],
+            # Resources and representations
             "has_linked_resource": [],
-            "is_in_paradata_nodegroup": [],
-            "has_paradata_nodegroup": [],
+            "has_geoposition": [],
             "has_semantic_shape": [],
             "has_representation_model": [],
-            "generic_connection": []            
+            "has_representation_model_doc": [],
+            "has_representation_model_sf": [],
+            # Paradata
+            "is_in_paradata_nodegroup": [],
+            "has_paradata_nodegroup": [],
+            # Licensing
+            "has_license": [],
+            "has_embargo": [],
+            # Fallback
+            "generic_connection": []
         }
         
         for edge in graph.edges:
@@ -292,11 +316,13 @@ class JSONExporter:
                 "from": edge.edge_source,
                 "to": edge.edge_target
             }
-            
+
             # Add edge to appropriate category
             if edge.edge_type in edges:
                 edges[edge.edge_type].append(edge_data)
             else:
+                # Log unknown edge types for debugging
+                print(f"WARNING: Unknown edge type '{edge.edge_type}' for edge {edge.edge_id} ({edge.edge_source} -> {edge.edge_target})")
                 edges["generic_connection"].append(edge_data)
                 
         return edges

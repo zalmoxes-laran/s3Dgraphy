@@ -1266,11 +1266,23 @@ class GraphMLImporter:
                 # print(f"Enhanced to extracted_from: ExtractorNode -> DocumentNode")
                 
             # CombinerNode -> ExtractorNode
-            elif (isinstance(source_node, CombinerNode) and 
+            elif (isinstance(source_node, CombinerNode) and
                 isinstance(target_node, ExtractorNode)):
                 edge_type = "combines"
                 # print(f"Enhanced to combines: CombinerNode -> ExtractorNode")
-        
+
+            # ✅ v1.5.3: StratigraphicNode -> DocumentNode = has_documentation
+            elif (source_type in stratigraphic_types and
+                isinstance(target_node, DocumentNode)):
+                edge_type = "has_documentation"
+                # print(f"Enhanced to has_documentation: {source_type} -> DocumentNode")
+
+            # ✅ v1.5.3: DocumentNode -> StratigraphicNode = is_documentation_of (reverse)
+            elif (isinstance(source_node, DocumentNode) and
+                  target_type in stratigraphic_types):
+                edge_type = "is_documentation_of"
+                # print(f"Enhanced to is_documentation_of: DocumentNode -> {target_type}")
+
         # Post-processing per generic_connection
         elif edge_type == "generic_connection":
             # ✅ v1.5.3: StratigraphicNode -> DocumentNode = has_documentation
