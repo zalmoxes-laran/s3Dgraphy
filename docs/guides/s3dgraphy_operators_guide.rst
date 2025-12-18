@@ -97,25 +97,25 @@ Creating and Validating Relationships
 
    # Basic edge creation with validation
    try:
-       edge = graph.add_edge("rel001", "US001", "US002", "is_before")
+       edge = graph.add_edge("rel001", "US002", "US001", "is_after")
        print(f"Added relationship: {edge}")
    except ValueError as e:
        print(f"Connection invalid: {e}")
 
    # Validate connection before creating
-   source_node = graph.find_node_by_id("US001")
-   target_node = graph.find_node_by_id("US002")
+   source_node = graph.find_node_by_id("US002")
+   target_node = graph.find_node_by_id("US001")
 
-   if Graph.validate_connection(source_node.node_type, target_node.node_type, "is_before"):
-       graph.add_edge("rel001", "US001", "US002", "is_before")
+   if Graph.validate_connection(source_node.node_type, target_node.node_type, "is_after"):
+       graph.add_edge("rel001", "US002", "US001", "is_after")
    else:
        print("Connection not allowed by schema rules")
 
    # Batch edge creation
    relationships = [
-       ("rel001", "US002", "US001", "is_before"),
-       ("rel002", "US003", "US002", "is_before"),
-       ("rel003", "US004", "US003", "is_before"),
+       ("rel001", "US001", "US002", "is_after"),
+       ("rel002", "US002", "US003", "is_after"),
+       ("rel003", "US003", "US004", "is_after"),
        ("rel004", "SF001", "US002", "extracted_from")
    ]
 
@@ -131,7 +131,7 @@ Edge Queries and Analysis
 .. code-block:: python
 
    # Get edges by type (uses indexed lookup)
-   temporal_edges = graph.indices.edges_by_type.get("is_before", [])
+   temporal_edges = graph.indices.edges_by_type.get("is_after", [])
    documentation_edges = graph.indices.edges_by_type.get("has_data_provenance", [])
 
    # Find all edges from a specific node
@@ -161,7 +161,7 @@ Edge Queries and Analysis
 
    # Usage examples
    all_connected = get_connected_nodes(graph, "US001")
-   before_relations = get_connected_nodes(graph, "US001", "is_before")
+   after_relations = get_connected_nodes(graph, "US001", "is_after")
 
 Advanced Graph Analysis
 -----------------------
@@ -173,20 +173,20 @@ Stratigraphic Sequence Analysis
 
    def build_stratigraphic_sequence(graph):
        """Build the complete stratigraphic sequence from temporal relationships"""
-       
+
        # Get all temporal edges
-       temporal_edges = graph.indices.edges_by_type.get("is_before", [])
-       
+       temporal_edges = graph.indices.edges_by_type.get("is_after", [])
+
        # Build adjacency list
-       before_map = {}  # node -> nodes that come before it
-       after_map = {}   # node -> nodes that come after it
-       
+       after_map = {}   # node -> nodes that come after it (more ancient)
+       before_map = {}  # node -> nodes that come before it (more recent)
+
        for edge in temporal_edges:
-           source = edge.edge_source
-           target = edge.edge_target
-           
-           if target not in before_map:
-               before_map[target] = []
+           source = edge.edge_source  # More recent unit
+           target = edge.edge_target  # More ancient unit
+
+           if source not in after_map:
+               after_map[source] = []
            before_map[target].append(source)
            
            if source not in after_map:

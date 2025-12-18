@@ -205,8 +205,8 @@ Core Components
 
 **Edge Types**
    Defined relationships with CIDOC-CRM mappings:
-   
-   - Temporal (is_before, has_same_time, changed_from)
+
+   - Temporal (is_after, is_before, has_same_time, changed_from)
    - Physical (abuts, fills, cuts, covers, rests_on)
    - Documentation (has_documentation, extracted_from)
    - Properties (has_property)
@@ -265,11 +265,11 @@ Create comprehensive stratigraphic documentation:
    
    floor = StratigraphicNode("US002", node_type="US")
    floor.description = "Mosaic floor"
-   
-   # Add temporal relationship
+
+   # Add temporal relationship (canonical direction: recent → ancient)
    graph.add_node(wall)
    graph.add_node(floor)
-   graph.add_edge("e1", "US001", "US002", "is_before")
+   graph.add_edge("e1", "US002", "US001", "is_after")  # floor is after (more recent than) wall
 
 Virtual Reconstruction
 ~~~~~~~~~~~~~~~~~~~~~~

@@ -416,15 +416,15 @@ Best Practices for Edge Usage
 Temporal Relationships
 ~~~~~~~~~~~~~~~~~~~~~~
 
-1. **Use consistent direction**: Earlier units point to later units with "is_before"
+1. **Use consistent direction**: Later units point to earlier units with "is_after" (canonical direction from recent to ancient)
 2. **Document contemporaneity**: Use "has_same_time" for features built together
 3. **Model transformations**: Use "changed_from" for reuse and modification
 
 .. code-block:: python
 
-   # Good: Consistent temporal direction
-   graph.add_edge("temp1", "US003_foundation", "US002_wall", "is_before")
-   graph.add_edge("temp2", "US002_wall", "US001_roof", "is_before")
+   # Good: Consistent temporal direction (canonical "is_after")
+   graph.add_edge("temp1", "US002_wall", "US003_foundation", "is_after")  # wall is more recent than foundation
+   graph.add_edge("temp2", "US001_roof", "US002_wall", "is_after")  # roof is more recent than wall
    
    # Good: Contemporary features
    graph.add_edge("cont1", "US002_wall", "US004_floor", "has_same_time")

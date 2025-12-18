@@ -74,10 +74,10 @@ The core of stratigraphic analysis is understanding temporal relationships:
 .. code-block:: python
 
    # Add temporal relationships (stratigraphic sequence)
-   # "is_before" means the source is older than the target
-   
-   site_graph.add_edge("rel1", "US002", "US001", "is_before")  # Medieval before Surface
-   site_graph.add_edge("rel2", "US003", "US002", "is_before")  # Roman before Medieval
+   # "is_after" means the source is more recent than the target (canonical direction)
+
+   site_graph.add_edge("rel1", "US001", "US002", "is_after")  # Surface after Medieval
+   site_graph.add_edge("rel2", "US002", "US003", "is_after")  # Medieval after Roman
 
    print(f"Graph now has {len(site_graph.edges)} relationships")
 
@@ -106,8 +106,8 @@ Here's the complete code for this tutorial:
 
    # Add stratigraphic relationships
    relationships = [
-       ("rel1", "US002", "US001", "is_before"),
-       ("rel2", "US003", "US002", "is_before")
+       ("rel1", "US001", "US002", "is_after"),
+       ("rel2", "US002", "US003", "is_after")
    ]
 
    for rel_id, source, target, rel_type in relationships:

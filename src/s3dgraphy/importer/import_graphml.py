@@ -188,7 +188,7 @@ class GraphMLImporter:
             original_source_id = str(edge.attrib['source'])
             original_target_id = str(edge.attrib['target'])
             edge_type = self.EM_extract_edge_type(edge)
-            
+
             # Gestisci gli ID duplicati
             if original_source_id in self.duplicate_id_map:
                 #print(f"Remapping source: {original_source_id} -> {self.duplicate_id_map[original_source_id]}")
@@ -196,8 +196,9 @@ class GraphMLImporter:
             if original_target_id in self.duplicate_id_map:
                 #print(f"Remapping target: {original_target_id} -> {self.duplicate_id_map[original_target_id]}")
                 original_target_id = self.duplicate_id_map[original_target_id]
-            
-            # Salva le mappature originali
+
+            # Salva le mappature originali (source/target mantengono la direzione del GraphML)
+            # GraphML ha già source=recent, target=ancient, che corrisponde a "is_after"
             edge_original_mappings.append({
                 'original_edge_id': original_edge_id,
                 'original_source_id': original_source_id,
@@ -1316,9 +1317,16 @@ class GraphMLImporter:
         """
         Extracts the basic semantic type of the edge from the GraphML line style.
 
-        Note: For stratigraphic relations, "is_before" is used during import.
-        In v1.5.3+, "is_before" is the reverse of the canonical "is_after" edge.
-        The connections datamodel handles both directions correctly.
+        Note: For stratigraphic relations, "is_after" is now used as the canonical direction.
+        In v1.5.3+, "is_after" (source more recent than target) is canonical,
+        while "is_before" (source older than target) is the reverse direction.
+
+        GraphML convention in Extended Matrix has arrows pointing from recent to ancient:
+        - Source node = more recent unit (positioned higher in the matrix)
+        - Target node = more ancient unit (positioned lower in the matrix)
+        - Visual arrow = points downward (from recent to ancient)
+
+        This matches perfectly with "is_after" canonical direction, so no reversal is needed.
 
         Args:
             edge_element (Element): XML element for the edge.
@@ -1327,6 +1335,7 @@ class GraphMLImporter:
             str: The edge type representing the semantic relationship.
         """
         edge_type = "generic_connection"  # Default edge type
+
         data_element = edge.find('./{http://graphml.graphdrawing.org/xmlns}data[@key="d10"]')
 
         if data_element is not None:
@@ -1336,9 +1345,10 @@ class GraphMLImporter:
                 style_type = line_style.attrib.get("type")
                 # Map each graphical style to its semantic meaning
                 if style_type == "line":
-                    # Legacy GraphML files use "is_before" for stratigraphic relations
-                    # v1.5.3 datamodel defines this as reverse of canonical "is_after"
-                    edge_type = "is_before"
+                    # v1.5.3: Use canonical "is_after" direction (recent → ancient)
+                    # GraphML already has source=recent, target=ancient (arrow points down)
+                    # This matches the canonical direction perfectly, no reversal needed
+                    edge_type = "is_after"
                 elif style_type == "double_line":
                     edge_type = "has_same_time"
                 elif style_type == "dotted":
@@ -1348,7 +1358,7 @@ class GraphMLImporter:
                 elif style_type == "dashed_dotted":
                     edge_type = "contrasts_with"
                 else:
-                    edge_type = "generic_connection"  # Default to "generic_connection" if unknown style
+                    edge_type = "generic_connection"
 
         return edge_type
 
