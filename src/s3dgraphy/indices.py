@@ -8,22 +8,39 @@ class GraphIndices:
     
     def clear(self):
         """Cleans all indexes"""
+        # ✅ OPTIMIZATION: Node ID -> Node direct lookup (O(1) instead of O(n))
+        self.nodes_by_id = {}
+
         # Nodi per tipo
         self.nodes_by_type = {}
-        
+
         # Property nodes
         self.property_nodes_by_name = {}
         self.property_values_by_name = {}  # {prop_name: set(values)}
-        
+
         # Relazioni stratigrafiche-proprietà
         self.strat_to_properties = {}  # {strat_id: {prop_name: value}}
         self.properties_to_strat = {}  # {prop_name: {value: [strat_ids]}}
-        
+
         # Edges
         self.edges_by_type = {}
         self.edges_by_source = {}
         self.edges_by_target = {}
+
+        # ✅ OPTIMIZATION: Composite edge index (source_id, edge_type) -> [edges]
+        self.edges_by_source_type = {}  # {(source_id, edge_type): [edges]}
+        self.edges_by_target_type = {}  # {(target_id, edge_type): [edges]}
     
+    def add_node(self, node):
+        """Adds a node to all relevant indices"""
+        # ✅ OPTIMIZATION: Add to node_id index
+        if hasattr(node, 'node_id'):
+            self.nodes_by_id[node.node_id] = node
+
+        # Add to type index
+        if hasattr(node, 'node_type'):
+            self.add_node_by_type(node.node_type, node)
+
     def add_node_by_type(self, node_type, node):
         """Adds a node to the index by type"""
         if node_type not in self.nodes_by_type:
@@ -49,16 +66,28 @@ class GraphIndices:
         if edge.edge_type not in self.edges_by_type:
             self.edges_by_type[edge.edge_type] = []
         self.edges_by_type[edge.edge_type].append(edge)
-        
+
         # Per source
         if edge.edge_source not in self.edges_by_source:
             self.edges_by_source[edge.edge_source] = []
         self.edges_by_source[edge.edge_source].append(edge)
-        
+
         # Per target
         if edge.edge_target not in self.edges_by_target:
             self.edges_by_target[edge.edge_target] = []
         self.edges_by_target[edge.edge_target].append(edge)
+
+        # ✅ OPTIMIZATION: Composite indices for O(1) lookup by (source, type)
+        source_type_key = (edge.edge_source, edge.edge_type)
+        if source_type_key not in self.edges_by_source_type:
+            self.edges_by_source_type[source_type_key] = []
+        self.edges_by_source_type[source_type_key].append(edge)
+
+        # ✅ OPTIMIZATION: Composite indices for O(1) lookup by (target, type)
+        target_type_key = (edge.edge_target, edge.edge_type)
+        if target_type_key not in self.edges_by_target_type:
+            self.edges_by_target_type[target_type_key] = []
+        self.edges_by_target_type[target_type_key].append(edge)
     
     def add_property_relation(self, prop_name, strat_id, value):
         """Adds a stratigraphic-property relationship"""

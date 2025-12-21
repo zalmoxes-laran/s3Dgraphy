@@ -70,31 +70,32 @@ class Graph:
         """Ricostruisce gli indici del grafo"""
         if self._indices is None:
             self._indices = GraphIndices()
-        
+
         self._indices.clear()
-        
-        # Indicizza nodi per tipo
+
+        # ✅ OPTIMIZATION: Use add_node() which populates both node_id and type indices
         for node in self.nodes:
-            node_type = getattr(node, 'node_type', 'unknown')
-            self._indices.add_node_by_type(node_type, node)
-            
+            self._indices.add_node(node)
+
             # Indicizzazione speciale per property nodes
+            node_type = getattr(node, 'node_type', None)
             if node_type == 'property' and hasattr(node, 'name'):
                 self._indices.add_property_node(node.name, node)
         
         # Indicizza edges
         for edge in self.edges:
             self._indices.add_edge(edge)
-            
+
             # Indicizzazione speciale per has_property edges
+            # ✅ FIX: Use newly built index instead of find_node_by_id() to avoid recursion
             if edge.edge_type == 'has_property':
-                source_node = self.find_node_by_id(edge.edge_source)
-                target_node = self.find_node_by_id(edge.edge_target)
+                source_node = self._indices.nodes_by_id.get(edge.edge_source)
+                target_node = self._indices.nodes_by_id.get(edge.edge_target)
                 if source_node and target_node and hasattr(target_node, 'name'):
                     prop_value = getattr(target_node, 'description', 'empty')
                     self._indices.add_property_relation(
-                        target_node.name, 
-                        edge.edge_source, 
+                        target_node.name,
+                        edge.edge_source,
                         prop_value
                     )
         
@@ -344,7 +345,15 @@ class Graph:
             pass
 
     def find_node_by_id(self, node_id):
-        """Finds a node by ID."""
+        """Finds a node by ID.
+
+        ✅ OPTIMIZATION: O(1) lookup using indices instead of O(n) iteration
+        """
+        # Use index if available (O(1) lookup)
+        if not self._indices_dirty and self._indices is not None:
+            return self._indices.nodes_by_id.get(node_id)
+
+        # Fallback to linear search if indices not ready
         for node in self.nodes:
             if node.node_id == node_id:
                 return node
@@ -381,7 +390,15 @@ class Graph:
         return [node for node in connected_nodes if node.node_type == node_type]
 
     def get_nodes_by_type(self, node_type):
-        """Gets all nodes of a given type."""
+        """Gets all nodes of a given type.
+
+        ✅ OPTIMIZATION: O(1) lookup using type index instead of O(n) iteration
+        """
+        # Use index if available (O(1) lookup)
+        if not self._indices_dirty and self._indices is not None:
+            return self._indices.nodes_by_type.get(node_type, [])
+
+        # Fallback to linear search if indices not ready
         return [node for node in self.nodes if node.node_type == node_type]
 
     def remove_node(self, node_id):
@@ -478,23 +495,37 @@ class Graph:
 
         Returns:
             EpochNode | None: Il nodo EpochNode connesso, oppure None se non trovato.
+
+        ✅ OPTIMIZATION: O(1) lookup using composite index instead of O(E) iteration
         """
-        for edge in self.edges:
-            if (edge.edge_source == node.node_id and edge.edge_type == edge_type):
-                #print("Ho trovato un edge corretto per il mio nodo")
+        # Use composite index if available (O(1) lookup)
+        if not self._indices_dirty and self._indices is not None:
+            # Check outgoing edges (source -> target)
+            source_key = (node.node_id, edge_type)
+            for edge in self._indices.edges_by_source_type.get(source_key, []):
                 target_node = self.find_node_by_id(edge.edge_target)
                 if target_node and target_node.node_type == "EpochNode":
-                    #print(f"Found connected EpochNode '{target_node.node_id}' via edge type '{edge_type}'.")
                     return target_node
-                else:
-                    pass
+
+            # Check incoming edges (target <- source)
+            target_key = (node.node_id, edge_type)
+            for edge in self._indices.edges_by_target_type.get(target_key, []):
+                source_node = self.find_node_by_id(edge.edge_source)
+                if source_node and source_node.node_type == "EpochNode":
+                    return source_node
+
+            return None
+
+        # Fallback to linear search if indices not ready
+        for edge in self.edges:
+            if (edge.edge_source == node.node_id and edge.edge_type == edge_type):
+                target_node = self.find_node_by_id(edge.edge_target)
+                if target_node and target_node.node_type == "EpochNode":
+                    return target_node
             elif (edge.edge_target == node.node_id and edge.edge_type == edge_type):
                 source_node = self.find_node_by_id(edge.edge_source)
                 if source_node and source_node.node_type == "EpochNode":
-                    #print(f"Found connected EpochNode '{source_node.node_id}' via edge type '{edge_type}'.")
                     return source_node
-                else:
-                    pass
 
         return None
 
@@ -509,8 +540,30 @@ class Graph:
 
         Returns:
             List[EpochNode]: Lista di nodi EpochNode connessi.
+
+        ✅ OPTIMIZATION: O(1) lookup using composite index instead of O(E) iteration
         """
         connected_epoch_nodes = []
+
+        # Use composite index if available (O(1) lookup)
+        if not self._indices_dirty and self._indices is not None:
+            # Check outgoing edges (source -> target)
+            source_key = (node.node_id, edge_type)
+            for edge in self._indices.edges_by_source_type.get(source_key, []):
+                target_node = self.find_node_by_id(edge.edge_target)
+                if target_node and target_node.node_type == "EpochNode":
+                    connected_epoch_nodes.append(target_node)
+
+            # Check incoming edges (target <- source)
+            target_key = (node.node_id, edge_type)
+            for edge in self._indices.edges_by_target_type.get(target_key, []):
+                source_node = self.find_node_by_id(edge.edge_source)
+                if source_node and source_node.node_type == "EpochNode":
+                    connected_epoch_nodes.append(source_node)
+
+            return connected_epoch_nodes
+
+        # Fallback to linear search if indices not ready
         for edge in self.edges:
             if (edge.edge_source == node.node_id and edge.edge_type == edge_type):
                 target_node = self.find_node_by_id(edge.edge_target)
@@ -683,16 +736,37 @@ class Graph:
     def get_connected_nodes_by_edge_type(self, node_id, edge_type):
         """
         Ottiene tutti i nodi connessi a un nodo specifico tramite un tipo di edge.
-        
+
         Args:
             node_id (str): ID del nodo di partenza
             edge_type (str): Tipo di edge da filtrare
-            
+
         Returns:
             list: Lista di nodi connessi attraverso il tipo di edge specificato
+
+        ✅ OPTIMIZATION: O(1) lookup using composite index instead of O(E) iteration
         """
         connected_nodes = []
-        
+
+        # Use composite index if available (O(1) lookup)
+        if not self._indices_dirty and self._indices is not None:
+            # Check outgoing edges (source -> target)
+            source_key = (node_id, edge_type)
+            for edge in self._indices.edges_by_source_type.get(source_key, []):
+                target_node = self.find_node_by_id(edge.edge_target)
+                if target_node:
+                    connected_nodes.append(target_node)
+
+            # Check incoming edges (target <- source)
+            target_key = (node_id, edge_type)
+            for edge in self._indices.edges_by_target_type.get(target_key, []):
+                source_node = self.find_node_by_id(edge.edge_source)
+                if source_node:
+                    connected_nodes.append(source_node)
+
+            return connected_nodes
+
+        # Fallback to linear search if indices not ready
         for edge in self.edges:
             if edge.edge_type == edge_type:
                 if edge.edge_source == node_id:
@@ -703,7 +777,7 @@ class Graph:
                     source_node = self.find_node_by_id(edge.edge_source)
                     if source_node:
                         connected_nodes.append(source_node)
-        
+
         return connected_nodes
 
     def get_property_nodes_for_node(self, node_id):
@@ -726,21 +800,32 @@ class Graph:
     def get_combiner_nodes_for_property(self, property_node_id):
         """
         Ottiene tutti i nodi combiner connessi a un nodo proprietà.
-        
+
         Args:
             property_node_id (str): ID del nodo proprietà
-            
+
         Returns:
             list: Lista di nodi combiner connessi
+
+        ✅ OPTIMIZATION: O(1) lookup using source index instead of O(E) iteration
         """
         combiners = []
-        
+
+        # Use index if available (O(1) lookup)
+        if not self._indices_dirty and self._indices is not None:
+            for edge in self._indices.edges_by_source.get(property_node_id, []):
+                target_node = self.find_node_by_id(edge.edge_target)
+                if target_node and target_node.node_type == "combiner":
+                    combiners.append(target_node)
+            return combiners
+
+        # Fallback to linear search
         for edge in self.edges:
             if edge.edge_source == property_node_id:
                 target_node = self.find_node_by_id(edge.edge_target)
                 if target_node and target_node.node_type == "combiner":
                     combiners.append(target_node)
-        
+
         return combiners
 
     def get_extractor_nodes_for_node(self, node_id):
