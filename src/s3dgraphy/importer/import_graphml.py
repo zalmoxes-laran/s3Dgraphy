@@ -62,13 +62,22 @@ class GraphMLImporter:
         for key_elem in tree.findall('.//{http://graphml.graphdrawing.org/xmlns}key'):
             key_id = key_elem.attrib.get('id')
             attr_name = key_elem.attrib.get('attr.name')
+            yfiles_type = key_elem.attrib.get('yfiles.type')
             key_for = key_elem.attrib.get('for')
 
+            # Gestisci chiavi con attr.name (url, description, EMID, URI)
             if attr_name and key_id:
                 if key_for == 'node':
                     key_map['node'][attr_name] = key_id
                 elif key_for == 'edge':
                     key_map['edge'][attr_name] = key_id
+
+            # Gestisci chiavi yfiles (nodegraphics, edgegraphics, etc.)
+            elif yfiles_type and key_id:
+                if key_for == 'node' and yfiles_type == 'nodegraphics':
+                    key_map['node']['nodegraphics'] = key_id
+                elif key_for == 'edge' and yfiles_type == 'edgegraphics':
+                    key_map['edge']['edgegraphics'] = key_id
 
         print(f"[GraphML Parser] Built key mapping:")
         print(f"  Node keys: {key_map['node']}")
@@ -245,9 +254,13 @@ class GraphMLImporter:
         edges_updated = 0
 
         # Aggiorna nodi
+        nodes_checked = 0
+        nodes_in_mapping = 0
         for node_elem in self.graphml_tree.findall('.//gml:node', ns):
+            nodes_checked += 1
             original_id = node_elem.attrib.get('id')
             if original_id in self.id_mapping:
+                nodes_in_mapping += 1
                 uuid_val = self.id_mapping[original_id]
                 # Cerca il nodo nel grafo per ottenere URI
                 graph_node = self.graph.find_node_by_id(uuid_val)
@@ -318,41 +331,54 @@ class GraphMLImporter:
             default_elem.attrib['{http://www.w3.org/XML/1998/namespace}space'] = 'preserve'
             root.insert(list(root).index(root.find('.//gml:graph', ns)), emid_node_key)
 
+            # IMPORTANTE: Aggiorna key_map con la nuova chiave EMID per nodi
+            self.key_map['node']['EMID'] = emid_key_id
+
             # Crea key per edge
+            emid_edge_key_id = f"d{max_id + 1}"
+            max_id += 1
             emid_edge_key = ET.Element('{http://graphml.graphdrawing.org/xmlns}key')
             emid_edge_key.attrib['attr.name'] = 'EMID'
             emid_edge_key.attrib['attr.type'] = 'string'
             emid_edge_key.attrib['for'] = 'edge'
-            emid_edge_key.attrib['id'] = f"d{max_id + 1}"
-            max_id += 1
+            emid_edge_key.attrib['id'] = emid_edge_key_id
             default_elem = ET.SubElement(emid_edge_key, '{http://graphml.graphdrawing.org/xmlns}default')
             default_elem.attrib['{http://www.w3.org/XML/1998/namespace}space'] = 'preserve'
             root.insert(list(root).index(root.find('.//gml:graph', ns)), emid_edge_key)
 
+            # IMPORTANTE: Aggiorna key_map con la nuova chiave EMID per edge
+            self.key_map['edge']['EMID'] = emid_edge_key_id
             print(f"[GraphML Slipback] Created EMID keys")
 
         # Crea URI key se non esiste (stessa logica)
         if 'URI' not in existing_keys:
+            uri_node_key_id = f"d{max_id + 1}"
+            max_id += 1
             uri_node_key = ET.Element('{http://graphml.graphdrawing.org/xmlns}key')
             uri_node_key.attrib['attr.name'] = 'URI'
             uri_node_key.attrib['attr.type'] = 'string'
             uri_node_key.attrib['for'] = 'node'
-            uri_node_key.attrib['id'] = f"d{max_id + 1}"
-            max_id += 1
+            uri_node_key.attrib['id'] = uri_node_key_id
             default_elem = ET.SubElement(uri_node_key, '{http://graphml.graphdrawing.org/xmlns}default')
             default_elem.attrib['{http://www.w3.org/XML/1998/namespace}space'] = 'preserve'
             root.insert(list(root).index(root.find('.//gml:graph', ns)), uri_node_key)
 
+            # IMPORTANTE: Aggiorna key_map
+            self.key_map['node']['URI'] = uri_node_key_id
+
+            uri_edge_key_id = f"d{max_id + 1}"
+            max_id += 1
             uri_edge_key = ET.Element('{http://graphml.graphdrawing.org/xmlns}key')
             uri_edge_key.attrib['attr.name'] = 'URI'
             uri_edge_key.attrib['attr.type'] = 'string'
             uri_edge_key.attrib['for'] = 'edge'
-            uri_edge_key.attrib['id'] = f"d{max_id + 1}"
-            max_id += 1
+            uri_edge_key.attrib['id'] = uri_edge_key_id
             default_elem = ET.SubElement(uri_edge_key, '{http://graphml.graphdrawing.org/xmlns}default')
             default_elem.attrib['{http://www.w3.org/XML/1998/namespace}space'] = 'preserve'
             root.insert(list(root).index(root.find('.//gml:graph', ns)), uri_edge_key)
 
+            # IMPORTANTE: Aggiorna key_map
+            self.key_map['edge']['URI'] = uri_edge_key_id
             print(f"[GraphML Slipback] Created URI keys")
 
     def _update_node_custom_fields(self, node_elem, uuid_val, uri_val=None):
@@ -937,10 +963,27 @@ class GraphMLImporter:
         """
         Estrae gli EpochNode dal nodo swimlane nel file GraphML.
         """
+        # FASE 2 SLIPBACK: Aggiungi il nodo swimlane stesso a id_mapping
+        swimlane_original_id = self.getnode_id(node_element)
+
+        # Estrai campi custom EMID e URI per il nodo swimlane
+        custom_fields = self.extract_custom_fields(node_element, 'node')
+
+        # Se esiste EMID, riutilizzalo, altrimenti genera nuovo UUID
+        if 'EMID' in custom_fields and custom_fields['EMID']:
+            swimlane_uuid = custom_fields['EMID']
+            print(f"[GraphML Parser] Reusing existing EMID for swimlane node: {swimlane_uuid} for node {swimlane_original_id}")
+        else:
+            swimlane_uuid = str(uuid.uuid4())
+            print(f"[GraphML Parser] Generated new UUID for swimlane node: {swimlane_uuid} for node {swimlane_original_id}")
+
+        # Aggiungi alla mappatura
+        self.id_mapping[swimlane_original_id] = swimlane_uuid
+
         # Mappa per tenere traccia delle righe per ID
         row_id_to_index = {}
         epoch_nodes = []
-        
+
         geometry = node_element.find('.//{http://www.yworks.com/xml/graphml}Geometry')
         y_start = float(geometry.attrib['y'])
 
@@ -1306,6 +1349,7 @@ class GraphMLImporter:
         # Usa key_map dinamico per trovare le chiavi corrette
         url_key = self.key_map['node'].get('url')
         description_key = self.key_map['node'].get('description')
+        nodegraphics_key = self.key_map['node'].get('nodegraphics')
 
         for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
             attrib = subnode.attrib
@@ -1322,9 +1366,8 @@ class GraphMLImporter:
                 else:
                     nodedescription = self.clean_comments(subnode.text)
 
-            # yfiles.type="nodegraphics" non ha attr.name, quindi cerchiamo per yfiles.type
-            # Cerca tra tutte le chiavi yfiles per nodegraphics
-            if 'yfiles.type' in ' '.join(str(v) for v in attrib.values()) or 'nodegraphics' in str(key):
+            # Estrai nodegraphics usando la chiave dinamica
+            if nodegraphics_key and key == nodegraphics_key:
                 for USname in subnode.findall('.//{http://www.yworks.com/xml/graphml}NodeLabel'):
                     nodename = self._check_if_empty(USname.text)
                 for fill_color in subnode.findall('.//{http://www.yworks.com/xml/graphml}Fill'):
@@ -1355,11 +1398,13 @@ class GraphMLImporter:
         # Usa key_map dinamico
         url_key = self.key_map['node'].get('url')
         description_key = self.key_map['node'].get('description')
+        nodegraphics_key = self.key_map['node'].get('nodegraphics')
 
         # Prima verifica se è un document node cercando le proprietà yfiles
         for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-            # Cerca nodegraphics (la chiave varia, usiamo yfiles.type)
-            if 'yfiles.type' in ' '.join(str(v) for v in subnode.attrib.values()) or 'nodegraphics' in str(subnode.attrib.get('key', '')):
+            key = subnode.attrib.get('key')
+            # Cerca nodegraphics usando la chiave dinamica
+            if nodegraphics_key and key == nodegraphics_key:
                 for USname in subnode.findall('.//{http://www.yworks.com/xml/graphml}NodeLabel'):
                     nodename = USname.text
                 for nodetype in subnode.findall('.//{http://www.yworks.com/xml/graphml}Property'):
@@ -1394,10 +1439,12 @@ class GraphMLImporter:
         # Usa key_map dinamico
         url_key = self.key_map['node'].get('url')
         description_key = self.key_map['node'].get('description')
+        nodegraphics_key = self.key_map['node'].get('nodegraphics')
 
         # Prima verifica se è un property node
         for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-            if 'yfiles.type' in ' '.join(str(v) for v in subnode.attrib.values()) or 'nodegraphics' in str(subnode.attrib.get('key', '')):
+            key = subnode.attrib.get('key')
+            if nodegraphics_key and key == nodegraphics_key:
                 for USname in subnode.findall('.//{http://www.yworks.com/xml/graphml}NodeLabel'):
                     nodename = self._check_if_empty(USname.text)
                 for nodetype in subnode.findall('.//{http://www.yworks.com/xml/graphml}Property'):
@@ -1432,10 +1479,12 @@ class GraphMLImporter:
         # Usa key_map dinamico
         url_key = self.key_map['node'].get('url')
         description_key = self.key_map['node'].get('description')
+        nodegraphics_key = self.key_map['node'].get('nodegraphics')
 
         # Prima verifica se è un extractor node (nome inizia con "D.")
         for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-            if 'yfiles.type' in ' '.join(str(v) for v in subnode.attrib.values()) or 'nodegraphics' in str(subnode.attrib.get('key', '')):
+            key = subnode.attrib.get('key')
+            if nodegraphics_key and key == nodegraphics_key:
                 for USname in subnode.findall('.//{http://www.yworks.com/xml/graphml}NodeLabel'):
                     nodename = self._check_if_empty(USname.text)
                 if nodename.startswith("D.") and not self.graph.find_node_by_name(nodename):
@@ -1469,10 +1518,12 @@ class GraphMLImporter:
         # Usa key_map dinamico
         url_key = self.key_map['node'].get('url')
         description_key = self.key_map['node'].get('description')
+        nodegraphics_key = self.key_map['node'].get('nodegraphics')
 
         # Prima verifica se è un combiner node (nome inizia con "C.")
         for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-            if 'yfiles.type' in ' '.join(str(v) for v in subnode.attrib.values()) or 'nodegraphics' in str(subnode.attrib.get('key', '')):
+            key = subnode.attrib.get('key')
+            if nodegraphics_key and key == nodegraphics_key:
                 for USname in subnode.findall('.//{http://www.yworks.com/xml/graphml}NodeLabel'):
                     nodename = self._check_if_empty(USname.text)
                 if nodename.startswith("C."):
