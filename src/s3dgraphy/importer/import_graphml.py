@@ -563,7 +563,15 @@ class GraphMLImporter:
         # FASE 3: Se esiste EMID, riutilizzalo come UUID, altrimenti generane uno nuovo
         if 'EMID' in custom_fields and custom_fields['EMID']:
             uuid_id = custom_fields['EMID']
-            print(f"[GraphML Parser] Reusing existing EMID as node ID: {uuid_id} for node {original_id}")
+
+            # ⚠️ VALIDAZIONE: Controlla se questo EMID è già stato usato (possibile duplicazione in yEd)
+            if uuid_id in [v for k, v in self.id_mapping.items() if k != original_id]:
+                print(f"⚠️  WARNING: Duplicate EMID detected! EMID {uuid_id[:20]}... is already used by another node.")
+                print(f"   This usually happens when duplicating nodes in yEd (Ctrl+D).")
+                print(f"   Generating NEW UUID for node {original_id} to avoid conflicts.")
+                uuid_id = str(uuid.uuid4())
+            else:
+                print(f"[GraphML Parser] Reusing existing EMID as node ID: {uuid_id} for node {original_id}")
         else:
             # Genera un nuovo UUID per questo nodo
             uuid_id = str(uuid.uuid4())

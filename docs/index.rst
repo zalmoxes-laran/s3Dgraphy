@@ -46,10 +46,17 @@ Key Features
 
 🔄 **Format Interoperability**
    Import from multiple formats:
-   
-   - **GraphML** - Primary format for Extended Matrix graphs
+
+   - **GraphML** - Primary format with UUID slipback for edit-import cycles
    - **XLSX** - Excel files with JSON mapping configurations
    - **SQLite** - pyArchInit database support
+
+🔐 **UUID Slipback System**
+   Automatic UUID persistence in GraphML files enables:
+
+   - Edit graphs in yEd while preserving node/edge identity
+   - Duplicate EMID detection and automatic resolution
+   - Seamless roundtrip editing workflow
 
 📤 **Export to JSON**
    Export graphs to JSON for web platforms (Heriverse, ATON)
