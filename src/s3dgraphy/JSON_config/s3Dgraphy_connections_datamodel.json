@@ -1,6 +1,6 @@
 {
-  "s3Dgraphy_connections_model_version": "1.5.3",
-  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. Version 1.5.3 introduces canonical/reverse directionality with verb-based labels for clear socket identification in node editors.",
+  "s3Dgraphy_connections_model_version": "1.5.4",
+  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. Version 1.5.3 introduces canonical/reverse directionality with verb-based labels for clear socket identification in node editors. Version 1.5.4 adds 'has_visual_reference' edge type.",
   "components": [
     "CIDOC-CRM",
     "CRMarchaeo",
@@ -591,6 +591,25 @@
       },
       "allowed_connections": {
         "source": ["StratigraphicNode", "SpecialFindUnit", "VirtualStratigraphicUnit"],
+        "target": ["DocumentNode"]
+      }
+    },
+    "has_visual_reference": {
+      "name": "has_visual_reference",
+      "label": "Has visual reference",
+      "description": "Indicates that the element has an associated visual reference.",
+      "reverse": {
+        "name": "is_visual_reference_of",
+        "label": "Is visual reference of"
+      },
+      "mapping": {
+        "cidoc": "NOTyetMAPPED",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": null,
+        "extension_name": null
+      },
+      "allowed_connections": {
+        "source": ["PropertyNode", "ExtractorNode", "CombinerNode", "ParadataNode"],
         "target": ["DocumentNode"]
       }
     },
