@@ -47,6 +47,9 @@ classifiers = [
 dependencies = [
     "pandas>=2.0.0",
     "numpy>=1.21.0",
+    "lxml>=4.9.0",
+    "openpyxl>=3.0.0",
+    "networkx>=3.0",
 ]
 
 [project.urls]
