@@ -208,10 +208,10 @@ class GraphMLExporter:
             assigned_epoch = self._assign_node_to_epoch(node, epochs)
 
             if assigned_epoch:
-                nodes_by_epoch[assigned_epoch.id].append(node)
+                nodes_by_epoch[assigned_epoch.node_id].append(node)
             else:
                 # Fallback to first epoch if no match
-                nodes_by_epoch[epochs[0].id].append(node)
+                nodes_by_epoch[epochs[0].node_id].append(node)
 
         # Position nodes within each epoch
         x_start = 150.0
@@ -219,13 +219,13 @@ class GraphMLExporter:
         y_padding = 80.0
 
         for epoch in epochs:
-            epoch_nodes = nodes_by_epoch.get(epoch.id, [])
+            epoch_nodes = nodes_by_epoch.get(epoch.node_id, [])
 
             if not epoch_nodes:
                 continue
 
             # Get Y range for this epoch
-            min_y, max_y = epoch_ranges.get(epoch.id, (100.0, 200.0))
+            min_y, max_y = epoch_ranges.get(epoch.node_id, (100.0, 200.0))
 
             # Calculate Y positions (evenly distributed or temporal order)
             available_height = max_y - min_y - (2 * y_padding)

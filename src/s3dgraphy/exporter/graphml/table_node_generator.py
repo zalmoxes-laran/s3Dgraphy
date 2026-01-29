@@ -84,11 +84,11 @@ class TableNodeGenerator:
         rows_elem = ET.SubElement(table, '{%s}Rows' % self.YFILES_NS)
 
         # Sort epochs by start time (most recent first for visual consistency)
-        sorted_epochs = sorted(epochs, key=lambda e: e.start if e.start else 0, reverse=True)
+        sorted_epochs = sorted(epochs, key=lambda e: e.start_time if e.start_time else 0, reverse=True)
 
         # Calculate row heights (proportional to epoch duration or default)
         total_duration = sum(
-            abs(e.end - e.start) if (e.start and e.end) else 100
+            abs(e.end_time - e.start_time) if (e.start_time and e.end_time) else 100
             for e in sorted_epochs
         )
 
@@ -100,8 +100,8 @@ class TableNodeGenerator:
             row_id = f"row_{idx}"
 
             # Calculate proportional height
-            if epoch.start is not None and epoch.end is not None:
-                duration = abs(epoch.end - epoch.start)
+            if epoch.start_time is not None and epoch.end_time is not None:
+                duration = abs(epoch.end_time - epoch.start_time)
                 proportional_height = (duration / total_duration) * available_height if total_duration > 0 else 0
             else:
                 proportional_height = 0
@@ -134,8 +134,8 @@ class TableNodeGenerator:
 
             # Build epoch label text
             label_parts = [epoch.name]
-            if epoch.start is not None and epoch.end is not None:
-                label_parts.append(f"[start:{int(epoch.start)};end:{int(epoch.end)}]")
+            if epoch.start_time is not None and epoch.end_time is not None:
+                label_parts.append(f"[start:{int(epoch.start_time)};end:{int(epoch.end_time)}]")
 
             epoch_label.text = ' '.join(label_parts)
 
@@ -200,11 +200,11 @@ class TableNodeGenerator:
             Dictionary mapping epoch IDs to (min_y, max_y) tuples
         """
         # Sort epochs by start time (most recent first)
-        sorted_epochs = sorted(epochs, key=lambda e: e.start if e.start else 0, reverse=True)
+        sorted_epochs = sorted(epochs, key=lambda e: e.start_time if e.start_time else 0, reverse=True)
 
         # Calculate total duration
         total_duration = sum(
-            abs(e.end - e.start) if (e.start and e.end) else 100
+            abs(e.end_time - e.start_time) if (e.start_time and e.end_time) else 100
             for e in sorted_epochs
         )
 
@@ -217,8 +217,8 @@ class TableNodeGenerator:
 
         for epoch in sorted_epochs:
             # Calculate row height
-            if epoch.start is not None and epoch.end is not None:
-                duration = abs(epoch.end - epoch.start)
+            if epoch.start_time is not None and epoch.end_time is not None:
+                duration = abs(epoch.end_time - epoch.start_time)
                 proportional_height = (duration / total_duration) * available_height if total_duration > 0 else 0
             else:
                 proportional_height = 0
@@ -226,7 +226,7 @@ class TableNodeGenerator:
             row_height = max(min_row_height, min_row_height + proportional_height)
 
             # Store range
-            y_ranges[epoch.id] = (current_y, current_y + row_height)
+            y_ranges[epoch.node_id] = (current_y, current_y + row_height)
 
             # Move to next row
             current_y += row_height
