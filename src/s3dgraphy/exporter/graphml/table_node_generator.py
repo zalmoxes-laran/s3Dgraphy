@@ -46,11 +46,10 @@ class TableNodeGenerator:
             lxml Element representing the TableNode
         """
         # Create root node element
-        node = ET.Element(
-            'node',
-            id="n0",
-            attrib={'{http://www.yworks.com/xml/graphml}foldertype': 'group'}
-        )
+        # Note: yfiles.foldertype is an attribute without namespace prefix
+        YFILES_ATTR = '{http://www.yworks.com/xml/graphml}foldertype'
+        node = ET.Element('node', id="n0")
+        node.set(YFILES_ATTR, 'group')
 
         # Create data element for d6 (node graphics)
         data = ET.SubElement(node, 'data', key='d6')

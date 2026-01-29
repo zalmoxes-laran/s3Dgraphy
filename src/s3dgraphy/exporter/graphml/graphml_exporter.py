@@ -71,6 +71,10 @@ class GraphMLExporter:
 
         # ID counters for nesting
         self.node_counters = defaultdict(int)
+        self.edge_counter = 0
+
+        # ID mapping: original node_id -> nested node_id
+        self.id_mapping = {}
 
     def export(self, output_path: str, em_mode: bool = True):
         """
@@ -135,8 +139,12 @@ class GraphMLExporter:
             x, y = strat_positions.get(node.node_id, (150.0, 150.0))
 
             # Generate node with nested ID
-            node_id = self._get_next_id("n0")
-            node_xml = self.node_gen.generate_node(node, x, y, node_id=node_id)
+            nested_id = self._get_next_id("n0")
+
+            # Store ID mapping for edge generation
+            self.id_mapping[node.node_id] = nested_id
+
+            node_xml = self.node_gen.generate_node(node, x, y, node_id=nested_id)
 
             if node_xml is not None:
                 swimlane_graph.append(node_xml)
@@ -352,6 +360,10 @@ class GraphMLExporter:
             group_id = self._get_next_id("n0")
             group_label = f"{node.node_id}_PD"
 
+            # Store group ID mapping
+            group_mapping_key = f"{node.node_id}_PD"
+            self.id_mapping[group_mapping_key] = group_id
+
             # Create ParadataNodeGroup
             group_xml = self.group_gen.generate_group_node(
                 node_id=group_id,
@@ -370,40 +382,70 @@ class GraphMLExporter:
             # Generate DocumentNode (inside group)
             if document_name not in documents_created:
                 doc_id = self._get_next_id(group_id)
+
+                # Map document node ID if it exists in the graph
+                doc_node = self._find_document_node(document_name)
+                doc_emid = doc_node.node_id if doc_node else None
+
                 doc_xml = self.doc_gen.generate_document_node(
                     node_id=doc_id,
                     document_name=document_name,
                     description=f"Document: {document_name}",
                     x=group_x + 30,
-                    y=group_y + 100
+                    y=group_y + 100,
+                    emid=doc_emid
                 )
                 documents_created[document_name] = (doc_id, doc_xml)
+
+                # Store ID mapping
+                if doc_node:
+                    self.id_mapping[doc_node.node_id] = doc_id
             else:
                 doc_id, doc_xml = documents_created[document_name]
 
             # Generate ExtractorNode (inside group)
             if extractor_name not in extractors_created:
                 ext_id = self._get_next_id(group_id)
+
+                # Map extractor node ID if it exists in the graph
+                ext_node = self._find_extractor_node(extractor_name)
+                ext_emid = ext_node.node_id if ext_node else None
+
                 ext_xml = self.extractor_gen.generate_extractor_node(
                     node_id=ext_id,
                     extractor_name=extractor_name,
                     description=f"Extractor: {extractor_name}",
                     x=group_x + 90,
-                    y=group_y + 70
+                    y=group_y + 70,
+                    emid=ext_emid
                 )
                 extractors_created[extractor_name] = (ext_id, ext_xml)
+
+                # Store ID mapping
+                if ext_node:
+                    self.id_mapping[ext_node.node_id] = ext_id
             else:
                 ext_id, ext_xml = extractors_created[extractor_name]
 
             # Generate PropertyNode (stratigraphic_definition)
             prop_id = self._get_next_id(group_id)
+
+            # Map property node ID if it exists in the graph
+            prop_node = self._find_property_node(node.node_id, "stratigraphic_definition")
+            prop_emid = prop_node.node_id if prop_node else None
+
             prop_xml = self.property_gen.generate_property_node(
                 node_id=prop_id,
                 property_name="stratigraphic_definition",
                 property_value=node.description or "",
                 x=group_x + 50,
-                y=group_y + 40
+                y=group_y + 40,
+                emid=prop_emid
             )
+
+            # Store ID mapping
+            if prop_node:
+                self.id_mapping[prop_node.node_id] = prop_id
 
             # Add nodes to group graph
             group_graph.append(doc_xml)
@@ -434,7 +476,20 @@ class GraphMLExporter:
 
         # Generate temporal edges (is_after, etc.)
         for edge in self.graph.edges:
-            edge_xml = self.edge_gen.generate_edge(edge, self.graph)
+            # Remap source and target to nested IDs
+            source_id = self.id_mapping.get(edge.edge_source, edge.edge_source)
+            target_id = self.id_mapping.get(edge.edge_target, edge.edge_target)
+
+            # Skip edges where either endpoint is not in the graph
+            if source_id == edge.edge_source and edge.edge_source not in self.id_mapping:
+                # Source node not found - might be a non-stratigraphic node
+                continue
+            if target_id == edge.edge_target and edge.edge_target not in self.id_mapping:
+                # Target node not found
+                continue
+
+            # Generate edge with remapped IDs
+            edge_xml = self._generate_remapped_edge(edge, source_id, target_id)
             edges_xml.append(edge_xml)
 
         # Generate paradata connection edges
@@ -458,3 +513,109 @@ class GraphMLExporter:
         self.node_counters[parent_id] += 1
 
         return f"{parent_id}::n{counter}"
+
+    def _generate_remapped_edge(self, edge, source_id: str, target_id: str) -> ET.Element:
+        """
+        Generate edge XML with remapped node IDs.
+
+        Args:
+            edge: Original Edge object
+            source_id: Remapped source node ID
+            target_id: Remapped target node ID
+
+        Returns:
+            Edge XML element
+        """
+        from lxml.etree import QName
+
+        # Generate nested edge ID (e.g., "e0", "e1", "e2")
+        edge_id = f"e{self.edge_counter}"
+        self.edge_counter += 1
+
+        # Create edge element with nested ID and remapped source/target
+        edge_elem = ET.Element(
+            'edge',
+            id=edge_id,
+            source=source_id,
+            target=target_id
+        )
+
+        # Add EMID data (key d12) - original edge UUID
+        emid_data = ET.SubElement(edge_elem, 'data', key='d12')
+        emid_data.text = edge.edge_id
+
+        # Add graphics data
+        gfx_data = ET.SubElement(edge_elem, 'data', key='d10')
+
+        # Create PolyLineEdge
+        poly_edge = ET.SubElement(gfx_data, '{%s}PolyLineEdge' % self.YFILES_NS)
+
+        # Line style
+        line_style = ET.SubElement(poly_edge, '{%s}LineStyle' % self.YFILES_NS)
+        line_style.set('color', '#000000')
+        line_style.set('type', 'line')
+        line_style.set('width', '2.0')
+
+        # Arrows
+        arrows = ET.SubElement(poly_edge, '{%s}Arrows' % self.YFILES_NS)
+        arrows.set('source', 'none')
+        arrows.set('target', 'standard')
+
+        return edge_elem
+
+    def _find_document_node(self, document_name: str):
+        """
+        Find a DocumentNode by name in the graph.
+
+        Args:
+            document_name: Name of the document to find
+
+        Returns:
+            DocumentNode if found, None otherwise
+        """
+        from s3dgraphy.nodes.document_node import DocumentNode
+
+        for node in self.graph.nodes:
+            if isinstance(node, DocumentNode) and node.name == document_name:
+                return node
+        return None
+
+    def _find_extractor_node(self, extractor_name: str):
+        """
+        Find an ExtractorNode by name in the graph.
+
+        Args:
+            extractor_name: Name of the extractor to find
+
+        Returns:
+            ExtractorNode if found, None otherwise
+        """
+        from s3dgraphy.nodes.extractor_node import ExtractorNode
+
+        for node in self.graph.nodes:
+            if isinstance(node, ExtractorNode) and node.name == extractor_name:
+                return node
+        return None
+
+    def _find_property_node(self, strat_node_id: str, property_name: str):
+        """
+        Find a PropertyNode connected to a stratigraphic node.
+
+        Args:
+            strat_node_id: ID of the stratigraphic node
+            property_name: Name of the property
+
+        Returns:
+            PropertyNode if found, None otherwise
+        """
+        from s3dgraphy.nodes.property_node import PropertyNode
+
+        # Look for property nodes connected to this stratigraphic node
+        for edge in self.graph.edges:
+            # Check for edges from property to stratigraphic node
+            if edge.edge_target == strat_node_id:
+                prop_node = self.graph.find_node_by_id(edge.edge_source)
+                if prop_node and isinstance(prop_node, PropertyNode):
+                    if prop_node.name == property_name:
+                        return prop_node
+        return None

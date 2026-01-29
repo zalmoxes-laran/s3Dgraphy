@@ -110,6 +110,14 @@ class NodeGenerator:
             id=final_id
         )
 
+        # Add EMID data (key d11) - original node UUID
+        emid_data = ET.SubElement(
+            node_elem,
+            qname(self.NS_GRAPHML, "data"),
+            key="d11"
+        )
+        emid_data.text = node.node_id  # Original UUID from s3dgraphy
+
         # Add description data (key d5)
         if node.description:
             desc_data = ET.SubElement(

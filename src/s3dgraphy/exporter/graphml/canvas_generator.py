@@ -164,6 +164,31 @@ class CanvasGenerator:
                 "id": "d10",
                 "for": "edge",
                 "yfiles.type": "edgegraphics"
+            },
+            # Extended Matrix custom fields
+            {
+                "id": "d11",
+                "for": "node",
+                "attr.name": "EMID",
+                "attr.type": "string"
+            },
+            {
+                "id": "d12",
+                "for": "edge",
+                "attr.name": "EMID",
+                "attr.type": "string"
+            },
+            {
+                "id": "d13",
+                "for": "node",
+                "attr.name": "URI",
+                "attr.type": "string"
+            },
+            {
+                "id": "d14",
+                "for": "edge",
+                "attr.name": "URI",
+                "attr.type": "string"
             }
         ]
 

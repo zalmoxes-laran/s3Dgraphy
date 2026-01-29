@@ -22,7 +22,8 @@ class PropertyNodeGenerator:
         x: float,
         y: float,
         width: float = 107.9,
-        height: float = 30.0
+        height: float = 30.0,
+        emid: Optional[str] = None
     ) -> ET.Element:
         """
         Generate PropertyNode as BPMN Annotation.
@@ -33,11 +34,17 @@ class PropertyNodeGenerator:
             property_value: Property value/description
             x, y: Coordinates
             width, height: Dimensions
+            emid: Optional EMID (original UUID) for the node
 
         Returns:
             lxml Element representing the PropertyNode
         """
         node = ET.Element('node', id=node_id)
+
+        # EMID data (d11) - if provided
+        if emid:
+            emid_data = ET.SubElement(node, 'data', key='d11')
+            emid_data.text = emid
 
         # Description data (d5)
         desc_data = ET.SubElement(node, 'data', key='d5')
@@ -157,7 +164,8 @@ class DocumentNodeGenerator:
         x: float = 0.0,
         y: float = 0.0,
         width: float = 42.8,
-        height: float = 63.8
+        height: float = 63.8,
+        emid: Optional[str] = None
     ) -> ET.Element:
         """
         Generate DocumentNode as BPMN Data Object.
@@ -168,11 +176,17 @@ class DocumentNodeGenerator:
             description: Optional description
             x, y: Coordinates
             width, height: Dimensions
+            emid: Optional EMID (original UUID) for the node
 
         Returns:
             lxml Element representing the DocumentNode
         """
         node = ET.Element('node', id=node_id)
+
+        # EMID data (d11) - if provided
+        if emid:
+            emid_data = ET.SubElement(node, 'data', key='d11')
+            emid_data.text = emid
 
         # Description data (d5)
         desc_data = ET.SubElement(node, 'data', key='d5')
@@ -277,7 +291,8 @@ class ExtractorNodeGenerator:
         y: float = 0.0,
         width: float = 25.0,
         height: float = 25.0,
-        svg_refid: int = 1
+        svg_refid: int = 1,
+        emid: Optional[str] = None
     ) -> ET.Element:
         """
         Generate ExtractorNode as SVG Node.
@@ -289,11 +304,17 @@ class ExtractorNodeGenerator:
             x, y: Coordinates
             width, height: Dimensions
             svg_refid: SVG reference ID (must match SVG definition in header)
+            emid: Optional EMID (original UUID) for the node
 
         Returns:
             lxml Element representing the ExtractorNode
         """
         node = ET.Element('node', id=node_id)
+
+        # EMID data (d11) - if provided
+        if emid:
+            emid_data = ET.SubElement(node, 'data', key='d11')
+            emid_data.text = emid
 
         # Description data (d5)
         desc_data = ET.SubElement(node, 'data', key='d5')
