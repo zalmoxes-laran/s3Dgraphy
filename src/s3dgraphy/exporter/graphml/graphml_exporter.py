@@ -173,11 +173,53 @@ class GraphMLExporter:
 
     def _export_flat_structure(self, output_path: str):
         """Fallback to flat structure (legacy compatibility)."""
-        # Import and use the old exporter logic
-        from .graphml_exporter_flat import GraphMLExporter as FlatExporter
+        print("⚠ Flat mode not yet implemented. Using EM structure without epochs.")
 
-        flat_exporter = FlatExporter(self.graph)
-        flat_exporter.export(output_path)
+        # For now, just export without TableNode wrapper
+        # Generate root GraphML structure
+        root = self.canvas_gen.generate_root(
+            graph_id=self.graph.graph_id,
+            include_svg_defs=True
+        )
+
+        # Get main <graph> element
+        main_graph = self.canvas_gen.get_graph_element(root)
+
+        # Generate all nodes directly (no swimlanes)
+        strat_nodes = [n for n in self.graph.nodes if isinstance(n, StratigraphicNode)]
+
+        from .utils import calculate_grid_positions
+
+        positions = calculate_grid_positions(
+            len(strat_nodes),
+            start_x=100.0,
+            start_y=100.0,
+            spacing_x=150.0,
+            spacing_y=100.0,
+            columns=5
+        )
+
+        for i, node in enumerate(strat_nodes):
+            x, y = positions[i]
+            node_xml = self.node_gen.generate_node(node, x, y)
+            if node_xml is not None:
+                main_graph.append(node_xml)
+
+        # Generate edges
+        for edge in self.graph.edges:
+            edge_xml = self.edge_gen.generate_edge(edge, self.graph)
+            main_graph.append(edge_xml)
+
+        # Write to file
+        tree = ET.ElementTree(root)
+        tree.write(
+            output_path,
+            encoding='UTF-8',
+            xml_declaration=True,
+            pretty_print=True
+        )
+
+        print(f"✓ Flat GraphML exported: {output_path}")
 
     def _position_nodes_in_epochs(
         self,
