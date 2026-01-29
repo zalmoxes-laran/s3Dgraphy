@@ -427,30 +427,37 @@ class GraphMLExporter:
             else:
                 ext_id, ext_xml = extractors_created[extractor_name]
 
-            # Generate PropertyNode (stratigraphic_definition)
-            prop_id = self._get_next_id(group_id)
+            # Find ALL PropertyNodes connected to this stratigraphic node
+            property_nodes = self._find_all_property_nodes(node.node_id)
 
-            # Map property node ID if it exists in the graph
-            prop_node = self._find_property_node(node.node_id, "stratigraphic_definition")
-            prop_emid = prop_node.node_id if prop_node else None
+            # Generate all PropertyNodes
+            property_y_offset = 40
+            for prop_node in property_nodes:
+                prop_id = self._get_next_id(group_id)
 
-            prop_xml = self.property_gen.generate_property_node(
-                node_id=prop_id,
-                property_name="stratigraphic_definition",
-                property_value=node.description or "",
-                x=group_x + 50,
-                y=group_y + 40,
-                emid=prop_emid
-            )
+                # Get property value
+                prop_value = getattr(prop_node, 'description', '') or str(getattr(prop_node, 'data', {}))
 
-            # Store ID mapping
-            if prop_node:
+                prop_xml = self.property_gen.generate_property_node(
+                    node_id=prop_id,
+                    property_name=prop_node.name,
+                    property_value=prop_value,
+                    x=group_x + 50,
+                    y=group_y + property_y_offset,
+                    emid=prop_node.node_id
+                )
+
+                # Store ID mapping
                 self.id_mapping[prop_node.node_id] = prop_id
 
-            # Add nodes to group graph
+                # Add to group graph
+                group_graph.append(prop_xml)
+
+                property_y_offset += 35  # Stack property nodes vertically
+
+            # Add document and extractor nodes to group graph
             group_graph.append(doc_xml)
             group_graph.append(ext_xml)
-            group_graph.append(prop_xml)
 
             # Store group for edge generation
             groups.append(group_xml)
@@ -596,6 +603,30 @@ class GraphMLExporter:
             if isinstance(node, ExtractorNode) and node.name == extractor_name:
                 return node
         return None
+
+    def _find_all_property_nodes(self, strat_node_id: str):
+        """
+        Find ALL PropertyNodes connected to a stratigraphic node.
+
+        Args:
+            strat_node_id: ID of the stratigraphic node
+
+        Returns:
+            List of PropertyNode objects
+        """
+        from s3dgraphy.nodes.property_node import PropertyNode
+
+        property_nodes = []
+
+        # Look for property nodes connected to this stratigraphic node
+        for edge in self.graph.edges:
+            # Check for edges with edge_type "has_property"
+            if edge.edge_source == strat_node_id and edge.edge_type == "has_property":
+                prop_node = self.graph.find_node_by_id(edge.edge_target)
+                if prop_node and isinstance(prop_node, PropertyNode):
+                    property_nodes.append(prop_node)
+
+        return property_nodes
 
     def _find_property_node(self, strat_node_id: str, property_name: str):
         """
