@@ -62,6 +62,15 @@ class SeriesOfStructuralVirtualStratigraphicUnit(StratigraphicNode):
         self.detailed_description = "Series of Structural Virtual Stratigraphic Units."
 
 
+class SeriesOfDocumentaryStratigraphicUnit(StratigraphicNode):
+    node_type = "serUSD"
+    def __init__(self, node_id, name, description=""):
+        super().__init__(node_id, name, description)
+        self.symbol = "white ellipse with orange border"
+        self.label = "USD series"
+        self.detailed_description = "Series of Documentary Stratigraphic Units (USD)."
+
+
 class NonStructuralVirtualStratigraphicUnit(StratigraphicNode):
     node_type = "USVn"
     def __init__(self, node_id, name, description=""):

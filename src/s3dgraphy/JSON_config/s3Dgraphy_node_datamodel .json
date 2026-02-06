@@ -148,6 +148,24 @@
               "description": "P3_has_note"
             }
           },
+          "serUSD": {
+            "class": "SeriesOfDocumentaryStratigraphicUnit",
+            "parent": "StratigraphicNode",
+            "abbreviation": "serUSD",
+            "label": "USD series",
+            "symbol": "white ellipse with orange border",
+            "description": "Series of Documentary Stratigraphic Units (USD). Represents a grouping of multiple related documentary stratigraphic units for organizational or analytical purposes.",
+            "s3Dgraphy_file": "stratigraphic_node.py",
+            "mapping": {
+              "cidoc": "A6 Group Declaration Event",
+              "cidoc_s3d": null,
+              "alternative": "E78 Collection + A8 Stratigraphic Unit"
+            },
+            "properties": {
+              "name": "P1_is_identified_by",
+              "description": "P3_has_note"
+            }
+          },
           "serUSVn": {
             "class": "SeriesOfNonStructuralVirtualStratigraphicUnit",
             "parent": "StratigraphicNode",

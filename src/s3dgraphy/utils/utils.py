@@ -14,6 +14,7 @@ from ..nodes.stratigraphic_node import (
     SeriesOfStratigraphicUnit,
     SeriesOfNonStructuralVirtualStratigraphicUnit,
     SeriesOfStructuralVirtualStratigraphicUnit,
+    SeriesOfDocumentaryStratigraphicUnit,
     NonStructuralVirtualStratigraphicUnit,
     StructuralVirtualStratigraphicUnit,
     SpecialFindUnit,
@@ -92,6 +93,8 @@ def convert_shape2type(yedtype, border_style):
         nodetype = ("US", "Stratigraphic Unit")
     elif yedtype == "parallelogram":
         nodetype = ("USVs", "Structural Virtual Stratigraphic Units")
+    elif yedtype == "ellipse" and border_style == "#D86400":
+        nodetype = ("serUSD", "Series of USD")
     elif yedtype == "ellipse" and border_style == "#31792D":
         nodetype = ("serUSVn", "Series of USVn")
     elif yedtype == "ellipse" and border_style == "#248FE7":
@@ -120,6 +123,7 @@ STRATIGRAPHIC_CLASS_MAP = {
     "serSU": SeriesOfStratigraphicUnit,
     "serUSVn": SeriesOfNonStructuralVirtualStratigraphicUnit,
     "serUSVs": SeriesOfStructuralVirtualStratigraphicUnit,
+    "serUSD": SeriesOfDocumentaryStratigraphicUnit,
     "USVn": NonStructuralVirtualStratigraphicUnit,
     "SF": SpecialFindUnit,
     "VSF": VirtualSpecialFindUnit,
