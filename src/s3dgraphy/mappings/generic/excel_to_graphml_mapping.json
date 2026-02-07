@@ -1,7 +1,7 @@
 {
-    "name": "Excel to GraphML Mapping (AI Data Collection)",
-    "description": "Mapping format for converting AI-extracted stratigraphic data from Excel to Extended Matrix GraphML format. Supports PropertyNode, ExtractorNode, DocumentNode for provenance tracking.",
-    "version": "1.0",
+    "name": "Excel to s3dgraphy Mapping (AI Data Collection)",
+    "description": "Maps Excel tabular data to s3dgraphy Graph format. The Graph can then be exported to Extended Matrix GraphML via GraphMLExporter. IMPORTANT: This mapping creates s3dgraphy nodes (StratigraphicNode with attributes), NOT Extended Matrix nodes (which include ParadataNodeGroup). The transformation Excel→s3dgraphy→GraphML involves three different formalizations: (1) Excel: tabular structure for data entry/AI extraction, (2) s3dgraphy: extended graph with 3D nodes + EM concepts, (3) Extended Matrix GraphML: hypergraph with groups for paradata. The GraphMLExporter handles s3dgraphy→GraphML transformation (e.g., extractor/document attributes → ParadataNodeGroup + ExtractorNode + DocumentNode).",
+    "version": "2.0",
     "project": "AI-powered Stratigraphic Data Collection",
     "table_settings": {
         "format_type": "xlsx",
@@ -148,16 +148,18 @@
         },
 
         "EXTRACTOR": {
-            "node_type": "PropertyNode",
+            "node_type": "StratigraphicNode",
             "property_name": "extractor",
+            "is_attribute": true,
             "display_name": "Extractor",
-            "description": "Who/what extracted this data (e.g., GPT-4, Claude, Manual excavation)."
+            "description": "Who/what extracted this data (e.g., GPT-4, Claude, Manual). STORED AS ATTRIBUTE on StratigraphicNode, NOT as separate node in s3dgraphy Graph. During GraphML export, GraphMLExporter reads this attribute and creates: ParadataNodeGroup → PropertyNode(stratigraphic_definition) → ExtractorNode (paradata family, SVG icon). This is the correct workflow: Excel column → s3dgraphy attribute → Extended Matrix paradata structure."
         },
         "DOCUMENT": {
-            "node_type": "PropertyNode",
+            "node_type": "StratigraphicNode",
             "property_name": "document",
+            "is_attribute": true,
             "display_name": "Source Document",
-            "description": "Source document reference (e.g., Report_2023.pdf, Field_notes_Day5.pdf)."
+            "description": "Source document reference (e.g., Report_2023.pdf, Field_notes_Day5.pdf). STORED AS ATTRIBUTE on StratigraphicNode, NOT as separate node in s3dgraphy Graph. During GraphML export, GraphMLExporter reads this attribute and creates: ParadataNodeGroup → PropertyNode(stratigraphic_definition) → DocumentNode (paradata family, BPMN Data Object icon). This is the correct workflow: Excel column → s3dgraphy attribute → Extended Matrix paradata structure."
         }
     },
 
@@ -182,9 +184,7 @@
         {"source_column": "ID", "target_column": "ABUTS", "edge_type": "abuts"},
         {"source_column": "ID", "target_column": "ABUTTED_BY", "edge_type": "is_abutted_by"},
         {"source_column": "ID", "target_column": "BONDED_TO", "edge_type": "is_bonded_to"},
-        {"source_column": "ID", "target_column": "EQUALS", "edge_type": "is_physically_equal_to"},
-        {"source_column": "ID", "target_column": "EXTRACTOR", "edge_type": "has_property"},
-        {"source_column": "ID", "target_column": "DOCUMENT", "edge_type": "has_property"}
+        {"source_column": "ID", "target_column": "EQUALS", "edge_type": "is_physically_equal_to"}
     ],
 
     "phase_definitions": {

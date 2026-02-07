@@ -1,544 +1,377 @@
 """
-Node Generator for GraphML Export
+Node generator for GraphML export.
 
-Generates yEd-compatible node XML elements for all s3dgraphy node types,
-including stratigraphic nodes, documents, extractors, properties, and epochs.
+Generates XML for all node types: StratigraphicNode, PropertyNode,
+ExtractorNode, DocumentNode.
 """
 
 from lxml import etree as ET
-from typing import Optional, Tuple
-from ...nodes.stratigraphic_node import StratigraphicNode
-from ...nodes.document_node import DocumentNode
-from ...nodes.extractor_node import ExtractorNode
-from ...nodes.property_node import PropertyNode
-from ...nodes.epoch_node import EpochNode
-from .utils import generate_uuid, qname, get_node_type_shape
+from typing import Optional
+from .node_registry import NodeRegistry
+from .utils import IDManager, calculate_node_width, generate_uuid
 
 
 class NodeGenerator:
-    """
-    Generates GraphML node elements for various s3dgraphy node types.
+    """Generates GraphML XML for various node types."""
 
-    Handles:
-    - StratigraphicNode: Shape-based nodes (US, USVs, USVn, SF, etc.)
-    - DocumentNode: BPMN data object shapes
-    - ExtractorNode: BPMN data object shapes (prefixed with "D.")
-    - PropertyNode: BPMN annotation shapes
-    - EpochNode: Not generated directly (part of swimlanes)
-    """
-
-    # Namespace constants
-    NS_GRAPHML = "http://graphml.graphdrawing.org/xmlns"
-    NS_YFILES = "http://www.yworks.com/xml/graphml"
-
-    # Default dimensions
-    DEFAULT_NODE_WIDTH = 120.0
-    DEFAULT_NODE_HEIGHT = 60.0
-    DEFAULT_DOC_WIDTH = 60.0
-    DEFAULT_DOC_HEIGHT = 80.0
-
-    def __init__(self):
-        """Initialize the node generator."""
-        self.node_positions = {}  # Track node positions for layout
-
-    def generate_node(
-        self,
-        node,
-        x: float = 150.0,
-        y: float = 150.0,
-        node_id: Optional[str] = None
-    ) -> Optional[ET.Element]:
+    def __init__(self, registry: NodeRegistry, id_manager: IDManager):
         """
-        Generate GraphML XML for a node based on its type.
-
+        Initialize node generator.
+        
         Args:
-            node: s3dgraphy Node object
-            x: X coordinate for node position
-            y: Y coordinate for node position
-            node_id: Optional custom node ID (for nested structures). If not provided, uses node.node_id
-
-        Returns:
-            ET.Element: GraphML <node> element, or None if node type not supported
+            registry: Node registry with visual properties
+            id_manager: ID manager for nested IDs
         """
-        # Use custom ID if provided, otherwise use node's ID
-        final_node_id = node_id if node_id else node.node_id
+        self.registry = registry
+        self.id_manager = id_manager
+        self.ns_y = 'http://www.yworks.com/xml/graphml'
 
-        # Dispatch to appropriate generator based on node type
-        if isinstance(node, StratigraphicNode):
-            return self.generate_stratigraphic_node(node, x, y, node_id=final_node_id)
-        elif isinstance(node, DocumentNode):
-            return self.generate_document_node(node, x, y, node_id=final_node_id)
-        elif isinstance(node, ExtractorNode):
-            return self.generate_extractor_node(node, x, y, node_id=final_node_id)
-        elif isinstance(node, PropertyNode):
-            return self.generate_property_node(node, x, y, node_id=final_node_id)
-        elif isinstance(node, EpochNode):
-            # Epochs are handled by swimlane generator
-            return None
-        else:
-            # Unknown node type - skip
-            return None
-
-    def generate_stratigraphic_node(
-        self,
-        node: StratigraphicNode,
-        x: float,
-        y: float,
-        node_id: Optional[str] = None
-    ) -> ET.Element:
+    def generate_stratigraphic_node(self, node, x: float = 100.0, y: float = 100.0,
+                                    parent_id: Optional[str] = None) -> ET.Element:
         """
-        Generate a stratigraphic node with appropriate shape and colors.
-
+        Generate ShapeNode for stratigraphic unit.
+        
         Args:
             node: StratigraphicNode instance
-            x: X coordinate
-            y: Y coordinate
-
+            x, y: Position coordinates
+            parent_id: Parent nested ID (for nodes inside groups)
+            
         Returns:
-            ET.Element: <node> element with yEd ShapeNode
+            node XML element
         """
-        # Get node type from class name or attributes
-        node_type = self._get_stratigraphic_type(node)
-
-        # Get shape, fill color, and border color
-        shape_type, fill_color, border_color = get_node_type_shape(node_type)
-
-        # Create <node> element
-        final_id = node_id if node_id else node.node_id
-        node_elem = ET.Element(
-            qname(self.NS_GRAPHML, "node"),
-            id=final_id
-        )
-
-        # Add EMID data (key d11) - original node UUID
-        emid_data = ET.SubElement(
-            node_elem,
-            qname(self.NS_GRAPHML, "data"),
-            key="d11"
-        )
-        emid_data.text = node.node_id  # Original UUID from s3dgraphy
-
-        # Add description data (key d5)
-        if node.description:
-            desc_data = ET.SubElement(
-                node_elem,
-                qname(self.NS_GRAPHML, "data"),
-                key="d5"
-            )
-            desc_data.set(
-                qname("http://www.w3.org/XML/1998/namespace", "space"),
-                "preserve"
-            )
-            desc_data.text = node.description
-
-        # Add node graphics data (key d6)
-        graphics_data = ET.SubElement(
-            node_elem,
-            qname(self.NS_GRAPHML, "data"),
-            key="d6"
-        )
-
-        # Create ShapeNode
-        shape_node = ET.SubElement(
-            graphics_data,
-            qname(self.NS_YFILES, "ShapeNode")
-        )
-
+        # Get or generate UUID
+        node_uuid = getattr(node, 'node_id', generate_uuid())
+        nested_id = self.id_manager.get_nested_id(node_uuid, parent_id)
+        
+        # Get visual properties
+        node_type = getattr(node, 'node_type', 'US')
+        visual_props = self.registry.get_visual_properties(node_type)
+        if not visual_props:
+            visual_props = self.registry.get_visual_properties('US')
+        
+        # Create node element
+        node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
+        node_elem.set('id', nested_id)
+        
+        # Add description (d5)
+        description = getattr(node, 'description', '')
+        if description:
+            data_d5 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+            data_d5.set('key', 'd5')
+            data_d5.text = str(description)
+        
+        # Add EMID (d7) - UUID for nodes
+        data_d7 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d7.set('key', 'd7')
+        data_d7.text = node_uuid
+        
+        # Add nodegraphics (d6) - ShapeNode
+        data_d6 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d6.set('key', 'd6')
+        
+        shape_node = ET.SubElement(data_d6, f'{{{self.ns_y}}}ShapeNode')
+        
         # Geometry
-        geometry = ET.SubElement(
-            shape_node,
-            qname(self.NS_YFILES, "Geometry"),
-            height=str(self.DEFAULT_NODE_HEIGHT),
-            width=str(self.DEFAULT_NODE_WIDTH),
-            x=str(x),
-            y=str(y)
-        )
-
-        # Fill color
-        fill = ET.SubElement(
-            shape_node,
-            qname(self.NS_YFILES, "Fill"),
-            color=fill_color,
-            transparent="false"
-        )
-
-        # Border style
-        border = ET.SubElement(
-            shape_node,
-            qname(self.NS_YFILES, "BorderStyle"),
-            color=border_color,
-            type="line",
-            width="4.0"
-        )
-
-        # Node label (name)
-        label = ET.SubElement(
-            shape_node,
-            qname(self.NS_YFILES, "NodeLabel"),
-            alignment="center",
-            autoSizePolicy="content",
-            fontFamily="Dialog",
-            fontSize="12",
-            fontStyle="plain",
-            hasBackgroundColor="false",
-            hasLineColor="false",
-            horizontalTextPosition="center",
-            iconTextGap="4",
-            modelName="custom",
-            textColor=self._get_text_color(fill_color),
-            verticalTextPosition="bottom",
-            visible="true"
-        )
-        label.text = node.name
-
-        # Label model (centered)
-        label_model = ET.SubElement(
-            label,
-            qname(self.NS_YFILES, "LabelModel")
-        )
-        ET.SubElement(
-            label_model,
-            qname(self.NS_YFILES, "SmartNodeLabelModel"),
-            distance="4.0"
-        )
-
-        # Model parameter
-        model_param = ET.SubElement(
-            label,
-            qname(self.NS_YFILES, "ModelParameter")
-        )
-        ET.SubElement(
-            model_param,
-            qname(self.NS_YFILES, "SmartNodeLabelModelParameter"),
-            labelRatioX="0.0",
-            labelRatioY="0.0",
-            nodeRatioX="0.0",
-            nodeRatioY="0.0",
-            offsetX="0.0",
-            offsetY="0.0",
-            upX="0.0",
-            upY="-1.0"
-        )
-
-        # Shape type
-        shape = ET.SubElement(
-            shape_node,
-            qname(self.NS_YFILES, "Shape"),
-            type=shape_type
-        )
-
-        return node_elem
-
-    def generate_document_node(
-        self,
-        node: DocumentNode,
-        x: float,
-        y: float,
-        node_id: Optional[str] = None
-    ) -> ET.Element:
-        """
-        Generate a document node with BPMN data object shape.
-
-        Args:
-            node: DocumentNode instance
-            x: X coordinate
-            y: Y coordinate
-
-        Returns:
-            ET.Element: <node> element with BPMN GenericNode
-        """
-        # Create <node> element
-        final_id = node_id if node_id else node.node_id
-        node_elem = ET.Element(
-            qname(self.NS_GRAPHML, "node"),
-            id=final_id
-        )
-
-        # Add graphics data (key d6)
-        graphics_data = ET.SubElement(
-            node_elem,
-            qname(self.NS_GRAPHML, "data"),
-            key="d6"
-        )
-
-        # Create GenericNode (BPMN)
-        generic_node = ET.SubElement(
-            graphics_data,
-            qname(self.NS_YFILES, "GenericNode"),
-            configuration="com.yworks.bpmn.Artifact.withShadow"
-        )
-
-        # Geometry
-        geometry = ET.SubElement(
-            generic_node,
-            qname(self.NS_YFILES, "Geometry"),
-            height=str(self.DEFAULT_DOC_HEIGHT),
-            width=str(self.DEFAULT_DOC_WIDTH),
-            x=str(x),
-            y=str(y)
-        )
-
+        node_label = getattr(node, 'name', node_type)
+        width = calculate_node_width(node_label)
+        geometry = ET.SubElement(shape_node, f'{{{self.ns_y}}}Geometry')
+        geometry.set('height', '60.0')
+        geometry.set('width', str(width))
+        geometry.set('x', str(x))
+        geometry.set('y', str(y))
+        
         # Fill
-        fill = ET.SubElement(
-            generic_node,
-            qname(self.NS_YFILES, "Fill"),
-            color="#FFFFFFE6",
-            transparent="false"
-        )
-
-        # Border
-        border = ET.SubElement(
-            generic_node,
-            qname(self.NS_YFILES, "BorderStyle"),
-            color="#000000",
-            type="line",
-            width="1.0"
-        )
-
-        # Node label
-        label = ET.SubElement(
-            generic_node,
-            qname(self.NS_YFILES, "NodeLabel"),
-            alignment="center",
-            autoSizePolicy="content",
-            fontFamily="Dialog",
-            fontSize="8",
-            fontStyle="plain",
-            hasBackgroundColor="false",
-            hasLineColor="false",
-            modelName="internal",
-            modelPosition="c",
-            textColor="#000000",
-            visible="true"
-        )
-        label.text = node.name
-
-        # Style properties (BPMN data object)
-        style_props = ET.SubElement(
-            generic_node,
-            qname(self.NS_YFILES, "StyleProperties")
-        )
-
-        # Icon line color
-        prop1 = ET.SubElement(
-            style_props,
-            qname(self.NS_YFILES, "Property"),
-            attrib={
-                "class": "java.awt.Color",
-                "name": "com.yworks.bpmn.icon.line.color",
-                "value": "#000000"
-            }
-        )
-
-        # Data object type
-        prop2 = ET.SubElement(
-            style_props,
-            qname(self.NS_YFILES, "Property"),
-            attrib={
-                "class": "com.yworks.yfiles.bpmn.view.DataObjectTypeEnum",
-                "name": "com.yworks.bpmn.dataObjectType",
-                "value": "DATA_OBJECT_TYPE_PLAIN"
-            }
-        )
-
-        # Icon fills
-        prop3 = ET.SubElement(
-            style_props,
-            qname(self.NS_YFILES, "Property"),
-            attrib={
-                "class": "java.awt.Color",
-                "name": "com.yworks.bpmn.icon.fill2",
-                "value": "#d4d4d4cc"
-            }
-        )
-
-        prop4 = ET.SubElement(
-            style_props,
-            qname(self.NS_YFILES, "Property"),
-            attrib={
-                "class": "java.awt.Color",
-                "name": "com.yworks.bpmn.icon.fill",
-                "value": "#ffffffe6"
-            }
-        )
-
-        # BPMN type
-        prop5 = ET.SubElement(
-            style_props,
-            qname(self.NS_YFILES, "Property"),
-            attrib={
-                "class": "com.yworks.yfiles.bpmn.view.BPMNTypeEnum",
-                "name": "com.yworks.bpmn.type",
-                "value": "ARTIFACT_TYPE_DATA_OBJECT"
-            }
-        )
-
+        fill = ET.SubElement(shape_node, f'{{{self.ns_y}}}Fill')
+        fill.set('color', visual_props.fill_color)
+        fill.set('transparent', 'false')
+        
+        # BorderStyle
+        border = ET.SubElement(shape_node, f'{{{self.ns_y}}}BorderStyle')
+        border.set('color', visual_props.border_color)
+        border.set('type', visual_props.border_type)
+        border.set('width', str(visual_props.border_width))
+        
+        # NodeLabel
+        label = ET.SubElement(shape_node, f'{{{self.ns_y}}}NodeLabel')
+        label.set('alignment', 'center')
+        label.set('autoSizePolicy', 'content')
+        label.set('fontFamily', 'Dialog')
+        label.set('fontSize', '12')
+        label.set('fontStyle', 'plain')
+        label.set('hasBackgroundColor', 'false')
+        label.set('hasLineColor', 'false')
+        label.set('horizontalTextPosition', 'center')
+        label.set('iconTextGap', '4')
+        label.set('modelName', 'custom')
+        label.set('textColor', visual_props.text_color)
+        label.set('verticalTextPosition', 'bottom')
+        label.set('visible', 'true')
+        label.text = node_label
+        
+        # LabelModel
+        label_model = ET.SubElement(label, f'{{{self.ns_y}}}LabelModel')
+        smart_model = ET.SubElement(label_model, f'{{{self.ns_y}}}SmartNodeLabelModel')
+        smart_model.set('distance', '4.0')
+        
+        # ModelParameter
+        model_param = ET.SubElement(label, f'{{{self.ns_y}}}ModelParameter')
+        smart_param = ET.SubElement(model_param, f'{{{self.ns_y}}}SmartNodeLabelModelParameter')
+        smart_param.set('labelRatioX', '0.0')
+        smart_param.set('labelRatioY', '0.0')
+        smart_param.set('nodeRatioX', '0.0')
+        smart_param.set('nodeRatioY', '0.0')
+        smart_param.set('offsetX', '0.0')
+        smart_param.set('offsetY', '0.0')
+        smart_param.set('upX', '0.0')
+        smart_param.set('upY', '-1.0')
+        
+        # Shape
+        shape = ET.SubElement(shape_node, f'{{{self.ns_y}}}Shape')
+        shape.set('type', visual_props.shape)
+        
         return node_elem
 
-    def generate_extractor_node(
-        self,
-        node: ExtractorNode,
-        x: float,
-        y: float,
-        node_id: Optional[str] = None
-    ) -> ET.Element:
+    def generate_property_node(self, node, x: float, y: float,
+                               parent_id: Optional[str] = None) -> ET.Element:
         """
-        Generate an extractor node (similar to document, but for data extractors).
-
-        ExtractorNode names are prefixed with "D." by convention (e.g., "D.GPT4").
-
-        Args:
-            node: ExtractorNode instance
-            x: X coordinate
-            y: Y coordinate
-
-        Returns:
-            ET.Element: <node> element with BPMN GenericNode
-        """
-        # Extractors use the same visual style as documents
-        return self.generate_document_node(node, x, y)
-
-    def generate_property_node(
-        self,
-        node: PropertyNode,
-        x: float,
-        y: float,
-        node_id: Optional[str] = None
-    ) -> ET.Element:
-        """
-        Generate a property node with BPMN annotation shape.
-
+        Generate BPMN Annotation for PropertyNode.
+        
         Args:
             node: PropertyNode instance
-            x: X coordinate
-            y: Y coordinate
-
+            x, y: Position coordinates
+            parent_id: Parent nested ID
+            
         Returns:
-            ET.Element: <node> element with BPMN GenericNode (annotation)
+            node XML element
         """
-        # Property nodes use BPMN annotation style
-        # For now, we'll use a simple rectangle shape
-        # (Full BPMN annotation support can be added later)
-
-        node_elem = ET.Element(
-            qname(self.NS_GRAPHML, "node"),
-            id=node.node_id
-        )
-
-        # Add graphics data
-        graphics_data = ET.SubElement(
-            node_elem,
-            qname(self.NS_GRAPHML, "data"),
-            key="d6"
-        )
-
-        # Create ShapeNode (simple rectangle for properties)
-        shape_node = ET.SubElement(
-            graphics_data,
-            qname(self.NS_YFILES, "ShapeNode")
-        )
-
-        # Geometry (smaller than stratigraphic nodes)
-        geometry = ET.SubElement(
-            shape_node,
-            qname(self.NS_YFILES, "Geometry"),
-            height="40.0",
-            width="100.0",
-            x=str(x),
-            y=str(y)
-        )
-
-        # Fill (light yellow)
-        fill = ET.SubElement(
-            shape_node,
-            qname(self.NS_YFILES, "Fill"),
-            color="#FFFFCC",
-            transparent="false"
-        )
-
-        # Border (thin, gray)
-        border = ET.SubElement(
-            shape_node,
-            qname(self.NS_YFILES, "BorderStyle"),
-            color="#666666",
-            type="line",
-            width="1.0"
-        )
-
-        # Label
-        label = ET.SubElement(
-            shape_node,
-            qname(self.NS_YFILES, "NodeLabel"),
-            alignment="center",
-            autoSizePolicy="content",
-            fontFamily="Dialog",
-            fontSize="10",
-            fontStyle="plain",
-            textColor="#000000",
-            visible="true"
-        )
-        label.text = node.name if node.name else node.property_name
-
-        # Shape
-        shape = ET.SubElement(
-            shape_node,
-            qname(self.NS_YFILES, "Shape"),
-            type="rectangle"
-        )
-
+        node_uuid = getattr(node, 'node_id', generate_uuid())
+        nested_id = self.id_manager.get_nested_id(node_uuid, parent_id)
+        
+        node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
+        node_elem.set('id', nested_id)
+        
+        # Add EMID (d7)
+        data_d7 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d7.set('key', 'd7')
+        data_d7.text = node_uuid
+        
+        # Add nodegraphics (d6) - GenericNode BPMN
+        data_d6 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d6.set('key', 'd6')
+        
+        generic_node = ET.SubElement(data_d6, f'{{{self.ns_y}}}GenericNode')
+        generic_node.set('configuration', 'com.yworks.bpmn.Artifact.withShadow')
+        
+        # Geometry
+        property_name = getattr(node, 'property_name', 'property')
+        width = calculate_node_width(property_name, base_width=62.75, char_width=6.0)
+        geometry = ET.SubElement(generic_node, f'{{{self.ns_y}}}Geometry')
+        geometry.set('height', '30.0')
+        geometry.set('width', str(width))
+        geometry.set('x', str(x))
+        geometry.set('y', str(y))
+        
+        # Fill
+        fill = ET.SubElement(generic_node, f'{{{self.ns_y}}}Fill')
+        fill.set('color', '#FFFFFFE6')
+        fill.set('transparent', 'false')
+        
+        # BorderStyle
+        border = ET.SubElement(generic_node, f'{{{self.ns_y}}}BorderStyle')
+        border.set('color', '#000000')
+        border.set('type', 'line')
+        border.set('width', '1.0')
+        
+        # NodeLabel
+        label = ET.SubElement(generic_node, f'{{{self.ns_y}}}NodeLabel')
+        label.text = property_name
+        
+        # StyleProperties
+        style_props = ET.SubElement(generic_node, f'{{{self.ns_y}}}StyleProperties')
+        
+        prop1 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
+        prop1.set('class', 'java.awt.Color')
+        prop1.set('name', 'com.yworks.bpmn.icon.line.color')
+        prop1.set('value', '#000000')
+        
+        prop2 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
+        prop2.set('class', 'java.awt.Color')
+        prop2.set('name', 'com.yworks.bpmn.icon.fill2')
+        prop2.set('value', '#d4d4d4cc')
+        
+        prop3 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
+        prop3.set('class', 'java.awt.Color')
+        prop3.set('name', 'com.yworks.bpmn.icon.fill')
+        prop3.set('value', '#ffffffe6')
+        
+        prop4 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
+        prop4.set('class', 'com.yworks.yfiles.bpmn.view.BPMNTypeEnum')
+        prop4.set('name', 'com.yworks.bpmn.type')
+        prop4.set('value', 'ARTIFACT_TYPE_ANNOTATION')
+        
         return node_elem
 
-    def _get_stratigraphic_type(self, node: StratigraphicNode) -> str:
+    def generate_extractor_node(self, node, x: float, y: float,
+                                parent_id: Optional[str] = None) -> ET.Element:
         """
-        Extract the stratigraphic type code from a node.
-
-        Tries to determine the type from:
-        1. node.node_type attribute
-        2. Class name (e.g., StructuralVirtualStratigraphicUnit -> USVs)
-
+        Generate SVG Node for ExtractorNode.
+        
         Args:
-            node: StratigraphicNode instance
-
+            node: ExtractorNode instance
+            x, y: Position coordinates
+            parent_id: Parent nested ID
+            
         Returns:
-            str: Type code (US, USVs, USVn, SF, etc.) or 'unknown'
+            node XML element
         """
-        # Try node_type attribute first
-        if hasattr(node, 'node_type') and node.node_type:
-            return node.node_type
-
-        # Map class names to type codes
-        class_name = node.__class__.__name__
-        class_to_type = {
-            'StratigraphicUnit': 'US',
-            'StructuralVirtualStratigraphicUnit': 'USVs',
-            'NonStructuralVirtualStratigraphicUnit': 'USVn',
-            'SpecialFindUnit': 'SF',
-            'VirtualSpecialFindUnit': 'VSF',
-            'DocumentaryStratigraphicUnit': 'USD',
-            'TransformationStratigraphicUnit': 'TSU',
-            'StratigraphicEventNode': 'SE',
-            'SeriesOfStratigraphicUnit': 'serSU',
-            'SeriesOfStructuralVirtualStratigraphicUnit': 'serUSVs',
-            'SeriesOfNonStructuralVirtualStratigraphicUnit': 'serUSVn',
-            'ContinuityNode': 'BR',
-        }
-
-        return class_to_type.get(class_name, 'unknown')
-
-    def _get_text_color(self, fill_color: str) -> str:
-        """
-        Determine text color (white or black) based on fill color.
-
-        Dark fills use white text, light fills use black text.
-
-        Args:
-            fill_color: Hex color code (e.g., "#FFFFFF")
-
-        Returns:
-            str: "#FFFFFF" or "#000000"
-        """
-        # Black fills (#000000) should have white text
-        if fill_color.upper() == "#000000":
-            return "#FFFFFF"
+        node_uuid = getattr(node, 'node_id', generate_uuid())
+        nested_id = self.id_manager.get_nested_id(node_uuid, parent_id)
+        
+        node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
+        node_elem.set('id', nested_id)
+        
+        # Add EMID (d7)
+        data_d7 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d7.set('key', 'd7')
+        data_d7.text = node_uuid
+        
+        # Add nodegraphics (d6) - SVGNode
+        data_d6 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d6.set('key', 'd6')
+        
+        svg_node = ET.SubElement(data_d6, f'{{{self.ns_y}}}SVGNode')
+        
+        # Geometry
+        geometry = ET.SubElement(svg_node, f'{{{self.ns_y}}}Geometry')
+        geometry.set('height', '25.0')
+        geometry.set('width', '25.0')
+        geometry.set('x', str(x))
+        geometry.set('y', str(y))
+        
+        # Fill
+        fill = ET.SubElement(svg_node, f'{{{self.ns_y}}}Fill')
+        fill.set('color', '#CCCCFF')
+        fill.set('transparent', 'false')
+        
+        # BorderStyle
+        border = ET.SubElement(svg_node, f'{{{self.ns_y}}}BorderStyle')
+        border.set('color', '#000000')
+        border.set('type', 'line')
+        border.set('width', '1.0')
+        
+        # NodeLabel (D. or C.)
+        extractor_name = getattr(node, 'name', 'D.')
+        # Determine label based on name
+        if 'combiner' in extractor_name.lower() or extractor_name.startswith('C.'):
+            label_text = 'C.'
+            svg_refid = '2'
         else:
-            return "#000000"
+            label_text = 'D.'
+            svg_refid = '3'
+        
+        label = ET.SubElement(svg_node, f'{{{self.ns_y}}}NodeLabel')
+        label.set('alignment', 'center')
+        label.set('borderDistance', '0.0')
+        label.set('fontSize', '10')
+        label.set('modelName', 'corners')
+        label.set('modelPosition', 'nw')
+        label.set('underlinedText', 'true')
+        label.set('visible', 'true')
+        label.text = label_text
+        
+        # SVGNodeProperties
+        svg_props = ET.SubElement(svg_node, f'{{{self.ns_y}}}SVGNodeProperties')
+        svg_props.set('usingVisualBounds', 'true')
+        
+        # SVGModel
+        svg_model = ET.SubElement(svg_node, f'{{{self.ns_y}}}SVGModel')
+        svg_model.set('svgBoundsPolicy', '0')
+        
+        svg_content = ET.SubElement(svg_model, f'{{{self.ns_y}}}SVGContent')
+        svg_content.set('refid', svg_refid)
+        
+        return node_elem
+
+    def generate_document_node(self, node, x: float, y: float,
+                               parent_id: Optional[str] = None) -> ET.Element:
+        """
+        Generate BPMN Data Object for DocumentNode.
+        
+        Args:
+            node: DocumentNode instance
+            x, y: Position coordinates
+            parent_id: Parent nested ID
+            
+        Returns:
+            node XML element
+        """
+        node_uuid = getattr(node, 'node_id', generate_uuid())
+        nested_id = self.id_manager.get_nested_id(node_uuid, parent_id)
+        
+        node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
+        node_elem.set('id', nested_id)
+        
+        # Add EMID (d7)
+        data_d7 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d7.set('key', 'd7')
+        data_d7.text = node_uuid
+        
+        # Add nodegraphics (d6) - GenericNode BPMN Data Object
+        data_d6 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d6.set('key', 'd6')
+        
+        generic_node = ET.SubElement(data_d6, f'{{{self.ns_y}}}GenericNode')
+        generic_node.set('configuration', 'com.yworks.bpmn.Artifact.withShadow')
+        
+        # Geometry
+        geometry = ET.SubElement(generic_node, f'{{{self.ns_y}}}Geometry')
+        geometry.set('height', '55.0')
+        geometry.set('width', '35.0')
+        geometry.set('x', str(x))
+        geometry.set('y', str(y))
+        
+        # Fill
+        fill = ET.SubElement(generic_node, f'{{{self.ns_y}}}Fill')
+        fill.set('color', '#FFFFFFE6')
+        fill.set('transparent', 'false')
+        
+        # BorderStyle
+        border = ET.SubElement(generic_node, f'{{{self.ns_y}}}BorderStyle')
+        border.set('color', '#000000')
+        border.set('type', 'line')
+        border.set('width', '1.0')
+        
+        # NodeLabel
+        doc_name = getattr(node, 'name', 'Document')
+        label = ET.SubElement(generic_node, f'{{{self.ns_y}}}NodeLabel')
+        label.text = doc_name
+        
+        # StyleProperties
+        style_props = ET.SubElement(generic_node, f'{{{self.ns_y}}}StyleProperties')
+        
+        prop1 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
+        prop1.set('class', 'java.awt.Color')
+        prop1.set('name', 'com.yworks.bpmn.icon.line.color')
+        prop1.set('value', '#000000')
+        
+        prop2 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
+        prop2.set('class', 'java.awt.Color')
+        prop2.set('name', 'com.yworks.bpmn.icon.fill2')
+        prop2.set('value', '#d4d4d4cc')
+        
+        prop3 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
+        prop3.set('class', 'java.awt.Color')
+        prop3.set('name', 'com.yworks.bpmn.icon.fill')
+        prop3.set('value', '#ffffffe6')
+        
+        prop4 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
+        prop4.set('class', 'com.yworks.yfiles.bpmn.view.BPMNTypeEnum')
+        prop4.set('name', 'com.yworks.bpmn.type')
+        prop4.set('value', 'ARTIFACT_TYPE_DATA_OBJECT')
+        
+        prop5 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
+        prop5.set('class', 'com.yworks.yfiles.bpmn.view.DataObjectTypeEnum')
+        prop5.set('name', 'com.yworks.bpmn.dataObjectType')
+        prop5.set('value', 'DATA_OBJECT_TYPE_PLAIN')
+        
+        return node_elem

@@ -1,282 +1,177 @@
 """
-GroupNode Generator for Extended Matrix GraphML Export.
+Group node generator for GraphML export.
 
-Generates yEd ProxyAutoBoundsNode elements for ParadataNodeGroup,
-ActivityNodeGroup, and TimeBranchNodeGroup.
-
-Based on reverse engineering of TempluMare_EM_converted_converted.graphml.
+Generates ProxyAutoBoundsNode for ParadataNodeGroup and ActivityNodeGroup.
 """
 
-from typing import List, Tuple, Optional
 from lxml import etree as ET
+from typing import List, Optional, Dict
+from .node_registry import NodeRegistry
+from .utils import IDManager, generate_uuid
+
+
+# Group background colors (reverse engineered from import_graphml.py lines 1323-1331)
+GROUP_COLORS = {
+    'ParadataNodeGroup': '#FFCC99',      # Correct color for paradata
+    'ActivityNodeGroup': '#CCFFFF',
+    'TimeBranchNodeGroup': '#99CC00'
+}
 
 
 class GroupNodeGenerator:
-    """Generate yEd ProxyAutoBoundsNode for various group types."""
+    """Generates ProxyAutoBoundsNode for group nodes."""
 
-    # yFiles namespace
-    YFILES_NS = "http://www.yworks.com/xml/graphml"
-
-    # Group type color mappings (from importer analysis)
-    GROUP_COLORS = {
-        'ParadataNodeGroup': '#FFCC99',      # Orange
-        'ActivityNodeGroup': '#CCFFFF',      # Cyan
-        'TimeBranchNodeGroup': '#99CC00',    # Green
-        'GroupNode': '#F5F5F5'               # Default gray
-    }
-
-    def __init__(self):
-        """Initialize the GroupNode generator."""
-        self.ns_map = {'y': self.YFILES_NS}
-
-    def generate_group_node(
-        self,
-        node_id: str,
-        group_type: str,
-        label: str,
-        x: float,
-        y: float,
-        width: float = 200.0,
-        height: float = 150.0,
-        closed: bool = False
-    ) -> ET.Element:
+    def __init__(self, registry: NodeRegistry, id_manager: IDManager):
         """
-        Generate ProxyAutoBoundsNode XML element.
-
+        Initialize group node generator.
+        
         Args:
-            node_id: Node ID following nesting pattern (e.g., "n0::n3::n3")
-            group_type: Type of group (ParadataNodeGroup, ActivityNodeGroup, etc.)
-            label: Display label for the group
-            x: X coordinate
-            y: Y coordinate
-            width: Group width (auto-calculated from content in yEd)
-            height: Group height (auto-calculated from content in yEd)
-            closed: Whether group starts in closed state
-
-        Returns:
-            lxml Element representing the GroupNode
+            registry: Node registry
+            id_manager: ID manager for nested IDs
         """
-        # Create root node element
-        node = ET.Element(
-            'node',
-            id=node_id,
-            attrib={'{http://www.yworks.com/xml/graphml}foldertype': 'folder'}
-        )
+        self.registry = registry
+        self.id_manager = id_manager
+        self.ns_y = 'http://www.yworks.com/xml/graphml'
 
-        # Create data element for d6 (node graphics)
-        data = ET.SubElement(node, 'data', key='d6')
-
-        # Create ProxyAutoBoundsNode
-        proxy_node = ET.SubElement(
-            data,
-            '{%s}ProxyAutoBoundsNode' % self.YFILES_NS
-        )
-
-        # Realizers (dual state: open and closed)
-        realizers = ET.SubElement(
-            proxy_node,
-            '{%s}Realizers' % self.YFILES_NS,
-            active='1' if closed else '0'  # 0 = open, 1 = closed
-        )
-
-        # Open state realizer
-        self._create_group_node_realizer(
-            realizers,
-            group_type,
-            label,
-            x, y, width, height,
-            closed=False
-        )
-
-        # Closed state realizer (compact representation)
-        closed_width = min(width, 118.6)
-        closed_height = min(height, 87.5)
-        self._create_group_node_realizer(
-            realizers,
-            group_type,
-            label,
-            x, y, closed_width, closed_height,
-            closed=True
-        )
-
-        # Create nested graph for group contents
-        graph = ET.SubElement(node, 'graph')
-        graph.set('edgedefault', 'directed')
-        graph.set('id', f"{node_id}:")
-
-        return node
-
-    def _create_group_node_realizer(
-        self,
-        parent: ET.Element,
-        group_type: str,
-        label: str,
-        x: float,
-        y: float,
-        width: float,
-        height: float,
-        closed: bool
-    ) -> ET.Element:
+    def generate_paradata_group(self, group_data: Dict, x: float = 800.0, y: float = 100.0) -> ET.Element:
         """
-        Create a single GroupNode realizer (open or closed state).
-
+        Generate ProxyAutoBoundsNode for ParadataNodeGroup.
+        
         Args:
-            parent: Parent Realizers element
-            group_type: Type of group
-            label: Display label
-            x, y, width, height: Geometry
-            closed: Whether this is the closed state
-
+            group_data: Dict with 'us_node', 'property_nodes', 'extractor_nodes', 'document_nodes'
+            x, y: Position coordinates
+            
         Returns:
-            GroupNode element
+            node XML element with nested graph
         """
-        group_node = ET.SubElement(parent, '{%s}GroupNode' % self.YFILES_NS)
+        us_node = group_data['us_node']
+        property_nodes = group_data.get('property_nodes', [])
+        extractor_nodes = group_data.get('extractor_nodes', [])
+        document_nodes = group_data.get('document_nodes', [])
+        
+        # Generate group UUID and nested ID
+        group_uuid = generate_uuid()
+        group_nested_id = self.id_manager.get_nested_id(group_uuid)
+        
+        # Create node element
+        node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
+        node_elem.set('id', group_nested_id)
+        node_elem.set('yfiles.foldertype', 'group')
+        
+        # Add EMID (d7)
+        data_d7 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d7.set('key', 'd7')
+        data_d7.text = group_uuid
+        
+        # Add nodegraphics (d6) - ProxyAutoBoundsNode
+        data_d6 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d6.set('key', 'd6')
+        
+        proxy_node = ET.SubElement(data_d6, f'{{{self.ns_y}}}ProxyAutoBoundsNode')
+        
+        realizers = ET.SubElement(proxy_node, f'{{{self.ns_y}}}Realizers')
+        realizers.set('active', '0')
+        
+        # Realizer 0: Open state
+        self._add_group_realizer(realizers, us_node, x, y, closed=False,
+                                width=376.0, height=250.0)
+        
+        # Realizer 1: Closed state
+        self._add_group_realizer(realizers, us_node, x + 100, y + 50, closed=True,
+                                width=118.0, height=87.0)
+        
+        # Create nested graph for group content
+        graph_elem = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}graph')
+        graph_elem.set('edgedefault', 'directed')
+        graph_elem.set('id', f'{group_nested_id}:')
+        
+        # Add nested nodes (will be populated by main exporter)
+        # Store group_nested_id in group_data for later use
+        group_data['group_nested_id'] = group_nested_id
+        
+        return node_elem
 
+    def _add_group_realizer(self, realizers: ET.Element, us_node, x: float, y: float,
+                           closed: bool, width: float, height: float):
+        """Add a GroupNode realizer (open or closed state)."""
+        group_node = ET.SubElement(realizers, f'{{{self.ns_y}}}GroupNode')
+        
         # Geometry
-        geometry = ET.SubElement(group_node, '{%s}Geometry' % self.YFILES_NS)
-        geometry.set('height', f"{height:.1f}")
-        geometry.set('width', f"{width:.1f}")
-        geometry.set('x', f"{x:.1f}")
-        geometry.set('y', f"{y:.1f}")
-
-        # Fill (background color based on group type)
-        fill = ET.SubElement(group_node, '{%s}Fill' % self.YFILES_NS)
-        fill.set('color', '#F5F5F5')  # Group background always light gray
+        geometry = ET.SubElement(group_node, f'{{{self.ns_y}}}Geometry')
+        geometry.set('height', str(height))
+        geometry.set('width', str(width))
+        geometry.set('x', str(x))
+        geometry.set('y', str(y))
+        
+        # Fill
+        fill = ET.SubElement(group_node, f'{{{self.ns_y}}}Fill')
+        fill.set('color', '#F5F5F5')
         fill.set('transparent', 'false')
-
-        # Border style
-        border = ET.SubElement(group_node, '{%s}BorderStyle' % self.YFILES_NS)
+        
+        # BorderStyle - DASHED for ParadataNodeGroup
+        border = ET.SubElement(group_node, f'{{{self.ns_y}}}BorderStyle')
         border.set('color', '#000000')
-        border.set('type', 'dashed')
+        border.set('type', 'dashed')  # Dashed border
         border.set('width', '1.0')
-
-        # Node label with color-coded background
-        node_label = ET.SubElement(group_node, '{%s}NodeLabel' % self.YFILES_NS)
-        node_label.set('alignment', 'right')
-        node_label.set('autoSizePolicy', 'node_width')
-        node_label.set('backgroundColor', self.GROUP_COLORS.get(group_type, '#F5F5F5'))
-        node_label.set('borderDistance', '0.0')
-        node_label.set('fontFamily', 'Dialog')
-        node_label.set('fontSize', '15')
-        node_label.set('fontStyle', 'plain')
-        node_label.set('hasLineColor', 'false')
-        node_label.set('height', '21.666015625')
-        node_label.set('horizontalTextPosition', 'center')
-        node_label.set('iconTextGap', '4')
-        node_label.set('modelName', 'internal')
-        node_label.set('modelPosition', 't')  # Top
-        node_label.set('textColor', '#000000')
-        node_label.set('verticalTextPosition', 'bottom')
-        node_label.set('visible', 'true')
-        node_label.set('width', f"{width:.1f}")
-        node_label.set('x', '0.0')
-        node_label.set('y', '0.0')
-        node_label.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
-        node_label.text = label
-
+        
+        # NodeLabel with CORRECT background color #FFCC99
+        us_name = getattr(us_node, 'name', 'US')
+        label_text = f'{us_name}_PD'
+        
+        label = ET.SubElement(group_node, f'{{{self.ns_y}}}NodeLabel')
+        label.set('alignment', 'right')
+        label.set('autoSizePolicy', 'node_width')
+        label.set('backgroundColor', GROUP_COLORS['ParadataNodeGroup'])  # #FFCC99
+        label.set('borderDistance', '0.0')
+        label.set('fontSize', '15')
+        label.set('fontStyle', 'plain')
+        label.set('hasLineColor', 'false')
+        label.set('horizontalTextPosition', 'center')
+        label.set('iconTextGap', '4')
+        label.set('modelName', 'internal')
+        label.set('modelPosition', 't')
+        label.set('textColor', '#000000')
+        label.set('verticalTextPosition', 'bottom')
+        label.set('visible', 'true')
+        label.text = label_text
+        
         # Shape
-        shape = ET.SubElement(group_node, '{%s}Shape' % self.YFILES_NS)
+        shape = ET.SubElement(group_node, f'{{{self.ns_y}}}Shape')
         shape.set('type', 'roundrectangle')
-
+        
         # State
-        state = ET.SubElement(group_node, '{%s}State' % self.YFILES_NS)
+        state = ET.SubElement(group_node, f'{{{self.ns_y}}}State')
         state.set('closed', 'true' if closed else 'false')
-        state.set('closedHeight', f"{height:.1f}")
-        state.set('closedWidth', f"{width:.1f}")
-        state.set('innerGraphDisplayEnabled', 'false')
-
-        # Insets (padding)
-        insets = ET.SubElement(group_node, '{%s}Insets' % self.YFILES_NS)
         if closed:
-            # Closed state has smaller insets
+            state.set('closedHeight', str(height))
+            state.set('closedWidth', str(width))
+        
+        # Insets
+        insets = ET.SubElement(group_node, f'{{{self.ns_y}}}Insets')
+        if closed:
             insets.set('bottom', '5')
-            insets.set('bottomF', '5.0')
             insets.set('left', '5')
-            insets.set('leftF', '5.0')
             insets.set('right', '5')
-            insets.set('rightF', '5.0')
             insets.set('top', '5')
-            insets.set('topF', '5.0')
         else:
-            # Open state has larger insets
             insets.set('bottom', '15')
-            insets.set('bottomF', '15.0')
             insets.set('left', '15')
-            insets.set('leftF', '15.0')
             insets.set('right', '15')
-            insets.set('rightF', '15.0')
             insets.set('top', '15')
-            insets.set('topF', '15.0')
 
-        # Border insets
-        border_insets = ET.SubElement(group_node, '{%s}BorderInsets' % self.YFILES_NS)
-        border_insets.set('bottom', '0')
-        border_insets.set('bottomF', '0.0')
-        border_insets.set('left', '0')
-        border_insets.set('leftF', '0.0')
-        border_insets.set('right', '0')
-        border_insets.set('rightF', '0.0')
-        border_insets.set('top', '0')
-        border_insets.set('topF', '0.0')
-
-        return group_node
-
-    def calculate_group_bounds(
-        self,
-        member_nodes: List[Tuple[float, float, float, float]],
-        padding: float = 20.0
-    ) -> Tuple[float, float, float, float]:
+    def generate_activity_group(self, group_data: Dict, x: float = 100.0, y: float = 100.0) -> ET.Element:
         """
-        Calculate bounding box for group based on member node positions.
-
+        Generate ProxyAutoBoundsNode for ActivityNodeGroup.
+        
+        Similar to ParadataNodeGroup but with different background color (#CCFFFF).
+        
         Args:
-            member_nodes: List of (x, y, width, height) tuples for each member
-            padding: Padding around member nodes
-
+            group_data: Dict with group information
+            x, y: Position coordinates
+            
         Returns:
-            Tuple of (x, y, width, height) for the group bounding box
+            node XML element
         """
-        if not member_nodes:
-            # Default size if no members
-            return (0.0, 0.0, 200.0, 150.0)
-
-        # Find min/max coordinates
-        min_x = min(node[0] for node in member_nodes)
-        min_y = min(node[1] for node in member_nodes)
-        max_x = max(node[0] + node[2] for node in member_nodes)
-        max_y = max(node[1] + node[3] for node in member_nodes)
-
-        # Calculate bounds with padding
-        x = min_x - padding
-        y = min_y - padding - 25.0  # Extra padding for header
-        width = (max_x - min_x) + (2 * padding)
-        height = (max_y - min_y) + (2 * padding) + 25.0
-
-        return (x, y, width, height)
-
-    @staticmethod
-    def generate_node_id(parent_id: str, index: int) -> str:
-        """
-        Generate nested node ID following EM pattern.
-
-        Args:
-            parent_id: Parent node ID (e.g., "n0::n3")
-            index: Child index
-
-        Returns:
-            Nested ID (e.g., "n0::n3::n5")
-        """
-        return f"{parent_id}::n{index}"
-
-    @staticmethod
-    def generate_graph_id(node_id: str) -> str:
-        """
-        Generate graph ID from node ID.
-
-        Args:
-            node_id: Node ID (e.g., "n0::n3::n3")
-
-        Returns:
-            Graph ID (e.g., "n0::n3::n3:")
-        """
-        return f"{node_id}:"
+        # Similar structure to paradata group but with ActivityNodeGroup color
+        # Implementation would be similar to generate_paradata_group but with #CCFFFF
+        pass

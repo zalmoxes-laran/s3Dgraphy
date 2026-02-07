@@ -1,149 +1,127 @@
 """
-Edge Generator for GraphML Export
+Edge generator for GraphML export.
 
-Generates yEd-compatible edge XML elements with appropriate line styles
-based on edge types from the s3dgraphy connections datamodel.
+Generates edges with correct line styles and EMID in d11 (NOT d7).
 """
 
 from lxml import etree as ET
-from typing import Optional
-from ...edges.edge import Edge
-from .utils import generate_uuid, qname, get_edge_line_style
+from typing import Dict, Tuple
+from .utils import IDManager, generate_uuid
+
+
+# Edge type to line style mapping
+EDGE_TYPE_TO_LINE_STYLE = {
+    'is_after': ('line', 2.0),                    # Temporal: solid line
+    'is_before': ('line', 2.0),                   # Temporal: solid line
+    'has_same_time': ('line', 2.0),               # Temporal: solid line
+    'changed_from': ('dotted', 2.0),              # Transformation: dotted
+    'has_data_provenance': ('dashed', 2.0),       # Provenance: dashed
+    'extracted_from': ('dashed', 2.0),            # Provenance: dashed
+    'has_property': ('line', 1.0),                # Property connection: thin
+    'has_paradata_nodegroup': ('dashed', 2.0),    # US → ParadataGroup: dashed
+    'is_in_paradata_nodegroup': ('line', 1.0),    # Node → Group (automatic)
+    'has_first_epoch': ('line', 1.0),             # Epoch connection
+    # Stratigraphic relations
+    'cuts': ('line', 2.0),
+    'is_cut_by': ('line', 2.0),
+    'overlies': ('line', 2.0),
+    'is_overlain_by': ('line', 2.0),
+    'fills': ('line', 2.0),
+    'is_filled_by': ('line', 2.0),
+    'abuts': ('line', 2.0),
+    'is_abutted_by': ('line', 2.0),
+    'is_bonded_to': ('line', 2.0),
+    'is_physically_equal_to': ('line', 2.0),
+}
 
 
 class EdgeGenerator:
-    """
-    Generates GraphML edge elements for s3dgraphy Edge objects.
+    """Generates GraphML edges with correct line styles."""
 
-    Handles:
-    - Temporal edges (is_after, changed_from)
-    - Physical stratigraphic relations (cuts, overlies, fills, abuts)
-    - Provenance edges (has_data_provenance, extracted_from)
-    - Property edges (has_property)
-    - Epoch edges (has_first_epoch, survive_in_epoch)
-    """
-
-    # Namespace constants
-    NS_GRAPHML = "http://graphml.graphdrawing.org/xmlns"
-    NS_YFILES = "http://www.yworks.com/xml/graphml"
-
-    def __init__(self):
-        """Initialize the edge generator."""
-        pass
-
-    def generate_edge(
-        self,
-        edge: Edge,
-        graph=None
-    ) -> ET.Element:
+    def __init__(self, id_manager: IDManager):
         """
-        Generate GraphML XML for an edge.
-
+        Initialize edge generator.
+        
         Args:
-            edge: s3dgraphy Edge object
-            graph: Optional Graph object (for additional context)
-
-        Returns:
-            ET.Element: GraphML <edge> element with yEd PolyLineEdge
+            id_manager: ID manager for nested IDs and edge IDs
         """
-        # Create <edge> element
-        edge_elem = ET.Element(
-            qname(self.NS_GRAPHML, "edge"),
-            id=edge.edge_id,
-            source=edge.edge_source,
-            target=edge.edge_target
-        )
+        self.id_manager = id_manager
+        self.ns_y = 'http://www.yworks.com/xml/graphml'
 
-        # Add edge description if present
-        if edge.description:
-            desc_data = ET.SubElement(
-                edge_elem,
-                qname(self.NS_GRAPHML, "data"),
-                key="d9"
-            )
-            desc_data.text = edge.description
-
-        # Add edge graphics data (key d10)
-        graphics_data = ET.SubElement(
-            edge_elem,
-            qname(self.NS_GRAPHML, "data"),
-            key="d10"
-        )
-
-        # Create PolyLineEdge
-        polyline = ET.SubElement(
-            graphics_data,
-            qname(self.NS_YFILES, "PolyLineEdge")
-        )
-
-        # Path (simple straight line)
-        path = ET.SubElement(
-            polyline,
-            qname(self.NS_YFILES, "Path"),
-            sx="0",
-            sy="0",
-            tx="0",
-            ty="0"
-        )
-
-        # Line style based on edge type
-        line_style = get_edge_line_style(edge.edge_type)
-        line_elem = ET.SubElement(
-            polyline,
-            qname(self.NS_YFILES, "LineStyle"),
-            color="#000000",
-            type=line_style,
-            width="2.0"
-        )
-
-        # Arrows
-        # For temporal edges (is_after), arrow points from recent to ancient
-        # For most edges, arrow points from source to target
-        arrow_source, arrow_target = self._get_arrow_directions(edge.edge_type)
-
-        arrows = ET.SubElement(
-            polyline,
-            qname(self.NS_YFILES, "Arrows"),
-            source=arrow_source,
-            target=arrow_target
-        )
-
-        # Bend style (straight lines, no curves)
-        bend = ET.SubElement(
-            polyline,
-            qname(self.NS_YFILES, "BendStyle"),
-            smoothed="false"
-        )
-
+    def generate_edge(self, edge, edge_uuid: str = None) -> ET.Element:
+        """
+        Generate edge XML element.
+        
+        Args:
+            edge: Edge object with source, target, edge_type
+            edge_uuid: Optional UUID for edge (generated if None)
+            
+        Returns:
+            edge XML element
+        """
+        # Get edge ID
+        edge_id = self.id_manager.get_edge_id()
+        
+        # Generate or use provided UUID
+        if edge_uuid is None:
+            edge_uuid = generate_uuid()
+        
+        # Get nested IDs for source and target
+        source_uuid = getattr(edge, 'edge_source', None)
+        target_uuid = getattr(edge, 'edge_target', None)
+        
+        if source_uuid is None or target_uuid is None:
+            raise ValueError(f"Edge missing source or target: {edge}")
+        
+        source_nested = self.id_manager.uuid_to_nested.get(source_uuid)
+        target_nested = self.id_manager.uuid_to_nested.get(target_uuid)
+        
+        if source_nested is None or target_nested is None:
+            # Nodes not yet mapped, skip edge (will be added later)
+            return None
+        
+        # Create edge element
+        edge_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}edge')
+        edge_elem.set('id', edge_id)
+        edge_elem.set('source', source_nested)
+        edge_elem.set('target', target_nested)
+        
+        # Add EMID (d11) - UUID for edges (NOT d7!)
+        data_d11 = ET.SubElement(edge_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d11.set('key', 'd11')
+        data_d11.text = edge_uuid
+        
+        # Add edgegraphics (d10)
+        data_d10 = ET.SubElement(edge_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d10.set('key', 'd10')
+        
+        polyline = ET.SubElement(data_d10, f'{{{self.ns_y}}}PolyLineEdge')
+        
+        # Get line style for edge type
+        edge_type = getattr(edge, 'edge_type', 'line')
+        line_style, line_width = EDGE_TYPE_TO_LINE_STYLE.get(edge_type, ('line', 2.0))
+        
+        # LineStyle
+        line_style_elem = ET.SubElement(polyline, f'{{{self.ns_y}}}LineStyle')
+        line_style_elem.set('color', '#000000')
+        line_style_elem.set('type', line_style)
+        line_style_elem.set('width', str(line_width))
+        
+        # Arrows (standard arrow pointing to target)
+        arrows = ET.SubElement(polyline, f'{{{self.ns_y}}}Arrows')
+        arrows.set('source', 'none')
+        arrows.set('target', 'standard')
+        
         return edge_elem
 
-    def _get_arrow_directions(self, edge_type: str) -> tuple:
+    def get_line_style(self, edge_type: str) -> Tuple[str, float]:
         """
-        Determine arrow directions for an edge type.
-
+        Get line style and width for edge type.
+        
         Args:
-            edge_type: Edge type from connections datamodel
-
+            edge_type: Edge type string
+            
         Returns:
-            tuple: (source_arrow, target_arrow)
-                   Each can be: "none", "standard", "white_delta", etc.
-
-        Arrow conventions:
-        - Temporal edges (is_after): arrow at target (pointing to ancient)
-        - Directed edges: arrow at target
-        - Symmetric edges: no arrows
+            (line_style, line_width) tuple
         """
-        # Symmetric relations (no arrows)
-        SYMMETRIC_EDGES = {
-            'has_same_time',
-            'is_bonded_to',
-            'is_physically_equal_to',
-            'contrasts_with'
-        }
-
-        if edge_type in SYMMETRIC_EDGES:
-            return ("none", "none")
-
-        # Most edges have arrow pointing to target
-        # (source → target)
-        return ("none", "standard")
+        return EDGE_TYPE_TO_LINE_STYLE.get(edge_type, ('line', 2.0))
