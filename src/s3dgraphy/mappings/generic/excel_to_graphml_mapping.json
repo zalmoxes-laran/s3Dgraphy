@@ -20,7 +20,7 @@
             "node_type": "PropertyNode",
             "property_name": "usType",
             "display_name": "US Type",
-            "description": "Type of stratigraphic unit: US, USVs, USVn, SF, VSF, USD, serSU, serUSVn, serUSVs, TSU, SE, BR"
+            "description": "Type of stratigraphic unit: US, USVs, USVn, SF, VSF, USD, serSU, serUSD, serUSVn, serUSVs, TSU, SE, BR"
         },
         "DESCRIPTION": {
             "node_type": "PropertyNode",
