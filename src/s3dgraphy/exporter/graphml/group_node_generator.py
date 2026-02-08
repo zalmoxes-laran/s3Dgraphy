@@ -58,7 +58,7 @@ class GroupNodeGenerator:
         # Create node element
         node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
         node_elem.set('id', group_nested_id)
-        node_elem.set('yfiles.foldertype', 'group')
+        node_elem.set('yfiles.foldertype', 'folder')  # "folder" for PD groups (ref: TempluMare)
         
         # Add EMID (d7)
         data_d7 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
@@ -72,7 +72,7 @@ class GroupNodeGenerator:
         proxy_node = ET.SubElement(data_d6, f'{{{self.ns_y}}}ProxyAutoBoundsNode')
         
         realizers = ET.SubElement(proxy_node, f'{{{self.ns_y}}}Realizers')
-        realizers.set('active', '0')
+        realizers.set('active', '1')  # Closed by default (ref: TempluMare PD groups)
         
         # Realizer 0: Open state
         self._add_group_realizer(realizers, us_node, x, y, closed=False,

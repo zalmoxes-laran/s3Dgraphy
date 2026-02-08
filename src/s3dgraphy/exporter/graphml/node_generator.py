@@ -182,33 +182,64 @@ class NodeGenerator:
         border.set('type', 'line')
         border.set('width', '1.0')
         
-        # NodeLabel
+        # NodeLabel (full attributes matching TempluMare reference)
         label = ET.SubElement(generic_node, f'{{{self.ns_y}}}NodeLabel')
+        label.set('alignment', 'center')
+        label.set('autoSizePolicy', 'content')
+        label.set('fontFamily', 'Dialog')
+        label.set('fontSize', '12')
+        label.set('fontStyle', 'plain')
+        label.set('hasBackgroundColor', 'false')
+        label.set('hasLineColor', 'false')
+        label.set('horizontalTextPosition', 'center')
+        label.set('iconTextGap', '4')
+        label.set('modelName', 'custom')
+        label.set('textColor', '#000000')
+        label.set('verticalTextPosition', 'bottom')
+        label.set('visible', 'true')
+        label.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
         label.text = property_name
-        
+
+        # LabelModel (SmartNodeLabelModel like strat nodes)
+        label_model = ET.SubElement(label, f'{{{self.ns_y}}}LabelModel')
+        smart_model = ET.SubElement(label_model, f'{{{self.ns_y}}}SmartNodeLabelModel')
+        smart_model.set('distance', '4.0')
+
+        # ModelParameter
+        model_param = ET.SubElement(label, f'{{{self.ns_y}}}ModelParameter')
+        smart_param = ET.SubElement(model_param, f'{{{self.ns_y}}}SmartNodeLabelModelParameter')
+        smart_param.set('labelRatioX', '0.0')
+        smart_param.set('labelRatioY', '0.0')
+        smart_param.set('nodeRatioX', '0.0')
+        smart_param.set('nodeRatioY', '0.0')
+        smart_param.set('offsetX', '0.0')
+        smart_param.set('offsetY', '0.0')
+        smart_param.set('upX', '0.0')
+        smart_param.set('upY', '-1.0')
+
         # StyleProperties
         style_props = ET.SubElement(generic_node, f'{{{self.ns_y}}}StyleProperties')
-        
+
         prop1 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
         prop1.set('class', 'java.awt.Color')
         prop1.set('name', 'com.yworks.bpmn.icon.line.color')
         prop1.set('value', '#000000')
-        
+
         prop2 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
         prop2.set('class', 'java.awt.Color')
         prop2.set('name', 'com.yworks.bpmn.icon.fill2')
         prop2.set('value', '#d4d4d4cc')
-        
+
         prop3 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
         prop3.set('class', 'java.awt.Color')
         prop3.set('name', 'com.yworks.bpmn.icon.fill')
         prop3.set('value', '#ffffffe6')
-        
+
         prop4 = ET.SubElement(style_props, f'{{{self.ns_y}}}Property')
         prop4.set('class', 'com.yworks.yfiles.bpmn.view.BPMNTypeEnum')
         prop4.set('name', 'com.yworks.bpmn.type')
         prop4.set('value', 'ARTIFACT_TYPE_ANNOTATION')
-        
+
         return node_elem
 
     def generate_extractor_node(self, node, x: float, y: float,
@@ -259,15 +290,15 @@ class NodeGenerator:
         border.set('type', 'line')
         border.set('width', '1.0')
         
-        # NodeLabel (D. or C.)
+        # NodeLabel — use full extractor name (e.g., "D.05.02", "C.10")
         extractor_name = getattr(node, 'name', 'D.')
-        # Determine label based on name
+        # Determine SVG icon: extractors = refid "1", combiners = refid "2"
         if 'combiner' in extractor_name.lower() or extractor_name.startswith('C.'):
-            label_text = 'C.'
-            svg_refid = '2'
+            label_text = extractor_name  # Full name: "C.10"
+            svg_refid = '2'             # Combiner SVG icon
         else:
-            label_text = 'D.'
-            svg_refid = '3'
+            label_text = extractor_name  # Full name: "D.05.02"
+            svg_refid = '1'             # Extractor SVG icon (NOT "3"!)
         
         label = ET.SubElement(svg_node, f'{{{self.ns_y}}}NodeLabel')
         label.set('alignment', 'center')
@@ -323,29 +354,44 @@ class NodeGenerator:
         generic_node = ET.SubElement(data_d6, f'{{{self.ns_y}}}GenericNode')
         generic_node.set('configuration', 'com.yworks.bpmn.Artifact.withShadow')
         
-        # Geometry
+        # Geometry (matching reference: h=63.79, w=42.80)
         geometry = ET.SubElement(generic_node, f'{{{self.ns_y}}}Geometry')
-        geometry.set('height', '55.0')
-        geometry.set('width', '35.0')
+        geometry.set('height', '63.79')
+        geometry.set('width', '42.80')
         geometry.set('x', str(x))
         geometry.set('y', str(y))
-        
+
         # Fill
         fill = ET.SubElement(generic_node, f'{{{self.ns_y}}}Fill')
         fill.set('color', '#FFFFFFE6')
         fill.set('transparent', 'false')
-        
+
         # BorderStyle
         border = ET.SubElement(generic_node, f'{{{self.ns_y}}}BorderStyle')
         border.set('color', '#000000')
         border.set('type', 'line')
         border.set('width', '1.0')
-        
-        # NodeLabel
+
+        # NodeLabel (centered, small font — matching TempluMare reference)
         doc_name = getattr(node, 'name', 'Document')
         label = ET.SubElement(generic_node, f'{{{self.ns_y}}}NodeLabel')
+        label.set('alignment', 'center')
+        label.set('autoSizePolicy', 'content')
+        label.set('fontFamily', 'Dialog')
+        label.set('fontSize', '8')  # Small font for documents
+        label.set('fontStyle', 'plain')
+        label.set('hasBackgroundColor', 'false')
+        label.set('hasLineColor', 'false')
+        label.set('horizontalTextPosition', 'center')
+        label.set('iconTextGap', '4')
+        label.set('modelName', 'internal')
+        label.set('modelPosition', 'c')  # Centered in node
+        label.set('textColor', '#000000')
+        label.set('verticalTextPosition', 'bottom')
+        label.set('visible', 'true')
+        label.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
         label.text = doc_name
-        
+
         # StyleProperties
         style_props = ET.SubElement(generic_node, f'{{{self.ns_y}}}StyleProperties')
         

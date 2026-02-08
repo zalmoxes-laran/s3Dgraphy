@@ -161,14 +161,18 @@ class GraphMLExporter:
         print("Building ParadataNodeGroups...")
         paradata_groups = self._build_paradata_groups(stratigraphic_nodes)
 
+        internal_edge_total = 0
         for group_data in paradata_groups:
             us_node = group_data['us_node']
 
-            # Position PD group near its US node
-            us_x = positions.get(us_node.node_id, (800.0, 100.0))[0]
-            us_y = positions.get(us_node.node_id, (800.0, 100.0))[1]
-            pd_x = us_x + 20.0
-            pd_y = us_y + 60.0
+            # Get US node position — all PD internal nodes must stay within the same epoch
+            us_pos = positions.get(us_node.node_id, (800.0, 100.0))
+            us_x = us_pos[0]
+            us_y = us_pos[1]
+
+            # PD group container position (near its US node)
+            pd_x = us_x - 30.0
+            pd_y = us_y + 5.0
 
             # Generate group container INSIDE the swimlane
             group_xml = group_gen.generate_paradata_group(
@@ -182,30 +186,94 @@ class GraphMLExporter:
                 './/{http://graphml.graphdrawing.org/xmlns}graph'
             )
 
-            # Add property nodes inside group
-            y_offset = 50.0
-            for prop_node in group_data.get('property_nodes', []):
+            # --- Internal node positioning (ABSOLUTE coordinates within epoch) ---
+            # All internal nodes must have y-coordinates within the epoch row
+            # to prevent PD group from spanning across epoch boundaries.
+            #
+            # Layout: HORIZONTAL — property, extractor, document side by side
+            # All on same y-line, just below the US node.
+            # This keeps the PD group compact and within the epoch row.
+            #
+            # Node heights: property=30, extractor=25, document=63.79
+            # The tallest (document) must fit within the epoch row.
+            # US node is at us_y (centered in epoch row).
+            # Place all internal nodes at us_y (same baseline).
+
+            prop_nested_ids = []
+            ext_nested_ids = []
+            doc_nested_ids = []
+
+            # All internal nodes at the same y as US node.
+            # The tallest internal node is document (63.79px).
+            # Position so they don't extend beyond the US node's bottom edge.
+            # US node: height=60, so bottom at us_y+60.
+            # Place internal nodes at us_y, same as US (they're inside a
+            # closed-by-default PD group, so exact fit is not critical).
+            internal_y = us_y
+            x_cursor = us_x + 10.0  # Start offset from US node
+
+            # Property nodes
+            for i, prop_node in enumerate(group_data.get('property_nodes', [])):
                 prop_xml = node_gen.generate_property_node(
-                    prop_node, x=20.0, y=y_offset, parent_id=group_nested_id
+                    prop_node,
+                    x=x_cursor,
+                    y=internal_y,
+                    parent_id=group_nested_id
                 )
                 nested_graph.append(prop_xml)
-                y_offset += 50.0
+                prop_nested_id = self.id_manager.uuid_to_nested.get(prop_node.node_id)
+                if prop_nested_id:
+                    prop_nested_ids.append(prop_nested_id)
+                x_cursor += 90.0  # property width ~68 + gap
 
-            # Add extractor nodes
-            for ext_node in group_data.get('extractor_nodes', []):
+            # Extractor nodes
+            for i, ext_node in enumerate(group_data.get('extractor_nodes', [])):
                 ext_xml = node_gen.generate_extractor_node(
-                    ext_node, x=150.0, y=y_offset, parent_id=group_nested_id
+                    ext_node,
+                    x=x_cursor,
+                    y=internal_y,
+                    parent_id=group_nested_id
                 )
                 nested_graph.append(ext_xml)
-                y_offset += 40.0
+                ext_nested_id = self.id_manager.uuid_to_nested.get(ext_node.node_id)
+                if ext_nested_id:
+                    ext_nested_ids.append(ext_nested_id)
+                x_cursor += 40.0  # extractor width 25 + gap
 
-            # Add document nodes
-            for doc_node in group_data.get('document_nodes', []):
+            # Document nodes
+            doc_x_base = x_cursor
+            for i, doc_node in enumerate(group_data.get('document_nodes', [])):
                 doc_xml = node_gen.generate_document_node(
-                    doc_node, x=200.0, y=y_offset, parent_id=group_nested_id
+                    doc_node,
+                    x=doc_x_base + (i * 50.0),
+                    y=internal_y,
+                    parent_id=group_nested_id
                 )
                 nested_graph.append(doc_xml)
-                y_offset += 70.0
+                doc_nested_id = self.id_manager.uuid_to_nested.get(doc_node.node_id)
+                if doc_nested_id:
+                    doc_nested_ids.append(doc_nested_id)
+
+            # --- Internal edges: property → extractor → document (all dashed) ---
+            internal_edge_counter = 0
+
+            # property → extractor edges
+            for p_id in prop_nested_ids:
+                for e_id in ext_nested_ids:
+                    edge_id = f"{group_nested_id}::e{internal_edge_counter}"
+                    internal_edge_counter += 1
+                    edge_xml = self._create_internal_pd_edge(edge_id, p_id, e_id)
+                    nested_graph.append(edge_xml)
+
+            # extractor → document edges
+            for e_id in ext_nested_ids:
+                for d_id in doc_nested_ids:
+                    edge_id = f"{group_nested_id}::e{internal_edge_counter}"
+                    internal_edge_counter += 1
+                    edge_xml = self._create_internal_pd_edge(edge_id, e_id, d_id)
+                    nested_graph.append(edge_xml)
+
+            internal_edge_total += internal_edge_counter
 
         # 8. Generate US → ParadataNodeGroup dashed edges
         print("Generating US→ParadataNodeGroup edges...")
@@ -225,7 +293,8 @@ class GraphMLExporter:
         same_time_count = sum(1 for e in export_edges if e.edge_type == 'has_same_time')
         pd_count = sum(1 for e in export_edges if e.edge_type == 'has_paradata_nodegroup')
         print(f"Generating {len(export_edges)} edges ({is_after_count} is_after, "
-              f"{same_time_count} has_same_time, {pd_count} has_paradata_nodegroup)...")
+              f"{same_time_count} has_same_time, {pd_count} has_paradata_nodegroup, "
+              f"{internal_edge_total} internal PD edges)...")
 
         for edge in export_edges:
             edge_xml = edge_gen.generate_edge(
@@ -253,6 +322,7 @@ class GraphMLExporter:
         print(f"  - Same-time edges: {same_time_count}")
         print(f"  - US→PD edges: {pd_count}")
         print(f"  - Total edges exported: {len(export_edges)}")
+        print(f"  - Internal PD edges: {internal_edge_total}")
         print(f"  - ParadataGroups: {len(paradata_groups)}")
 
     def _create_simple_swimlane(self, swimlane_id: str) -> ET.Element:
@@ -292,6 +362,65 @@ class GraphMLExporter:
         graph.set('id', f'{swimlane_id}:')
 
         return node
+
+    def _create_internal_pd_edge(self, edge_id: str, source_id: str, target_id: str) -> ET.Element:
+        """
+        Create an internal dashed edge within a ParadataNodeGroup.
+
+        All internal PD edges are dashed, black, width 1.0, with standard arrow at target.
+        Matches TempluMare reference (e.g., property→extractor, extractor→document).
+
+        Args:
+            edge_id: Full nested edge ID (e.g., "n0::n51::e0")
+            source_id: Full nested source node ID (e.g., "n0::n51::n0")
+            target_id: Full nested target node ID (e.g., "n0::n51::n1")
+
+        Returns:
+            ET.Element: Edge XML element
+        """
+        ns_graphml = "http://graphml.graphdrawing.org/xmlns"
+        ns_y = "http://www.yworks.com/xml/graphml"
+        from .utils import generate_uuid
+
+        edge_elem = ET.Element(f'{{{ns_graphml}}}edge')
+        edge_elem.set('id', edge_id)
+        edge_elem.set('source', source_id)
+        edge_elem.set('target', target_id)
+
+        # EMID (d12 for edges — not d11 which is also for edges)
+        data_d12 = ET.SubElement(edge_elem, f'{{{ns_graphml}}}data')
+        data_d12.set('key', 'd12')
+        data_d12.text = generate_uuid()
+
+        # Edge graphics (d10)
+        data_d10 = ET.SubElement(edge_elem, f'{{{ns_graphml}}}data')
+        data_d10.set('key', 'd10')
+
+        polyline = ET.SubElement(data_d10, f'{{{ns_y}}}PolyLineEdge')
+
+        # Path
+        path = ET.SubElement(polyline, f'{{{ns_y}}}Path')
+        path.set('sx', '0.0')
+        path.set('sy', '0.0')
+        path.set('tx', '0.0')
+        path.set('ty', '0.0')
+
+        # LineStyle — DASHED, black, width 1.0
+        line_style = ET.SubElement(polyline, f'{{{ns_y}}}LineStyle')
+        line_style.set('color', '#000000')
+        line_style.set('type', 'dashed')
+        line_style.set('width', '1.0')
+
+        # Arrows — standard at target only
+        arrows = ET.SubElement(polyline, f'{{{ns_y}}}Arrows')
+        arrows.set('source', 'none')
+        arrows.set('target', 'standard')
+
+        # BendStyle
+        bend = ET.SubElement(polyline, f'{{{ns_y}}}BendStyle')
+        bend.set('smoothed', 'false')
+
+        return edge_elem
 
     def _build_paradata_groups(self, stratigraphic_nodes: List) -> List[Dict]:
         """
