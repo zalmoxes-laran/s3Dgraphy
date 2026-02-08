@@ -33,14 +33,16 @@ class GroupNodeGenerator:
         self.id_manager = id_manager
         self.ns_y = 'http://www.yworks.com/xml/graphml'
 
-    def generate_paradata_group(self, group_data: Dict, x: float = 800.0, y: float = 100.0) -> ET.Element:
+    def generate_paradata_group(self, group_data: Dict, x: float = 800.0, y: float = 100.0,
+                               parent_id: str = None) -> ET.Element:
         """
         Generate ProxyAutoBoundsNode for ParadataNodeGroup.
-        
+
         Args:
             group_data: Dict with 'us_node', 'property_nodes', 'extractor_nodes', 'document_nodes'
             x, y: Position coordinates
-            
+            parent_id: Parent nested ID (e.g., "n0" when inside swimlane)
+
         Returns:
             node XML element with nested graph
         """
@@ -48,10 +50,10 @@ class GroupNodeGenerator:
         property_nodes = group_data.get('property_nodes', [])
         extractor_nodes = group_data.get('extractor_nodes', [])
         document_nodes = group_data.get('document_nodes', [])
-        
+
         # Generate group UUID and nested ID
         group_uuid = generate_uuid()
-        group_nested_id = self.id_manager.get_nested_id(group_uuid)
+        group_nested_id = self.id_manager.get_nested_id(group_uuid, parent_id=parent_id)
         
         # Create node element
         node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
@@ -86,8 +88,9 @@ class GroupNodeGenerator:
         graph_elem.set('id', f'{group_nested_id}:')
         
         # Add nested nodes (will be populated by main exporter)
-        # Store group_nested_id in group_data for later use
+        # Store group identifiers in group_data for later use
         group_data['group_nested_id'] = group_nested_id
+        group_data['group_uuid'] = group_uuid
         
         return node_elem
 

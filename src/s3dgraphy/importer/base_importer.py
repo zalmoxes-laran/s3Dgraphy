@@ -244,7 +244,19 @@ class BaseImporter(ABC):
             description_column = self._get_description_column()
             description = str(row_data.get(description_column, '')) if description_column else ''
             
-            strat_type = self.mapping.get('stratigraphic_type', 'US')
+            # Determine node type from TYPE column if available
+            type_column = None
+            for col_name, col_config in self.mapping.get('column_mappings', {}).items():
+                if col_config.get('property_name') == 'usType':
+                    type_column = col_name
+                    break
+
+            strat_type = self.mapping.get('stratigraphic_type', 'US')  # default
+            if type_column and type_column in row_data:
+                excel_type = self._clean_value_for_ui(row_data[type_column])
+                if excel_type:
+                    strat_type = excel_type
+
             node_class = get_stratigraphic_node_class(strat_type)
             
             import uuid
@@ -308,28 +320,76 @@ class BaseImporter(ABC):
         return strat_node
 
     def _process_properties(self, row_data: Dict[str, Any], node_id: str, strat_node: Node):
-        """Process properties based on mapping configuration."""
-        
+        """Process properties based on mapping configuration.
+
+        Skips columns that are handled elsewhere:
+        - Relationship columns (OVERLIES, CUTS, etc.) → handled by _process_stratigraphic_relations()
+        - Epoch columns (PERIOD, PHASE, SUBPHASE) → handled by _process_epochs()
+        - Epoch companion columns (PERIOD_START, PERIOD_END, etc.) → consumed by _process_epochs()
+        - Attribute columns (EXTRACTOR, DOCUMENT) → stored as node attributes for ParadataNodeGroup
+        """
+
         # 🔄 Supporta sia nuovo che vecchio formato, ma in modo semplice
         if 'column_mappings' in self.mapping:
             # Formato nuovo: tutte le colonne che non sono speciali diventano proprietà
             id_column = self._get_id_column()
             description_column = self._get_description_column()
-            
+
+            # Build skip set: columns handled elsewhere
+            skip_columns = set()
+
+            # 1. Relationship columns (handled in _process_stratigraphic_relations)
+            STRATIGRAPHIC_EDGE_TYPES = {
+                'overlies', 'is_overlain_by', 'cuts', 'is_cut_by',
+                'fills', 'is_filled_by', 'abuts', 'is_abutted_by',
+                'is_bonded_to', 'is_physically_equal_to'
+            }
+            for rel in self.mapping.get('relations', []):
+                if rel.get('edge_type') in STRATIGRAPHIC_EDGE_TYPES:
+                    skip_columns.add(rel['target_column'])
+
+            # 2. Epoch columns and their START/END companions (handled in _process_epochs)
+            epoch_base_columns = set()
             for col_name, col_config in self.mapping.get('column_mappings', {}).items():
-                # Skip colonne speciali
+                if col_config.get('node_type') == 'EpochNode':
+                    skip_columns.add(col_name)
+                    epoch_base_columns.add(col_name)
+            # Skip epoch START/END companion columns
+            for col_name, col_config in self.mapping.get('column_mappings', {}).items():
+                prop_name = col_config.get('property_name', '')
+                if prop_name.endswith(('Start', 'End')):
+                    base = col_name.rsplit('_', 1)[0] if '_' in col_name else col_name
+                    if base in epoch_base_columns:
+                        skip_columns.add(col_name)
+
+            for col_name, col_config in self.mapping.get('column_mappings', {}).items():
+                # Skip ID and description columns
                 if col_name in [id_column, description_column]:
                     continue
                 if col_config.get('is_id', False) or col_config.get('is_description', False):
                     continue
-                
+                # Skip columns handled elsewhere (relations, epochs)
+                if col_name in skip_columns:
+                    continue
+
+                # 3. Attribute columns → store as node attribute, not PropertyNode
+                #    (EXTRACTOR, DOCUMENT → consumed by GraphMLExporter for ParadataNodeGroup)
+                if col_config.get('is_attribute', False):
+                    if col_name in row_data and not self._is_invalid_id(row_data[col_name]):
+                        prop_name = col_config.get('property_name', col_name)
+                        value = self._clean_value_for_ui(row_data[col_name])
+                        if value:
+                            setattr(strat_node, prop_name, value)
+                    continue
+
+                # 4. Regular property columns → PropertyNode (e.g., DESCRIPTION via display_name)
                 if col_name in row_data:
                     prop_value = row_data[col_name]
                     if not self._is_invalid_id(prop_value):
                         # Usa display_name se disponibile
                         prop_name = col_config.get('display_name', col_name)
                         self._create_property(node_id, prop_name, prop_value)
-        
+
         elif 'property_columns' in self.mapping:
             # Formato legacy
             prop_columns = self.mapping.get('property_columns', {})
@@ -433,8 +493,168 @@ class BaseImporter(ABC):
         Used when working with existing graphs (node matching by name instead of ID).
         """
         for node in self.graph.nodes:
-            # Check both current name and original_name attribute  
+            # Check both current name and original_name attribute
             original_name = getattr(node, 'attributes', {}).get('original_name')
             if node.name == target_name or original_name == target_name:
                 return node
         return None
+
+    def _process_stratigraphic_relations(self):
+        """Second pass: create topological Edge objects from relationship columns.
+
+        These edges are INTERMEDIATE data: they are NOT exported directly to GraphML.
+        Instead, the GraphMLExporter uses TemporalInferenceEngine to derive
+        minimal 'is_after' temporal edges from these topological relationships.
+
+        Called after all nodes are created (two-pass approach), so target nodes exist.
+        Uses the 'relations' array from the mapping JSON to identify
+        which columns contain stratigraphic relationships and their edge types.
+        """
+        if not self.mapping:
+            return
+
+        relations = self.mapping.get('relations', [])
+        if not relations:
+            return
+
+        if not hasattr(self, '_stored_rows') or not self._stored_rows:
+            return
+
+        # Build lookup: relationship columns → edge_type (only stratigraphic)
+        STRATIGRAPHIC_EDGE_TYPES = {
+            'overlies', 'is_overlain_by', 'cuts', 'is_cut_by',
+            'fills', 'is_filled_by', 'abuts', 'is_abutted_by',
+            'is_bonded_to', 'is_physically_equal_to'
+        }
+        rel_columns = {}
+        for rel in relations:
+            if rel.get('edge_type') in STRATIGRAPHIC_EDGE_TYPES:
+                rel_columns[rel['target_column']] = rel['edge_type']
+
+        if not rel_columns:
+            return
+
+        edges_created = 0
+        for row_data in self._stored_rows:
+            source_name = self._clean_value_for_ui(row_data.get(self._get_id_column(), ''))
+            source_node = self._find_node_by_name(source_name)
+            if not source_node:
+                continue
+
+            for col_name, edge_type in rel_columns.items():
+                if col_name not in row_data or self._is_invalid_id(row_data[col_name]):
+                    continue
+
+                target_ids_str = str(row_data[col_name])
+                for target_id in target_ids_str.split(','):
+                    target_id = target_id.strip()
+                    if not target_id:
+                        continue
+
+                    target_node = self._find_node_by_name(target_id)
+                    if target_node:
+                        edge_id = f"{source_node.node_id}_{edge_type}_{target_node.node_id}"
+                        if not self.graph.find_edge_by_id(edge_id):
+                            try:
+                                self.graph.add_edge(edge_id, source_node.node_id,
+                                                  target_node.node_id, edge_type)
+                                edges_created += 1
+                            except ValueError as e:
+                                self.warnings.append(f"Edge warning: {e}")
+                    else:
+                        self.warnings.append(
+                            f"Relation {edge_type}: target '{target_id}' not found for source '{source_name}'"
+                        )
+
+        logger.info(f"Stratigraphic relations: {edges_created} topological edges created")
+
+    def _process_epochs(self):
+        """Second pass: create EpochNode objects from PERIOD/PHASE/SUBPHASE columns.
+
+        Identifies columns with node_type: "EpochNode" in the mapping,
+        creates unique EpochNode instances (deduplicated by name+start+end),
+        and links them to stratigraphic nodes via 'has_first_epoch' edges.
+
+        Called after all stratigraphic nodes are created (two-pass approach).
+        """
+        if not self.mapping:
+            return
+
+        if not hasattr(self, '_stored_rows') or not self._stored_rows:
+            return
+
+        # Identify epoch columns from mapping
+        epoch_columns = []
+        for col_name, col_config in self.mapping.get('column_mappings', {}).items():
+            if col_config.get('node_type') == 'EpochNode':
+                epoch_columns.append(col_name)
+
+        if not epoch_columns:
+            return
+
+        # Map epoch name columns to their START/END siblings
+        epoch_config = {}
+        for col in epoch_columns:
+            start_col = f"{col}_START"
+            end_col = f"{col}_END"
+            epoch_config[col] = {'start': start_col, 'end': end_col}
+
+        # Track created epochs to avoid duplicates
+        created_epochs = {}  # key: "col_name_start_end" → EpochNode
+
+        import uuid as uuid_mod
+        from ..nodes.epoch_node import EpochNode as EpochNodeClass
+
+        epochs_created = 0
+        epoch_edges_created = 0
+
+        for row_data in self._stored_rows:
+            source_name = self._clean_value_for_ui(row_data.get(self._get_id_column(), ''))
+            source_node = self._find_node_by_name(source_name)
+            if not source_node:
+                continue
+
+            for epoch_col, config in epoch_config.items():
+                if epoch_col not in row_data or self._is_invalid_id(row_data[epoch_col]):
+                    continue
+
+                epoch_name = self._clean_value_for_ui(row_data[epoch_col])
+                if not epoch_name:
+                    continue
+
+                start_time = row_data.get(config['start'], None)
+                end_time = row_data.get(config['end'], None)
+
+                # Clean numeric values
+                if self._is_invalid_id(start_time):
+                    start_time = None
+                if self._is_invalid_id(end_time):
+                    end_time = None
+
+                # Dedup key includes column name (PERIOD vs PHASE can have same name)
+                epoch_key = f"{epoch_col}_{epoch_name}_{start_time}_{end_time}"
+
+                if epoch_key not in created_epochs:
+                    epoch_node = EpochNodeClass(
+                        node_id=str(uuid_mod.uuid4()),
+                        name=epoch_name,
+                        start_time=float(start_time) if start_time is not None else None,
+                        end_time=float(end_time) if end_time is not None else None,
+                        description=f"{epoch_col}: {epoch_name}"
+                    )
+                    self.graph.add_node(epoch_node)
+                    created_epochs[epoch_key] = epoch_node
+                    epochs_created += 1
+
+                # Link stratigraphic node to epoch via has_first_epoch
+                epoch_node = created_epochs[epoch_key]
+                edge_id = f"{source_node.node_id}_has_first_epoch_{epoch_node.node_id}"
+                if not self.graph.find_edge_by_id(edge_id):
+                    try:
+                        self.graph.add_edge(edge_id, source_node.node_id,
+                                          epoch_node.node_id, 'has_first_epoch')
+                        epoch_edges_created += 1
+                    except ValueError as e:
+                        self.warnings.append(f"Epoch edge warning: {e}")
+
+        logger.info(f"Epochs: {epochs_created} EpochNode created, {epoch_edges_created} has_first_epoch edges")

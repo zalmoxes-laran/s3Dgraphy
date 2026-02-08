@@ -238,6 +238,10 @@ class MappedXLSXImporter(BaseImporter):
             skipped_rows = 0
             error_rows = 0
 
+            # ✅ TWO-PASS: Initialize stored rows for second pass
+            # (stratigraphic relations and epochs are created after all nodes exist)
+            self._stored_rows = []
+
             # ✅ PERFORMANCE: Batch processing with itertuples (5-10x faster than iterrows)
             # iterrows() is slow because it returns Series objects with overhead
             # itertuples() returns named tuples which are much faster
@@ -261,11 +265,13 @@ class MappedXLSXImporter(BaseImporter):
                         skipped_rows += 1
                         continue
 
-                    # Process the row
+                    # Process the row (first pass: creates nodes + PropertyNodes)
                     result_node = self.process_row(row_dict)
 
                     if result_node is not None:
                         successful_rows += 1
+                        # Store row data for second pass (relations + epochs)
+                        self._stored_rows.append(row_dict.copy())
                     else:
                         skipped_rows += 1
 
@@ -275,6 +281,12 @@ class MappedXLSXImporter(BaseImporter):
                     self.warnings.append(error_msg)
                     if error_rows <= 3:  # Only print first 3 errors
                         print(f"  ❌ {error_msg}")
+
+            # ✅ TWO-PASS: Second pass — create topological edges and EpochNodes
+            # (requires all stratigraphic nodes to exist first)
+            print(f"Second pass: creating topological edges and epochs...")
+            self._process_stratigraphic_relations()
+            self._process_epochs()
 
             # Add to warnings for UI
             self.warnings.append(f"\nImport summary:")

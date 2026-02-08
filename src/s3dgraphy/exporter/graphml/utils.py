@@ -70,14 +70,20 @@ class IDManager:
         """
         return self.nested_to_uuid.get(nested_id)
 
-    def get_edge_id(self) -> str:
+    def get_edge_id(self, prefix: str = None) -> str:
         """
         Generate unique edge ID.
 
+        Args:
+            prefix: Optional prefix for nested edges (e.g., "n0" → "n0::e0")
+
         Returns:
-            Edge ID in format: e0, e1, e2, etc.
+            Edge ID in format: e0, e1, e2, etc. (or n0::e0, n0::e1 with prefix)
         """
-        edge_id = f"e{self.edge_counter}"
+        if prefix:
+            edge_id = f"{prefix}::e{self.edge_counter}"
+        else:
+            edge_id = f"e{self.edge_counter}"
         self.edge_counter += 1
         return edge_id
 
@@ -88,6 +94,20 @@ class IDManager:
         self.nested_counter = 0
         self.group_counters.clear()
         self.edge_counter = 0
+
+
+def qname(namespace: str, tag: str) -> str:
+    """
+    Create a qualified XML name with namespace.
+
+    Args:
+        namespace: XML namespace URI
+        tag: Element tag name
+
+    Returns:
+        Qualified name in format: {namespace}tag
+    """
+    return f"{{{namespace}}}{tag}"
 
 
 def generate_uuid() -> str:
