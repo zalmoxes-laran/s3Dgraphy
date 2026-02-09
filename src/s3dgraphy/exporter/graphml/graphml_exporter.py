@@ -13,7 +13,7 @@ from .node_registry import NodeRegistry
 from .node_generator import NodeGenerator
 from .group_node_generator import GroupNodeGenerator
 from .edge_generator import EdgeGenerator
-from .utils import IDManager
+from .utils import IDManager, generate_uuid
 
 
 class GraphMLExporter:
@@ -87,8 +87,16 @@ class GraphMLExporter:
             'is_bonded_to', 'is_physically_equal_to'
         }
 
-        # Filter out topological edges, keep non-topological ones (has_property, has_first_epoch, etc.)
-        export_edges = [e for e in self.graph.edges if e.edge_type not in TOPOLOGICAL_EDGE_TYPES]
+        # Paradata internal edges — handled by ParadataNodeGroup structure,
+        # must NOT appear as top-level edges in the swimlane graph
+        PARADATA_EDGE_TYPES = {
+            'has_property', 'has_data_provenance', 'extracted_from', 'combines'
+        }
+
+        # Filter out topological AND paradata-internal edges
+        export_edges = [e for e in self.graph.edges
+                        if e.edge_type not in TOPOLOGICAL_EDGE_TYPES
+                        and e.edge_type not in PARADATA_EDGE_TYPES]
 
         # Add minimal temporal edges as is_after
         for source_id, target_id in minimal_edges:
@@ -206,11 +214,6 @@ class GraphMLExporter:
             # US node is at us_y (centered in epoch row).
             # Place all internal nodes at us_y (same baseline).
 
-            prop_nested_ids = []
-            ext_nested_ids = []
-            doc_nested_ids = []
-            comb_nested_ids = []
-
             # All internal nodes at the same y as US node.
             # The tallest internal node is document (63.79px).
             # Position so they don't extend beyond the US node's bottom edge.
@@ -221,7 +224,7 @@ class GraphMLExporter:
             x_cursor = us_x + 10.0  # Start offset from US node
 
             # Property nodes
-            for i, prop_node in enumerate(group_data.get('property_nodes', [])):
+            for prop_node in group_data.get('property_nodes', []):
                 prop_xml = node_gen.generate_property_node(
                     prop_node,
                     x=x_cursor,
@@ -229,14 +232,11 @@ class GraphMLExporter:
                     parent_id=group_nested_id
                 )
                 nested_graph.append(prop_xml)
-                prop_nested_id = self.id_manager.uuid_to_nested.get(prop_node.node_id)
-                if prop_nested_id:
-                    prop_nested_ids.append(prop_nested_id)
                 x_cursor += 90.0  # property width ~68 + gap
 
             # Combiner nodes (between property and extractor)
             # generate_extractor_node already handles C.XX naming → refid='2'
-            for i, comb_node in enumerate(group_data.get('combiner_nodes', [])):
+            for comb_node in group_data.get('combiner_nodes', []):
                 comb_xml = node_gen.generate_extractor_node(
                     comb_node,
                     x=x_cursor,
@@ -244,13 +244,10 @@ class GraphMLExporter:
                     parent_id=group_nested_id
                 )
                 nested_graph.append(comb_xml)
-                comb_nested_id = self.id_manager.uuid_to_nested.get(comb_node.node_id)
-                if comb_nested_id:
-                    comb_nested_ids.append(comb_nested_id)
                 x_cursor += 40.0  # combiner width 25 + gap
 
             # Extractor nodes
-            for i, ext_node in enumerate(group_data.get('extractor_nodes', [])):
+            for ext_node in group_data.get('extractor_nodes', []):
                 ext_xml = node_gen.generate_extractor_node(
                     ext_node,
                     x=x_cursor,
@@ -258,12 +255,9 @@ class GraphMLExporter:
                     parent_id=group_nested_id
                 )
                 nested_graph.append(ext_xml)
-                ext_nested_id = self.id_manager.uuid_to_nested.get(ext_node.node_id)
-                if ext_nested_id:
-                    ext_nested_ids.append(ext_nested_id)
                 x_cursor += 40.0  # extractor width 25 + gap
 
-            # Document nodes
+            # Document nodes (per-group copies)
             doc_x_base = x_cursor
             for i, doc_node in enumerate(group_data.get('document_nodes', [])):
                 doc_xml = node_gen.generate_document_node(
@@ -273,56 +267,64 @@ class GraphMLExporter:
                     parent_id=group_nested_id
                 )
                 nested_graph.append(doc_xml)
-                doc_nested_id = self.id_manager.uuid_to_nested.get(doc_node.node_id)
-                if doc_nested_id:
-                    doc_nested_ids.append(doc_nested_id)
 
-            # --- Internal edges (all dashed) ---
-            # Two modes:
-            # 1. With combiners: property → combiner → extractor → document
-            # 2. Without combiners (legacy): property → extractor → document
+            # --- Internal edges using chain associations (all dashed) ---
+            # Each chain records: property → [combiner →] extractor → document
+            # Only the exact associations from the in-memory graph are connected.
             internal_edge_counter = 0
 
-            if comb_nested_ids:
-                # COMBINER MODE: property → combiner → extractor → document
-                # property → combiner
-                for p_id in prop_nested_ids:
-                    for c_id in comb_nested_ids:
-                        edge_id = f"{group_nested_id}::e{internal_edge_counter}"
-                        internal_edge_counter += 1
-                        edge_xml = self._create_internal_pd_edge(edge_id, p_id, c_id)
-                        nested_graph.append(edge_xml)
+            for chain in group_data.get('chains', []):
+                prop_nid = self.id_manager.uuid_to_nested.get(
+                    chain['property'].node_id)
+                if not prop_nid:
+                    continue
 
-                # combiner → extractor
-                for c_id in comb_nested_ids:
-                    for e_id in ext_nested_ids:
+                if chain.get('combiner'):
+                    comb_nid = self.id_manager.uuid_to_nested.get(
+                        chain['combiner'].node_id)
+                    if comb_nid:
+                        # Edge: property → combiner
                         edge_id = f"{group_nested_id}::e{internal_edge_counter}"
                         internal_edge_counter += 1
-                        edge_xml = self._create_internal_pd_edge(edge_id, c_id, e_id)
-                        nested_graph.append(edge_xml)
+                        nested_graph.append(
+                            self._create_internal_pd_edge(edge_id, prop_nid, comb_nid))
 
-                # extractor → document
-                for e_id in ext_nested_ids:
-                    for d_id in doc_nested_ids:
-                        edge_id = f"{group_nested_id}::e{internal_edge_counter}"
-                        internal_edge_counter += 1
-                        edge_xml = self._create_internal_pd_edge(edge_id, e_id, d_id)
-                        nested_graph.append(edge_xml)
-            else:
-                # SIMPLE MODE: property → extractor → document
-                for p_id in prop_nested_ids:
-                    for e_id in ext_nested_ids:
-                        edge_id = f"{group_nested_id}::e{internal_edge_counter}"
-                        internal_edge_counter += 1
-                        edge_xml = self._create_internal_pd_edge(edge_id, p_id, e_id)
-                        nested_graph.append(edge_xml)
-
-                for e_id in ext_nested_ids:
-                    for d_id in doc_nested_ids:
-                        edge_id = f"{group_nested_id}::e{internal_edge_counter}"
-                        internal_edge_counter += 1
-                        edge_xml = self._create_internal_pd_edge(edge_id, e_id, d_id)
-                        nested_graph.append(edge_xml)
+                        for ext_info in chain.get('extractors', []):
+                            ext_nid = self.id_manager.uuid_to_nested.get(
+                                ext_info['extractor'].node_id)
+                            doc_nid = self.id_manager.uuid_to_nested.get(
+                                ext_info['document'].node_id) if ext_info.get('document') else None
+                            if ext_nid:
+                                # Edge: combiner → extractor
+                                edge_id = f"{group_nested_id}::e{internal_edge_counter}"
+                                internal_edge_counter += 1
+                                nested_graph.append(
+                                    self._create_internal_pd_edge(edge_id, comb_nid, ext_nid))
+                            if ext_nid and doc_nid:
+                                # Edge: extractor → document
+                                edge_id = f"{group_nested_id}::e{internal_edge_counter}"
+                                internal_edge_counter += 1
+                                nested_graph.append(
+                                    self._create_internal_pd_edge(edge_id, ext_nid, doc_nid))
+                else:
+                    # Simple chain: property → extractor → document
+                    for ext_info in chain.get('extractors', []):
+                        ext_nid = self.id_manager.uuid_to_nested.get(
+                            ext_info['extractor'].node_id)
+                        doc_nid = self.id_manager.uuid_to_nested.get(
+                            ext_info['document'].node_id) if ext_info.get('document') else None
+                        if ext_nid:
+                            # Edge: property → extractor
+                            edge_id = f"{group_nested_id}::e{internal_edge_counter}"
+                            internal_edge_counter += 1
+                            nested_graph.append(
+                                self._create_internal_pd_edge(edge_id, prop_nid, ext_nid))
+                        if ext_nid and doc_nid:
+                            # Edge: extractor → document
+                            edge_id = f"{group_nested_id}::e{internal_edge_counter}"
+                            internal_edge_counter += 1
+                            nested_graph.append(
+                                self._create_internal_pd_edge(edge_id, ext_nid, doc_nid))
 
             internal_edge_total += internal_edge_counter
 
@@ -484,15 +486,15 @@ class GraphMLExporter:
         2. LEGACY PATH: If no qualia PropertyNodes found, use extractor/document attributes
            on the StratigraphicNode to create a single "stratigraphic_definition" property.
 
-        Naming convention (legacy path):
-        - Documents: D.01, D.02, D.03 (global serial, reusable)
-        - Extractors: D.01.01 (extractor #01 from document D.01)
+        Returns group_data dicts that include a 'chains' list preserving exact
+        provenance associations (which property → which extractor → which document).
+        Document nodes are created per-group to avoid sharing across PD groups in GraphML.
 
         Args:
             stratigraphic_nodes: List of StratigraphicNode instances
 
         Returns:
-            List of dicts with group data (including 'combiner_nodes' key)
+            List of dicts with group data including 'chains' for edge generation
         """
         groups = []
 
@@ -527,22 +529,33 @@ class GraphMLExporter:
 
             if paradata_props:
                 # QUALIA PATH: traverse graph for full provenance chain
+                # Build CHAINS that preserve exact associations
                 property_nodes = list(paradata_props)
                 extractor_nodes = []
-                document_nodes = []
                 combiner_nodes = []
+                chains = []
 
-                # Track unique nodes (avoid duplicates across properties)
+                # Per-group document copies: original_doc_id → local DocumentNode
+                # Within a single PD group, multiple extractors can share a document
+                local_doc_copies = {}
+
+                # Track unique extractors/combiners within this group
                 seen_extractors = set()
-                seen_documents = set()
                 seen_combiners = set()
 
                 for prop in paradata_props:
+                    chain = {
+                        'property': prop,
+                        'combiner': None,
+                        'extractors': []
+                    }
+
                     # Check if property has combiner (multi-source)
                     combiners = self.graph.get_combiner_nodes_for_property(prop.node_id)
 
                     if combiners:
                         for comb in combiners:
+                            chain['combiner'] = comb
                             if comb.node_id not in seen_combiners:
                                 seen_combiners.add(comb.node_id)
                                 combiner_nodes.append(comb)
@@ -557,9 +570,18 @@ class GraphMLExporter:
                                 # Get documents connected to extractor
                                 docs = self.graph.get_document_nodes_for_extractor(ext.node_id)
                                 for doc in docs:
-                                    if doc.node_id not in seen_documents:
-                                        seen_documents.add(doc.node_id)
-                                        document_nodes.append(doc)
+                                    # Create per-group copy of document node
+                                    if doc.node_id not in local_doc_copies:
+                                        local_doc = DocumentNode(
+                                            node_id=generate_uuid(),
+                                            name=doc.name,
+                                            description=doc.description
+                                        )
+                                        local_doc_copies[doc.node_id] = local_doc
+                                    chain['extractors'].append({
+                                        'extractor': ext,
+                                        'document': local_doc_copies[doc.node_id]
+                                    })
                     else:
                         # Simple chain: property → extractor → document
                         exts = self.graph.get_extractor_nodes_for_node(prop.node_id)
@@ -570,16 +592,31 @@ class GraphMLExporter:
 
                             docs = self.graph.get_document_nodes_for_extractor(ext.node_id)
                             for doc in docs:
-                                if doc.node_id not in seen_documents:
-                                    seen_documents.add(doc.node_id)
-                                    document_nodes.append(doc)
+                                # Create per-group copy of document node
+                                if doc.node_id not in local_doc_copies:
+                                    local_doc = DocumentNode(
+                                        node_id=generate_uuid(),
+                                        name=doc.name,
+                                        description=doc.description
+                                    )
+                                    local_doc_copies[doc.node_id] = local_doc
+                                chain['extractors'].append({
+                                    'extractor': ext,
+                                    'document': local_doc_copies[doc.node_id]
+                                })
+
+                    chains.append(chain)
+
+                # Collect all unique local document copies for node generation
+                document_nodes = list(local_doc_copies.values())
 
                 group_data = {
                     'us_node': us_node,
                     'property_nodes': property_nodes,
                     'extractor_nodes': extractor_nodes,
                     'document_nodes': document_nodes,
-                    'combiner_nodes': combiner_nodes
+                    'combiner_nodes': combiner_nodes,
+                    'chains': chains
                 }
                 groups.append(group_data)
 
@@ -619,6 +656,7 @@ class GraphMLExporter:
                     document_nodes = []
 
                     # Create ExtractorNode with serial name
+                    ext_node = None
                     if extractor:
                         ext_node = ExtractorNode(
                             node_id=f"{us_node.node_id}_ext",
@@ -628,6 +666,7 @@ class GraphMLExporter:
                         extractor_nodes.append(ext_node)
 
                     # Create DocumentNode with serial name
+                    doc_node = None
                     if document:
                         doc_node = DocumentNode(
                             node_id=f"{us_node.node_id}_doc_{doc_name}",
@@ -636,12 +675,25 @@ class GraphMLExporter:
                         )
                         document_nodes.append(doc_node)
 
+                    # Build legacy chain
+                    legacy_chain = {
+                        'property': property_node,
+                        'combiner': None,
+                        'extractors': []
+                    }
+                    if ext_node:
+                        legacy_chain['extractors'].append({
+                            'extractor': ext_node,
+                            'document': doc_node
+                        })
+
                     group_data = {
                         'us_node': us_node,
                         'property_nodes': property_nodes,
                         'extractor_nodes': extractor_nodes,
                         'document_nodes': document_nodes,
-                        'combiner_nodes': []
+                        'combiner_nodes': [],
+                        'chains': [legacy_chain]
                     }
 
                     groups.append(group_data)

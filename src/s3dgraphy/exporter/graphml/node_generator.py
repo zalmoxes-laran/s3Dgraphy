@@ -149,19 +149,26 @@ class NodeGenerator:
         
         node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
         node_elem.set('id', nested_id)
-        
+
+        # Add description (d5) — property value
+        description = getattr(node, 'description', '')
+        if description:
+            data_d5 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+            data_d5.set('key', 'd5')
+            data_d5.text = str(description)
+
         # Add EMID (d7)
         data_d7 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
         data_d7.set('key', 'd7')
         data_d7.text = node_uuid
-        
+
         # Add nodegraphics (d6) - GenericNode BPMN
         data_d6 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
         data_d6.set('key', 'd6')
-        
+
         generic_node = ET.SubElement(data_d6, f'{{{self.ns_y}}}GenericNode')
         generic_node.set('configuration', 'com.yworks.bpmn.Artifact.withShadow')
-        
+
         # Geometry
         property_name = getattr(node, 'name', 'property')
         width = calculate_node_width(property_name, base_width=62.75, char_width=6.0)
@@ -260,16 +267,23 @@ class NodeGenerator:
         
         node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
         node_elem.set('id', nested_id)
-        
+
+        # Add description (d5) — extracted text or combiner reasoning
+        description = getattr(node, 'description', '')
+        if description:
+            data_d5 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+            data_d5.set('key', 'd5')
+            data_d5.text = str(description)
+
         # Add EMID (d7)
         data_d7 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
         data_d7.set('key', 'd7')
         data_d7.text = node_uuid
-        
+
         # Add nodegraphics (d6) - SVGNode
         data_d6 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
         data_d6.set('key', 'd6')
-        
+
         svg_node = ET.SubElement(data_d6, f'{{{self.ns_y}}}SVGNode')
         
         # Geometry
@@ -341,19 +355,26 @@ class NodeGenerator:
         
         node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
         node_elem.set('id', nested_id)
-        
+
+        # Add description (d5) — source document filename
+        description = getattr(node, 'description', '')
+        if description:
+            data_d5 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+            data_d5.set('key', 'd5')
+            data_d5.text = str(description)
+
         # Add EMID (d7)
         data_d7 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
         data_d7.set('key', 'd7')
         data_d7.text = node_uuid
-        
+
         # Add nodegraphics (d6) - GenericNode BPMN Data Object
         data_d6 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
         data_d6.set('key', 'd6')
-        
+
         generic_node = ET.SubElement(data_d6, f'{{{self.ns_y}}}GenericNode')
         generic_node.set('configuration', 'com.yworks.bpmn.Artifact.withShadow')
-        
+
         # Geometry (matching reference: h=63.79, w=42.80)
         geometry = ET.SubElement(generic_node, f'{{{self.ns_y}}}Geometry')
         geometry.set('height', '63.79')
