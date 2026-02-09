@@ -642,6 +642,7 @@ class BaseImporter(ABC):
                         end_time=float(end_time) if end_time is not None else None,
                         description=f"{epoch_col}: {epoch_name}"
                     )
+                    epoch_node.epoch_level = epoch_col.lower()  # "period", "phase", "subphase"
                     self.graph.add_node(epoch_node)
                     created_epochs[epoch_key] = epoch_node
                     epochs_created += 1

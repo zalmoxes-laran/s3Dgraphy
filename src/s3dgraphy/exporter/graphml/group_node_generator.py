@@ -76,11 +76,11 @@ class GroupNodeGenerator:
         
         # Realizer 0: Open state
         self._add_group_realizer(realizers, us_node, x, y, closed=False,
-                                width=376.0, height=250.0)
-        
-        # Realizer 1: Closed state
-        self._add_group_realizer(realizers, us_node, x + 100, y + 50, closed=True,
-                                width=118.0, height=87.0)
+                                width=376.0, height=120.0)
+
+        # Realizer 1: Closed state (same position as open, compact height)
+        self._add_group_realizer(realizers, us_node, x, y, closed=True,
+                                width=118.0, height=30.0)
         
         # Create nested graph for group content
         graph_elem = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}graph')

@@ -25,6 +25,7 @@
         "DESCRIPTION": {
             "node_type": "PropertyNode",
             "property_name": "description",
+            "is_description": true,
             "display_name": "Description",
             "description": "Detailed textual description of the stratigraphic unit."
         },
@@ -152,14 +153,14 @@
             "property_name": "extractor",
             "is_attribute": true,
             "display_name": "Extractor",
-            "description": "Who/what extracted this data (e.g., GPT-4, Claude, Manual). STORED AS ATTRIBUTE on StratigraphicNode, NOT as separate node in s3dgraphy Graph. During GraphML export, GraphMLExporter reads this attribute and creates: ParadataNodeGroup → PropertyNode(stratigraphic_definition) → ExtractorNode (paradata family, SVG icon). This is the correct workflow: Excel column → s3dgraphy attribute → Extended Matrix paradata structure."
+            "description": "Actor/agent identity for the stratigraphic definition extraction (e.g., GPT-4, Claude, Manual). NOTE: In Extended Matrix semantics, 'extractor' means a specific text passage or observation extracted from a document. This column stores the actor identity for the stratigraphic_definition property. Per-property extractors with proper EM semantics will be supported via the qualia properties file. STORED AS ATTRIBUTE on StratigraphicNode."
         },
         "DOCUMENT": {
             "node_type": "StratigraphicNode",
             "property_name": "document",
             "is_attribute": true,
             "display_name": "Source Document",
-            "description": "Source document reference (e.g., Report_2023.pdf, Field_notes_Day5.pdf). STORED AS ATTRIBUTE on StratigraphicNode, NOT as separate node in s3dgraphy Graph. During GraphML export, GraphMLExporter reads this attribute and creates: ParadataNodeGroup → PropertyNode(stratigraphic_definition) → DocumentNode (paradata family, BPMN Data Object icon). This is the correct workflow: Excel column → s3dgraphy attribute → Extended Matrix paradata structure."
+            "description": "Source document for the stratigraphic definition (e.g., Report_2023.pdf, Field_notes_Day5.pdf). Should be a specific file reference, not a generic description. Per-property documents will be supported via the qualia properties file. STORED AS ATTRIBUTE on StratigraphicNode."
         }
     },
 

@@ -107,7 +107,12 @@ class GraphMLExporter:
                 export_edges.append(same_time_edge)
 
         # 4. Get epoch nodes and calculate positions
-        epoch_nodes = [n for n in self.graph.nodes if isinstance(n, EpochNode)]
+        # Filter to PHASE-level epochs only for swimlane rows
+        all_epoch_nodes = [n for n in self.graph.nodes if isinstance(n, EpochNode)]
+        epoch_nodes = [n for n in all_epoch_nodes
+                       if getattr(n, 'epoch_level', '').lower() == 'phase']
+        if not epoch_nodes:
+            epoch_nodes = all_epoch_nodes  # fallback: use all if no PHASE epochs
         strat_nodes = [n for n in self.graph.nodes if isinstance(n, StratigraphicNode)]
 
         positions = {}
