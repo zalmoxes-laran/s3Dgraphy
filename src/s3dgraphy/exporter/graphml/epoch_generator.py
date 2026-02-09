@@ -380,6 +380,7 @@ class EpochSwimlanesGenerator:
         nodes: List,
         epoch_nodes: List[EpochNode],
         temporal_edges: List[Tuple[str, str]],
+        graph=None,
         row_height: float = 150.0,
         start_x: float = 100.0,
         spacing_x: float = 150.0
@@ -417,8 +418,8 @@ class EpochSwimlanesGenerator:
         G = nx.DiGraph()
         G.add_edges_from(temporal_edges)
 
-        # Assign nodes to epochs
-        epoch_assignments = self._assign_nodes_to_epochs(nodes, sorted_epochs)
+        # Assign nodes to epochs using graph edges (has_first_epoch)
+        epoch_assignments = self._assign_nodes_to_epochs(nodes, sorted_epochs, graph)
 
         # Position nodes within each epoch
         current_epoch_y = 50.0  # Start after header
@@ -453,16 +454,20 @@ class EpochSwimlanesGenerator:
     def _assign_nodes_to_epochs(
         self,
         nodes: List,
-        epochs: List[EpochNode]
+        epochs: List[EpochNode],
+        graph=None
     ) -> Dict[str, List]:
         """
         Assign stratigraphic nodes to their corresponding epochs.
 
         Uses the graph edges (has_first_epoch) to find which epoch each node belongs to.
+        Each node may have multiple has_first_epoch edges (PERIOD, PHASE, SUBPHASE).
+        We select the most specific epoch that is in the displayed epoch list.
 
         Args:
             nodes: List of stratigraphic nodes
-            epochs: List of EpochNode instances (sorted)
+            epochs: List of EpochNode instances (sorted, most recent first)
+            graph: Graph object for querying has_first_epoch edges
 
         Returns:
             Dictionary mapping epoch_id to list of nodes
@@ -470,19 +475,31 @@ class EpochSwimlanesGenerator:
         from ...nodes.stratigraphic_node import StratigraphicNode
 
         assignments = {epoch.node_id: [] for epoch in epochs}
+        epoch_ids = {epoch.node_id for epoch in epochs}
 
         for node in nodes:
             if not isinstance(node, StratigraphicNode):
                 continue
 
-            # Check if node has epoch_id attribute (set during import)
-            if hasattr(node, 'epoch_id') and node.epoch_id:
-                if node.epoch_id in assignments:
-                    assignments[node.epoch_id].append(node)
-            else:
-                # Assign to most recent epoch (default)
+            assigned = False
+
+            if graph is not None:
+                # Query graph edges to find connected epoch nodes
+                connected_epochs = graph.get_connected_epoch_nodes_list_by_edge_type(
+                    node, 'has_first_epoch'
+                )
+                # Filter to only epochs in our displayed list
+                matching = [e for e in connected_epochs if e.node_id in epoch_ids]
+                if matching:
+                    # Last match = most specific (SUBPHASE > PHASE > PERIOD)
+                    # because import processes PERIOD first, then PHASE, then SUBPHASE
+                    assignments[matching[-1].node_id].append(node)
+                    assigned = True
+
+            if not assigned:
+                # Fallback: assign to last epoch (least recent) if no edge found
                 if epochs:
-                    assignments[epochs[0].node_id].append(node)
+                    assignments[epochs[-1].node_id].append(node)
 
         return assignments
 
@@ -493,6 +510,10 @@ class EpochSwimlanesGenerator:
     ) -> List:
         """
         Order nodes by temporal precedence using topological sort.
+
+        Nodes with temporal edges are sorted first, then nodes without
+        temporal edges are appended at the end (preserving original order).
+        This ensures ALL nodes get positioned, not just those with edges.
 
         Args:
             nodes: List of nodes to order
@@ -511,7 +532,16 @@ class EpochSwimlanesGenerator:
         try:
             ordered_ids = list(nx.topological_sort(subgraph))
             id_to_node = {n.node_id: n for n in nodes}
-            return [id_to_node[nid] for nid in ordered_ids if nid in id_to_node]
+            ordered = [id_to_node[nid] for nid in ordered_ids if nid in id_to_node]
+
+            # Append nodes that have no temporal edges (not in the temporal graph)
+            # These would otherwise be silently dropped and get no position
+            ordered_set = {n.node_id for n in ordered}
+            for node in nodes:
+                if node.node_id not in ordered_set:
+                    ordered.append(node)
+
+            return ordered
         except nx.NetworkXError:
             # If cycle or no edges, return as-is
             return nodes

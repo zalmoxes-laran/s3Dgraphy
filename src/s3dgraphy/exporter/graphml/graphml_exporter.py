@@ -117,8 +117,10 @@ class GraphMLExporter:
             epoch_gen = EpochSwimlanesGenerator()
 
             # Calculate positions for nodes within swimlanes
+            # Pass graph so epoch assignment can use has_first_epoch edges
             positions = epoch_gen.calculate_epoch_positions(
-                strat_nodes, epoch_nodes, minimal_edges
+                strat_nodes, epoch_nodes, minimal_edges,
+                graph=self.graph
             )
 
         # 5. Generate swimlane TableNode as CONTAINER for everything
@@ -429,8 +431,12 @@ class GraphMLExporter:
         For each stratigraphic node with extractor/document attributes,
         create a ParadataNodeGroup containing:
         - PropertyNode (stratigraphic_definition)
-        - ExtractorNode
-        - DocumentNode
+        - ExtractorNode (named D.XX.YY — extractor #YY from document D.XX)
+        - DocumentNode (named D.XX — serial number, reusable across groups)
+
+        Naming convention:
+        - Documents: D.01, D.02, D.03 (global serial, reusable)
+        - Extractors: D.01.01 (extractor #01 from document D.01)
 
         Args:
             stratigraphic_nodes: List of StratigraphicNode instances
@@ -444,12 +450,36 @@ class GraphMLExporter:
         from ...nodes.extractor_node import ExtractorNode
         from ...nodes.document_node import DocumentNode
 
+        # Global registry for document serial numbers
+        document_registry = {}  # document_name → serial_number (1, 2, ...)
+        doc_serial_counter = 1
+        # Per-document extractor counter
+        extractor_counters = {}  # doc_serial → counter
+
         for us_node in stratigraphic_nodes:
             # Check if node has extractor/document attributes
             extractor = getattr(us_node, 'extractor', None)
             document = getattr(us_node, 'document', None)
 
             if extractor or document:
+                # Assign serial number to document (reuse if already seen)
+                doc_serial = 0
+                doc_name = "D.00"
+                if document:
+                    if document not in document_registry:
+                        document_registry[document] = doc_serial_counter
+                        doc_serial_counter += 1
+                    doc_serial = document_registry[document]
+                    doc_name = f"D.{doc_serial:02d}"  # D.01, D.02, ...
+
+                # Assign serial number to extractor within its document
+                ext_name = f"{doc_name}.01"
+                if extractor:
+                    extractor_counters.setdefault(doc_serial, 0)
+                    extractor_counters[doc_serial] += 1
+                    ext_serial = extractor_counters[doc_serial]
+                    ext_name = f"D.{doc_serial:02d}.{ext_serial:02d}"  # D.01.01
+
                 # Create PropertyNode for stratigraphic_definition
                 property_node = PropertyNode(
                     node_id=f"{us_node.node_id}_prop_strdef",
@@ -461,20 +491,21 @@ class GraphMLExporter:
                 extractor_nodes = []
                 document_nodes = []
 
-                # Create ExtractorNode if extractor exists
+                # Create ExtractorNode with serial name
                 if extractor:
                     ext_node = ExtractorNode(
                         node_id=f"{us_node.node_id}_ext",
-                        name=f"D.{extractor}",
+                        name=ext_name,
                         description=f"Extractor: {extractor}"
                     )
                     extractor_nodes.append(ext_node)
 
-                # Create DocumentNode if document exists
+                # Create DocumentNode with serial name
+                # Each PD group gets its own instance (unique node_id) but same label
                 if document:
                     doc_node = DocumentNode(
-                        node_id=f"{us_node.node_id}_doc",
-                        name=document,
+                        node_id=f"{us_node.node_id}_doc_{doc_name}",
+                        name=doc_name,
                         description=f"Source document: {document}"
                     )
                     document_nodes.append(doc_node)

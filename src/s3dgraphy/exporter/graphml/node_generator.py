@@ -75,7 +75,7 @@ class NodeGenerator:
         node_label = getattr(node, 'name', node_type)
         width = calculate_node_width(node_label)
         geometry = ET.SubElement(shape_node, f'{{{self.ns_y}}}Geometry')
-        geometry.set('height', '60.0')
+        geometry.set('height', '30.0')
         geometry.set('width', str(width))
         geometry.set('x', str(x))
         geometry.set('y', str(y))
@@ -163,7 +163,7 @@ class NodeGenerator:
         generic_node.set('configuration', 'com.yworks.bpmn.Artifact.withShadow')
         
         # Geometry
-        property_name = getattr(node, 'property_name', 'property')
+        property_name = getattr(node, 'name', 'property')
         width = calculate_node_width(property_name, base_width=62.75, char_width=6.0)
         geometry = ET.SubElement(generic_node, f'{{{self.ns_y}}}Geometry')
         geometry.set('height', '30.0')

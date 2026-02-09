@@ -120,7 +120,7 @@ def generate_uuid() -> str:
     return str(uuid.uuid4())
 
 
-def calculate_node_width(label: str, base_width: float = 120.0, char_width: float = 7.0) -> float:
+def calculate_node_width(label: str, base_width: float = 90.0, char_width: float = 7.0) -> float:
     """
     Calculate node width based on label length.
 
