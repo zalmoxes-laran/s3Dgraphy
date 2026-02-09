@@ -209,6 +209,7 @@ class GraphMLExporter:
             prop_nested_ids = []
             ext_nested_ids = []
             doc_nested_ids = []
+            comb_nested_ids = []
 
             # All internal nodes at the same y as US node.
             # The tallest internal node is document (63.79px).
@@ -232,6 +233,21 @@ class GraphMLExporter:
                 if prop_nested_id:
                     prop_nested_ids.append(prop_nested_id)
                 x_cursor += 90.0  # property width ~68 + gap
+
+            # Combiner nodes (between property and extractor)
+            # generate_extractor_node already handles C.XX naming → refid='2'
+            for i, comb_node in enumerate(group_data.get('combiner_nodes', [])):
+                comb_xml = node_gen.generate_extractor_node(
+                    comb_node,
+                    x=x_cursor,
+                    y=internal_y,
+                    parent_id=group_nested_id
+                )
+                nested_graph.append(comb_xml)
+                comb_nested_id = self.id_manager.uuid_to_nested.get(comb_node.node_id)
+                if comb_nested_id:
+                    comb_nested_ids.append(comb_nested_id)
+                x_cursor += 40.0  # combiner width 25 + gap
 
             # Extractor nodes
             for i, ext_node in enumerate(group_data.get('extractor_nodes', [])):
@@ -261,24 +277,52 @@ class GraphMLExporter:
                 if doc_nested_id:
                     doc_nested_ids.append(doc_nested_id)
 
-            # --- Internal edges: property → extractor → document (all dashed) ---
+            # --- Internal edges (all dashed) ---
+            # Two modes:
+            # 1. With combiners: property → combiner → extractor → document
+            # 2. Without combiners (legacy): property → extractor → document
             internal_edge_counter = 0
 
-            # property → extractor edges
-            for p_id in prop_nested_ids:
-                for e_id in ext_nested_ids:
-                    edge_id = f"{group_nested_id}::e{internal_edge_counter}"
-                    internal_edge_counter += 1
-                    edge_xml = self._create_internal_pd_edge(edge_id, p_id, e_id)
-                    nested_graph.append(edge_xml)
+            if comb_nested_ids:
+                # COMBINER MODE: property → combiner → extractor → document
+                # property → combiner
+                for p_id in prop_nested_ids:
+                    for c_id in comb_nested_ids:
+                        edge_id = f"{group_nested_id}::e{internal_edge_counter}"
+                        internal_edge_counter += 1
+                        edge_xml = self._create_internal_pd_edge(edge_id, p_id, c_id)
+                        nested_graph.append(edge_xml)
 
-            # extractor → document edges
-            for e_id in ext_nested_ids:
-                for d_id in doc_nested_ids:
-                    edge_id = f"{group_nested_id}::e{internal_edge_counter}"
-                    internal_edge_counter += 1
-                    edge_xml = self._create_internal_pd_edge(edge_id, e_id, d_id)
-                    nested_graph.append(edge_xml)
+                # combiner → extractor
+                for c_id in comb_nested_ids:
+                    for e_id in ext_nested_ids:
+                        edge_id = f"{group_nested_id}::e{internal_edge_counter}"
+                        internal_edge_counter += 1
+                        edge_xml = self._create_internal_pd_edge(edge_id, c_id, e_id)
+                        nested_graph.append(edge_xml)
+
+                # extractor → document
+                for e_id in ext_nested_ids:
+                    for d_id in doc_nested_ids:
+                        edge_id = f"{group_nested_id}::e{internal_edge_counter}"
+                        internal_edge_counter += 1
+                        edge_xml = self._create_internal_pd_edge(edge_id, e_id, d_id)
+                        nested_graph.append(edge_xml)
+            else:
+                # SIMPLE MODE: property → extractor → document
+                for p_id in prop_nested_ids:
+                    for e_id in ext_nested_ids:
+                        edge_id = f"{group_nested_id}::e{internal_edge_counter}"
+                        internal_edge_counter += 1
+                        edge_xml = self._create_internal_pd_edge(edge_id, p_id, e_id)
+                        nested_graph.append(edge_xml)
+
+                for e_id in ext_nested_ids:
+                    for d_id in doc_nested_ids:
+                        edge_id = f"{group_nested_id}::e{internal_edge_counter}"
+                        internal_edge_counter += 1
+                        edge_xml = self._create_internal_pd_edge(edge_id, e_id, d_id)
+                        nested_graph.append(edge_xml)
 
             internal_edge_total += internal_edge_counter
 
@@ -433,13 +477,14 @@ class GraphMLExporter:
         """
         Build ParadataNodeGroup structures from stratigraphic nodes.
 
-        For each stratigraphic node with extractor/document attributes,
-        create a ParadataNodeGroup containing:
-        - PropertyNode (stratigraphic_definition)
-        - ExtractorNode (named D.XX.YY — extractor #YY from document D.XX)
-        - DocumentNode (named D.XX — serial number, reusable across groups)
+        TWO PATHS:
+        1. QUALIA PATH: If the graph has PropertyNodes connected via has_property edges
+           (created by QualiaImporter from em_paradata.xlsx), traverse the graph to build
+           the full provenance chain: property → [combiner →] extractor → document.
+        2. LEGACY PATH: If no qualia PropertyNodes found, use extractor/document attributes
+           on the StratigraphicNode to create a single "stratigraphic_definition" property.
 
-        Naming convention:
+        Naming convention (legacy path):
         - Documents: D.01, D.02, D.03 (global serial, reusable)
         - Extractors: D.01.01 (extractor #01 from document D.01)
 
@@ -447,81 +492,158 @@ class GraphMLExporter:
             stratigraphic_nodes: List of StratigraphicNode instances
 
         Returns:
-            List of dicts with group data
+            List of dicts with group data (including 'combiner_nodes' key)
         """
         groups = []
 
         from ...nodes.property_node import PropertyNode
         from ...nodes.extractor_node import ExtractorNode
         from ...nodes.document_node import DocumentNode
+        from ...nodes.combiner_node import CombinerNode
 
-        # Global registry for document serial numbers
+        # Properties to EXCLUDE from qualia paradata (these are structural, not qualia)
+        # Include both camelCase forms (from mapping property_name) and
+        # display name forms (from PropertyNode.name created by BaseImporter)
+        EXCLUDED_PROPS = {
+            'usType', 'US Type', 'description', 'Description',
+            'period', 'phase', 'subphase',
+            'periodStart', 'periodEnd', 'phaseStart', 'phaseEnd',
+            'subphaseStart', 'subphaseEnd',
+            'overlies', 'overlainBy', 'cuts', 'cutBy',
+            'fills', 'filledBy', 'abuts', 'abuttedBy',
+            'bondedTo', 'equals', 'stratigraphic_definition'
+        }
+
+        # Global registry for document serial numbers (legacy path only)
         document_registry = {}  # document_name → serial_number (1, 2, ...)
         doc_serial_counter = 1
-        # Per-document extractor counter
+        # Per-document extractor counter (legacy path only)
         extractor_counters = {}  # doc_serial → counter
 
         for us_node in stratigraphic_nodes:
-            # Check if node has extractor/document attributes
-            extractor = getattr(us_node, 'extractor', None)
-            document = getattr(us_node, 'document', None)
+            # --- QUALIA PATH: Check for PropertyNodes in graph ---
+            prop_nodes = self.graph.get_property_nodes_for_node(us_node.node_id)
+            paradata_props = [p for p in prop_nodes if p.name not in EXCLUDED_PROPS]
 
-            if extractor or document:
-                # Assign serial number to document (reuse if already seen)
-                doc_serial = 0
-                doc_name = "D.00"
-                if document:
-                    if document not in document_registry:
-                        document_registry[document] = doc_serial_counter
-                        doc_serial_counter += 1
-                    doc_serial = document_registry[document]
-                    doc_name = f"D.{doc_serial:02d}"  # D.01, D.02, ...
-
-                # Assign serial number to extractor within its document
-                ext_name = f"{doc_name}.01"
-                if extractor:
-                    extractor_counters.setdefault(doc_serial, 0)
-                    extractor_counters[doc_serial] += 1
-                    ext_serial = extractor_counters[doc_serial]
-                    ext_name = f"D.{doc_serial:02d}.{ext_serial:02d}"  # D.01.01
-
-                # Create PropertyNode for stratigraphic_definition
-                property_node = PropertyNode(
-                    node_id=f"{us_node.node_id}_prop_strdef",
-                    name="stratigraphic_definition",
-                    property_type="stratigraphic_definition"
-                )
-
-                property_nodes = [property_node]
+            if paradata_props:
+                # QUALIA PATH: traverse graph for full provenance chain
+                property_nodes = list(paradata_props)
                 extractor_nodes = []
                 document_nodes = []
+                combiner_nodes = []
 
-                # Create ExtractorNode with serial name
-                if extractor:
-                    ext_node = ExtractorNode(
-                        node_id=f"{us_node.node_id}_ext",
-                        name=ext_name,
-                        description=f"Extractor: {extractor}"
-                    )
-                    extractor_nodes.append(ext_node)
+                # Track unique nodes (avoid duplicates across properties)
+                seen_extractors = set()
+                seen_documents = set()
+                seen_combiners = set()
 
-                # Create DocumentNode with serial name
-                # Each PD group gets its own instance (unique node_id) but same label
-                if document:
-                    doc_node = DocumentNode(
-                        node_id=f"{us_node.node_id}_doc_{doc_name}",
-                        name=doc_name,
-                        description=f"Source document: {document}"
-                    )
-                    document_nodes.append(doc_node)
+                for prop in paradata_props:
+                    # Check if property has combiner (multi-source)
+                    combiners = self.graph.get_combiner_nodes_for_property(prop.node_id)
+
+                    if combiners:
+                        for comb in combiners:
+                            if comb.node_id not in seen_combiners:
+                                seen_combiners.add(comb.node_id)
+                                combiner_nodes.append(comb)
+
+                            # Get extractors connected to combiner
+                            exts = self.graph.get_extractor_nodes_for_node(comb.node_id)
+                            for ext in exts:
+                                if ext.node_id not in seen_extractors:
+                                    seen_extractors.add(ext.node_id)
+                                    extractor_nodes.append(ext)
+
+                                # Get documents connected to extractor
+                                docs = self.graph.get_document_nodes_for_extractor(ext.node_id)
+                                for doc in docs:
+                                    if doc.node_id not in seen_documents:
+                                        seen_documents.add(doc.node_id)
+                                        document_nodes.append(doc)
+                    else:
+                        # Simple chain: property → extractor → document
+                        exts = self.graph.get_extractor_nodes_for_node(prop.node_id)
+                        for ext in exts:
+                            if ext.node_id not in seen_extractors:
+                                seen_extractors.add(ext.node_id)
+                                extractor_nodes.append(ext)
+
+                            docs = self.graph.get_document_nodes_for_extractor(ext.node_id)
+                            for doc in docs:
+                                if doc.node_id not in seen_documents:
+                                    seen_documents.add(doc.node_id)
+                                    document_nodes.append(doc)
 
                 group_data = {
                     'us_node': us_node,
                     'property_nodes': property_nodes,
                     'extractor_nodes': extractor_nodes,
-                    'document_nodes': document_nodes
+                    'document_nodes': document_nodes,
+                    'combiner_nodes': combiner_nodes
                 }
-
                 groups.append(group_data)
+
+            else:
+                # --- LEGACY PATH: use extractor/document attributes ---
+                extractor = getattr(us_node, 'extractor', None)
+                document = getattr(us_node, 'document', None)
+
+                if extractor or document:
+                    # Assign serial number to document (reuse if already seen)
+                    doc_serial = 0
+                    doc_name = "D.00"
+                    if document:
+                        if document not in document_registry:
+                            document_registry[document] = doc_serial_counter
+                            doc_serial_counter += 1
+                        doc_serial = document_registry[document]
+                        doc_name = f"D.{doc_serial:02d}"  # D.01, D.02, ...
+
+                    # Assign serial number to extractor within its document
+                    ext_name = f"{doc_name}.01"
+                    if extractor:
+                        extractor_counters.setdefault(doc_serial, 0)
+                        extractor_counters[doc_serial] += 1
+                        ext_serial = extractor_counters[doc_serial]
+                        ext_name = f"D.{doc_serial:02d}.{ext_serial:02d}"  # D.01.01
+
+                    # Create PropertyNode for stratigraphic_definition
+                    property_node = PropertyNode(
+                        node_id=f"{us_node.node_id}_prop_strdef",
+                        name="stratigraphic_definition",
+                        property_type="stratigraphic_definition"
+                    )
+
+                    property_nodes = [property_node]
+                    extractor_nodes = []
+                    document_nodes = []
+
+                    # Create ExtractorNode with serial name
+                    if extractor:
+                        ext_node = ExtractorNode(
+                            node_id=f"{us_node.node_id}_ext",
+                            name=ext_name,
+                            description=f"Extractor: {extractor}"
+                        )
+                        extractor_nodes.append(ext_node)
+
+                    # Create DocumentNode with serial name
+                    if document:
+                        doc_node = DocumentNode(
+                            node_id=f"{us_node.node_id}_doc_{doc_name}",
+                            name=doc_name,
+                            description=f"Source document: {document}"
+                        )
+                        document_nodes.append(doc_node)
+
+                    group_data = {
+                        'us_node': us_node,
+                        'property_nodes': property_nodes,
+                        'extractor_nodes': extractor_nodes,
+                        'document_nodes': document_nodes,
+                        'combiner_nodes': []
+                    }
+
+                    groups.append(group_data)
 
         return groups
