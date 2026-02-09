@@ -12,6 +12,14 @@ This is NOT a BaseImporter subclass — the logic is fundamentally different:
 - Creates paradata provenance chains (property→extractor→document)
 - Supports multi-source combiner reasoning
 
+Column format (no mapping JSON needed):
+    Fixed: US_ID, PROPERTY_TYPE, VALUE, COMBINER_REASONING
+    Repeatable pairs: EXTRACTOR_1, DOCUMENT_1, EXTRACTOR_2, DOCUMENT_2, ...
+
+Logic:
+    - COMBINER_REASONING empty → single-source: use EXTRACTOR_1/DOCUMENT_1 only
+    - COMBINER_REASONING present → combiner: scan all EXTRACTOR_N/DOCUMENT_N pairs
+
 Usage:
     # 1. First import stratigraphy (creates US nodes)
     strat_importer = MappedXLSXImporter(filepath='stratigraphy.xlsx', ...)
@@ -28,11 +36,9 @@ Usage:
 
 import os
 import io
-import json
+import re
 import uuid
-import platform
 import pandas as pd
-from pathlib import Path
 
 from ..graph import Graph
 from ..nodes.property_node import PropertyNode
@@ -49,6 +55,9 @@ class QualiaImporter:
     extractor text and source document. Supports combiner reasoning for
     multi-source properties.
 
+    Column detection is automatic via regex — no mapping JSON required.
+    The importer scans for EXTRACTOR_N/DOCUMENT_N pairs dynamically.
+
     Naming convention:
         - Documents: D.01, D.02, ... (global serial, reused if same document)
         - Extractors: D.01.01, D.01.02, ... (serial per document)
@@ -56,17 +65,19 @@ class QualiaImporter:
     """
 
     def __init__(self, filepath: str, existing_graph: Graph,
-                 mapping_name: str = 'em_paradata_mapping',
-                 overwrite: bool = False):
+                 overwrite: bool = False,
+                 sheet_name: str = 'Paradata',
+                 start_row: int = 2):
         """
         Initialize QualiaImporter.
 
         Args:
             filepath: Path to em_paradata.xlsx file
             existing_graph: Graph with stratigraphic nodes already loaded (REQUIRED)
-            mapping_name: Name of the mapping JSON file (without extension)
             overwrite: If True, update existing properties with new values.
                        If False, skip duplicates with warning. Default: False.
+            sheet_name: Excel sheet name to read. Default: 'Paradata'.
+            start_row: First data row (1-based, after header). Default: 2.
 
         Raises:
             ValueError: If existing_graph is None
@@ -80,7 +91,8 @@ class QualiaImporter:
 
         self.filepath = filepath
         self.graph = existing_graph
-        self.mapping = self._load_mapping(mapping_name)
+        self.sheet_name = sheet_name
+        self.start_row = start_row
         self.overwrite = overwrite
         self.warnings = []
 
@@ -97,31 +109,44 @@ class QualiaImporter:
         # Node registries (to avoid duplicates)
         self._document_nodes = {}      # doc_name → DocumentNode
 
-    def _load_mapping(self, mapping_name: str) -> dict:
-        """Load mapping JSON from the generic mappings directory."""
-        # Try generic mappings directory first
-        mappings_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            'mappings', 'generic'
-        )
-        mapping_path = os.path.join(mappings_dir, f'{mapping_name}.json')
+        # Detected column pairs (populated during parse)
+        self.pair_indices = []
 
-        if not os.path.exists(mapping_path):
-            # Fallback: try emdb directory
-            mappings_dir = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                'mappings', 'emdb'
-            )
-            mapping_path = os.path.join(mappings_dir, f'{mapping_name}.json')
+    def _detect_extractor_document_pairs(self, columns: list) -> list:
+        """
+        Detect EXTRACTOR_N/DOCUMENT_N column pairs from DataFrame columns.
 
-        if not os.path.exists(mapping_path):
-            raise FileNotFoundError(
-                f"Mapping file not found: {mapping_name}.json\n"
-                f"Searched in: {mappings_dir}"
-            )
+        Scans column names with regex to find all valid pairs where both
+        EXTRACTOR_N and DOCUMENT_N exist. Warns about orphan columns.
 
-        with open(mapping_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        Args:
+            columns: List of column names from the DataFrame
+
+        Returns:
+            Sorted list of valid pair indices (e.g., [1, 2, 3])
+        """
+        ext_pattern = re.compile(r'^EXTRACTOR_(\d+)$')
+        doc_pattern = re.compile(r'^DOCUMENT_(\d+)$')
+
+        ext_indices = set()
+        doc_indices = set()
+
+        for col in columns:
+            m = ext_pattern.match(col)
+            if m:
+                ext_indices.add(int(m.group(1)))
+            m = doc_pattern.match(col)
+            if m:
+                doc_indices.add(int(m.group(1)))
+
+        # Warn about mismatches
+        for idx in sorted(ext_indices - doc_indices):
+            self.warnings.append(f"EXTRACTOR_{idx} found without matching DOCUMENT_{idx}")
+        for idx in sorted(doc_indices - ext_indices):
+            self.warnings.append(f"DOCUMENT_{idx} found without matching EXTRACTOR_{idx}")
+
+        valid_pairs = sorted(ext_indices & doc_indices)
+        return valid_pairs
 
     def _generate_uuid(self) -> str:
         """Generate a UUID for node/edge IDs."""
@@ -315,25 +340,27 @@ class QualiaImporter:
         )
 
     def _process_combiner_row(self, property_node: PropertyNode,
-                               extractor_text: str, combiner_reasoning: str,
-                               combiner_sources: list):
+                               combiner_reasoning: str,
+                               source_pairs: list):
         """
         Process a combiner row: property → combiner → [extractor→document, ...].
 
+        Each source pair provides its OWN extractor text and document name,
+        ensuring each ExtractorNode has distinct content.
+
         Creates:
             - CombinerNode
-            - For each combiner source:
+            - For each (extractor_text, doc_name) pair:
                 - DocumentNode (reused if same doc)
-                - ExtractorNode (with extractor_text from main EXTRACTOR column)
+                - ExtractorNode (with this pair's specific extractor text)
                 - Edge: ExtractorNode → extracted_from → DocumentNode
                 - Edge: CombinerNode → combines → ExtractorNode
             - Edge: PropertyNode → has_data_provenance → CombinerNode
 
         Args:
             property_node: The PropertyNode for this row
-            extractor_text: Summary text of the combined reasoning
-            combiner_reasoning: Detailed reasoning text
-            combiner_sources: List of source document names
+            combiner_reasoning: Detailed reasoning text for the CombinerNode
+            source_pairs: List of (extractor_text, document_name) tuples
         """
         # Create CombinerNode
         comb_node = self._create_combiner_node(combiner_reasoning)
@@ -346,21 +373,13 @@ class QualiaImporter:
             edge_type='has_data_provenance'
         )
 
-        # For each combiner source, create extractor→document chain
-        for source_doc in combiner_sources:
-            if not source_doc or pd.isna(source_doc):
-                continue
-
-            source_doc = str(source_doc).strip()
-            if not source_doc:
-                continue
-
+        # For each source pair, create extractor→document chain
+        for extractor_text, doc_name in source_pairs:
             # Create/get DocumentNode
-            doc_node = self._get_or_create_document_node(source_doc)
-            doc_serial = self.document_registry[source_doc]
+            doc_node = self._get_or_create_document_node(doc_name)
+            doc_serial = self.document_registry[doc_name]
 
-            # Create ExtractorNode for this source
-            # Use a portion of the extractor text + source doc reference
+            # Create ExtractorNode with this pair's specific text
             ext_node = self._create_extractor_node(doc_serial, extractor_text)
 
             # Edge: ExtractorNode → extracted_from → DocumentNode
@@ -386,11 +405,12 @@ class QualiaImporter:
         """
         Parse em_paradata.xlsx and enrich the existing graph.
 
+        Detects EXTRACTOR_N/DOCUMENT_N column pairs automatically via regex.
         For each row:
         1. Find the US node by name (US_ID column)
         2. Create PropertyNode with PROPERTY_TYPE and VALUE
-        3. Create provenance chain (single-source or combiner)
-        4. Connect everything with proper edge types
+        3. Determine mode: single-source (COMBINER_REASONING empty) or combiner
+        4. Create provenance chain with proper edge types
 
         Returns:
             The enriched Graph
@@ -406,11 +426,6 @@ class QualiaImporter:
         if not os.path.exists(self.filepath):
             raise FileNotFoundError(f"Paradata file not found: {self.filepath}")
 
-        # Get settings from mapping
-        table_settings = self.mapping.get('table_settings', {})
-        sheet_name = table_settings.get('sheet_name', 'Paradata')
-        start_row = table_settings.get('start_row', 2)
-
         # Read Excel file
         file_content = None
         try:
@@ -420,7 +435,7 @@ class QualiaImporter:
             with pd.ExcelFile(file_content, engine='openpyxl') as excel_file:
                 df = pd.read_excel(
                     excel_file,
-                    sheet_name=sheet_name,
+                    sheet_name=self.sheet_name,
                     header=0,
                     na_values=['', 'NA', 'N/A'],
                     keep_default_na=True,
@@ -428,8 +443,8 @@ class QualiaImporter:
                 )
 
             # Skip tutorial/example rows if start_row > 1
-            if start_row > 1:
-                actual_start_idx = start_row - 2
+            if self.start_row > 1:
+                actual_start_idx = self.start_row - 2
                 df = df.iloc[actual_start_idx:].reset_index(drop=True)
 
             if df.empty:
@@ -443,6 +458,16 @@ class QualiaImporter:
         finally:
             if file_content is not None:
                 file_content.close()
+
+        # Detect EXTRACTOR_N/DOCUMENT_N pairs
+        self.pair_indices = self._detect_extractor_document_pairs(list(df.columns))
+        print(f"  Detected extractor/document pairs: {self.pair_indices}")
+
+        if not self.pair_indices:
+            raise ValueError(
+                "No EXTRACTOR_N/DOCUMENT_N column pairs found. "
+                "Expected columns like EXTRACTOR_1, DOCUMENT_1, EXTRACTOR_2, DOCUMENT_2, ..."
+            )
 
         # Process each row
         successful = 0
@@ -471,11 +496,7 @@ class QualiaImporter:
                 # 2. Get property data
                 property_type = row.get('PROPERTY_TYPE')
                 value = row.get('VALUE')
-                extractor_text = row.get('EXTRACTOR')
-                document_name = row.get('DOCUMENT')
                 combiner_reasoning = row.get('COMBINER_REASONING')
-                combiner_source_1 = row.get('COMBINER_SOURCE_1')
-                combiner_source_2 = row.get('COMBINER_SOURCE_2')
 
                 # Validate required fields
                 if pd.isna(property_type) or not str(property_type).strip():
@@ -488,16 +509,19 @@ class QualiaImporter:
                     skipped += 1
                     continue
 
-                if pd.isna(extractor_text) or not str(extractor_text).strip():
-                    self.warnings.append(f"Row {idx+1}: Missing EXTRACTOR — skipping")
+                property_type = str(property_type).strip()
+                value = str(value).strip()
+
+                # 3. Validate EXTRACTOR_1 (always required)
+                extractor_1 = row.get('EXTRACTOR_1')
+                document_1 = row.get('DOCUMENT_1')
+
+                if pd.isna(extractor_1) or not str(extractor_1).strip():
+                    self.warnings.append(f"Row {idx+1}: Missing EXTRACTOR_1 — skipping")
                     skipped += 1
                     continue
 
-                property_type = str(property_type).strip()
-                value = str(value).strip()
-                extractor_text = str(extractor_text).strip()
-
-                # 3. Check for existing property (duplicate detection)
+                # 4. Check for existing property (duplicate detection)
                 existing_prop = self._find_existing_property(us_node.node_id, property_type)
 
                 if existing_prop:
@@ -537,51 +561,67 @@ class QualiaImporter:
                         edge_type='has_property'
                     )
 
-                # 5. Create provenance chain
+                # 5. Determine mode and create provenance chain
                 has_combiner = (
                     not pd.isna(combiner_reasoning) and
                     str(combiner_reasoning).strip()
                 )
 
                 if has_combiner:
-                    # Multi-source combiner path
-                    combiner_sources = []
-                    if not pd.isna(combiner_source_1) and str(combiner_source_1).strip():
-                        combiner_sources.append(str(combiner_source_1).strip())
-                    if not pd.isna(combiner_source_2) and str(combiner_source_2).strip():
-                        combiner_sources.append(str(combiner_source_2).strip())
+                    # Combiner mode: scan all EXTRACTOR_N/DOCUMENT_N pairs
+                    source_pairs = []
+                    for pair_idx in self.pair_indices:
+                        ext_val = row.get(f'EXTRACTOR_{pair_idx}')
+                        doc_val = row.get(f'DOCUMENT_{pair_idx}')
 
-                    if not combiner_sources:
+                        # Skip empty pairs
+                        if pd.isna(ext_val) or not str(ext_val).strip():
+                            continue
+                        if pd.isna(doc_val) or not str(doc_val).strip():
+                            continue
+
+                        source_pairs.append((
+                            str(ext_val).strip(),
+                            str(doc_val).strip()
+                        ))
+
+                    if len(source_pairs) < 2:
                         self.warnings.append(
-                            f"Row {idx+1}: COMBINER_REASONING present but no COMBINER_SOURCE columns — "
-                            f"treating as single-source"
+                            f"Row {idx+1}: COMBINER_REASONING present but fewer than 2 "
+                            f"source pairs found — treating as single-source"
                         )
-                        # Fallback: treat as single-source if no sources specified
-                        if not pd.isna(document_name) and str(document_name).strip():
+                        # Fallback: use first pair as single-source
+                        if source_pairs:
                             self._process_single_source_row(
-                                prop_node, extractor_text, str(document_name).strip()
+                                prop_node, source_pairs[0][0], source_pairs[0][1]
+                            )
+                        elif not pd.isna(document_1) and str(document_1).strip():
+                            self._process_single_source_row(
+                                prop_node, str(extractor_1).strip(),
+                                str(document_1).strip()
                             )
                         else:
                             self.warnings.append(
-                                f"Row {idx+1}: No DOCUMENT and no COMBINER_SOURCE — "
+                                f"Row {idx+1}: No valid source pairs — "
                                 f"property created without provenance"
                             )
                     else:
                         self._process_combiner_row(
-                            prop_node, extractor_text,
+                            prop_node,
                             str(combiner_reasoning).strip(),
-                            combiner_sources
+                            source_pairs
                         )
                 else:
-                    # Single-source path
-                    if pd.isna(document_name) or not str(document_name).strip():
+                    # Single-source mode: use EXTRACTOR_1/DOCUMENT_1 only
+                    if pd.isna(document_1) or not str(document_1).strip():
                         self.warnings.append(
-                            f"Row {idx+1}: Missing DOCUMENT for single-source row — "
+                            f"Row {idx+1}: Missing DOCUMENT_1 for single-source row — "
                             f"property created without provenance"
                         )
                     else:
                         self._process_single_source_row(
-                            prop_node, extractor_text, str(document_name).strip()
+                            prop_node, str(extractor_1).strip(),
+                            str(document_1).strip()
                         )
 
                 successful += 1
