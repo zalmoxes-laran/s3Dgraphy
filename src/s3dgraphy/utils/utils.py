@@ -349,3 +349,88 @@ def add_graph_prefix(name: str, graph_code: str, separator: str = '.') -> str:
         'VDL16.US001'
     """
     return manage_id_prefix(name, graph_code, 'add', separator)
+
+
+def get_ai_prompt(language: str = None) -> str:
+    """
+    Build and return the AI extraction prompt for stratigraphic data.
+
+    Reads the AI_EXTRACTION_PROMPT.md bundled inside the s3dgraphy package,
+    extracts Part A (stratigraphy) and Part B (paradata), and prepends a
+    language instruction.
+
+    Args:
+        language: Target language for AI-generated descriptions.
+            If None, empty, or equal to "the same as the original document",
+            the prompt instructs the AI to use the source document's language.
+            Otherwise, the specified language is used (e.g., "Italian", "English").
+
+    Returns:
+        str: The composed prompt text ready to paste into an AI assistant.
+
+    Raises:
+        FileNotFoundError: If the bundled prompt file cannot be located.
+        ValueError: If the prompt file cannot be parsed (fewer than 2 code blocks).
+
+    Example:
+        >>> prompt = get_ai_prompt("Italian")
+        >>> print(prompt[:60])
+        IMPORTANT: Write all descriptions and properties in Italian.
+    """
+    # Locate the bundled prompt file inside the package
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+    prompt_path = os.path.join(data_dir, 'AI_EXTRACTION_PROMPT.md')
+
+    if not os.path.exists(prompt_path):
+        raise FileNotFoundError(
+            f"AI extraction prompt not found at: {prompt_path}. "
+            "Ensure s3dgraphy is installed correctly."
+        )
+
+    with open(prompt_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Extract code blocks (text between ``` delimiters)
+    blocks = []
+    current_block = []
+    in_block = False
+    for line in content.splitlines():
+        if line.strip() == '```':
+            if in_block:
+                blocks.append('\n'.join(current_block))
+                current_block = []
+            in_block = not in_block
+        elif in_block:
+            current_block.append(line)
+
+    if len(blocks) < 2:
+        raise ValueError(
+            "Could not parse prompt blocks from AI_EXTRACTION_PROMPT.md. "
+            f"Expected at least 2 code blocks, found {len(blocks)}."
+        )
+
+    part_a = blocks[0]
+    part_b = blocks[1]
+
+    # Build language instruction
+    default_lang = "the same as the original document"
+    if not language or language.strip().lower() == default_lang.lower():
+        lang_instruction = (
+            "IMPORTANT: Write all descriptions and properties in the same "
+            "language as the original document."
+        )
+    else:
+        lang_instruction = (
+            f"IMPORTANT: Write all descriptions and properties in {language.strip()}."
+        )
+
+    # Compose final prompt
+    full_prompt = (
+        f"{lang_instruction}\n\n"
+        f"--- PART A: STRATIGRAPHY EXTRACTION ---\n\n"
+        f"{part_a}\n\n"
+        f"--- PART B: PARADATA EXTRACTION ---\n\n"
+        f"{part_b}"
+    )
+
+    return full_prompt

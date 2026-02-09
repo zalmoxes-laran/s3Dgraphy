@@ -40,7 +40,7 @@ from .multigraph import MultiGraphManager, load_graph_from_file, get_graph, get_
 from .importer import GraphMLImporter
 
 # Utility imports
-from .utils import convert_shape2type, manage_id_prefix, get_base_name, add_graph_prefix
+from .utils import convert_shape2type, manage_id_prefix, get_base_name, add_graph_prefix, get_ai_prompt
 
 from .indices import GraphIndices
 
@@ -84,5 +84,6 @@ __all__ = [
     "load_mapping_file",
     "manage_id_prefix",
     "get_base_name",
-    "add_graph_prefix"
+    "add_graph_prefix",
+    "get_ai_prompt"
 ]
