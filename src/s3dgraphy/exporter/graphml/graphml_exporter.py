@@ -607,6 +607,69 @@ class GraphMLExporter:
 
                     chains.append(chain)
 
+                # --- INJECT LEGACY stratigraphic_definition chain ---
+                # When both stratigraphy.xlsx and em_paradata.xlsx are loaded,
+                # the qualia path above only sees PropertyNodes from em_paradata.
+                # But the StratigraphicNode may also carry extractor/document
+                # attributes from stratigraphy.xlsx (columns W/X). Inject those
+                # as an additional stratigraphic_definition chain so they appear
+                # alongside the qualia properties in the same PD group.
+                extractor_attr = getattr(us_node, 'extractor', None)
+                document_attr = getattr(us_node, 'document', None)
+
+                if extractor_attr or document_attr:
+                    legacy_prop = PropertyNode(
+                        node_id=f"{us_node.node_id}_prop_strdef",
+                        name="stratigraphic_definition",
+                        property_type="stratigraphic_definition"
+                    )
+                    property_nodes.append(legacy_prop)
+
+                    legacy_chain = {
+                        'property': legacy_prop,
+                        'combiner': None,
+                        'extractors': []
+                    }
+
+                    if extractor_attr:
+                        # Assign serial name using document_registry / extractor_counters
+                        doc_serial = 0
+                        doc_name_label = "D.00"
+                        if document_attr:
+                            if document_attr not in document_registry:
+                                document_registry[document_attr] = doc_serial_counter
+                                doc_serial_counter += 1
+                            doc_serial = document_registry[document_attr]
+                            doc_name_label = f"D.{doc_serial:02d}"
+
+                        extractor_counters.setdefault(doc_serial, 0)
+                        extractor_counters[doc_serial] += 1
+                        ext_serial = extractor_counters[doc_serial]
+                        ext_name = f"D.{doc_serial:02d}.{ext_serial:02d}"
+
+                        ext_node = ExtractorNode(
+                            node_id=f"{us_node.node_id}_ext",
+                            name=ext_name,
+                            description=f"Extractor: {extractor_attr}"
+                        )
+                        extractor_nodes.append(ext_node)
+
+                        doc_node = None
+                        if document_attr:
+                            doc_node = DocumentNode(
+                                node_id=f"{us_node.node_id}_doc_{doc_name_label}",
+                                name=doc_name_label,
+                                description=f"Source document: {document_attr}"
+                            )
+                            local_doc_copies[doc_node.node_id] = doc_node
+
+                        legacy_chain['extractors'].append({
+                            'extractor': ext_node,
+                            'document': doc_node
+                        })
+
+                    chains.append(legacy_chain)
+
                 # Collect all unique local document copies for node generation
                 document_nodes = list(local_doc_copies.values())
 
