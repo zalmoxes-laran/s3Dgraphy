@@ -1276,18 +1276,22 @@ class GraphMLImporter:
 
     def EM_extract_generic_node_name(self, node_element):
         node_name = ''
-        data_d6 = node_element.find('./{http://graphml.graphdrawing.org/xmlns}data[@key="d6"]')
-        if data_d6 is not None:
-            node_label = data_d6.find('.//{http://www.yworks.com/xml/graphml}NodeLabel')
+        ng_key = self.key_map.get('node', {}).get('nodegraphics', 'd6')
+        ns = 'http://graphml.graphdrawing.org/xmlns'
+        data_ng = node_element.find(f'./{{{ns}}}data[@key="{ng_key}"]')
+        if data_ng is not None:
+            node_label = data_ng.find('.//{http://www.yworks.com/xml/graphml}NodeLabel')
             if node_label is not None:
                 node_name = self._check_if_empty(node_label.text)
         return node_name
 
     def EM_extract_group_node_name(self, node_element):
         group_name = ''
-        data_d6 = node_element.find('./{http://graphml.graphdrawing.org/xmlns}data[@key="d6"]')
-        if data_d6 is not None:
-            node_label = data_d6.find('.//{http://www.yworks.com/xml/graphml}NodeLabel')
+        ng_key = self.key_map.get('node', {}).get('nodegraphics', 'd6')
+        ns = 'http://graphml.graphdrawing.org/xmlns'
+        data_ng = node_element.find(f'./{{{ns}}}data[@key="{ng_key}"]')
+        if data_ng is not None:
+            node_label = data_ng.find('.//{http://www.yworks.com/xml/graphml}NodeLabel')
             if node_label is not None:
                 group_name = self._check_if_empty(node_label.text)
         return group_name
@@ -1304,18 +1308,22 @@ class GraphMLImporter:
 
     def EM_extract_group_node_background_color(self, node_element):
         background_color = None
-        data_d6 = node_element.find('./{http://graphml.graphdrawing.org/xmlns}data[@key="d6"]')
-        if data_d6 is not None:
-            node_label = data_d6.find('.//{http://www.yworks.com/xml/graphml}NodeLabel')
+        ng_key = self.key_map.get('node', {}).get('nodegraphics', 'd6')
+        ns = 'http://graphml.graphdrawing.org/xmlns'
+        data_ng = node_element.find(f'./{{{ns}}}data[@key="{ng_key}"]')
+        if data_ng is not None:
+            node_label = data_ng.find('.//{http://www.yworks.com/xml/graphml}NodeLabel')
             if node_label is not None:
                 background_color = node_label.attrib.get('backgroundColor')
         return background_color
 
     def EM_extract_group_node_y_pos(self, node_element):
         y_pos = 0.0
-        data_d6 = node_element.find('./{http://graphml.graphdrawing.org/xmlns}data[@key="d6"]')
-        if data_d6 is not None:
-            geometry = data_d6.find('.//{http://www.yworks.com/xml/graphml}Geometry')
+        ng_key = self.key_map.get('node', {}).get('nodegraphics', 'd6')
+        ns = 'http://graphml.graphdrawing.org/xmlns'
+        data_ng = node_element.find(f'./{{{ns}}}data[@key="{ng_key}"]')
+        if data_ng is not None:
+            geometry = data_ng.find('.//{http://www.yworks.com/xml/graphml}Geometry')
             if geometry is not None:
                 y_pos = float(geometry.attrib.get('y', 0.0))
         return y_pos
@@ -1487,8 +1495,17 @@ class GraphMLImporter:
             if nodegraphics_key and key == nodegraphics_key:
                 for USname in subnode.findall('.//{http://www.yworks.com/xml/graphml}NodeLabel'):
                     nodename = self._check_if_empty(USname.text)
-                if nodename.startswith("D.") and not self.graph.find_node_by_name(nodename):
+                if nodename.startswith("D."):
                     subnode_is_extractor = True
+                    # Warning if an extractor with the same name already exists
+                    existing = self.graph.find_node_by_name(nodename)
+                    if existing and hasattr(existing, 'node_type') and existing.node_type == 'extractor':
+                        self.graph.add_warning(
+                            f"Duplicate extractor name '{nodename}': "
+                            f"already exists in the graph. "
+                            f"Each extractor should have a unique sequential name. "
+                            f"Please rename one of the '{nodename}' nodes in yEd."
+                        )
 
         if subnode_is_extractor:
             for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
@@ -1543,67 +1560,73 @@ class GraphMLImporter:
     def EM_check_node_continuity(self, node_element):
         """
         Verifica se un nodo è un nodo di continuità (BR).
-        
+
         Args:
             node_element: Elemento XML del nodo
-            
+
         Returns:
             bool: True se il nodo è di tipo continuity
         """
+        # Use dynamic key mapping for url field (contains _continuity marker)
+        url_key = self.key_map.get('node', {}).get('url', 'd5')
+
         # Cerca nei dati del nodo
         for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-            if subnode.attrib.get('key') == 'd5':
+            if subnode.attrib.get('key') == url_key:
                 # Verifica se il testo è "_continuity"
                 if subnode.text and "_continuity" in subnode.text:
                     # print(f"Found continuity node: {node_element.attrib['id']}")
                     return True
-                    
+
         # Verifica se è un SVGNode (alternativa)
         svg_node = node_element.find('.//{http://graphml.graphdrawing.org/xmlns}data/{http://www.yworks.com/xml/graphml}SVGNode')
         if svg_node is not None:
             # Cerca di nuovo nei dati per confermare se è un nodo continuity
             for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-                if subnode.attrib.get('key') == 'd5' and subnode.text:
+                if subnode.attrib.get('key') == url_key and subnode.text:
                     if "_continuity" in subnode.text:
                         # print(f"Found SVG continuity node: {node_element.attrib['id']}")
                         return True
-                        
+
         return False
 
     def EM_extract_continuity(self, node_element):
         """
         Estrae informazioni da un nodo continuity.
-        
+
         Args:
             node_element: Elemento XML del nodo
-            
+
         Returns:
             tuple: (descrizione, posizione y, id)
         """
-        is_d5 = False
+        is_url_found = False
         node_y_pos = 0.0
         nodedescription = None
         node_id = node_element.attrib['id']
 
-        # Estrai descrizione dal campo d5
+        # Use dynamic key mapping
+        url_key = self.key_map.get('node', {}).get('url', 'd5')
+        ng_key = self.key_map.get('node', {}).get('nodegraphics', 'd6')
+
+        # Estrai descrizione dal campo url (contains _continuity marker)
         for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-            if subnode.attrib.get('key') == 'd5':
-                is_d5 = True
+            if subnode.attrib.get('key') == url_key:
+                is_url_found = True
                 nodedescription = subnode.text
-            
-            # Per SVGNode, estrai la posizione y
+
+                # Per SVGNode, estrai la posizione y
                 geometry = subnode.find('.//{http://www.yworks.com/xml/graphml}SVGNode/{http://www.yworks.com/xml/graphml}Geometry')
                 if geometry is not None:
                     y_str = geometry.attrib.get('y', '0.0')
                     try:
                         node_y_pos = float(y_str)
-                        # print(f"Extracted y position from SVGNode: {node_y_pos}")
                     except (ValueError, TypeError):
                         print(f"Error converting y position to float: {y_str}")
                         node_y_pos = 0.0
-            
-            # Fallback per i nodi non SVG
-            if subnode.attrib.get('key') == 'd6':
+
+            # Fallback per i nodi non SVG: use nodegraphics key
+            if subnode.attrib.get('key') == ng_key:
                 geometry = subnode.find('.//{http://www.yworks.com/xml/graphml}Geometry')
                 if geometry is not None:
                     y_str = geometry.attrib.get('y', '0.0')
@@ -1611,14 +1634,14 @@ class GraphMLImporter:
                         node_y_pos = float(y_str)
                     except (ValueError, TypeError):
                         node_y_pos = 0.0
-        
-        if not is_d5:
+
+        if not is_url_found:
             nodedescription = ''
-            
+
         if nodedescription == "_continuity":
             #print(f"Extracting continuity node: ID={node_id}, y_pos={node_y_pos}")
             pass
-            
+
         return nodedescription, node_y_pos, node_id
 
     def enhance_edge_type(self, edge_type, source_node, target_node):
@@ -1700,6 +1723,16 @@ class GraphMLImporter:
                 edge_type = "is_documentation_of"
                 # print(f"Enhanced to is_documentation_of: DocumentNode -> {target_type}")
 
+            # StratigraphicNode → ParadataNodeGroup = has_paradata_nodegroup
+            elif (source_type in stratigraphic_types and
+                  target_type == "ParadataNodeGroup"):
+                edge_type = "has_paradata_nodegroup"
+
+            # PropertyNode → ParadataNodeGroup = is_in_paradata_nodegroup
+            elif (source_type == "property" and
+                  target_type == "ParadataNodeGroup"):
+                edge_type = "is_in_paradata_nodegroup"
+
             # Nodi ParadataNode (e sottoclassi) collegati a ParadataNodeGroup
             elif (isinstance(source_node, (DocumentNode, ExtractorNode, CombinerNode, ParadataNode)) and
                 target_type == "ParadataNodeGroup"):
@@ -1738,7 +1771,10 @@ class GraphMLImporter:
         """
         edge_type = "generic_connection"  # Default edge type
 
-        data_element = edge.find('./{http://graphml.graphdrawing.org/xmlns}data[@key="d10"]')
+        # Use dynamic key mapping instead of hardcoded "d10"
+        edge_graphics_key = self.key_map.get('edge', {}).get('edgegraphics', 'd10')
+        ns = 'http://graphml.graphdrawing.org/xmlns'
+        data_element = edge.find(f'./{{{ns}}}data[@key="{edge_graphics_key}"]')
 
         if data_element is not None:
             # Extract graphical line style and map it to a semantic relationship

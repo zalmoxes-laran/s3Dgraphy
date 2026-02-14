@@ -379,7 +379,7 @@ def get_ai_prompt(language: str = None) -> str:
     """
     # Locate the bundled prompt file inside the package
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-    prompt_path = os.path.join(data_dir, 'AI_EXTRACTION_PROMPT.md')
+    prompt_path = os.path.join(data_dir, 'AI_EXTRACTION_PROMPT_v2.md')
 
     if not os.path.exists(prompt_path):
         raise FileNotFoundError(
