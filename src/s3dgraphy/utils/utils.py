@@ -355,9 +355,8 @@ def get_ai_prompt(language: str = None) -> str:
     """
     Build and return the AI extraction prompt for stratigraphic data.
 
-    Reads the AI_EXTRACTION_PROMPT.md bundled inside the s3dgraphy package,
-    extracts Part A (stratigraphy) and Part B (paradata), and prepends a
-    language instruction.
+    Reads the AI_EXTRACTION_PROMPT_v2.md bundled inside the s3dgraphy package
+    and prepends a language instruction.
 
     Args:
         language: Target language for AI-generated descriptions.
@@ -370,7 +369,6 @@ def get_ai_prompt(language: str = None) -> str:
 
     Raises:
         FileNotFoundError: If the bundled prompt file cannot be located.
-        ValueError: If the prompt file cannot be parsed (fewer than 2 code blocks).
 
     Example:
         >>> prompt = get_ai_prompt("Italian")
@@ -390,28 +388,6 @@ def get_ai_prompt(language: str = None) -> str:
     with open(prompt_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    # Extract code blocks (text between ``` delimiters)
-    blocks = []
-    current_block = []
-    in_block = False
-    for line in content.splitlines():
-        if line.strip() == '```':
-            if in_block:
-                blocks.append('\n'.join(current_block))
-                current_block = []
-            in_block = not in_block
-        elif in_block:
-            current_block.append(line)
-
-    if len(blocks) < 2:
-        raise ValueError(
-            "Could not parse prompt blocks from AI_EXTRACTION_PROMPT.md. "
-            f"Expected at least 2 code blocks, found {len(blocks)}."
-        )
-
-    part_a = blocks[0]
-    part_b = blocks[1]
-
     # Build language instruction
     default_lang = "the same as the original document"
     if not language or language.strip().lower() == default_lang.lower():
@@ -424,13 +400,7 @@ def get_ai_prompt(language: str = None) -> str:
             f"IMPORTANT: Write all descriptions and properties in {language.strip()}."
         )
 
-    # Compose final prompt
-    full_prompt = (
-        f"{lang_instruction}\n\n"
-        f"--- PART A: STRATIGRAPHY EXTRACTION ---\n\n"
-        f"{part_a}\n\n"
-        f"--- PART B: PARADATA EXTRACTION ---\n\n"
-        f"{part_b}"
-    )
+    # Compose: language instruction + full prompt content
+    full_prompt = f"{lang_instruction}\n\n{content}"
 
     return full_prompt
