@@ -363,10 +363,12 @@ class NodeGenerator:
             data_d5.set('key', 'd5')
             data_d5.text = str(description)
 
-        # Add EMID (d7)
+        # Add EMID (d7) — use original_emid if available (per-group document copies
+        # share the same EMID as the original DocumentNode in the graph)
+        emid_value = getattr(node, 'original_emid', None) or node_uuid
         data_d7 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
         data_d7.set('key', 'd7')
-        data_d7.text = node_uuid
+        data_d7.text = emid_value
 
         # Add nodegraphics (d6) - GenericNode BPMN Data Object
         data_d6 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')

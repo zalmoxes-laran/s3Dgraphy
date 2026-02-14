@@ -522,6 +522,27 @@ class GraphMLExporter:
         # Per-document extractor counter (legacy path only)
         extractor_counters = {}  # doc_serial → counter
 
+        # Pre-scan graph for existing paradata nodes to avoid name collisions.
+        # QualiaImporter may have already created D.XX / D.XX.YY nodes in the
+        # in-memory graph; the legacy inject counters must start AFTER those.
+        import re as _re
+        for _node in self.graph.get_nodes_by_type("document"):
+            _m = _re.match(r'^D\.(\d+)$', _node.name)
+            if _m:
+                _serial = int(_m.group(1))
+                _doc_name = _node.description if _node.description else None
+                if _doc_name:
+                    document_registry[_doc_name] = _serial
+                if _serial >= doc_serial_counter:
+                    doc_serial_counter = _serial + 1
+
+        for _node in self.graph.get_nodes_by_type("extractor"):
+            _m = _re.match(r'^D\.(\d+)\.(\d+)$', _node.name)
+            if _m:
+                _ds, _es = int(_m.group(1)), int(_m.group(2))
+                extractor_counters.setdefault(_ds, 0)
+                extractor_counters[_ds] = max(extractor_counters[_ds], _es)
+
         for us_node in stratigraphic_nodes:
             # --- QUALIA PATH: Check for PropertyNodes in graph ---
             prop_nodes = self.graph.get_property_nodes_for_node(us_node.node_id)
@@ -571,12 +592,16 @@ class GraphMLExporter:
                                 docs = self.graph.get_document_nodes_for_extractor(ext.node_id)
                                 for doc in docs:
                                     # Create per-group copy of document node
+                                    # Uses unique UUID for nesting but preserves
+                                    # original node_id as EMID so all copies of
+                                    # the same document share the same EMID.
                                     if doc.node_id not in local_doc_copies:
                                         local_doc = DocumentNode(
                                             node_id=generate_uuid(),
                                             name=doc.name,
                                             description=doc.description
                                         )
+                                        local_doc.original_emid = doc.node_id
                                         local_doc_copies[doc.node_id] = local_doc
                                     chain['extractors'].append({
                                         'extractor': ext,
@@ -599,6 +624,7 @@ class GraphMLExporter:
                                         name=doc.name,
                                         description=doc.description
                                     )
+                                    local_doc.original_emid = doc.node_id
                                     local_doc_copies[doc.node_id] = local_doc
                                 chain['extractors'].append({
                                     'extractor': ext,
