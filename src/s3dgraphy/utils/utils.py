@@ -355,7 +355,7 @@ def get_ai_prompt(language: str = None) -> str:
     """
     Build and return the AI extraction prompt for stratigraphic data.
 
-    Reads the AI_EXTRACTION_PROMPT_v2.md bundled inside the s3dgraphy package
+    Reads the AI_EXTRACTION_PROMPT_v3.md bundled inside the s3dgraphy package
     and prepends a language instruction.
 
     Args:
@@ -377,7 +377,7 @@ def get_ai_prompt(language: str = None) -> str:
     """
     # Locate the bundled prompt file inside the package
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-    prompt_path = os.path.join(data_dir, 'AI_EXTRACTION_PROMPT_v2.md')
+    prompt_path = os.path.join(data_dir, 'AI_EXTRACTION_PROMPT_v3.md')
 
     if not os.path.exists(prompt_path):
         raise FileNotFoundError(
