@@ -152,6 +152,81 @@ class QualiaImporter:
         """Generate a UUID for node/edge IDs."""
         return str(uuid.uuid4())
 
+    def _scan_existing_graph(self):
+        """
+        Scan the existing graph for paradata nodes and initialize counters
+        to avoid name collisions when adding new nodes.
+
+        Scans DocumentNodes (D.XX), ExtractorNodes (D.XX.YY), and
+        CombinerNodes (C.XX) to find the highest serial numbers in use,
+        then sets internal counters to continue from the next available number.
+
+        Also pre-loads the _document_nodes registry so that existing
+        documents are reused rather than re-created.
+        """
+        doc_name_pattern = re.compile(r'^D\.(\d+)$')
+        ext_name_pattern = re.compile(r'^D\.(\d+)\.(\d+)$')
+        comb_name_pattern = re.compile(r'^C\.(\d+)$')
+
+        max_doc_serial = 0
+        max_comb_serial = 0
+        docs_found = 0
+        extractors_found = 0
+        combiners_found = 0
+
+        # --- Scan DocumentNodes ---
+        for node in self.graph.get_nodes_by_type("document"):
+            m = doc_name_pattern.match(node.name)
+            if m:
+                serial = int(m.group(1))
+                max_doc_serial = max(max_doc_serial, serial)
+                docs_found += 1
+
+                # Use description as the document name key (original filename)
+                doc_name = node.description if node.description else None
+                if doc_name:
+                    self.document_registry[doc_name] = serial
+                    self._document_nodes[doc_name] = node
+
+        # --- Scan ExtractorNodes ---
+        for node in self.graph.get_nodes_by_type("extractor"):
+            m = ext_name_pattern.match(node.name)
+            if m:
+                doc_serial = int(m.group(1))
+                ext_serial = int(m.group(2))
+                extractors_found += 1
+
+                # Track highest extractor serial per document
+                current_max = self.extractor_counters.get(doc_serial, 0)
+                self.extractor_counters[doc_serial] = max(current_max, ext_serial)
+
+        # --- Scan CombinerNodes ---
+        for node in self.graph.get_nodes_by_type("combiner"):
+            m = comb_name_pattern.match(node.name)
+            if m:
+                serial = int(m.group(1))
+                max_comb_serial = max(max_comb_serial, serial)
+                combiners_found += 1
+
+        # --- Update global counters ---
+        if max_doc_serial > 0:
+            self.doc_serial_counter = max_doc_serial + 1
+
+        if max_comb_serial > 0:
+            self.combiner_counter = max_comb_serial
+
+        # --- Print summary ---
+        if docs_found > 0 or extractors_found > 0 or combiners_found > 0:
+            print(f"  Existing paradata found in graph:")
+            print(f"    Documents: {docs_found} (next serial: D.{self.doc_serial_counter:02d})")
+            print(f"    Extractors: {extractors_found}")
+            if self.extractor_counters:
+                for ds, mx in sorted(self.extractor_counters.items()):
+                    print(f"      D.{ds:02d}.* → next: D.{ds:02d}.{mx + 1:02d}")
+            print(f"    Combiners: {combiners_found} (next serial: C.{self.combiner_counter + 1:02d})")
+        else:
+            print(f"  No existing paradata nodes found — starting fresh.")
+
     def _get_document_serial(self, doc_name: str) -> int:
         """
         Get or create serial number for a document name.
@@ -422,6 +497,9 @@ class QualiaImporter:
         print(f"\n{'='*60}")
         print(f"QualiaImporter: Loading em_paradata from {os.path.basename(self.filepath)}")
         print(f"{'='*60}")
+
+        # Scan existing graph for paradata nodes to avoid name collisions
+        self._scan_existing_graph()
 
         if not os.path.exists(self.filepath):
             raise FileNotFoundError(f"Paradata file not found: {self.filepath}")
