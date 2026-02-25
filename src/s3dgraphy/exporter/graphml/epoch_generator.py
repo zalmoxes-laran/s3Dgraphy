@@ -542,6 +542,6 @@ class EpochSwimlanesGenerator:
                     ordered.append(node)
 
             return ordered
-        except nx.NetworkXError:
-            # If cycle or no edges, return as-is
+        except (nx.NetworkXError, nx.NetworkXUnfeasible):
+            # If cycle or no edges, return as-is (unordered)
             return nodes
