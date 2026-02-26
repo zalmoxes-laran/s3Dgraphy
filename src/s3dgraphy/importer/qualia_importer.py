@@ -735,6 +735,10 @@ class QualiaImporter:
 
         print(f"{'='*60}\n")
 
+        # Propagate warnings to graph.warnings so Blender UI can display them
+        for w in self.warnings:
+            self.graph.add_warning(f"[Paradata] {w}")
+
         return self.graph
 
     def display_warnings(self):

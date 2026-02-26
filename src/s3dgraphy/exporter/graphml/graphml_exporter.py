@@ -72,7 +72,9 @@ class GraphMLExporter:
             try:
                 minimal_edges = engine.transitive_reduction(temporal_edges)
             except ValueError as e:
-                print(f"  ⚠️ Temporal cycle detected: {e}")
+                warning_msg = f"Temporal cycle detected: {str(e).splitlines()[0]}"
+                print(f"  ⚠️ {warning_msg}")
+                self.graph.add_warning(warning_msg)
                 minimal_edges = temporal_edges  # fallback: use unreduced
 
             engine.print_inference_report(temporal_edges, minimal_edges)
