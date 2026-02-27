@@ -351,33 +351,69 @@ def add_graph_prefix(name: str, graph_code: str, separator: str = '.') -> str:
     return manage_id_prefix(name, graph_code, 'add', separator)
 
 
-def get_ai_prompt(language: str = None) -> str:
-    """
-    Build and return the AI extraction prompt for stratigraphic data.
+def _process_section(text: str, section_id: str, include: bool) -> str:
+    """Include or remove a <!-- SECTION: X -->...<!-- /SECTION: X --> block."""
+    import re
+    open_tag  = f'<!-- SECTION: {section_id} -->'
+    close_tag = f'<!-- /SECTION: {section_id} -->'
+    if include:
+        return text.replace(open_tag, '').replace(close_tag, '')
+    pattern = re.escape(open_tag) + r'.*?' + re.escape(close_tag)
+    return re.sub(pattern, '', text, flags=re.DOTALL)
 
-    Reads the AI_EXTRACTION_PROMPT_v3.md bundled inside the s3dgraphy package
-    and prepends a language instruction.
+
+def _process_flag(text: str, flag_id: str, include: bool) -> str:
+    """Include or remove a <!-- FLAG: X -->...<!-- /FLAG: X --> block."""
+    import re
+    open_tag  = f'<!-- FLAG: {flag_id} -->'
+    close_tag = f'<!-- /FLAG: {flag_id} -->'
+    if include:
+        return text.replace(open_tag, '').replace(close_tag, '')
+    pattern = re.escape(open_tag) + r'.*?' + re.escape(close_tag)
+    return re.sub(pattern, '', text, flags=re.DOTALL)
+
+
+def _strip_html_comments(text: str) -> str:
+    """Remove all remaining HTML comments from text."""
+    import re
+    return re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
+
+
+def get_ai_prompt(
+    language: str = None,
+    include_part_a: bool = True,
+    include_part_b: bool = True,
+    include_part_c: bool = False,
+    include_part_d: bool = False,
+    include_checklist: bool = True,
+    include_validation: bool = False,
+) -> str:
+    """
+    Build and return the AI extraction prompt for stratigraphic data (v4.1).
+
+    Reads ``AI_EXTRACTION_PROMPT_v4.md`` bundled inside the s3dgraphy package,
+    assembles the requested sections, substitutes the language placeholder, and
+    prepends a language instruction line.
 
     Args:
-        language: Target language for AI-generated descriptions.
-            If None, empty, or equal to "the same as the original document",
-            the prompt instructs the AI to use the source document's language.
-            Otherwise, the specified language is used (e.g., "Italian", "English").
+        language: Working language. If None / empty / "the same as the original
+            document", the AI is instructed to keep the source document's language.
+        include_part_a: Include Part A (Stratigraphy extraction). Default True.
+        include_part_b: Include Part B (Paradata extraction). Default True.
+        include_part_c: Include Part C (ParadataEpochs). Default False.
+        include_part_d: Include Part D (Sources list). Default False.
+        include_checklist: Include Part E (end-of-session checklist). Default True.
+        include_validation: Include the embedded Python validation script and
+            related checklist items (FLAG: VALIDAZIONE_FINALE). Default False.
 
     Returns:
-        str: The composed prompt text ready to paste into an AI assistant.
+        str: The assembled prompt ready to paste into an AI assistant.
 
     Raises:
         FileNotFoundError: If the bundled prompt file cannot be located.
-
-    Example:
-        >>> prompt = get_ai_prompt("Italian")
-        >>> print(prompt[:60])
-        IMPORTANT: Write all descriptions and properties in Italian.
     """
-    # Locate the bundled prompt file inside the package
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-    prompt_path = os.path.join(data_dir, 'AI_EXTRACTION_PROMPT_v3.md')
+    prompt_path = os.path.join(data_dir, 'AI_EXTRACTION_PROMPT_v4.md')
 
     if not os.path.exists(prompt_path):
         raise FileNotFoundError(
@@ -386,21 +422,41 @@ def get_ai_prompt(language: str = None) -> str:
         )
 
     with open(prompt_path, 'r', encoding='utf-8') as f:
-        content = f.read()
+        source_md = f.read()
 
-    # Build language instruction
-    default_lang = "the same as the original document"
-    if not language or language.strip().lower() == default_lang.lower():
+    # Resolve language
+    _default = "the same as the original document"
+    lang = language.strip() if language else ""
+    lang_str = lang if (lang and lang.lower() != _default.lower()) else _default
+
+    # 1. Language placeholder
+    result = source_md.replace('[LINGUA]', lang_str)
+
+    # 2. Flags (nested inside sections — must be processed first)
+    result = _process_flag(result, 'VALIDAZIONE_FINALE', include_validation)
+
+    # 3. Sections
+    for section_id, include in [
+        ('PART_A',    include_part_a),
+        ('PART_B',    include_part_b),
+        ('PART_C',    include_part_c),
+        ('PART_D',    include_part_d),
+        ('CHECKLIST', include_checklist),
+    ]:
+        result = _process_section(result, section_id, include)
+
+    # 4. Strip any remaining HTML comment markers
+    result = _strip_html_comments(result)
+
+    # 5. Prepend language instruction
+    if lang_str == _default:
         lang_instruction = (
             "IMPORTANT: Write all descriptions and properties in the same "
             "language as the original document."
         )
     else:
         lang_instruction = (
-            f"IMPORTANT: Write all descriptions and properties in {language.strip()}."
+            f"IMPORTANT: Write all descriptions and properties in {lang_str}."
         )
 
-    # Compose: language instruction + full prompt content
-    full_prompt = f"{lang_instruction}\n\n{content}"
-
-    return full_prompt
+    return f"{lang_instruction}\n\n{result.strip()}"

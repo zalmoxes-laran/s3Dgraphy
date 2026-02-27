@@ -477,6 +477,32 @@ class GraphMLExporter:
 
         return edge_elem
 
+    # Topological edge types used for relation string computation
+    _TOPO_EDGE_TYPES = (
+        'overlies', 'is_overlain_by', 'cuts', 'is_cut_by',
+        'fills', 'is_filled_by', 'abuts', 'is_abutted_by',
+        'is_bonded_to', 'is_physically_equal_to'
+    )
+
+    def _compute_relations_string(self, us_node) -> str:
+        """Return 'overlies: A, B; cuts: C' for outgoing topological edges (non-empty only)."""
+        from ...utils.utils import get_base_name
+        node_map = {n.node_id: n for n in self.graph.nodes}
+        relations: dict = {}
+        for edge in self.graph.edges:
+            if edge.edge_source == us_node.node_id and edge.edge_type in self._TOPO_EDGE_TYPES:
+                target = node_map.get(edge.edge_target)
+                if target:
+                    name = get_base_name(target.name) or target.name
+                    relations.setdefault(edge.edge_type, []).append(name)
+        if not relations:
+            return ""
+        parts = []
+        for rel_type in self._TOPO_EDGE_TYPES:
+            if rel_type in relations:
+                parts.append(f"{rel_type}: {', '.join(sorted(relations[rel_type]))}")
+        return "; ".join(parts)
+
     def _build_paradata_groups(self, stratigraphic_nodes: List) -> List[Dict]:
         """
         Build ParadataNodeGroup structures from stratigraphic nodes.
@@ -515,7 +541,7 @@ class GraphMLExporter:
             'subphaseStart', 'subphaseEnd',
             'overlies', 'overlainBy', 'cuts', 'cutBy',
             'fills', 'filledBy', 'abuts', 'abuttedBy',
-            'bondedTo', 'equals', 'stratigraphic_definition'
+            'bondedTo', 'equals'
         }
 
         # Global registry for document serial numbers (legacy path only)
@@ -567,6 +593,13 @@ class GraphMLExporter:
                 seen_combiners = set()
 
                 for prop in paradata_props:
+                    # Augment stratigraphic_definition with relations from graph edges
+                    if prop.name == 'stratigraphic_definition':
+                        rel_str = self._compute_relations_string(us_node)
+                        if rel_str:
+                            existing = prop.description or ""
+                            prop.description = f"{existing}\n---\n{rel_str}" if existing else rel_str
+
                     chain = {
                         'property': prop,
                         'combiner': None,
@@ -642,14 +675,18 @@ class GraphMLExporter:
                 # attributes from stratigraphy.xlsx (columns W/X). Inject those
                 # as an additional stratigraphic_definition chain so they appear
                 # alongside the qualia properties in the same PD group.
+                # Skip if qualia already processed a stratigraphic_definition node.
                 extractor_attr = getattr(us_node, 'extractor', None)
                 document_attr = getattr(us_node, 'document', None)
+                has_qualia_strdef = any(p.name == 'stratigraphic_definition' for p in paradata_props)
+                rel_str_inject = self._compute_relations_string(us_node)
 
-                if extractor_attr or document_attr:
+                if not has_qualia_strdef and (extractor_attr or document_attr or rel_str_inject):
                     legacy_prop = PropertyNode(
                         node_id=f"{us_node.node_id}_prop_strdef",
                         name="stratigraphic_definition",
-                        property_type="stratigraphic_definition"
+                        property_type="stratigraphic_definition",
+                        description=rel_str_inject
                     )
                     property_nodes.append(legacy_prop)
 
@@ -736,10 +773,13 @@ class GraphMLExporter:
                         ext_name = f"D.{doc_serial:02d}.{ext_serial:02d}"  # D.01.01
 
                     # Create PropertyNode for stratigraphic_definition
+                    # Include stratigraphic relations in description
+                    _rel_str = self._compute_relations_string(us_node)
                     property_node = PropertyNode(
                         node_id=f"{us_node.node_id}_prop_strdef",
                         name="stratigraphic_definition",
-                        property_type="stratigraphic_definition"
+                        property_type="stratigraphic_definition",
+                        description=_rel_str
                     )
 
                     property_nodes = [property_node]
