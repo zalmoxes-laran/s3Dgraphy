@@ -3,7 +3,7 @@
 import xml.etree.ElementTree as ET
 from ..graph import Graph
 from ..nodes.stratigraphic_node import (
-    Node, StratigraphicNode, ContinuityNode)
+    Node, StratigraphicNode, StratigraphicUnit, DocumentaryStratigraphicUnit, ContinuityNode)
 from ..nodes.paradata_node import ParadataNode
 from ..nodes.document_node import DocumentNode
 from ..nodes.combiner_node import CombinerNode
@@ -870,6 +870,15 @@ class GraphMLImporter:
         # Determinare il tipo di nodo gruppo basandoci sul background color
         group_node_type = self.determine_group_node_type_by_color(group_background_color)
 
+        # US/USD Container: crea un nodo stratigrafico regolare (non un GroupNode)
+        # La contenitorialità è espressa tramite edge is_part_of, non tramite tipo di nodo
+        if group_node_type in ('USContainer', 'USDContainer'):
+            self._handle_stratigraphic_container(
+                group_node_type, uuid_id, original_id, group_name,
+                group_description, group_y_pos, node_uri, node_element
+            )
+            return
+
         if group_node_type == 'ActivityNodeGroup':
             group_node = ActivityNodeGroup(
                 node_id=uuid_id,
@@ -930,10 +939,10 @@ class GraphMLImporter:
                 # Qui devi usare la mappatura UUID per creare l'arco
                 if subnode_original_id in self.id_mapping:
                     subnode_uuid = self.id_mapping[subnode_original_id]
-                    
+
                     # Creare l'arco appropriato in base al tipo di gruppo
                     edge_type = "generic_connection"  # Fallback sicuro
-                    
+
                     if group_node_type == "ActivityNodeGroup":
                         edge_type = "is_in_activity"
                         edge_id_prefix = "is_in_activity"
@@ -946,7 +955,7 @@ class GraphMLImporter:
                     else:
                         # Per altri tipi di gruppo non specificati
                         edge_id_prefix = "grouped_in"
-                    
+
                     # Crea l'edge con gli UUID
                     edge_id = f"{subnode_uuid}_{edge_id_prefix}_{uuid_id}"
                     try:
@@ -958,6 +967,81 @@ class GraphMLImporter:
                         )
                     except Exception as e:
                         print(f"Error creating edge from {subnode_uuid} to {uuid_id}: {e}")
+
+    def _handle_stratigraphic_container(self, group_node_type, uuid_id, original_id,
+                                         group_name, group_description, group_y_pos,
+                                         node_uri, node_element):
+        """
+        Gestisce un nodo gruppo GraphML che rappresenta una US o USD contenitrice.
+        Crea un nodo stratigrafico regolare (StratigraphicUnit o DocumentaryStratigraphicUnit)
+        e collega i nodi figli tramite edge is_part_of.
+
+        La contenitorialità non è un tipo di nodo diverso: è una relazione (is_part_of).
+        Questo permette al nodo container di mantenere tutte le proprietà stratigrafiche
+        (epoca, attività, representation model, etc.).
+        """
+        # Crea il nodo stratigrafico appropriato
+        if group_node_type == 'USContainer':
+            container_node = StratigraphicUnit(
+                node_id=uuid_id,
+                name=group_name,
+                description=group_description
+            )
+            container_node.attributes['shape'] = 'rectangle'
+            container_node.attributes['border_style'] = '#9B3333'
+            container_node.attributes['fill_color'] = '#FFFFFF'
+            print(f"[GraphML Parser] Created US container node: {group_name} ({uuid_id})")
+        else:  # USDContainer
+            container_node = DocumentaryStratigraphicUnit(
+                node_id=uuid_id,
+                name=group_name,
+                description=group_description
+            )
+            container_node.attributes['shape'] = 'roundrectangle'
+            container_node.attributes['border_style'] = '#D86400'
+            container_node.attributes['fill_color'] = '#FFFFFF'
+            print(f"[GraphML Parser] Created USD container node: {group_name} ({uuid_id})")
+
+        # Attributi di tracciamento
+        container_node.attributes['original_id'] = original_id
+        container_node.attributes['graph_id'] = self.graph.graph_id
+        container_node.attributes['y_pos'] = float(group_y_pos)
+        container_node.attributes['is_container'] = True
+
+        if node_uri:
+            container_node.attributes['URI'] = node_uri
+
+        self.graph.add_node(container_node)
+
+        # Processa i nodi figli contenuti nel gruppo
+        subgraph = node_element.find('{http://graphml.graphdrawing.org/xmlns}graph')
+        if subgraph is not None:
+            subnodes = subgraph.findall('{http://graphml.graphdrawing.org/xmlns}node')
+            for subnode in subnodes:
+                subnode_original_id = self.getnode_id(subnode)
+                subnode_type = self._check_node_type(subnode)
+
+                if subnode_type == 'node_simple':
+                    self.process_node_element(subnode)
+                elif subnode_type == 'node_group':
+                    self.handle_group_node(subnode)
+                elif subnode_type == 'node_swimlane':
+                    self.extract_epochs(subnode, self.graph)
+
+                # Crea edge is_part_of: figlio -> container
+                if subnode_original_id in self.id_mapping:
+                    subnode_uuid = self.id_mapping[subnode_original_id]
+                    edge_id = f"{subnode_uuid}_is_part_of_{uuid_id}"
+                    try:
+                        self.graph.add_edge(
+                            edge_id=edge_id,
+                            edge_source=subnode_uuid,
+                            edge_target=uuid_id,
+                            edge_type="is_part_of"
+                        )
+                        print(f"[GraphML Parser] Created is_part_of edge: {subnode_uuid} -> {uuid_id}")
+                    except Exception as e:
+                        print(f"Error creating is_part_of edge from {subnode_uuid} to {uuid_id}: {e}")
 
     def extract_epochs(self, node_element, graph):
         """
@@ -1335,6 +1419,10 @@ class GraphMLImporter:
             return 'ParadataNodeGroup'
         elif background_color == '#99CC00':
             return 'TimeBranchNodeGroup'
+        elif background_color == '#9B3333':
+            return 'USContainer'
+        elif background_color == '#D86400':
+            return 'USDContainer'
         else:
             return 'GroupNode'
 

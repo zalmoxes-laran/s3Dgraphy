@@ -613,6 +613,25 @@
         "target": ["DocumentNode"]
       }
     },
+    "is_part_of": {
+      "name": "is_part_of",
+      "label": "Is part of",
+      "description": "Indicates physical containment: a node is physically contained within a stratigraphic unit (e.g., a Special Find reused inside a wall).",
+      "reverse": {
+        "name": "has_part",
+        "label": "Has part"
+      },
+      "mapping": {
+        "cidoc": "P46i_forms_part_of",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "P46_is_composed_of",
+        "extension_name": "CIDOC-CRM"
+      },
+      "allowed_connections": {
+        "source": ["SpecialFindUnit", "VirtualSpecialFindUnit"],
+        "target": ["StratigraphicUnit", "DocumentaryStratigraphicUnit"]
+      }
+    },
     "generic_connection": {
       "name": "generic_connection",
       "label": "Generic connection",
