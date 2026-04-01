@@ -13,10 +13,14 @@ s3dgraphy Documentation
    :target: https://github.com/zalmoxes-laran/s3dgraphy/blob/main/LICENSE
    :alt: License
 
-**s3dgraphy** is a Python library that implements the Extended Matrix formal language 
-for archaeological stratigraphic documentation and virtual reconstruction processes. 
-It provides the core graph structure and node management system that powers the 
+**s3dgraphy** is a Python library that implements the `Extended Matrix <https://www.extendedmatrix.org>`_ formal language
+for archaeological stratigraphic documentation and virtual reconstruction processes.
+It provides the core graph structure and node management system that powers the
 Extended Matrix Framework (EMF).
+
+.. note::
+
+   **s3dgraphy and Extended Matrix are not the same thing.** Extended Matrix (EM) is a *formal visual language* — a human-readable notation for stratigraphic sequences, designed to be authored and reviewed by archaeologists using graph editors or AI-assisted tools. s3dgraphy is its *computational counterpart*: the Python library that encodes EM knowledge as a property knowledge graph (GraphML/JSON) and enables software tools to read, write, validate, and exchange that knowledge. Think of EM as the score and s3dgraphy as the engine that plays it.
 
 🎯 What is s3dgraphy?
 ---------------------
