@@ -576,106 +576,219 @@ class Graph:
         return connected_epoch_nodes
 
 
-    def calculate_chronology(self, graph):
-        """
-        Calculate the chronology for all stratigraphic nodes in the graph.
+    # =========================================================================
+    # CHRONOLOGY CALCULATION & TEMPORAL PROPAGATION (TPQ/TAQ)
+    # =========================================================================
 
-        This method implements the chronology calculation protocol, considering
-        the hierarchy of data: specific > local > general. It propagates temporal
-        information through the stratigraphic relationships and epoch associations.
+    # Relations where source is MORE RECENT than target
+    _SOURCE_IS_MORE_RECENT = {'cuts', 'overlies', 'fills', 'is_after'}
+    # Relations where target is MORE RECENT than source
+    _TARGET_IS_MORE_RECENT = {'is_cut_by', 'is_overlain_by', 'is_filled_by', 'is_before'}
+
+    def calculate_chronology(self, graph=None):
+        """
+        Calculate chronology for all stratigraphic nodes in this graph.
+
+        Protocol (hierarchy: specific > local > general):
+        1. Assign base times from epoch associations (has_first_epoch, survive_in_epoch)
+        2. Override with specific property values (absolute_start_date, absolute_end_date)
+        3. Propagate TPQ/TAQ constraints through stratigraphic relations
 
         Args:
-            graph (Graph): The graph containing stratigraphic nodes and their relationships.
-
-        Returns:
-            None: The method updates the nodes in place.
+            graph: Deprecated, ignored. Kept for backwards compatibility.
         """
-        stratigraphic_nodes = self.get_nodes_of_type(graph, "StratigraphicNode")
+        strat_nodes = self.get_nodes_by_type("StratigraphicNode")
 
-        for node in stratigraphic_nodes:
-            self.propagate_chronology(graph, node)
+        # Pass 1: calculate base times (epoch + specific properties)
+        for node in strat_nodes:
+            self._calculate_base_chronology(node)
 
+        # Pass 2: propagate TPQ/TAQ constraints
+        self._propagate_tpq_taq(strat_nodes)
 
-    def propagate_chronology(self, graph, node):
+    def _calculate_base_chronology(self, node):
         """
-        Propagate chronological information for a single stratigraphic node.
+        Calculate base chronological times for a node from epochs and properties.
+        Specific properties (absolute_start_date/absolute_end_date) override epoch times.
+        """
+        # Get epoch-based times
+        epoch_nodes = self.get_connected_epoch_nodes_list_by_edge_type(node, "has_first_epoch")
+        # Also include survive_in_epoch for broader range
+        survived_epochs = self.get_connected_epoch_nodes_list_by_edge_type(node, "survive_in_epoch")
+        all_epochs = epoch_nodes + survived_epochs
 
-        This method applies the chronology calculation protocol to a specific node,
-        considering its properties, associated epochs, and stratigraphic relationships.
+        epoch_start = None
+        epoch_end = None
+        if all_epochs:
+            valid_starts = [e.start_time for e in all_epochs if hasattr(e, 'start_time') and e.start_time is not None]
+            valid_ends = [e.end_time for e in all_epochs if hasattr(e, 'end_time') and e.end_time is not None]
+            if valid_starts:
+                epoch_start = min(valid_starts)
+            if valid_ends:
+                epoch_end = max(valid_ends)
+
+        # Look for specific property nodes (override epoch times)
+        start_prop = self._find_temporal_property(node, "absolute_start_date")
+        end_prop = self._find_temporal_property(node, "absolute_end_date")
+
+        start_time = float(start_prop.value) if start_prop and start_prop.value is not None else epoch_start
+        end_time = float(end_prop.value) if end_prop and end_prop.value is not None else epoch_end
+
+        self._set_calculated_times(node, start_time, end_time)
+
+    def _find_temporal_property(self, node, property_type):
+        """
+        Find a property node of a given type connected to a stratigraphic node.
+
+        Searches via 'has_property' edges for PropertyNode with matching property_type.
 
         Args:
-            graph (Graph): The graph containing the node and its relationships.
-            node (StratigraphicNode): The node for which to calculate chronology.
+            node: The stratigraphic node to search from.
+            property_type: The property type to find (e.g. "absolute_start_date").
 
         Returns:
-            None: The method updates the node in place.
+            PropertyNode or None
         """
-        start_time_prop = self.find_property_node(graph, node, "Start_time")
-        end_time_prop = self.find_property_node(graph, node, "End_time")
-
-        epochs = self.get_connected_epoch_nodes(graph, node)
-
-        delta_start = min(epoch.start_time for epoch in epochs) if epochs else None
-        delta_end = max(epoch.end_time for epoch in epochs) if epochs else None
-
-        start_time = float(start_time_prop.value) if start_time_prop else delta_start
-        end_time = float(end_time_prop.value) if end_time_prop else delta_end
-        self.set_calculated_times(node, start_time, end_time)
-        self.propagate_to_connected_nodes(graph, node, start_time, end_time)
-
-
-    def find_property_node(self, graph, node, property_type):
-        """
-        Find a specific property node connected to a stratigraphic node.
-
-        This method searches for a property node of a given type that is connected
-        to the stratigraphic node via a 'dashed' edge type.
-
-        Args:
-            graph (Graph): The graph containing the nodes and their relationships.
-            node (StratigraphicNode): The stratigraphic node to search from.
-            property_type (str): The type of property to find (e.g., "Start_time", "End_time").
-
-        Returns:
-            PropertyNode or None: The found property node, or None if not found.
-        """
-        for edge in self.get_connected_edges(graph, node):
-            if edge.type == "dashed":
-                prop_node = self.find_node_by_id(graph, edge.target)
-                if self.is_property_node(prop_node) and prop_node.property_type == property_type:
+        for edge in self.get_connected_edges(node.node_id):
+            if edge.edge_type == "has_property" and edge.edge_source == node.node_id:
+                prop_node = self.find_node_by_id(edge.edge_target)
+                if (prop_node and
+                    isinstance(prop_node, PropertyNode) and
+                    prop_node.property_type == property_type):
                     return prop_node
         return None
 
-
-    def set_calculated_times(self, node, start_time, end_time):
+    def _set_calculated_times(self, node, start_time, end_time):
         """
-        Set the calculated start and end times as attributes of a stratigraphic node.
-
-        Args:
-            node (StratigraphicNode): The node to update.
-            start_time (float or None): The calculated start time.
-            end_time (float or None): The calculated end time.
+        Set calculated start and end times as node attributes.
         """
         if start_time is not None:
             node.attributes["CALCUL_START_T"] = start_time
         if end_time is not None:
             node.attributes["CALCUL_END_T"] = end_time
 
-
-    def filter_nodes_by_time_range(self, graph, start_time, end_time):
+    def _propagate_tpq_taq(self, strat_nodes):
         """
-        Filter stratigraphic nodes based on a given time range.
+        Propagate Terminus Post Quem (TPQ) and Terminus Ante Quem (TAQ) constraints.
+
+        TPQ (propagates upward to more recent nodes):
+            If node A has CALCUL_START_T = X, all nodes that are MORE RECENT than A
+            cannot have CALCUL_START_T < X.
+
+        TAQ (propagates downward to more ancient nodes):
+            If node A has CALCUL_END_T = Y, all nodes that are MORE ANCIENT than A
+            cannot have CALCUL_END_T > Y.
+
+        Only restricts (tightens) existing values, never widens them.
+        """
+        # Build adjacency maps for temporal direction
+        # more_recent_neighbors[node_id] = list of node_ids that are MORE RECENT
+        # more_ancient_neighbors[node_id] = list of node_ids that are MORE ANCIENT
+        more_recent_of = {}  # node_id -> [nodes that are more recent than this node]
+        more_ancient_of = {}  # node_id -> [nodes that are more ancient than this node]
+
+        for edge in self.edges:
+            if edge.edge_type in self._SOURCE_IS_MORE_RECENT:
+                # source is more recent than target
+                more_recent_of.setdefault(edge.edge_target, []).append(edge.edge_source)
+                more_ancient_of.setdefault(edge.edge_source, []).append(edge.edge_target)
+            elif edge.edge_type in self._TARGET_IS_MORE_RECENT:
+                # target is more recent than source
+                more_recent_of.setdefault(edge.edge_source, []).append(edge.edge_target)
+                more_ancient_of.setdefault(edge.edge_target, []).append(edge.edge_source)
+
+        # TPQ propagation: propagate start_time upward (to more recent nodes)
+        # Use BFS from every node that has a CALCUL_START_T
+        for node in strat_nodes:
+            start_t = node.attributes.get("CALCUL_START_T")
+            if start_t is None:
+                continue
+
+            visited = {node.node_id}
+            queue = list(more_recent_of.get(node.node_id, []))
+
+            while queue:
+                neighbor_id = queue.pop(0)
+                if neighbor_id in visited:
+                    continue
+                visited.add(neighbor_id)
+
+                neighbor = self.find_node_by_id(neighbor_id)
+                if not neighbor or not hasattr(neighbor, 'node_type'):
+                    continue
+
+                current_start = neighbor.attributes.get("CALCUL_START_T")
+                # Only tighten: if neighbor's start is before our start, restrict it
+                if current_start is None or current_start < start_t:
+                    neighbor.attributes["CALCUL_START_T"] = start_t
+
+                # Continue propagation upward
+                for next_id in more_recent_of.get(neighbor_id, []):
+                    if next_id not in visited:
+                        queue.append(next_id)
+
+        # TAQ propagation: propagate end_time downward (to more ancient nodes)
+        for node in strat_nodes:
+            end_t = node.attributes.get("CALCUL_END_T")
+            if end_t is None:
+                continue
+
+            visited = {node.node_id}
+            queue = list(more_ancient_of.get(node.node_id, []))
+
+            while queue:
+                neighbor_id = queue.pop(0)
+                if neighbor_id in visited:
+                    continue
+                visited.add(neighbor_id)
+
+                neighbor = self.find_node_by_id(neighbor_id)
+                if not neighbor or not hasattr(neighbor, 'node_type'):
+                    continue
+
+                current_end = neighbor.attributes.get("CALCUL_END_T")
+                # Only tighten: if neighbor's end is after our end, restrict it
+                if current_end is None or current_end > end_t:
+                    neighbor.attributes["CALCUL_END_T"] = end_t
+
+                # Continue propagation downward
+                for next_id in more_ancient_of.get(neighbor_id, []):
+                    if next_id not in visited:
+                        queue.append(next_id)
+
+    def filter_nodes_by_time_range(self, *args):
+        """
+        Filter stratigraphic nodes that overlap with a given time range.
+
+        Accepts:
+            filter_nodes_by_time_range(start_time, end_time)       - new API
+            filter_nodes_by_time_range(graph, start_time, end_time) - old API (graph ignored)
+        """
+        if len(args) == 3:
+            # Old API: (graph, start_time, end_time) - ignore graph
+            start_time, end_time = float(args[1]), float(args[2])
+        elif len(args) == 2:
+            start_time, end_time = float(args[0]), float(args[1])
+        else:
+            return []
+        return self._filter_nodes_by_time_range(start_time, end_time)
+
+    def _filter_nodes_by_time_range(self, start_time, end_time):
+        """
+        Filter stratigraphic nodes that overlap with a given time range.
+
+        A node is included if its [CALCUL_START_T, CALCUL_END_T] interval
+        overlaps with [start_time, end_time].
 
         Args:
-            graph (Graph): The graph containing the nodes to filter.
-            start_time (float): The start of the time range to filter by.
-            end_time (float): The end of the time range to filter by.
+            start_time (float): Start of the time range.
+            end_time (float): End of the time range.
 
         Returns:
-            list: A list of StratigraphicNodes that fall within the specified time range.
+            list: StratigraphicNodes within the specified time range.
         """
         filtered_nodes = []
-        for node in self.get_nodes_of_type(graph, "StratigraphicNode"):
+        for node in self.get_nodes_by_type("StratigraphicNode"):
             node_start = node.attributes.get("CALCUL_START_T")
             node_end = node.attributes.get("CALCUL_END_T")
             if node_start is not None and node_end is not None:
