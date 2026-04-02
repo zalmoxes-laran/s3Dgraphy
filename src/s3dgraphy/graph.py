@@ -597,7 +597,11 @@ class Graph:
         Args:
             graph: Deprecated, ignored. Kept for backwards compatibility.
         """
-        strat_nodes = self.get_nodes_by_type("StratigraphicNode")
+        _STRAT_TYPES = ('US', 'USVs', 'USVn', 'VSF', 'SF', 'USD',
+                        'serSU', 'serUSD', 'serUSVn', 'serUSVs', 'USM')
+        strat_nodes = []
+        for t in _STRAT_TYPES:
+            strat_nodes.extend(self.get_nodes_by_type(t))
 
         # Pass 1: calculate base times (epoch + specific properties)
         for node in strat_nodes:
