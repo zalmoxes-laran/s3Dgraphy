@@ -584,6 +584,13 @@ class GraphMLImporter:
             #print(f"Skipping already processed node with original ID: {original_id}")
             return
 
+        # Salta nodi commento/nota di yEd (sfondo giallo, non sono nodi EM)
+        _, _, _, _, _, fillcolor, _ = self.EM_extract_node_name(node_element)
+        if fillcolor and fillcolor.upper() in ('#FFCC00', '#FFFF00', '#FFFF99'):
+            nodename_check, _, _, _, _, _, _ = self.EM_extract_node_name(node_element)
+            print(f"[GraphML Parser] Skipping comment/note node: '{nodename_check}' (fill={fillcolor})")
+            return
+
         # Estrai campi custom EMID e URI
         custom_fields = self.extract_custom_fields(node_element, 'node')
 
