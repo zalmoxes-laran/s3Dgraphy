@@ -297,15 +297,11 @@ Export Failures
    
    .. code-block:: python
    
-      # Use streaming export for large datasets
-      from s3dgraphy.exporters import StreamingJSONExporter
-      
-      exporter = StreamingJSONExporter()
-      exporter.export_large_graph(
-          graph,
-          "large_export.json",
-          chunk_size=1000
-      )
+      # Export large graphs to JSON
+      from s3dgraphy.exporter.json_exporter import JSONExporter
+
+      exporter = JSONExporter("large_export.json")
+      exporter.export_graphs()
 
 3. **Debug Export Process**
    
@@ -519,19 +515,16 @@ Slow Graph Operations
           graph.add_node(node)  # Indexed lookups remain O(1)
 
 3. **Optimize Memory Usage**
-   
+
    .. code-block:: python
-   
-      # Enable lazy loading
-      graph.enable_lazy_loading()
-      
-      # Configure memory limits
-      graph.set_memory_limit("2GB")
-      
-      # Use memory profiling
-      from s3dgraphy.profiling import MemoryProfiler
-      
-      profiler = MemoryProfiler()
+
+      # Graph indices are rebuilt lazily -- invalidated on changes,
+      # rebuilt only when queried. This keeps memory usage efficient.
+
+      # For very large imports, add nodes in sequence:
+      for node in large_node_list:
+          graph.add_node(node)
+      # Indices rebuild once on first query, not on each add
       with profiler.profile():
           # Your operations here
           graph.process_large_dataset()
@@ -627,11 +620,11 @@ Blender Integration Problems
    
    .. code-block:: python
    
-      # Export in EMtools-compatible format
-      from s3dgraphy.exporters import EMToolsExporter
-      
-      exporter = EMToolsExporter()
-      exporter.export_for_emtools(graph, "blender_export.json")
+      # Export in JSON format for EM-tools / Heriverse
+      from s3dgraphy.exporter.json_exporter import JSONExporter
+
+      exporter = JSONExporter("blender_export.json")
+      exporter.export_graphs()
 
 Database Integration Issues
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

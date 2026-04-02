@@ -35,21 +35,18 @@ Now let's add some stratigraphic units representing different archaeological lay
 
    # Create stratigraphic units
    surface_layer = StratigraphicUnit(
-       node_id="US001", 
-       name="Surface layer", 
-       node_type="US"
+       node_id="US001",
+       name="Surface layer"
    )
-   
+
    medieval_layer = StratigraphicUnit(
-       node_id="US002", 
-       name="Medieval occupation", 
-       node_type="US"
+       node_id="US002",
+       name="Medieval occupation"
    )
-   
+
    roman_floor = StratigraphicUnit(
-       node_id="US003", 
-       name="Roman floor", 
-       node_type="US"
+       node_id="US003",
+       name="Roman floor"
    )
 
 Adding Nodes to the Graph
@@ -96,9 +93,9 @@ Here's the complete code for this tutorial:
 
    # Create and add stratigraphic units
    units = [
-       StratigraphicUnit("US001", "Surface layer", "US"),
-       StratigraphicUnit("US002", "Medieval occupation", "US"),
-       StratigraphicUnit("US003", "Roman floor", "US")
+       StratigraphicUnit("US001", "Surface layer"),
+       StratigraphicUnit("US002", "Medieval occupation"),
+       StratigraphicUnit("US003", "Roman floor")
    ]
 
    for unit in units:
@@ -119,7 +116,8 @@ Here's the complete code for this tutorial:
    print(f"  - {len(site_graph.edges)} edges")
 
    # Export
-   site_graph.export_graphml("pompeii_forum.graphml")
+   from s3dgraphy.exporter.graphml import GraphMLExporter
+   GraphMLExporter(site_graph).export("pompeii_forum.graphml")
 
 Next Steps
 ----------

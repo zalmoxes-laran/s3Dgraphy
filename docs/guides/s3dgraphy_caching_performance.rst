@@ -113,44 +113,31 @@ Efficient Node Addition
 
 .. code-block:: python
 
-   def add_nodes_batch(self, nodes: List[Node], validate=True):
+   def add_node(self, node: Node, overwrite=False) -> Node:
        """
-       Add multiple nodes efficiently with single index rebuild.
-       
+       Add a single node to the graph with automatic index invalidation.
+
        Args:
-           nodes: List of nodes to add
-           validate: Whether to validate each node (default: True)
-       
-       Performance: O(n) vs O(n log n) for individual additions
+           node: Node to add
+           overwrite: Whether to overwrite if node already exists (default: False)
+
+       Note: For batch additions, use a loop with add_node(). Index
+       invalidation is handled automatically on each call.
        """
-       added_nodes = []
-       
-       for node in nodes:
-           existing_node = self.find_node_by_id(node.node_id)
-           if existing_node:
-               if validate:
-                   self.add_warning(f"Node '{node.node_id}' already exists, skipping")
-                   continue
-           
-           self.nodes.append(node)
-           added_nodes.append(node)
-       
-       # Single index invalidation at the end
-       if added_nodes:
-           self._indices_dirty = True
-       
-       return added_nodes
+       # ... node addition logic ...
+       self._indices_dirty = True
+       return node
 
    # Usage example
    nodes_to_add = []
    for i in range(1000):
        node = StratigraphicUnit(f"US{i:03d}")
-       node.set_attribute("batch_import", True)
        nodes_to_add.append(node)
 
-   # Much faster than 1000 individual add_node() calls
-   added = graph.add_nodes_batch(nodes_to_add)
-   print(f"Added {len(added)} nodes in batch operation")
+   # Add all nodes to graph
+   for node in nodes_to_add:
+       graph.add_node(node)
+   print(f"Added {len(nodes_to_add)} nodes")
 
 Efficient Edge Addition
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -644,11 +631,11 @@ Performance Best Practices
            nodes = []
            for i in range(1000):
                node = StratigraphicUnit(f"US{i:03d}")
-               node.set_attribute("area", f"Area_{i // 100}")
                nodes.append(node)
-           
-           # Add all nodes at once
-           graph.add_nodes_batch(nodes)
+
+           # Add all nodes to graph
+           for node in nodes:
+               graph.add_node(node)
            
            # 2. Batch edge creation
            edge_definitions = []

@@ -22,11 +22,12 @@ Adding and Managing Nodes
    nodes = []
    for i in range(100):
        node = StratigraphicUnit(f"US{i:03d}")
-       node.set_attribute("area", "Area_A")
+       node.area = "Area_A"
        nodes.append(node)
 
-   # Use batch operation for better performance
-   graph.add_nodes_batch(nodes)  # More efficient than individual add_node calls
+   # Add all nodes to graph
+   for node in nodes:
+       graph.add_node(node)
 
 Node Queries and Filtering
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

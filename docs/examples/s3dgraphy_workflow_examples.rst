@@ -961,7 +961,7 @@ Workflow 2: Regional Settlement Pattern Analysis
            try:
                graph_id = manager.load_graph(site_info["file"], site_info["id"])
                graph = manager.get_graph(graph_id)
-               graph.set_attribute("site_type", site_info["type"])
+               graph.data["site_type"] = site_info["type"]
                loaded_graphs[site_info["id"]] = graph
                print(f"Loaded {site_info['id']}: {len(graph.nodes)} nodes")
            except Exception as e:
@@ -993,7 +993,7 @@ Workflow 2: Regional Settlement Pattern Analysis
                "total_edges": len(graph.edges),
                "stratigraphic_units": len(graph.get_nodes_by_type("US")),
                "special_finds": len(graph.get_nodes_by_type("SF")),
-               "site_type": graph.get_attribute("site_type", "unknown"),
+               "site_type": graph.data.get("site_type", "unknown"),
                "temporal_span": calculate_temporal_span(graph),
                "material_types": analyze_material_types(graph),
                "architectural_features": analyze_architectural_features(graph)

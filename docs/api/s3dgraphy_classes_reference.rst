@@ -342,27 +342,20 @@ Base Node Class
    class Node:
        """
        Base class for all node types in the graph.
-       
+
        Attributes:
            node_id (str): Unique identifier for the node
-           node_type (str): Type classification of the node
+           node_type (str): Type classification (set by subclass class variable)
            name (str): Human-readable name
+           description (str): Description text
            attributes (dict): Additional node attributes
        """
-       
-       def __init__(self, node_id: str, node_type: str):
+
+       def __init__(self, node_id: str, name: str, description: str = ""):
            self.node_id = node_id
-           self.node_type = node_type
-           self.name = ""
+           self.name = name
+           self.description = description
            self.attributes = {}
-       
-       def set_attribute(self, key: str, value):
-           """Sets an attribute value"""
-           self.attributes[key] = value
-       
-       def get_attribute(self, key: str, default=None):
-           """Gets an attribute value with optional default"""
-           return self.attributes.get(key, default)
 
 Stratigraphic Node Classes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -375,23 +368,19 @@ StratigraphicNode (Base)
    class StratigraphicNode(Node):
        """
        Base class for all stratigraphic nodes.
-       
+
        Specialized attributes:
-           description (str): Detailed description
-           area (str): Excavation area
-           sector (str): Excavation sector
-           shape (str): YED shape type
-           y_pos (float): Y position for chronological ordering
-           fill_color (str): Visual representation color
-           border_style (str): Visual border style
+           symbol (str): Symbol description for visual representation
+           label (str): Display label
+           detailed_description (str): Extended description
        """
-       
-       def __init__(self, node_id: str, node_type: str):
-           super().__init__(node_id, node_type)
-           self.description = ""
-           self.area = ""
-           self.sector = ""
-           # Visual and positional attributes set during import
+       node_type = "StratigraphicNode"
+
+       def __init__(self, node_id: str, name: str, description: str = ""):
+           super().__init__(node_id, name, description)
+           self.symbol = None
+           self.label = None
+           self.detailed_description = None
 
 StratigraphicUnit (US)
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -401,12 +390,13 @@ StratigraphicUnit (US)
    class StratigraphicUnit(StratigraphicNode):
        """
        Represents a stratigraphic unit (US - Unità Stratigrafica).
-       
+
        The basic unit of stratigraphic excavation.
        """
-       
-       def __init__(self, node_id: str):
-           super().__init__(node_id, "US")
+       node_type = "US"
+
+       def __init__(self, node_id: str, name: str, description: str = ""):
+           super().__init__(node_id, name, description)
 
 SpecialFindUnit (SF)
 ^^^^^^^^^^^^^^^^^^^^
@@ -416,12 +406,13 @@ SpecialFindUnit (SF)
    class SpecialFindUnit(StratigraphicNode):
        """
        Represents a special find unit (SF - Reperto Speciale).
-       
+
        Used for individual artifacts or significant finds.
        """
-       
-       def __init__(self, node_id: str):
-           super().__init__(node_id, "SF")
+       node_type = "SF"
+
+       def __init__(self, node_id: str, name: str, description: str = ""):
+           super().__init__(node_id, name, description)
 
 Virtual Units
 ^^^^^^^^^^^^^
@@ -430,19 +421,21 @@ Virtual Units
 
    class StructuralVirtualStratigraphicUnit(StratigraphicNode):
        """
-       Virtual unit representing structural elements (USV).
+       Virtual unit representing structural elements (USV/s).
        """
-       
-       def __init__(self, node_id: str):
-           super().__init__(node_id, "USV")
+       node_type = "USVs"
+
+       def __init__(self, node_id: str, name: str, description: str = ""):
+           super().__init__(node_id, name, description)
 
    class NonStructuralVirtualStratigraphicUnit(StratigraphicNode):
        """
-       Virtual unit for non-structural interpretive elements (USNV).
+       Virtual unit for non-structural interpretive elements (USV/n).
        """
-       
-       def __init__(self, node_id: str):
-           super().__init__(node_id, "USNV")
+       node_type = "USVn"
+
+       def __init__(self, node_id: str, name: str, description: str = ""):
+           super().__init__(node_id, name, description)
 
 Temporal and Analysis Nodes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -482,17 +475,16 @@ DocumentNode
    class DocumentNode(Node):
        """
        Represents a document or source of information.
-       
+
        Attributes:
            url (str): URL or file path to the document
-           description (str): Description of the document content
+           data (dict): Additional document data
        """
-       
-       def __init__(self, node_id: str, name: str = "", url: str = "", description: str = ""):
-           super().__init__(node_id, "document")
-           self.name = name
+
+       def __init__(self, node_id: str, name: str = "", description: str = "", url=None, data=None):
+           super().__init__(node_id, name, description)
            self.url = url
-           self.description = description
+           self.data = data or {}
 
 PropertyNode
 ^^^^^^^^^^^^
@@ -524,12 +516,13 @@ GroupNode (Base)
    class GroupNode(Node):
        """
        Base class for grouping nodes.
-       
+
        Provides functionality for organizing related nodes.
        """
-       
-       def __init__(self, node_id: str, node_type: str):
-           super().__init__(node_id, node_type)
+
+       def __init__(self, node_id: str, name: str, description: str = "", y_pos: float = 0.0):
+           super().__init__(node_id, name, description)
+           self.y_pos = y_pos
 
 ActivityNodeGroup
 ^^^^^^^^^^^^^^^^^
@@ -539,13 +532,12 @@ ActivityNodeGroup
    class ActivityNodeGroup(GroupNode):
        """
        Groups nodes related to a specific activity or process.
-       
+
        Used to organize stratigraphic units by excavation activity.
        """
-       
-       def __init__(self, node_id: str, name: str = ""):
-           super().__init__(node_id, "ActivityNodeGroup")
-           self.name = name
+
+       def __init__(self, node_id: str, name: str, description: str = "", y_pos: float = 0.0):
+           super().__init__(node_id, name, description, y_pos)
 
 Usage Examples
 --------------
@@ -563,15 +555,11 @@ Complete Graph Creation Example
    site.name = {"en": "House VII Excavation", "it": "Scavo Casa VII"}
 
    # Add stratigraphic units
-   wall = StratigraphicUnit("US001")
-   wall.name = "Eastern Wall"
-   wall.description = "Stone wall with opus reticulatum technique"
+   wall = StratigraphicUnit("US001", name="Eastern Wall", description="Stone wall with opus reticulatum technique")
    wall.set_attribute("material", "limestone")
    wall.set_attribute("technique", "opus_reticulatum")
 
-   floor = StratigraphicUnit("US002") 
-   floor.name = "Mosaic Floor"
-   floor.description = "Geometric mosaic pavement"
+   floor = StratigraphicUnit("US002", name="Mosaic Floor", description="Geometric mosaic pavement")
    floor.set_attribute("material", "tesserae")
    floor.set_attribute("pattern", "geometric")
 
