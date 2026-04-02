@@ -1,7 +1,7 @@
 s3dgraphy Documentation
 ========================
 
-.. image:: https://img.shields.io/badge/version-0.1.13-blue.svg
+.. image:: https://img.shields.io/badge/version-0.1.31-blue.svg
    :target: https://pypi.org/project/s3dgraphy/
    :alt: Version
 
@@ -20,10 +20,10 @@ Extended Matrix Framework (EMF).
 
 .. note::
 
-   **s3dgraphy and Extended Matrix are not the same thing.** Extended Matrix (EM) is a *formal visual language* — a human-readable notation for stratigraphic sequences, designed to be authored and reviewed by archaeologists using graph editors or AI-assisted tools. s3dgraphy is its *computational counterpart*: the Python library that encodes EM knowledge as a property knowledge graph (GraphML/JSON) and enables software tools to read, write, validate, and exchange that knowledge. Think of EM as the score and s3dgraphy as the engine that plays it.
+   **s3dgraphy and Extended Matrix are not the same thing.** Extended Matrix (EM) is a *formal visual language* -- a human-readable notation for stratigraphic sequences, designed to be authored and reviewed by archaeologists using graph editors or AI-assisted tools. s3dgraphy is its *computational counterpart*: the Python library that encodes EM knowledge as a property knowledge graph (GraphML/JSON) and enables software tools to read, write, validate, and exchange that knowledge. Think of EM as the score and s3dgraphy as the engine that plays it.
 
-🎯 What is s3dgraphy?
----------------------
+What is s3dgraphy?
+------------------
 
 s3dgraphy is the **core graph library** for Extended Matrix, providing:
 
@@ -31,43 +31,63 @@ s3dgraphy is the **core graph library** for Extended Matrix, providing:
 - **Node and edge types** specific to stratigraphy and paradata
 - **Import capabilities** from GraphML, XLSX, and SQLite databases
 - **Export to JSON** for web visualization platforms
+- **Export to GraphML** for round-trip editing in yEd and other graph editors
+- **Container group nodes** for mereological (part--whole) relationships
+- **Instance chains** for tracking objects across epochs via ``changed_from`` edges
 - **CIDOC-CRM mappings** for semantic interoperability
 - **Integration with EM-tools** for Blender 3D visualization
 
 Key Features
 ------------
 
-🔗 **Graph-Based Architecture**
+**Graph-Based Architecture**
    Native support for complex archaeological relationships and temporal sequences
 
-📊 **Stratigraphic Modeling**
+**Stratigraphic Modeling**
    Specialized node types for stratigraphic units, documentation, and interpretation:
-   
-   - Physical units (US, SF, USD)
-   - Virtual reconstructions (USV, VSF)
+
+   - Physical units (US, SF, USD) and their serial variants (serSU, serUSD)
+   - Virtual reconstructions (USV/s, USV/n, serUSVn, VSF)
+   - Transformation units (TSU)
    - Documentation (DOC)
    - Paradata chains (EXT, COMB, PROP)
 
-🔄 **Format Interoperability**
-   Import from multiple formats:
+**Container Group Nodes**
+   Stratigraphic units (US, USD, VSF) can act as containers for other elements,
+   expressing mereological (part--whole) relationships via ``is_part_of`` / ``has_part``
+   edges. In yEd, containers are represented as group nodes with specific background
+   colors (US: ``#9B3333``, USD: ``#D86400``, VSF: ``#B19F61``).
 
-   - **GraphML** - Primary format with UUID slipback for edit-import cycles
-   - **XLSX** - Excel files with JSON mapping configurations
-   - **SQLite** - pyArchInit database support
+**Instance Chains**
+   The ``changed_from`` connector links the same physical object across different
+   epochs into a navigable chain. For example, a capital found on the ground today
+   (SF), the same capital as a collapsed element in a previous epoch (USD), and the
+   same capital in its original Roman-era position (US) form a single instance chain.
 
-🔐 **UUID Slipback System**
+**Format Interoperability**
+   Full round-trip import/export:
+
+   - **GraphML** -- Primary format with UUID slipback for edit-import cycles
+   - **GraphML export** -- Re-export graphs to GraphML preserving structure and containers
+   - **XLSX** -- Excel files with JSON mapping configurations
+   - **SQLite** -- pyArchInit database support
+   - **JSON** -- Export for web platforms (Heriverse, ATON)
+
+**UUID Slipback System**
    Automatic UUID persistence in GraphML files enables:
 
    - Edit graphs in yEd while preserving node/edge identity
    - Duplicate EMID detection and automatic resolution
    - Seamless roundtrip editing workflow
 
-📤 **Export to JSON**
-   Export graphs to JSON for web platforms (Heriverse, ATON)
+**Comment Node Skipping**
+   yEd comment/note nodes (yellow fill colors ``#FFCC00``, ``#FFFF00``, ``#FFFF99``)
+   are automatically detected and skipped during GraphML import, so annotations in
+   the graph editor do not pollute the archaeological data.
 
-🏛️ **Archaeological Standards**
+**Archaeological Standards**
    Built-in support for CIDOC-CRM mapping with extensions:
-   
+
    - CIDOC-CRM (core)
    - CRMarchaeo (archaeological)
    - CRMdig (digital provenance)
@@ -75,14 +95,11 @@ Key Features
    - CRMinf (argumentation)
    - CIDOC-S3D (Extended Matrix custom)
 
-⚡ **Performance Optimized**
+**Performance Optimized**
    Graph indexing system for efficient queries on large datasets
 
-🔄 **Blender Integration**
+**Blender Integration**
    Direct integration with EM-tools for 3D archaeological visualization
-
-📖 **Comprehensive Documentation**
-   Detailed guides, tutorials, and API reference
 
 Quick Start
 -----------
@@ -113,28 +130,21 @@ Create and populate a graph:
 
    from s3dgraphy import Graph
    from s3dgraphy.nodes import StratigraphicNode, DocumentNode
-   
+
    # Create a new graph
    graph = Graph("pompeii_house_vii")
-   
+
    # Add a stratigraphic unit
-   us001 = StratigraphicNode("US001", node_type="US")
-   us001.name = "US001"
-   us001.description = "Mosaic floor, main atrium"
-   us001.set_attribute("material", "tesserae")
-   us001.set_attribute("dating", "1st century CE")
+   us001 = StratigraphicNode("US001", name="US001", description="Mosaic floor, main atrium")
    graph.add_node(us001)
-   
+
    # Add documentation
-   doc001 = DocumentNode("DOC001")
-   doc001.name = "DOC001"
-   doc001.description = "Floor photograph"
-   doc001.set_attribute("type", "photograph")
+   doc001 = DocumentNode("DOC001", name="DOC001", description="Floor photograph")
    graph.add_node(doc001)
-   
+
    # Create relationship
    graph.add_edge("edge_001", "US001", "DOC001", "has_documentation")
-   
+
    print(f"Graph contains {len(graph.nodes)} nodes and {len(graph.edges)} edges")
 
 Import from GraphML
@@ -142,38 +152,41 @@ Import from GraphML
 
 .. code-block:: python
 
-   from s3dgraphy.importer import GraphMLImporter
-   from s3dgraphy import Graph
-   
-   # Create graph
-   graph = Graph("my_excavation")
-   
-   # Import GraphML file
+   from s3dgraphy import GraphMLImporter
+
+   # Import GraphML file (graph is created automatically)
    importer = GraphMLImporter("excavation_data.graphml")
    graph = importer.parse()
-   
+
    print(f"Imported {len(graph.nodes)} nodes")
-   
+
    # Check for warnings
    if graph.warnings:
        print("Import warnings:")
        for warning in graph.warnings:
            print(f"  - {warning}")
 
+Export to GraphML
+~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+   from s3dgraphy.exporter.graphml import GraphMLExporter
+
+   # Export graph back to GraphML
+   exporter = GraphMLExporter(graph)
+   exporter.export("output/site_data.graphml")
+
 Export to JSON
 ~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   from s3dgraphy.exporter import JSONExporter
-   
-   # Create exporter
+   from s3dgraphy.exporter.json_exporter import JSONExporter
+
+   # Create exporter and export all graphs
    exporter = JSONExporter("output/project.json")
-   
-   # Export all graphs
    exporter.export_graphs()
-   
-   print("Export completed")
 
 Import from XLSX
 ~~~~~~~~~~~~~~~~
@@ -182,17 +195,15 @@ Import from XLSX
 
    from s3dgraphy.importer import MappedXLSXImporter
    from s3dgraphy import Graph
-   
-   # Create graph
+
+   # Create graph and import with predefined mapping
    graph = Graph("xlsx_import")
-   
-   # Import with predefined mapping
    importer = MappedXLSXImporter(
        filepath="stratigraphic_units.xlsx",
        mapping_name="emdb_basic",
        graph=graph
    )
-   
+
    graph = importer.parse()
    print(f"Imported {len(graph.nodes)} nodes from XLSX")
 
@@ -207,28 +218,30 @@ Core Components
 
 **Node Types**
    Specialized classes for different archaeological entities:
-   
-   - StratigraphicNode (US, USV, SF, VSF, USD)
+
+   - StratigraphicNode (US, USV, SF, VSF, USD, TSU) and serial variants (serSU, serUSD, serUSVn)
    - ParadataNode (DOC, EXT, COMB, PROP)
    - GroupNode (Paradata groups, time branches, activities)
-   - RepresentationModelNode (3D models)
+   - RepresentationModelNode (3D models for US, DOC, SF)
    - ReferenceNode (GEO, LINK, EP, AUTH)
 
 **Edge Types**
    Defined relationships with CIDOC-CRM mappings:
 
    - Temporal (is_after, is_before, has_same_time, changed_from)
-   - Physical (abuts, fills, cuts, covers, rests_on)
-   - Documentation (has_documentation, extracted_from)
+   - Containment (is_part_of, has_part)
+   - Documentation (has_data_provenance, extracted_from, combines)
    - Properties (has_property)
-   - Paradata (has_paradata_nodegroup)
+   - Paradata (has_paradata_nodegroup, is_in_paradata_nodegroup)
    - Epochs (has_first_epoch, survive_in_epoch)
+   - Representation (has_representation_model, has_semantic_shape)
+   - Contrast (contrasts_with)
 
 **Import System**
    Modular importers for GraphML, XLSX, SQLite with JSON mapping support
 
 **Export System**
-   JSON exporter for web visualization platforms
+   GraphML exporter for round-trip editing; JSON exporter for web visualization
 
 **Multi-Graph Manager**
    Manage multiple graphs within a single project
@@ -238,20 +251,20 @@ JSON Configuration Files
 
 s3dgraphy uses three core JSON configuration files:
 
-1. **s3Dgraphy_node_datamodel.json** (v1.5.2)
-   
+1. **s3Dgraphy_node_datamodel.json** (v1.5.1)
+
    - Defines all node types and properties
    - CIDOC-CRM mappings for each node type
    - Node hierarchy and inheritance
 
-2. **s3Dgraphy_connections_datamodel.json** (v1.5.2)
-   
+2. **s3Dgraphy_connections_datamodel.json** (v1.5.4)
+
    - Defines all edge types
    - CIDOC-CRM mappings for relationships
    - Allowed source/target node combinations
 
 3. **em_visual_rules.json**
-   
+
    - Visual representation rules for Blender
    - 3D models, 2D icons, colors, styles
 
@@ -267,17 +280,17 @@ Create comprehensive stratigraphic documentation:
 
 .. code-block:: python
 
+   from s3dgraphy import Graph
+   from s3dgraphy.nodes import StratigraphicNode
+
    # Document stratigraphic sequence
    graph = Graph("excavation_area_a")
-   
-   # Add units
-   wall = StratigraphicNode("US001", node_type="US")
-   wall.description = "Stone wall foundation"
-   
-   floor = StratigraphicNode("US002", node_type="US")
-   floor.description = "Mosaic floor"
 
-   # Add temporal relationship (canonical direction: recent → ancient)
+   # Add units
+   wall = StratigraphicNode("US001", name="US001", description="Stone wall foundation")
+   floor = StratigraphicNode("US002", name="US002", description="Mosaic floor")
+
+   # Add temporal relationship (canonical direction: recent -> ancient)
    graph.add_node(wall)
    graph.add_node(floor)
    graph.add_edge("e1", "US002", "US001", "is_after")  # floor is after (more recent than) wall
@@ -289,22 +302,21 @@ Document 3D reconstruction processes:
 
 .. code-block:: python
 
+   from s3dgraphy.nodes import StratigraphicNode, DocumentNode, ExtractorNode
+
    # Virtual unit
-   usv = StratigraphicNode("USV001", node_type="USVs")
-   usv.description = "Reconstructed upper wall"
-   
+   usv = StratigraphicNode("USV001", name="USV001", description="Reconstructed upper wall")
+
    # Link to documentation
-   doc = DocumentNode("DOC001")
-   doc.description = "Archaeological parallels"
-   
+   doc = DocumentNode("DOC001", name="DOC001", description="Archaeological parallels")
+
    # Extraction process
-   ext = ExtractorNode("EXT001")
-   ext.source = "Comparative analysis"
-   
+   ext = ExtractorNode("EXT001", name="EXT001")
+
    graph.add_node(usv)
    graph.add_node(doc)
    graph.add_node(ext)
-   
+
    # Create paradata chain
    graph.add_edge("e1", "EXT001", "DOC001", "extracted_from")
    graph.add_edge("e2", "USV001", "EXT001", "has_paradata_nodegroup")
@@ -316,10 +328,14 @@ Import from multiple sources:
 
 .. code-block:: python
 
+   from s3dgraphy import GraphMLImporter
+   from s3dgraphy.importer import MappedXLSXImporter
+   from s3dgraphy.exporter.json_exporter import JSONExporter
+
    # Import GraphML base structure
    importer1 = GraphMLImporter("base_stratigraphy.graphml")
    graph = importer1.parse()
-   
+
    # Add data from Excel
    importer2 = MappedXLSXImporter(
        filepath="additional_data.xlsx",
@@ -327,10 +343,10 @@ Import from multiple sources:
        graph=graph
    )
    graph = importer2.parse()
-   
+
    # Export combined data
-   from s3dgraphy.exporter import export_to_json
-   export_to_json("combined_data.json", [graph.graph_id])
+   exporter = JSONExporter("combined_data.json")
+   exporter.export_graphs()
 
 Extended Matrix Ecosystem
 --------------------------
@@ -385,7 +401,9 @@ Community & Support
 Current Status
 --------------
 
-**Version**: 0.1.13
+**Version**: 0.1.31
+
+**Datamodel**: nodes v1.5.1, connections v1.5.4
 
 **Status**: Active development
 
@@ -399,21 +417,24 @@ Roadmap
 Completed Features
 ~~~~~~~~~~~~~~~~~~
 
-✅ Core graph structure with indexing
-✅ Node type system with CIDOC-CRM mappings
-✅ GraphML import
-✅ XLSX import with mapping system
-✅ SQLite/pyArchInit import
-✅ JSON export
-✅ Multi-graph management
-✅ Integration with EM-tools for Blender
+- Core graph structure with indexing
+- Node type system with CIDOC-CRM mappings
+- GraphML import with UUID slipback
+- GraphML export with container group support
+- XLSX import with mapping system
+- SQLite/pyArchInit import
+- JSON export for web platforms
+- Container group nodes (US, USD, VSF as containers with is_part_of edges)
+- Instance chains via changed_from edges
+- Comment/note node skipping during import
+- Multi-graph management
+- Integration with EM-tools for Blender
 
 Planned Features
 ~~~~~~~~~~~~~~~~
 
 **Near-term** (next releases):
 
-- GraphML export functionality
 - Enhanced validation system
 - Performance optimizations for very large graphs
 - Additional CIDOC-CRM mapping refinements
@@ -432,58 +453,55 @@ Table of Contents
 .. toctree::
    :maxdepth: 2
    :caption: Getting Started
-   
+
    installation
-   quickstart
-   core_concepts
+   s3dgraphy_quickstart
+   s3dgraphy_core_concepts
 
 .. toctree::
    :maxdepth: 2
    :caption: User Guide
-   
+
    s3dgraphy_import_export
    s3dgraphy_mapping_system
    s3dgraphy_json_config
    s3dgraphy_integration_emtools
-   graph_management
-   node_types
 
 .. toctree::
    :maxdepth: 2
    :caption: API Reference
-   
-   api/graph
+
    api/nodes
    api/edges
-   api/importers
-   api/exporters
    api/s3dgraphy_classes_reference
    api/s3dgraphy_edges_reference
 
 .. toctree::
    :maxdepth: 2
    :caption: Examples & Workflows
-   
-   examples/basic_usage
-   examples/archaeological_workflow
-   examples/blender_integration
-   examples/data_migration
+
+   tutorials/basic_usage
+   examples/s3dgraphy_workflow_examples
 
 .. toctree::
    :maxdepth: 2
    :caption: Development
-   
-   contributing
-   architecture
-   changelog
-   roadmap
+
+   s3dgraphy_changelog
+   s3dgraphy_roadmap
 
 .. toctree::
    :maxdepth: 1
    :caption: Support
-   
-   troubleshooting
-   faq
+
+   s3dgraphy_troubleshooting
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Advanced
+
+   guides/s3dgraphy_caching_performance
+   guides/s3dgraphy_operators_guide
 
 Citation
 --------
@@ -495,9 +513,9 @@ If you use s3dgraphy in your research, please cite:
    @software{s3dgraphy,
      title = {s3dgraphy: Core Graph Library for Extended Matrix},
      author = {Demetrescu, Emanuel},
-     year = {2024},
+     year = {2025},
      url = {https://github.com/zalmoxes-laran/s3dgraphy},
-     version = {0.1.13}
+     version = {0.1.31}
    }
 
 Indices and Tables

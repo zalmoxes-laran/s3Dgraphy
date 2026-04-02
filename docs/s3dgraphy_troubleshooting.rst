@@ -192,8 +192,8 @@ Missing GeoPositionNode
    
    .. code-block:: python
    
-      # Import from GIS file
-      from s3dgraphy.importers import GISImporter
+      # Import from GIS file (conceptual example)
+      from s3dgraphy.importer import GISImporter
       
       gis_importer = GISImporter()
       geo_data = gis_importer.extract_reference_system("site.shp")
@@ -514,8 +514,9 @@ Slow Graph Operations
       for i in range(1000):
           graph.add_node(nodes[i])  # Slow
       
-      # Use batch addition
-      graph.add_nodes_batch(nodes)  # Fast
+      # Use batch addition (add nodes in a loop)
+      for node in nodes:
+          graph.add_node(node)  # Indexed lookups remain O(1)
 
 3. **Optimize Memory Usage**
    

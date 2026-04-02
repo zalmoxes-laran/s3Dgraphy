@@ -20,7 +20,7 @@ Node Data Model
 
 File: ``s3Dgraphy_node_datamodel.json``
 
-Version: 1.5.2
+Version: 1.5.1
 
 This file defines all node types available in the Extended Matrix, organized into categories.
 
@@ -30,7 +30,7 @@ Structure Overview
 .. code-block:: json
 
    {
-       "s3Dgraphy_node_model_version": "1.5.2",
+       "s3Dgraphy_node_model_version": "1.5.1",
        "description": "Complete node type definitions for Extended Matrix",
        "node_categories": {
            "stratigraphic_nodes": { ... },
@@ -261,7 +261,7 @@ Connections Data Model
 
 File: ``s3Dgraphy_connections_datamodel.json``
 
-Version: 1.5.2
+Version: 1.5.4
 
 This file defines all edge types (connections) with CIDOC-CRM mappings.
 
@@ -529,6 +529,31 @@ Generic Relations
    - CIDOC-CRM: ``P130_shows_features_of``
    - CRMarchaeo: ``AP11_has_physical_relation``
    - Source/Target: Any Node
+
+Containment Relations
+^^^^^^^^^^^^^^^^^^^^^
+
+**is_part_of**
+   Physical containment: child is part of container
+
+   - CIDOC-CRM: ``P46_is_composed_of``
+   - Source: SpecialFindUnit, VirtualSpecialFindUnit
+   - Target: StratigraphicUnit, DocumentaryStratigraphicUnit, VirtualSpecialFindUnit
+
+**has_part**
+   Reverse of is_part_of (auto-generated)
+
+   - CIDOC-CRM: ``P46i_forms_part_of``
+
+Visual Reference Relations
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**has_visual_reference**
+   Links a node to a visual reference (added in v1.5.4)
+
+   - CIDOC-CRM: ``P138i_has_representation``
+   - Source: Various node types
+   - Target: DocumentNode
 
 Edge Definition Structure
 ~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -4,11 +4,10 @@ Import and Export
 This document describes the import and export capabilities of s3dgraphy, the core Python library for managing Extended Matrix graphs.
 
 .. note::
-   s3dgraphy version 0.1.13 currently supports:
-   
+   s3dgraphy version 0.1.31 supports:
+
    - **Import**: GraphML, XLSX (with JSON mapping), SQLite/pyArchInit (with JSON mapping)
-   - **Export**: JSON
-   - **Planned**: GraphML export (future release)
+   - **Export**: JSON, GraphML
 
 Import System
 -------------
@@ -50,8 +49,22 @@ GraphML Import Features
 
 The GraphML importer includes:
 
-- **Automatic node type detection** from GraphML attributes
-- **Edge type mapping** to Extended Matrix connection types
+- **Automatic node type detection** from GraphML attributes and visual properties
+- **Edge type mapping** from visual line styles to semantic types:
+
+  - solid line → ``is_after`` / ``is_before``
+  - double line → ``has_same_time``
+  - dotted line → ``changed_from``
+  - dashed line → ``has_data_provenance``
+  - dashed-dotted line → ``contrasts_with``
+
+- **Container group node support**: group nodes with specific background colours are converted to regular stratigraphic nodes with ``is_part_of`` edges:
+
+  - ``#9B3333`` (dark red) → US container
+  - ``#D86400`` (orange) → USD container
+  - ``#B19F61`` (gold) → VSF container
+
+- **Comment node skipping**: yEd annotation nodes with yellow fill colours (``#FFCC00``, ``#FFFF00``, ``#FFFF99``) are automatically detected and skipped
 - **Attribute preservation** for all node and edge properties
 - **Warning system** for incomplete or malformed data
 - **Support for multilingual content** (name, description fields)
@@ -682,28 +695,65 @@ For large datasets:
        if e.edge_source == "US001"
    ]
 
-Future Import/Export Features
-------------------------------
-
-Planned for future releases:
-
 GraphML Export
-~~~~~~~~~~~~~~
+--------------
 
-GraphML export functionality is planned for a future release:
+s3dgraphy can export graphs back to GraphML format, enabling full round-trip editing workflows with yEd and other GraphML-compatible tools.
+
+Basic GraphML Export
+~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   # PLANNED - Not yet implemented
-   from s3dgraphy.exporter import GraphMLExporter
-   
-   exporter = GraphMLExporter("output.graphml")
-   exporter.export_graph(graph.graph_id)
+   from s3dgraphy.exporter.graphml import GraphMLExporter
 
-Additional Export Formats
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+   # Create exporter with the graph to export
+   exporter = GraphMLExporter(graph)
 
-Under consideration:
+   # Export to file
+   exporter.export("output/site_data.graphml")
+
+GraphML Export Features
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The GraphML exporter preserves:
+
+- **Node types and visual properties** (shapes, colours, borders)
+- **Edge types with correct line styles** (solid, dotted, dashed, double, dashed-dotted)
+- **Container group nodes** with correct background colours (US: ``#9B3333``, USD: ``#D86400``, VSF: ``#B19F61``)
+- **Epoch swimlanes and activity groups**
+- **Paradata node groups**
+- **Canvas layout** with node positions
+
+Round-Trip Workflow
+~~~~~~~~~~~~~~~~~~~
+
+The combination of GraphML import (with UUID slipback) and GraphML export enables a complete round-trip:
+
+1. Author a graph in yEd
+2. Import into s3dgraphy (UUIDs written back to the file)
+3. Process, validate, or enrich the graph programmatically
+4. Export back to GraphML for further editing in yEd
+
+.. code-block:: python
+
+   from s3dgraphy import GraphMLImporter
+   from s3dgraphy.exporter.graphml import GraphMLExporter
+
+   # Import
+   importer = GraphMLImporter("site_data.graphml")
+   graph = importer.parse()
+
+   # ... process graph ...
+
+   # Export back
+   exporter = GraphMLExporter(graph)
+   exporter.export("site_data_processed.graphml")
+
+Future Export Formats
+---------------------
+
+Under consideration for future releases:
 
 - **GeoJSON export** for GIS integration
 - **RDF/TTL export** for semantic web (CIDOC-CRM compliance)

@@ -1,5 +1,5 @@
 __version__ = "0.1.31"
-__datamodel_version__ = "1.5.3"  # s3Dgraphy connections datamodel version
+__datamodel_version__ = "1.5.4"  # s3Dgraphy connections datamodel version
 
 # s3Dgraphy/__init__.py
 
@@ -10,8 +10,9 @@ s3Dgraphy is a Python library for creating and managing multitemporal, 3D knowle
 It includes functionality for graph creation, stratigraphic data management, edge definitions,
 node types, visual layout generation, and graph import/export operations.
 
-Datamodel v1.5.3: Introduces canonical/reverse edge directionality pattern
-for cleaner schema and precise socket labeling in node editors.
+Datamodel v1.5.4: Adds 'has_visual_reference' edge type, VSF as container target
+for is_part_of, and comment node skipping. Previous v1.5.3 introduced canonical/reverse
+edge directionality pattern for cleaner schema and precise socket labeling in node editors.
 
 Author: Emanuel Demetrescu, 2024
 License: GNU-GPL 3.0

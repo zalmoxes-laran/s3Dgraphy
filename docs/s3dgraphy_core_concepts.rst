@@ -1,45 +1,45 @@
 Core Concepts
 =============
 
-This section introduces the fundamental concepts and architecture of s3dgraphy, 
+This section introduces the fundamental concepts and architecture of s3dgraphy,
 the core Python library implementing the Extended Matrix formal language.
 
 Graph Structure
 ---------------
 
-s3dgraphy implements a **property graph model** specifically designed for archaeological 
-stratigraphic documentation. Each graph represents an archaeological site or project 
+s3dgraphy implements a **property graph model** specifically designed for archaeological
+stratigraphic documentation. Each graph represents an archaeological site or project
 and contains:
 
 **Nodes (Vertices)**
-   Represent archaeological entities such as stratigraphic units, documents, 
+   Represent archaeological entities such as stratigraphic units, documents,
    interpretations, and metadata
 
-**Edges (Relationships)**  
-   Represent relationships between entities, including temporal sequences, 
-   documentation links, and analytical connections
+**Edges (Relationships)**
+   Represent relationships between entities, including temporal sequences,
+   documentation links, containment, and analytical connections
 
 **Properties**
-   Both nodes and edges can carry attributes and metadata specific to 
+   Both nodes and edges can carry attributes and metadata specific to
    archaeological documentation needs
 
 Multigraph Architecture
 -----------------------
 
-s3dgraphy supports **multiple graphs** within a single project through the 
+s3dgraphy supports **multiple graphs** within a single project through the
 MultiGraphManager system:
 
 .. code-block:: python
 
    from s3dgraphy import MultiGraphManager
-   
+
    # Access the global manager
    manager = MultiGraphManager()
-   
+
    # Create multiple site graphs
    site_a = manager.create_graph("SiteA_2024")
-   site_b = manager.create_graph("SiteB_2024") 
-   
+   site_b = manager.create_graph("SiteB_2024")
+
    # Each graph is independent but can reference others
    print(f"Active graphs: {manager.get_all_graph_ids()}")
 
@@ -53,185 +53,355 @@ This allows for:
 Node Type Hierarchy
 --------------------
 
-s3dgraphy implements a specialized node type system for archaeological documentation:
+s3dgraphy implements a specialized node type system for archaeological documentation.
+All node classes inherit from a common ``Node`` base class and are auto-registered
+via ``__init_subclass__()``, enabling automatic type dispatch during import.
 
-Core Node Types
+Stratigraphic Nodes
+~~~~~~~~~~~~~~~~~~~~
+
+These are the core archaeological units:
+
+**StratigraphicUnit (US)**
+   Physical stratigraphic units -- walls, floors, fills, deposits. Can also act as
+   a *container* for Special Finds via ``is_part_of`` edges (see :ref:`containers`).
+
+**SeriesOfStratigraphicUnit (serSU)**
+   A single node representing multiple serial elements of the same type (e.g., a
+   sequence of capitals, column bases) that are geometrically discontinuous.
+
+**DocumentaryStratigraphicUnit (USD)**
+   Units identified through indirect documentation -- historical records, geophysical
+   surveys, photographs, paintings, written descriptions. Can also act as a *container*.
+
+**SeriesOfDocumentaryStratigraphicUnit (serUSD)**
+   Serial variant of USD for groups of documentary units sharing similar characteristics.
+
+**StructuralVirtualStratigraphicUnit (USV/s)**
+   Virtual reconstruction hypothesis based on an in-situ fragmented SU. Restores the
+   effect of a destruction event, making the reconstruction "physically proven."
+
+**NonStructuralVirtualStratigraphicUnit (USV/n)**
+   Virtual reconstruction based on external sources (comparisons, general rules).
+   Not connected to a destruction event, hence not "physically proven."
+
+**SeriesOfNonStructuralVirtualStratigraphicUnit (serUSVn)**
+   Series of USV/n objects (e.g., a colonnade), considered as a whole.
+
+**SpecialFindUnit (SF)**
+   A non-in-situ element (fragmented or intact) that needs repositioning. It is a real
+   object with known properties except for original position.
+
+**VirtualSpecialFindUnit (VSF)**
+   Represents restoration, integration, or completion of a repositioned SF. Inherits
+   physical properties from the corresponding SF. Can also act as a *container* for
+   SF elements that compose it (e.g., tile fragments belonging to a reconstructed roof).
+
+**TransformationStratigraphicUnit (TSU)**
+   Records chemical, physical, or biological changes on a surface or material over time.
+   Subtypes: colour change, negative/subtractive, positive/additive, translational.
+
+**ContinuityNode**
+   A technical node that marks the survival of a stratigraphic unit into a subsequent
+   epoch without physical change.
+
+**StratigraphicEventNode**
+   Represents a destruction event (negative SU, prefixed with ``-``).
+
+Paradata Nodes
+~~~~~~~~~~~~~~
+
+Documentation and data provenance nodes forming the paradata chain:
+
+**DocumentNode (DOC)**
+   Source materials -- photos, drawings, reports, 3D scans, historical texts.
+
+**ExtractorNode (EXT)**
+   Information extraction processes -- how data was derived from a source.
+
+**CombinerNode (COMB)**
+   Information combination/reasoning -- synthesising multiple extracted data points.
+
+**PropertyNode (PROP)**
+   Properties associated with stratigraphic nodes -- material, colour, dating, etc.
+
+**AuthorNode (AUTH)**
+   Persons responsible for documentation or interpretation.
+
+Group Nodes
+~~~~~~~~~~~
+
+Organizational containers used in the Extended Matrix graph:
+
+**ParadataNodeGroup**
+   Groups paradata nodes (DOC, EXT, COMB) together as a documentation unit for a
+   stratigraphic node.
+
+**ActivityNodeGroup**
+   Archaeological activities or events that group related stratigraphic units.
+
+**TimeBranchNodeGroup**
+   Alternative temporal sequences -- branches representing competing hypotheses
+   about the chronological interpretation of a site.
+
+Representation Nodes
+~~~~~~~~~~~~~~~~~~~~
+
+3D model and visualization metadata:
+
+**RepresentationModelNode**
+   3D model associated with a stratigraphic unit (glTF/GLB format).
+
+**RepresentationModelDocNode**
+   3D model of a documentation source (e.g., photogrammetric model).
+
+**RepresentationModelSpecialFindNode**
+   3D model of a special find.
+
+**SemanticShapeNode**
+   Symbolic 3D shapes (proxies, annotations in 3D space).
+
+Reference Nodes
 ~~~~~~~~~~~~~~~
 
-**StratigraphicNode** - Base class for all archaeological units
-   - ``US`` - Physical stratigraphic units (walls, floors, fills)
-   - ``USV`` - Virtual reconstruction units (``USVs`` structural, ``USVn`` non-structural)
-   - ``SF`` - Special finds (artifacts, samples)
-   - ``VSF`` - Virtual special finds (reconstructed artifacts)
-   - ``USD`` - Documentary units (based on historical sources)
+**EpochNode (EP)**
+   Temporal periods and chronological frameworks with start/end dates.
 
-**ParadataNode** - Documentation and analytical metadata
-   - ``DocumentNode`` - Source materials (photos, drawings, reports)
-   - ``ExtractorNode`` - Analytical processes and interpretations
-   - ``AuthorNode`` - Persons responsible for documentation
-   - ``ActivityNode`` - Methodological activities and processes
+**GeoPositionNode (GEO)**
+   Spatial reference systems and coordinates (EPSG, shifts).
 
-**RepresentationNode** - 3D and visual representations
-   - ``RepresentationModelNode`` - 3D models for stratigraphic units
-   - ``RepresentationModelDocNode`` - 3D models for documents
-   - ``RepresentationModelSpecialFindNode`` - 3D models for special finds
-   - ``SemanticShapeNode`` - Semantic annotations in 3D space
+**LinkNode (LINK)**
+   External resource links.
 
-**AuxiliaryNode** - Supporting metadata
-   - ``EpochNode`` - Temporal periods and chronological frameworks
-   - ``GeoPositionNode`` - Spatial reference systems and coordinates
-
-Example Usage
-~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   from s3dgraphy.nodes import StratigraphicNode, DocumentNode, ExtractorNode
-   
-   # Create stratigraphic unit
-   wall = StratigraphicNode("US001", node_type="US")
-   wall.set_attribute("material", "limestone")
-   wall.set_attribute("technique", "opus_reticulatum")
-   
-   # Create documentation
-   photo = DocumentNode("DOC001", "wall_photo.jpg")
-   photo.set_attribute("author", "archaeologist@site.org")
-   photo.set_attribute("date", "2024-03-15")
-   
-   # Create analysis
-   analysis = ExtractorNode("EXT001")
-   analysis.set_attribute("method", "visual_analysis") 
-   analysis.set_attribute("result", "Roman period construction")
+**LicenseNode / EmbargoNode**
+   Rights management and temporal access restrictions.
 
 Edge Types and Relationships
 -----------------------------
 
-s3dgraphy defines specific edge types that correspond to archaeological relationships 
-and CIDOC-CRM ontology mappings:
+s3dgraphy uses **semantic edge types** that correspond to specific archaeological
+relationships and CIDOC-CRM ontology mappings. In the GraphML representation, edge
+types are encoded as visual line styles; during import, they are converted to their
+semantic names:
+
+.. list-table:: GraphML Line Style to Semantic Edge Type Mapping
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - **GraphML Line Style**
+     - **Semantic Edge Type**
+     - **Meaning**
+   * - solid line
+     - ``is_after`` / ``is_before``
+     - Chronological sequence between stratigraphic units
+   * - double line
+     - ``has_same_time``
+     - Contemporaneous elements
+   * - dotted line
+     - ``changed_from``
+     - Same object across epochs (instance chain)
+   * - dashed line
+     - ``has_data_provenance``
+     - Provenance and documentation relationships
+   * - dashed-dotted line
+     - ``contrasts_with``
+     - Conflicting hypotheses or mutually exclusive branches
 
 Temporal Relationships
 ~~~~~~~~~~~~~~~~~~~~~~
 
-**line** - Sequential relationships
-   Basic temporal sequences between stratigraphic units (before/after)
+**is_after / is_before**
+   Chronological sequence between stratigraphic units. The canonical direction in the
+   Extended Matrix is from more recent to more ancient (``is_after``).
 
-**dashed** - Provenance relationships  
-   Links between data and its documentation sources
+**has_same_time**
+   Two elements are contemporaneous -- they existed or were created at the same time.
 
-**dotted** - Temporal changes
-   Represents modifications or evolution of entities over time
+**changed_from**
+   Represents the same physical object through different epochs. When multiple nodes
+   are connected by ``changed_from`` edges, they form an **instance chain** -- a
+   navigable sequence documenting the complete biography of a single object through time.
 
-**double_line** - Contemporaneity
-   Simultaneous existence or compositional relationships
+   Example: a capital found on the ground today (SF), the same capital as a collapsed
+   element in a previous epoch (USD), and the capital in its original Roman-era position
+   (US) form a three-node instance chain.
 
-Analytical Relationships
-~~~~~~~~~~~~~~~~~~~~~~~~
+Containment Relationships
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
-**dashed_dotted** - Conflicting hypotheses
-   Represents alternative interpretations or mutually exclusive properties
+**is_part_of / has_part**
+   Mereological (part--whole) relationships. A child node ``is_part_of`` a container
+   node. The reverse ``has_part`` is automatically generated.
 
-**TBD** - Undefined relationships
-   Placeholder for relationships that need further classification
+   Allowed sources: SF, VSF.
+   Allowed targets: US, USD, VSF.
 
-Example Usage
-~~~~~~~~~~~~~
+   In GraphML, containment is expressed through group nodes with specific background
+   colours. See :ref:`containers` below.
 
-.. code-block:: python
+Documentation Relationships
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   from s3dgraphy import Graph
-   
-   graph = Graph("site_relationships")
-   
-   # Add temporal sequence: US003 is earlier than US002
-   graph.add_edge("temp_1", "US003", "US002", "line")
-   
-   # Add documentation: photo documents the wall  
-   graph.add_edge("doc_1", "US001", "DOC001", "dashed")
-   
-   # Add contemporaneity: floor and wall are contemporary
-   graph.add_edge("contemp_1", "US001", "US004", "double_line")
+**has_data_provenance**
+   Links interpretations to their evidence sources.
 
-Data Export and Interoperability
----------------------------------
+**extracted_from**
+   Information derived from a specific document or source.
 
-s3dgraphy provides multiple export formats for data exchange and integration:
+**combines**
+   Synthesised from multiple sources via a CombinerNode.
 
-JSON Export Structure
-~~~~~~~~~~~~~~~~~~~~~
+**has_property**
+   Associates a PropertyNode (material, colour, dating, etc.) with a stratigraphic node.
 
-The primary export format is structured JSON that preserves all graph information:
+Group Relationships
+~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: json
+**has_first_epoch / survive_in_epoch**
+   Connect stratigraphic units to their temporal periods.
 
-   {
-       "context": {},
-       "multigraph": {
-           "SiteA_2024": {
-               "name@it": "Site A Excavation",
-               "description@it": "2024 excavation campaign",
-               "data": {
-                   "geo_position": {
-                       "epsg": 32633,
-                       "shift_x": 500000.0,
-                       "shift_y": 4500000.0,
-                       "shift_z": 100.0
-                   },
-                   "epochs": {
-                       "Roman": {
-                           "start": -27,
-                           "end": 476,
-                           "color": "#CC6600"
-                       }
-                   }
-               },
-               "nodes": {},
-               "edges": {}
-           }
-       }
-   }
+**is_in_activity / has_activity**
+   Group related units under a common activity or event.
 
-GraphML Export
-~~~~~~~~~~~~~~
+**has_timebranch / is_in_timebranch**
+   Connect nodes to alternative interpretation branches.
 
-For compatibility with network analysis tools and graph databases:
+**contrasts_with**
+   Marks two time branches as mutually exclusive.
 
-.. code-block:: python
+Representation Relationships
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   # Export to GraphML format
-   graph.export_graphml("site_analysis.graphml")
-   
-   # Import from existing GraphML
-   from s3dgraphy.importers import GraphMLImporter
-   importer = GraphMLImporter()
-   imported_graph = importer.import_from_file("existing_data.graphml")
+**has_representation_model**
+   Links a stratigraphic node to its 3D model.
+
+**has_visual_reference**
+   Links a node to a visual reference (added in datamodel v1.5.4).
+
+**has_semantic_shape**
+   Links a node to a symbolic 3D shape.
+
+.. _containers:
+
+Container Group Nodes
+---------------------
+
+In the Extended Matrix, certain stratigraphic units can act as **containers** for
+other elements. This expresses a mereological (part--whole) relationship: a Special
+Find (SF) is physically contained within a wall (US), or fragments (SF) compose a
+reconstructed whole (VSF).
+
+**How it works in yEd:**
+
+In the yEd graph editor, a container is represented as a **group node** with a
+specific background colour. Child elements are placed visually inside the group.
+
+.. list-table:: Container Group Node Colours
+   :header-rows: 1
+   :widths: 30 20 50
+
+   * - **Container Type**
+     - **Background Colour**
+     - **Example**
+   * - US (Stratigraphic Unit)
+     - ``#9B3333`` (dark red)
+     - A wall containing a reused capital (SF)
+   * - USD (Documentary Strat. Unit)
+     - ``#D86400`` (orange)
+     - A documentary context containing an artefact (SF)
+   * - VSF (Virtual Special Find)
+     - ``#B19F61`` (gold)
+     - A reconstructed roof containing tile fragments (SF)
+
+**How it works in s3dgraphy:**
+
+During GraphML import, the importer:
+
+1. Detects group nodes with the recognised background colours
+2. Creates a regular stratigraphic node of the appropriate type (not a GroupNode subclass)
+3. Creates ``is_part_of`` edges from each child node to the container
+4. The container retains all its normal stratigraphic relationships (epoch, activity, temporal edges)
+
+The container is identified at query time by the presence of ``is_part_of`` / ``has_part``
+edges, not by a special node class.
+
+During GraphML export, container nodes are re-exported as group nodes with the correct
+background colours, preserving the visual nesting in yEd.
+
+Instance Chains
+---------------
+
+When the same physical object exists across multiple epochs -- each represented as a
+distinct stratigraphic unit -- the ``changed_from`` connector links these instances
+into a navigable **instance chain**.
+
+The chain is traversed transitively: if A ``changed_from`` B and B ``changed_from`` C,
+then A, B, and C form a single instance chain representing the complete biography of
+a physical object through time.
+
+**Naming convention** (recommended but not enforced):
+
+``{TYPE}{ID}-{LETTER}`` where the letter indicates the epoch order (A = most recent,
+B = previous, C = older, etc.). Example: ``USM5000-A``, ``USD5000-B``, ``SF5000-C``.
+
+The system relies solely on ``changed_from`` edges to identify chains, never on name parsing.
+
+In the EM-tools Blender interface, instance chain members are marked with a three-dots
+icon and can be filtered to show only the chain members.
+
+Comment Node Skipping
+---------------------
+
+yEd allows users to place annotation/comment nodes in their graphs. These are typically
+yellow rectangular nodes used for notes and are not part of the archaeological data model.
+
+During GraphML import, s3dgraphy automatically detects and skips nodes with the following
+fill colours:
+
+- ``#FFCC00``
+- ``#FFFF00``
+- ``#FFFF99``
+
+These nodes are silently excluded from the graph and a log message is printed.
 
 CIDOC-CRM Mapping
-~~~~~~~~~~~~~~~~~
+------------------
 
-s3dgraphy maintains full compatibility with CIDOC-CRM ontology for heritage data:
+s3dgraphy maintains compatibility with the CIDOC-CRM ontology for heritage data
+interoperability. Each node type and edge type carries CIDOC-CRM mapping metadata,
+including extensions:
 
-.. list-table:: Edge Type Mappings
+.. list-table:: Key Edge Type CIDOC-CRM Mappings
    :header-rows: 1
-   :widths: 20 30 50
+   :widths: 25 35 40
 
    * - **Edge Type**
      - **CIDOC-CRM Property**
      - **Archaeological Meaning**
-   * - line
-     - P4 has time-span
+   * - is_before
+     - P120_occurs_before
      - Chronological sequence of stratigraphic events
-   * - dashed  
-     - P22 has modifier
+   * - has_same_time
+     - P114_is_equal_in_time_to
+     - Contemporary elements or features
+   * - changed_from
+     - P123_resulted_from
+     - Same object across epochs (instance chain)
+   * - has_data_provenance
+     - P70i_is_documented_in
      - Provenance and documentation relationships
-   * - dotted
-     - P1 is identified by
-     - Temporal changes or entity evolution
-   * - double_line
-     - P106 is composed of
-     - Contemporary units or compositional relationships
-   * - dashed_dotted
-     - P2 has type
-     - Alternative interpretations or conflicting properties
+   * - contrasts_with
+     - P69_has_association_with
+     - Mutually exclusive interpretations
+   * - is_part_of
+     - P46_is_composed_of
+     - Mereological containment (part--whole)
+   * - has_property
+     - P2_has_type
+     - Property attribution
+
+For complete CIDOC-CRM mappings, see the connections datamodel JSON configuration
+(:doc:`s3dgraphy_json_config`).
 
 Integration with Extended Matrix Framework
 ------------------------------------------
@@ -244,13 +414,13 @@ s3dgraphy serves as the core library for the broader Extended Matrix ecosystem:
 **3D Survey Collection (3DSC)**
    High-quality 3D model preparation and metadata management
 
-**ATON 3 Framework** 
+**ATON 3 Framework**
    Web-based archaeological visualization and data sharing
 
 **Heriverse Platform**
    Virtual heritage experiences and public engagement
 
-The library's design ensures seamless data flow between these tools while maintaining 
+The library's design ensures seamless data flow between these tools while maintaining
 scientific rigor and documentation standards.
 
 Performance and Scalability
@@ -260,68 +430,11 @@ s3dgraphy is optimized for real-world archaeological projects:
 
 **Graph Size Support**
    - **Small projects**: 100-500 nodes (single-season excavations)
-   - **Medium projects**: 500-5,000 nodes (multi-season sites)  
+   - **Medium projects**: 500-5,000 nodes (multi-season sites)
    - **Large projects**: 5,000+ nodes (major archaeological sites)
 
-**Memory Management**
-   - Lazy loading for large datasets
-   - Efficient node and edge storage
-   - Configurable caching strategies
-
 **Performance Optimization**
-   - Indexed node and edge lookups
+   - Indexed node and edge lookups via ``GraphIndices``
+   - O(1) node lookup by ID, type, and name
    - Optimized graph traversal algorithms
-   - Batch operations for bulk data handling
-
-.. code-block:: python
-
-   # Performance example: bulk node creation
-   graph = Graph("large_site")
-   
-   # Efficient batch addition
-   nodes = []
-   for i in range(1000):
-       node = StratigraphicNode(f"US{i:03d}", node_type="US")
-       nodes.append(node)
-   
-   graph.add_nodes_batch(nodes)  # Single operation vs. 1000 individual calls
-
-Extensibility and Customization
---------------------------------
-
-s3dgraphy is designed for extension and customization:
-
-Custom Node Types
-~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   from s3dgraphy.nodes import Node
-   
-   class CustomSampleNode(Node):
-       """Custom node type for specialized sample analysis"""
-       
-       def __init__(self, node_id, sample_type):
-           super().__init__(node_id, "custom_sample")
-           self.set_attribute("sample_type", sample_type)
-           
-       def add_analysis_result(self, method, result):
-           if "analyses" not in self.attributes:
-               self.attributes["analyses"] = {}
-           self.attributes["analyses"][method] = result
-
-Custom Relationship Types
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   # Register custom edge types
-   graph.register_edge_type("chemical_similarity", {
-       "cidoc_mapping": "P130_shows_features_of",
-       "description": "Chemical composition similarity"
-   })
-   
-   # Use custom relationship
-   graph.add_edge("chem_1", "SAMPLE001", "SAMPLE002", "chemical_similarity")
-
-For more advanced customization examples, see the :doc:`examples/extension_development` guide.
+   - Lazy index invalidation for batch operations
