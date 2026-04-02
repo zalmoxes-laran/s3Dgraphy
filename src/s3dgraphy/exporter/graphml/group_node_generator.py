@@ -16,7 +16,8 @@ GROUP_COLORS = {
     'ActivityNodeGroup': '#CCFFFF',
     'TimeBranchNodeGroup': '#99CC00',
     'USContainer': '#9B3333',            # US group (stratigraphic container)
-    'USDContainer': '#D86400'            # USD group (documentary container)
+    'USDContainer': '#D86400',           # USD group (documentary container)
+    'VSFContainer': '#B19F61'            # VSF group (virtual special find container)
 }
 
 
@@ -185,7 +186,7 @@ class GroupNodeGenerator:
                                      x: float = 100.0, y: float = 100.0,
                                      parent_id: str = None) -> ET.Element:
         """
-        Generate ProxyAutoBoundsNode for a US/USD container.
+        Generate ProxyAutoBoundsNode for a US/USD/VSF container.
 
         A US/USD container is a regular StratigraphicUnit or DocumentaryStratigraphicUnit
         that has has_part edges. In GraphML, it is rendered as a yEd group node with the
@@ -204,6 +205,8 @@ class GroupNodeGenerator:
         node_type = getattr(container_node, 'node_type', 'US')
         if node_type == 'USD':
             bg_color = GROUP_COLORS['USDContainer']
+        elif node_type == 'VSF':
+            bg_color = GROUP_COLORS['VSFContainer']
         else:
             bg_color = GROUP_COLORS['USContainer']
 

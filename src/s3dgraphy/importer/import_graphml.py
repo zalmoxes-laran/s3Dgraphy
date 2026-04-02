@@ -3,7 +3,8 @@
 import xml.etree.ElementTree as ET
 from ..graph import Graph
 from ..nodes.stratigraphic_node import (
-    Node, StratigraphicNode, StratigraphicUnit, DocumentaryStratigraphicUnit, ContinuityNode)
+    Node, StratigraphicNode, StratigraphicUnit, DocumentaryStratigraphicUnit,
+    VirtualSpecialFindUnit, ContinuityNode)
 from ..nodes.paradata_node import ParadataNode
 from ..nodes.document_node import DocumentNode
 from ..nodes.combiner_node import CombinerNode
@@ -872,7 +873,7 @@ class GraphMLImporter:
 
         # US/USD Container: crea un nodo stratigrafico regolare (non un GroupNode)
         # La contenitorialità è espressa tramite edge is_part_of, non tramite tipo di nodo
-        if group_node_type in ('USContainer', 'USDContainer'):
+        if group_node_type in ('USContainer', 'USDContainer', 'VSFContainer'):
             self._handle_stratigraphic_container(
                 group_node_type, uuid_id, original_id, group_name,
                 group_description, group_y_pos, node_uri, node_element
@@ -972,9 +973,9 @@ class GraphMLImporter:
                                          group_name, group_description, group_y_pos,
                                          node_uri, node_element):
         """
-        Gestisce un nodo gruppo GraphML che rappresenta una US o USD contenitrice.
-        Crea un nodo stratigrafico regolare (StratigraphicUnit o DocumentaryStratigraphicUnit)
-        e collega i nodi figli tramite edge is_part_of.
+        Gestisce un nodo gruppo GraphML che rappresenta una US, USD o VSF contenitrice.
+        Crea un nodo stratigrafico regolare (StratigraphicUnit, DocumentaryStratigraphicUnit
+        o VirtualSpecialFindUnit) e collega i nodi figli tramite edge is_part_of.
 
         La contenitorialità non è un tipo di nodo diverso: è una relazione (is_part_of).
         Questo permette al nodo container di mantenere tutte le proprietà stratigrafiche
@@ -991,7 +992,7 @@ class GraphMLImporter:
             container_node.attributes['border_style'] = '#9B3333'
             container_node.attributes['fill_color'] = '#FFFFFF'
             print(f"[GraphML Parser] Created US container node: {group_name} ({uuid_id})")
-        else:  # USDContainer
+        elif group_node_type == 'USDContainer':
             container_node = DocumentaryStratigraphicUnit(
                 node_id=uuid_id,
                 name=group_name,
@@ -1001,6 +1002,16 @@ class GraphMLImporter:
             container_node.attributes['border_style'] = '#D86400'
             container_node.attributes['fill_color'] = '#FFFFFF'
             print(f"[GraphML Parser] Created USD container node: {group_name} ({uuid_id})")
+        else:  # VSFContainer
+            container_node = VirtualSpecialFindUnit(
+                node_id=uuid_id,
+                name=group_name,
+                description=group_description
+            )
+            container_node.attributes['shape'] = 'octagon'
+            container_node.attributes['border_style'] = '#B19F61'
+            container_node.attributes['fill_color'] = '#000000'
+            print(f"[GraphML Parser] Created VSF container node: {group_name} ({uuid_id})")
 
         # Attributi di tracciamento
         container_node.attributes['original_id'] = original_id
@@ -1423,6 +1434,8 @@ class GraphMLImporter:
             return 'USContainer'
         elif background_color == '#D86400':
             return 'USDContainer'
+        elif background_color == '#B19F61':
+            return 'VSFContainer'
         else:
             return 'GroupNode'
 

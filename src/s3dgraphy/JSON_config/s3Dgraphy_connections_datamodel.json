@@ -629,7 +629,7 @@
       },
       "allowed_connections": {
         "source": ["SpecialFindUnit", "VirtualSpecialFindUnit"],
-        "target": ["StratigraphicUnit", "DocumentaryStratigraphicUnit"]
+        "target": ["StratigraphicUnit", "DocumentaryStratigraphicUnit", "VirtualSpecialFindUnit"]
       }
     },
     "generic_connection": {
