@@ -644,21 +644,34 @@ class Graph:
         """
         Find a property node of a given type connected to a stratigraphic node.
 
-        Searches via 'has_property' edges for PropertyNode with matching property_type.
+        Searches via 'has_property' edges for PropertyNode with matching
+        property_type OR name (GraphML imports may store the type as the node name
+        while property_type defaults to "string").
+
+        The temporal value may be in `value` or `description` (GraphML stores
+        annotation text in description).
 
         Args:
             node: The stratigraphic node to search from.
             property_type: The property type to find (e.g. "absolute_start_date").
 
         Returns:
-            PropertyNode or None
+            PropertyNode or None (with value guaranteed set if found)
         """
         for edge in self.get_connected_edges(node.node_id):
             if edge.edge_type == "has_property" and edge.edge_source == node.node_id:
                 prop_node = self.find_node_by_id(edge.edge_target)
-                if (prop_node and
-                    isinstance(prop_node, PropertyNode) and
-                    prop_node.property_type == property_type):
+                if not prop_node or not isinstance(prop_node, PropertyNode):
+                    continue
+                # Match by property_type OR by node name
+                if prop_node.property_type == property_type or prop_node.name == property_type:
+                    # Ensure value is populated (GraphML may store it in description)
+                    if (not prop_node.value or prop_node.value == "") and prop_node.description:
+                        try:
+                            float(prop_node.description)
+                            prop_node.value = prop_node.description
+                        except (ValueError, TypeError):
+                            pass
                     return prop_node
         return None
 
