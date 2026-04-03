@@ -52,6 +52,7 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
 fi
 
 # Check if working directory is clean
+ALLOW_DIRTY=0
 if ! git diff --quiet || ! git diff --cached --quiet; then
     echo -e "${YELLOW}⚠️  Warning: Working directory has uncommitted changes${NC}"
     read -p "Continue anyway? (y/N): " -n 1 -r
@@ -60,13 +61,38 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
         echo "Aborted."
         exit 1
     fi
+    ALLOW_DIRTY=1
 fi
 
-# Check if bump2version is installed
-if ! command -v bump2version &> /dev/null; then
-    echo -e "${RED}❌ Error: bump2version not found${NC}"
-    echo "Install with: pip install bump2version"
+# Ensure virtual environment with bump2version
+VENV_DIR=".venv"
+
+# Find python interpreter
+PYTHON_BIN=$(command -v python3 || command -v python)
+if [ -z "$PYTHON_BIN" ]; then
+    echo -e "${RED}❌ Error: python3 not found on PATH${NC}"
     exit 1
+fi
+
+# Create venv if missing
+if [ ! -d "$VENV_DIR" ]; then
+    echo -e "${BLUE}📦 Creating virtual environment in ${VENV_DIR}${NC}"
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
+fi
+
+VENV_BIN="$VENV_DIR/bin"
+VENV_PYTHON="$VENV_BIN/python"
+BUMP_CMD="$VENV_BIN/bump2version"
+BUMP_ARGS=()
+
+if [ "$ALLOW_DIRTY" -eq 1 ]; then
+    BUMP_ARGS+=("--allow-dirty")
+fi
+
+# Install bump2version if missing in venv
+if ! "$VENV_PYTHON" -m pip show bump2version > /dev/null 2>&1; then
+    echo -e "${BLUE}📥 Installing bump2version inside ${VENV_DIR}${NC}"
+    "$VENV_PYTHON" -m pip install --upgrade pip bump2version
 fi
 
 # Get current version before bump
@@ -76,7 +102,7 @@ echo -e "Current version: ${GREEN}$CURRENT_VERSION${NC}"
 
 # Perform version bump
 echo -e "${BLUE}🔢 Bumping $BUMP_TYPE version...${NC}"
-if bump2version "$BUMP_TYPE"; then
+if "$BUMP_CMD" "${BUMP_ARGS[@]}" "$BUMP_TYPE"; then
     echo -e "${GREEN}✅ Version bump successful${NC}"
 else
     echo -e "${RED}❌ Version bump failed${NC}"

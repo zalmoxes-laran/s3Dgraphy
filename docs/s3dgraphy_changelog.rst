@@ -6,113 +6,101 @@ All notable changes to s3dgraphy will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
-.. note::
-   s3dgraphy is currently developed within EM-tools but will become a standalone 
-   library. This changelog tracks s3dgraphy-specific developments.
-
-[Unreleased]
-------------
-
-Core Library Development
-~~~~~~~~~~~~~~~~~~~~~~~~
+[0.1.32] - 2026
+----------------
 
 Added
 ^^^^^
-- Three core JSON configuration files (Visual Rules, CIDOC Mapping, Connection Rules)
-- Stratigraphic node subclasses implementation
-- Actor and Link nodes support
-- Representation Model node functionality
-- GraphML import compatibility layer
-- Tag parser for EM canvas integration
-- 3D model library (GLTF) and 2D icons (PNG) support
-- Modular architecture revision
-- Information propagation algorithm (v1)
-- Color schema migration from EM-tools
+- **Chronology calculation engine** (``calculate_chronology``): BFS-based temporal
+  inference that propagates absolute dates (TPQ/TAQ) through stratigraphic relations,
+  storing computed ``CALCUL_START_T`` and ``CALCUL_END_T`` attributes on each node
+- **Temporal property detection**: ``_find_temporal_property`` resolves
+  ``absolute_start_date`` / ``absolute_end_date`` PropertyNodes by matching on
+  ``property_type`` or ``name``, with fallback to ``description`` as value source
 
 Changed
 ^^^^^^^
-- Migrated core graph functionality from EM-tools codebase
-- Restructured node type hierarchy for better extensibility
-- Improved JSON configuration management
+- ``calculate_chronology`` now collects stratigraphic nodes by their actual
+  ``node_type`` values (US, USVs, USVn, VSF, SF, USD, serSU, serUSD, serUSVn,
+  serUSVs, USM) instead of the former class-name lookup ``"StratigraphicNode"``
 
-[0.1.0] - Development Version
------------------------------
+Fixed
+^^^^^
+- PropertyNode value resolution when the GraphML importer stores the numeric value
+  in ``description`` rather than ``value``
+- Node type lookup in chronology calculation returning 0 nodes due to mismatch
+  between class name and ``node_type`` attribute
 
-Initial Development
-~~~~~~~~~~~~~~~~~~~
+[0.1.31] - 2025
+----------------
+
+Added
+^^^^^
+- **GraphML export** with full round-trip support (``GraphMLExporter``)
+- **Container group nodes**: US (``#9B3333``), USD (``#D86400``), VSF (``#B19F61``) as group nodes in GraphML, converted to regular nodes with ``is_part_of`` edges on import
+- **VirtualSpecialFindUnit as container**: VSF can now contain SF elements via ``is_part_of``
+- **Instance chains**: ``changed_from`` edges link the same object across epochs; BFS traversal identifies connected components
+- **Comment node skipping**: yEd annotation nodes with yellow fill (``#FFCC00``, ``#FFFF00``, ``#FFFF99``) are skipped during import
+- **has_visual_reference** edge type (connections datamodel v1.5.4)
+- Canonical/reverse edge directionality pattern (connections datamodel v1.5.3)
+- GraphML export of container group nodes with correct background colours
+- GraphML export of epoch swimlanes, activity groups, and paradata groups
+
+Changed
+^^^^^^^
+- Connections datamodel updated to v1.5.4
+- ``is_part_of`` allowed targets now include ``VirtualSpecialFindUnit``
+- Improved duplicate EMID detection during GraphML import
+
+[0.1.13] - 2024
+----------------
+
+Added
+^^^^^
+- XLSX import with JSON mapping system (``MappedXLSXImporter``)
+- SQLite/pyArchInit import with JSON mapping
+- Graph indexing system (``GraphIndices``) for O(1) lookups
+- UUID slipback mechanism for GraphML round-trip editing
+- Multi-graph management (``MultiGraphManager``)
+- Three core JSON configuration files (Visual Rules, CIDOC Mapping, Connection Rules)
+- Stratigraphic node subclasses (US, USV, SF, VSF, USD)
+- Paradata chain nodes (DOC, EXT, COMB, PROP)
+- Representation Model nodes
+- Actor, Link, License, Embargo nodes
+- Tag parser for EM canvas integration
+- 3D model library (glTF) and 2D icons (PNG)
+
+Changed
+^^^^^^^
+- Modular architecture revision from EM-tools codebase
+- Node type hierarchy restructured for extensibility
+
+[0.1.0] - Initial Development
+------------------------------
 
 Added
 ^^^^^
 - Basic graph structure implementation
 - Node and edge management system
-- JSON import/export functionality
+- JSON export functionality
 - Integration hooks for Blender (via EM-tools)
 - Core stratigraphic modeling capabilities
 - Document and paradata node support
-
-Technical Infrastructure
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Added
-^^^^^
 - Python package structure
-- Basic unit testing framework
 - Documentation structure with Sphinx
-- CI/CD pipeline preparation
-
-Planned for v1.0
-----------------
-
-Library Completion
-~~~~~~~~~~~~~~~~~~
-
-- [ ] ParadataGroup node handling for stratigraphic units
-- [ ] Preset qualia vocabulary implementation  
-- [ ] Complete CIDOC-CRM mapping validation
-- [ ] Enhanced GraphML import/export
-- [ ] Comprehensive unit test coverage
-- [ ] API documentation completion
-- [ ] Performance optimization
-- [ ] Memory usage optimization
-
-Standalone Features
-~~~~~~~~~~~~~~~~~~~
-
-- [ ] Independent installation via PyPI
-- [ ] Command-line interface (CLI)
-- [ ] Batch processing capabilities
-- [ ] Integration examples for other platforms (Unity, Unreal, etc.)
-
-Documentation
-~~~~~~~~~~~~~
-
-- [ ] Complete user guide
-- [ ] API reference documentation
-- [ ] Tutorial series
-- [ ] Integration examples
-- [ ] Performance benchmarking
 
 Version History Context
 -----------------------
 
-s3dgraphy represents the core graph library that powers the Extended Matrix Framework. 
-It evolved from the graph management components of EM-tools and is being developed 
-as a standalone Python library to enable Extended Matrix functionality across 
+s3dgraphy represents the core graph library that powers the Extended Matrix Framework.
+It evolved from the graph management components of EM-tools and is developed
+as a standalone Python library to enable Extended Matrix functionality across
 multiple platforms and applications.
-
-The library implements the formal Extended Matrix language for archaeological 
-stratigraphic documentation and virtual reconstruction processes, providing a 
-robust foundation for scientific 3D heritage documentation workflows.
-
-Related Projects
-----------------
-
-- `EM-tools for Blender <https://github.com/zalmoxes-laran/EM-blender-tools>`_ - 3D visualization and annotation
-- `Extended Matrix Documentation <https://github.com/zalmoxes-laran/ExtendedMatrix>`_ - Formal language reference
-- `Extended Matrix Framework <https://www.extendedmatrix.org>`_ - Complete ecosystem
 
 Links
 -----
 
-[Unreleased]: https://github.com/zalmoxes-laran/s3dgraphy/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/zalmoxes-laran/s3dgraphy/releases/tag/v0.1.0
+| [0.1.32]: https://github.com/zalmoxes-laran/s3dgraphy/compare/v0.1.31...v0.1.32
+| [0.1.31]: https://github.com/zalmoxes-laran/s3dgraphy/compare/v0.1.13...v0.1.31
+| [0.1.13]: https://github.com/zalmoxes-laran/s3dgraphy/compare/v0.1.0...v0.1.13
+| [0.1.0]: https://github.com/zalmoxes-laran/s3dgraphy/releases/tag/v0.1.0

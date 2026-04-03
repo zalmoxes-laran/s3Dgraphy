@@ -1,66 +1,59 @@
 Development Roadmap
 ===================
 
-This document outlines the development roadmap for s3dgraphy, the core Python library 
+This document outlines the development roadmap for s3dgraphy, the core Python library
 that implements the Extended Matrix formal language for archaeological documentation.
 
-.. note::
-   s3dgraphy is currently developed within EM-tools but is being extracted as a 
-   standalone library.
+Current Version: 0.1.32
+------------------------
 
-Version 1.0 (Q2 2025) - Standalone Library Release
----------------------------------------------------
+Completed Features
+~~~~~~~~~~~~~~~~~~
 
-✅ **Completed Features**
-
-- [x] Three core JSON files (Visual Rules, CIDOC Mapping, Connection Rules)
-- [x] Stratigraphic node subclasses (US, USV, SF, etc.)
-- [x] Actor and Link nodes implementation
-- [x] Document and Extractor node support
-- [x] Representation Model nodes
-- [x] GraphML import compatibility
+- [x] Core graph structure with indexing (``GraphIndices``)
+- [x] Node type system with CIDOC-CRM mappings
+- [x] Three core JSON configuration files (Visual Rules, CIDOC Mapping, Connection Rules)
+- [x] Stratigraphic node subclasses (US, USV, SF, VSF, USD, TSU) and serial variants
+- [x] Actor, Link, License, and Embargo nodes
+- [x] Document, Extractor, Combiner, Property nodes (paradata chain)
+- [x] Representation Model nodes (3D models for US, DOC, SF)
+- [x] GraphML import with UUID slipback
+- [x] GraphML export with container group support
+- [x] Container group nodes (US, USD, VSF) with is_part_of edges
+- [x] Instance chains via changed_from edges
+- [x] Comment/note node skipping during import
+- [x] XLSX import with JSON mapping system
+- [x] SQLite/pyArchInit import with JSON mapping
+- [x] JSON export for web platforms (Heriverse, ATON)
+- [x] Multi-graph management (MultiGraphManager)
+- [x] Integration with EM-tools for Blender
 - [x] Tag parser for EM canvas integration
-- [x] 3D model library (GLTF) and 2D icons (PNG)
-- [x] Modular architecture revision
-- [x] Information propagation algorithm (v1)
-- [x] Color schema migration from EM-tools
+- [x] 3D model library (glTF) and 2D icons (PNG)
+- [x] Modular architecture
+- [x] PyPI package release
+- [x] Canonical/reverse edge directionality (v1.5.3)
+- [x] has_visual_reference edge type (v1.5.4)
+- [x] **Chronology calculation** (``calculate_chronology``): BFS-based TPQ/TAQ propagation from absolute dates and epoch membership through stratigraphic relations
+- [x] **Temporal property detection** with fallback matching by name and description
 
-📋 **Planned for v1.0**
+Next Priorities
+~~~~~~~~~~~~~~~
 
-- [ ] ParadataGroup node handling for stratigraphic units
-- [ ] Preset qualia vocabulary implementation
-- [ ] Complete CIDOC-CRM mapping validation
-- [ ] Enhanced GraphML import/export
+- [ ] Enhanced validation system
+- [ ] Performance optimizations for very large graphs (10,000+ nodes)
+- [ ] Additional CIDOC-CRM mapping refinements
 - [ ] Comprehensive unit test coverage
-- [ ] API documentation completion
-- [ ] PyPI package release
+- [ ] Complete API documentation
 
-Version 1.1 (Q3 2025) - Enhanced Functionality
------------------------------------------------
+Future Features
+~~~~~~~~~~~~~~~
 
+- [ ] GeoJSON export for GIS integration
+- [ ] RDF/TTL export for semantic web (CIDOC-CRM compliance)
+- [ ] Neo4j export for graph database integration
 - [ ] Command-line interface (CLI)
 - [ ] Batch processing capabilities
-- [ ] Performance optimization for large graphs
-- [ ] Basic visualization utilities
-- [ ] Database integration (PostgreSQL, Neo4j, SQLite)
-
-Version 1.2 (Q4 2025) - Ecosystem Integration
-----------------------------------------------
-
-- [ ] Seamless EMtools integration
-- [ ] 3DSC workflow support
-- [ ] ATON 3 framework integration
-- [ ] Heriverse platform compatibility
-- [ ] Unity/Unreal integration examples
-
-Version 2.0 (2026) - Advanced Features
----------------------------------------
-
-- [ ] Enhanced temporal modeling
-- [ ] Multi-user collaboration
-- [ ] Advanced analytics tools
-- [ ] Graph neural networks integration
-- [ ] Full Linked Data support
+- [ ] Standalone GUI application
 
 Related Projects
 ----------------

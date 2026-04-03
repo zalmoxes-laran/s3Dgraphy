@@ -1,0 +1,118 @@
+{
+    "name": "Site Properties Mapping",
+    "description": "Maps site-specific property data to existing graph nodes as auxiliary properties. Used with the auxiliary file system to enrich StratigraphicNode objects with detailed descriptions, interpretations, materials, building techniques, and other project-specific attributes.",
+    "version": "1.0",
+    "table_settings": {
+        "format_type": "xlsx",
+        "sheet_name": "Properties",
+        "start_row": 2
+    },
+    "column_mappings": {
+        "ID": {
+            "node_type": "StratigraphicNode",
+            "is_id": true,
+            "display_name": "Stratigraphic Unit ID",
+            "description": "Must match an existing node ID in the graph."
+        },
+        "DEFINITION": {
+            "node_type": "PropertyNode",
+            "property_name": "Definition",
+            "display_name": "Definition",
+            "description": "Synthetic definition of the stratigraphic unit (e.g., Wall, Threshold, Floor, Fill, Cut)."
+        },
+        "INTERPRETATION": {
+            "node_type": "PropertyNode",
+            "property_name": "Interpretation",
+            "display_name": "Interpretation",
+            "description": "Functional interpretation of the unit in its archaeological context."
+        },
+        "BUILDING_TECHNIQUE": {
+            "node_type": "PropertyNode",
+            "property_name": "Building Technique",
+            "display_name": "Building Technique",
+            "description": "Construction technique used (e.g., opus reticulatum, opus incertum, dry stone)."
+        },
+        "INORGANIC_COMPONENTS": {
+            "node_type": "PropertyNode",
+            "property_name": "Inorganic Components",
+            "display_name": "Inorganic Components",
+            "description": "Inorganic materials present (e.g., stone, morite, brick, tile, pottery)."
+        },
+        "ORGANIC_COMPONENTS": {
+            "node_type": "PropertyNode",
+            "property_name": "Organic Components",
+            "display_name": "Organic Components",
+            "description": "Organic materials present (e.g., wood, bone, charcoal, seeds)."
+        },
+        "MEASURES": {
+            "node_type": "PropertyNode",
+            "property_name": "Measures",
+            "display_name": "Measures",
+            "description": "Dimensions of the unit (free format or LxWxH in meters)."
+        },
+        "MATERIAL": {
+            "node_type": "PropertyNode",
+            "property_name": "Material",
+            "display_name": "Material",
+            "description": "Primary material of the unit."
+        },
+        "COLOR": {
+            "node_type": "PropertyNode",
+            "property_name": "Color",
+            "display_name": "Color",
+            "description": "Color of the unit (Munsell notation or descriptive)."
+        },
+        "CONSERVATION_STATE": {
+            "node_type": "PropertyNode",
+            "property_name": "Conservation State",
+            "display_name": "Conservation State",
+            "description": "Current state of conservation of the unit."
+        },
+        "SITE": {
+            "node_type": "PropertyNode",
+            "property_name": "Site",
+            "display_name": "Site",
+            "description": "Name of the archaeological site."
+        },
+        "AREA": {
+            "node_type": "PropertyNode",
+            "property_name": "Area",
+            "display_name": "Area",
+            "description": "Excavation area, sector, or room identifier."
+        },
+        "SOURCE_PDF": {
+            "node_type": "PropertyNode",
+            "property_name": "Source PDF",
+            "display_name": "Source PDF",
+            "description": "Source PDF file reference."
+        },
+        "SOURCE_PAGE": {
+            "node_type": "PropertyNode",
+            "property_name": "Source Page",
+            "display_name": "Source Page",
+            "description": "Page number in the source PDF."
+        },
+        "NOTES": {
+            "node_type": "PropertyNode",
+            "property_name": "Notes",
+            "display_name": "Notes",
+            "description": "Additional notes and observations."
+        }
+    },
+    "relations": [
+        {"source_column": "ID", "target_column": "DEFINITION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "INTERPRETATION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "BUILDING_TECHNIQUE", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "INORGANIC_COMPONENTS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "ORGANIC_COMPONENTS", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "MEASURES", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "MATERIAL", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "COLOR", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "CONSERVATION_STATE", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "SITE", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "AREA", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "SOURCE_PDF", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "SOURCE_PAGE", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "NOTES", "edge_type": "has_property"}
+    ]
+}

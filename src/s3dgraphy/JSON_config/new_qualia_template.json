@@ -1,0 +1,177 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "created": "2025-02-14",
+    "purpose": "Template for AI to report newly discovered Qualia types during extraction",
+    "usage": "AI populates this structure in _NEW_QUALIA sheet when encountering properties not in em_qualia_types.json"
+  },
+  "new_qualia_entry_schema": {
+    "required_fields": {
+      "proposed_id": {
+        "type": "string",
+        "description": "Snake_case identifier for the new qualia (e.g., 'scaffolding_holes')",
+        "example": "scaffolding_holes"
+      },
+      "proposed_name": {
+        "type": "string",
+        "description": "Human-readable name",
+        "example": "Scaffolding Holes"
+      },
+      "proposed_category": {
+        "type": "enum",
+        "values": ["physical_material", "spatiotemporal", "functional", "cultural_interpretive", "contextual"],
+        "description": "Which main category this qualia belongs to",
+        "example": "physical_material"
+      },
+      "proposed_subcategory": {
+        "type": "string",
+        "description": "Existing or suggested new subcategory",
+        "example": "technical"
+      },
+      "description": {
+        "type": "string",
+        "description": "Clear definition of what this qualia represents",
+        "example": "Regular holes in masonry indicating original scaffolding positions during construction"
+      },
+      "data_type": {
+        "type": "enum",
+        "values": ["string", "text", "float", "integer", "boolean", "date", "date_range", "percentage", "controlled_vocabulary", "controlled_vocabulary_multiple", "coordinates", "dimension_set", "reference_list", "string_list"],
+        "description": "Expected data type for values",
+        "example": "controlled_vocabulary"
+      },
+      "source_quote": {
+        "type": "string",
+        "description": "Verbatim quote from source document where this property was mentioned",
+        "example": "\"i fori pontai sono disposti su tre file orizzontali\" [p. 23]"
+      },
+      "source_document": {
+        "type": "string",
+        "description": "Document reference where this qualia was encountered",
+        "example": "Relazione_scavo_2019.pdf"
+      }
+    },
+    "optional_fields": {
+      "suggested_values": {
+        "type": "array",
+        "description": "For controlled vocabularies, suggested allowed values",
+        "example": ["present", "absent", "filled", "visible"]
+      },
+      "units": {
+        "type": "array",
+        "description": "For measurements, applicable units",
+        "example": ["cm", "m"]
+      },
+      "rationale": {
+        "type": "string",
+        "description": "Why this qualia is distinct from existing ones and worth adding",
+        "example": "No existing qualia captures construction trace evidence; closest is construction_technique but that's about method, not physical traces"
+      },
+      "similar_existing": {
+        "type": "string",
+        "description": "Most similar existing qualia (if any) and why it's insufficient",
+        "example": "construction_technique - covers methods but not physical evidence of construction process"
+      },
+      "proposed_mappings": {
+        "type": "object",
+        "description": "Suggested ontology mappings if known",
+        "example": {
+          "getty_aat": "300002753",
+          "cidoc_crm": "E55_Type"
+        }
+      },
+      "expected_extractors": {
+        "type": "array",
+        "description": "Suggested extraction methods",
+        "example": ["visual_inspection", "3d_model_analysis"]
+      },
+      "occurrence_count": {
+        "type": "integer",
+        "description": "How many times this property type was encountered in the current extraction",
+        "example": 5
+      }
+    }
+  },
+  "xlsx_sheet_format": {
+    "sheet_name": "_NEW_QUALIA",
+    "columns": [
+      "PROPOSED_ID",
+      "PROPOSED_NAME",
+      "PROPOSED_CATEGORY",
+      "PROPOSED_SUBCATEGORY",
+      "DESCRIPTION",
+      "DATA_TYPE",
+      "SUGGESTED_VALUES",
+      "UNITS",
+      "SOURCE_QUOTE",
+      "SOURCE_DOCUMENT",
+      "RATIONALE",
+      "SIMILAR_EXISTING",
+      "OCCURRENCE_COUNT"
+    ],
+    "notes": "One row per proposed new qualia. This sheet is for human review and vocabulary expansion."
+  },
+  "examples": [
+    {
+      "proposed_id": "scaffolding_holes",
+      "proposed_name": "Scaffolding Holes",
+      "proposed_category": "physical_material",
+      "proposed_subcategory": "technical",
+      "description": "Holes in masonry walls indicating original scaffolding pole positions",
+      "data_type": "controlled_vocabulary",
+      "suggested_values": ["present", "absent", "filled", "partially_filled"],
+      "source_quote": "\"nella muratura sono visibili i fori pontai disposti su tre ordini\" [p. 45]",
+      "source_document": "Relazione_tecnica_murature.pdf",
+      "rationale": "Common construction evidence in Roman masonry; needed for accurate reconstruction of building process",
+      "similar_existing": "construction_technique covers method but not physical traces",
+      "occurrence_count": 3
+    },
+    {
+      "proposed_id": "opus_signinum_thickness",
+      "proposed_name": "Opus Signinum Thickness",
+      "proposed_category": "physical_material",
+      "proposed_subcategory": "dimensional",
+      "description": "Thickness of waterproof cocciopesto/opus signinum layer",
+      "data_type": "float",
+      "units": ["cm", "mm"],
+      "source_quote": "\"lo strato di cocciopesto ha uno spessore variabile tra 2 e 4 cm\" [p. 12]",
+      "source_document": "Analisi_rivestimenti.pdf",
+      "rationale": "Specific measurement for waterproofing layers; general 'thickness' is for the whole US, not specific layers",
+      "similar_existing": "thickness - but that's for the whole unit, not internal layers",
+      "occurrence_count": 2
+    },
+    {
+      "proposed_id": "reused_material_origin",
+      "proposed_name": "Reused Material Origin",
+      "proposed_category": "cultural_interpretive",
+      "proposed_subcategory": "stylistic",
+      "description": "Original provenance or building of reused (spolia) materials",
+      "data_type": "text",
+      "source_quote": "\"i blocchi calcarei provengono probabilmente dalla demolizione del tempio repubblicano\" [p. 78]",
+      "source_document": "Studio_materiali_reimpiego.pdf",
+      "rationale": "Important for understanding building chronology and material economy; goes beyond simple material_type",
+      "similar_existing": "material_type identifies what, not where from",
+      "occurrence_count": 4
+    }
+  ],
+  "usage_instructions": {
+    "when_to_create_entry": [
+      "Property mentioned in source documents that doesn't match any existing qualia",
+      "Property with distinct semantic meaning from similar existing qualia",
+      "Property that appears multiple times across different units, suggesting it's a pattern not an anomaly",
+      "Property with clear definition and potential controlled vocabulary"
+    ],
+    "when_not_to_create_entry": [
+      "Property is just a variant name for existing qualia (use existing qualia instead)",
+      "Property is a one-off observation better captured in free-text description",
+      "Property is too specific to a single site/context to be generalizable",
+      "Property can be expressed as a combination of existing qualia"
+    ],
+    "quality_criteria": [
+      "Clear, unambiguous definition",
+      "Distinct from existing qualia (explain why)",
+      "Generalizable to other archaeological contexts",
+      "Has clear data type and (if applicable) controlled vocabulary",
+      "Includes source evidence with verbatim quote"
+    ]
+  }
+}

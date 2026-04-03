@@ -1,0 +1,233 @@
+"""
+GraphML Exporter - Main Orchestrator
+
+Exports s3dgraphy Graph objects to Extended Matrix-compatible GraphML format.
+Coordinates all generator components to produce valid yEd GraphML files.
+"""
+
+from lxml import etree as ET
+from typing import Optional
+from ...graph import Graph
+from ...nodes.stratigraphic_node import StratigraphicNode
+from ...nodes.epoch_node import EpochNode
+from ...nodes.document_node import DocumentNode
+from ...nodes.extractor_node import ExtractorNode
+from ...nodes.property_node import PropertyNode
+from ...edges import get_connections_datamodel
+from .canvas_generator import CanvasGenerator
+from .node_generator import NodeGenerator
+from .edge_generator import EdgeGenerator
+from .paradata_generator import ParadataGenerator
+from .epoch_generator import EpochSwimlanesGenerator
+from .utils import calculate_grid_positions
+
+
+class GraphMLExporter:
+    """
+    Main exporter class for converting s3dgraphy Graph to GraphML.
+
+    Usage:
+        exporter = GraphMLExporter(graph)
+        exporter.export("output.graphml")
+    """
+
+    def __init__(self, graph: Graph):
+        """
+        Initialize the GraphML exporter with a Graph object.
+
+        Args:
+            graph: s3dgraphy Graph instance to export
+        """
+        self.graph = graph
+        self.connections_dm = get_connections_datamodel()
+
+        # Initialize generators
+        self.canvas_gen = CanvasGenerator()
+        self.node_gen = NodeGenerator()
+        self.edge_gen = EdgeGenerator()
+        self.paradata_gen = ParadataGenerator()
+        self.epoch_gen = EpochSwimlanesGenerator()
+
+        # Track nodes for layout
+        self.node_positions = {}
+
+    def export(self, output_path: str):
+        """
+        Export the graph to a GraphML file.
+
+        Args:
+            output_path: Path where the GraphML file will be saved
+        """
+        # Generate root structure
+        root = self.canvas_gen.generate_root(
+            graph_id=self.graph.graph_id
+        )
+
+        # Get the <graph> element
+        graph_elem = self.canvas_gen.get_graph_element(root)
+
+        # Generate paradata structure
+        paradata_nodes, paradata_edges = self.paradata_gen.generate_paradata_structure(
+            self.graph
+        )
+
+        # Create extended graph with paradata nodes
+        extended_graph = Graph(
+            graph_id=self.graph.graph_id,
+            name=self.graph.name
+        )
+
+        # Add original nodes
+        for node in self.graph.nodes:
+            extended_graph.add_node(node)
+
+        # Add paradata nodes
+        for node in paradata_nodes:
+            extended_graph.add_node(node)
+
+        # Add original edges
+        for edge in self.graph.edges:
+            extended_graph.add_edge(
+                edge_id=edge.edge_id,
+                edge_source=edge.edge_source,
+                edge_target=edge.edge_target,
+                edge_type=edge.edge_type
+            )
+
+        # Add paradata edges
+        for edge in paradata_edges:
+            extended_graph.add_edge(
+                edge_id=edge.edge_id,
+                edge_source=edge.edge_source,
+                edge_target=edge.edge_target,
+                edge_type=edge.edge_type
+            )
+
+        # Calculate node positions (using extended graph)
+        self._calculate_layout(extended_graph, paradata_nodes)
+
+        # Generate nodes
+        for node in extended_graph.nodes:
+            # Skip EpochNodes for now (they'll be handled differently)
+            if isinstance(node, EpochNode):
+                continue
+
+            # Get position
+            x, y = self.node_positions.get(node.node_id, (150.0, 150.0))
+
+            # Generate node XML
+            node_xml = self.node_gen.generate_node(node, x, y)
+
+            if node_xml is not None:
+                graph_elem.append(node_xml)
+
+        # Generate edges
+        for edge in extended_graph.edges:
+            edge_xml = self.edge_gen.generate_edge(edge, extended_graph)
+            graph_elem.append(edge_xml)
+
+        # Write to file
+        tree = ET.ElementTree(root)
+        tree.write(
+            output_path,
+            encoding='UTF-8',
+            xml_declaration=True,
+            pretty_print=True
+        )
+
+        print(f"✓ GraphML exported: {output_path}")
+        print(f"  Stratigraphic nodes: {len([n for n in self.graph.nodes if isinstance(n, StratigraphicNode)])}")
+        print(f"  Paradata nodes: {len(paradata_nodes)}")
+        print(f"  Total edges: {len(extended_graph.edges)}")
+
+    def _calculate_layout(self, extended_graph, paradata_nodes):
+        """
+        Calculate positions for all nodes including paradata.
+
+        Uses a simple grid layout for now. More sophisticated layouts
+        (temporal ordering, swimlanes) will be added later.
+
+        Args:
+            extended_graph: Graph object including paradata nodes
+            paradata_nodes: List of paradata nodes to position
+        """
+        # Separate nodes by type for better layout
+        strat_nodes = []
+        doc_nodes = []
+        extractor_nodes = []
+        property_nodes = []
+        other_nodes = []
+
+        for node in extended_graph.nodes:
+            if isinstance(node, EpochNode):
+                continue  # Skip epochs
+            elif isinstance(node, StratigraphicNode):
+                strat_nodes.append(node)
+            elif isinstance(node, DocumentNode):
+                doc_nodes.append(node)
+            elif isinstance(node, ExtractorNode):
+                extractor_nodes.append(node)
+            elif isinstance(node, PropertyNode):
+                property_nodes.append(node)
+            else:
+                other_nodes.append(node)
+
+        # Layout stratigraphic nodes in main area (left side, grid)
+        strat_positions = calculate_grid_positions(
+            len(strat_nodes),
+            start_x=100.0,
+            start_y=100.0,
+            spacing_x=150.0,
+            spacing_y=100.0,
+            columns=5
+        )
+
+        for i, node in enumerate(strat_nodes):
+            self.node_positions[node.node_id] = strat_positions[i]
+
+        # Layout paradata nodes on the right side
+        paradata_start_x = 800.0
+        paradata_start_y = 100.0
+
+        # Documents
+        doc_positions = calculate_grid_positions(
+            len(doc_nodes),
+            start_x=paradata_start_x,
+            start_y=paradata_start_y,
+            spacing_x=100.0,
+            spacing_y=120.0,
+            columns=2
+        )
+
+        for i, node in enumerate(doc_nodes):
+            self.node_positions[node.node_id] = doc_positions[i]
+
+        # Extractors (slightly offset from documents)
+        extractor_positions = calculate_grid_positions(
+            len(extractor_nodes),
+            start_x=paradata_start_x + 150.0,
+            start_y=paradata_start_y,
+            spacing_x=100.0,
+            spacing_y=120.0,
+            columns=2
+        )
+
+        for i, node in enumerate(extractor_nodes):
+            self.node_positions[node.node_id] = extractor_positions[i]
+
+        # Properties (below stratigraphic nodes)
+        property_positions = calculate_grid_positions(
+            len(property_nodes),
+            start_x=100.0,
+            start_y=600.0,
+            spacing_x=120.0,
+            spacing_y=60.0,
+            columns=6
+        )
+
+        for i, node in enumerate(property_nodes):
+            self.node_positions[node.node_id] = property_positions[i]
+
+        # Other nodes (fallback position)
+        for node in other_nodes:
+            self.node_positions[node.node_id] = (400.0, 400.0)

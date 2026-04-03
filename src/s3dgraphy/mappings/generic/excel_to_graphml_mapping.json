@@ -1,0 +1,197 @@
+{
+    "name": "Excel to s3dgraphy Mapping (AI Data Collection)",
+    "description": "Maps Excel tabular data to s3dgraphy Graph format. The Graph can then be exported to Extended Matrix GraphML via GraphMLExporter. IMPORTANT: This mapping creates s3dgraphy nodes (StratigraphicNode with attributes), NOT Extended Matrix nodes (which include ParadataNodeGroup). The transformation Excel→s3dgraphy→GraphML involves three different formalizations: (1) Excel: tabular structure for data entry/AI extraction, (2) s3dgraphy: extended graph with 3D nodes + EM concepts, (3) Extended Matrix GraphML: hypergraph with groups for paradata. The GraphMLExporter handles s3dgraphy→GraphML transformation (e.g., extractor/document attributes → ParadataNodeGroup + ExtractorNode + DocumentNode).",
+    "version": "2.0",
+    "project": "AI-powered Stratigraphic Data Collection",
+    "table_settings": {
+        "format_type": "xlsx",
+        "sheet_name": "Stratigraphy",
+        "start_row": 2
+    },
+
+    "column_mappings": {
+        "ID": {
+            "node_type": "StratigraphicNode",
+            "is_id": true,
+            "display_name": "Stratigraphic Unit ID",
+            "description": "Unique identifier (US/USM/USV/SF number) for the stratigraphic unit."
+        },
+        "TYPE": {
+            "node_type": "PropertyNode",
+            "property_name": "usType",
+            "display_name": "US Type",
+            "description": "Type of stratigraphic unit: US, USVs, USVn, SF, VSF, USD, serSU, serUSD, serUSVn, serUSVs, TSU, SE, BR"
+        },
+        "DESCRIPTION": {
+            "node_type": "PropertyNode",
+            "property_name": "description",
+            "is_description": true,
+            "display_name": "Description",
+            "description": "Detailed textual description of the stratigraphic unit."
+        },
+
+        "PERIOD": {
+            "node_type": "EpochNode",
+            "property_name": "period",
+            "display_name": "Period",
+            "description": "Historical period (e.g., Romano, Medievale, Moderno)."
+        },
+        "PERIOD_START": {
+            "node_type": "PropertyNode",
+            "property_name": "periodStart",
+            "display_name": "Period Start",
+            "description": "Start date of the period (e.g., -753 for Roman Kingdom start)."
+        },
+        "PERIOD_END": {
+            "node_type": "PropertyNode",
+            "property_name": "periodEnd",
+            "display_name": "Period End",
+            "description": "End date of the period (e.g., 476 for Roman Empire end)."
+        },
+
+        "PHASE": {
+            "node_type": "EpochNode",
+            "property_name": "phase",
+            "display_name": "Phase",
+            "description": "Chronological phase within the period (e.g., Imperiale, Repubblicano)."
+        },
+        "PHASE_START": {
+            "node_type": "PropertyNode",
+            "property_name": "phaseStart",
+            "display_name": "Phase Start",
+            "description": "Start date of the phase."
+        },
+        "PHASE_END": {
+            "node_type": "PropertyNode",
+            "property_name": "phaseEnd",
+            "display_name": "Phase End",
+            "description": "End date of the phase."
+        },
+
+        "SUBPHASE": {
+            "node_type": "EpochNode",
+            "property_name": "subphase",
+            "display_name": "Subphase",
+            "description": "Chronological subphase (finer granularity)."
+        },
+        "SUBPHASE_START": {
+            "node_type": "PropertyNode",
+            "property_name": "subphaseStart",
+            "display_name": "Subphase Start",
+            "description": "Start date of the subphase."
+        },
+        "SUBPHASE_END": {
+            "node_type": "PropertyNode",
+            "property_name": "subphaseEnd",
+            "display_name": "Subphase End",
+            "description": "End date of the subphase."
+        },
+
+        "OVERLIES": {
+            "node_type": "PropertyNode",
+            "property_name": "overlies",
+            "display_name": "Overlies",
+            "description": "Comma-separated IDs of SUs that this SU lies upon (covers)."
+        },
+        "OVERLAIN_BY": {
+            "node_type": "PropertyNode",
+            "property_name": "overlainBy",
+            "display_name": "Overlain By",
+            "description": "Comma-separated IDs of SUs that rest on top of this SU."
+        },
+        "CUTS": {
+            "node_type": "PropertyNode",
+            "property_name": "cuts",
+            "display_name": "Cuts",
+            "description": "Comma-separated IDs of SUs that are cut by this SU."
+        },
+        "CUT_BY": {
+            "node_type": "PropertyNode",
+            "property_name": "cutBy",
+            "display_name": "Cut By",
+            "description": "Comma-separated IDs of SUs that cut this SU."
+        },
+        "FILLS": {
+            "node_type": "PropertyNode",
+            "property_name": "fills",
+            "display_name": "Fills",
+            "description": "Comma-separated IDs of SUs that this SU fills."
+        },
+        "FILLED_BY": {
+            "node_type": "PropertyNode",
+            "property_name": "filledBy",
+            "display_name": "Filled By",
+            "description": "Comma-separated IDs of SUs that fill this SU."
+        },
+        "ABUTS": {
+            "node_type": "PropertyNode",
+            "property_name": "abuts",
+            "display_name": "Abuts",
+            "description": "Comma-separated IDs of SUs that this SU abuts against."
+        },
+        "ABUTTED_BY": {
+            "node_type": "PropertyNode",
+            "property_name": "abuttedBy",
+            "display_name": "Abutted By",
+            "description": "Comma-separated IDs of SUs that abut this SU."
+        },
+        "BONDED_TO": {
+            "node_type": "PropertyNode",
+            "property_name": "bondedTo",
+            "display_name": "Bonded To",
+            "description": "Comma-separated IDs of SUs physically bonded to this one."
+        },
+        "EQUALS": {
+            "node_type": "PropertyNode",
+            "property_name": "equals",
+            "display_name": "Equals",
+            "description": "Comma-separated IDs of SUs physically equal to this one (same fabric)."
+        },
+
+        "EXTRACTOR": {
+            "node_type": "StratigraphicNode",
+            "property_name": "extractor",
+            "is_attribute": true,
+            "display_name": "Extractor",
+            "description": "Actor/agent identity for the stratigraphic definition extraction (e.g., GPT-4, Claude, Manual). NOTE: In Extended Matrix semantics, 'extractor' means a specific text passage or observation extracted from a document. This column stores the actor identity for the stratigraphic_definition property. Per-property extractors with proper EM semantics will be supported via the qualia properties file. STORED AS ATTRIBUTE on StratigraphicNode."
+        },
+        "DOCUMENT": {
+            "node_type": "StratigraphicNode",
+            "property_name": "document",
+            "is_attribute": true,
+            "display_name": "Source Document",
+            "description": "Source document for the stratigraphic definition (e.g., Report_2023.pdf, Field_notes_Day5.pdf). Should be a specific file reference, not a generic description. Per-property documents will be supported via the qualia properties file. STORED AS ATTRIBUTE on StratigraphicNode."
+        }
+    },
+
+    "relations": [
+        {"source_column": "ID", "target_column": "TYPE", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "DESCRIPTION", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "PERIOD", "edge_type": "has_first_epoch"},
+        {"source_column": "ID", "target_column": "PERIOD_START", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "PERIOD_END", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "PHASE", "edge_type": "has_first_epoch"},
+        {"source_column": "ID", "target_column": "PHASE_START", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "PHASE_END", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "SUBPHASE", "edge_type": "has_first_epoch"},
+        {"source_column": "ID", "target_column": "SUBPHASE_START", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "SUBPHASE_END", "edge_type": "has_property"},
+        {"source_column": "ID", "target_column": "OVERLIES", "edge_type": "overlies"},
+        {"source_column": "ID", "target_column": "OVERLAIN_BY", "edge_type": "is_overlain_by"},
+        {"source_column": "ID", "target_column": "CUTS", "edge_type": "cuts"},
+        {"source_column": "ID", "target_column": "CUT_BY", "edge_type": "is_cut_by"},
+        {"source_column": "ID", "target_column": "FILLS", "edge_type": "fills"},
+        {"source_column": "ID", "target_column": "FILLED_BY", "edge_type": "is_filled_by"},
+        {"source_column": "ID", "target_column": "ABUTS", "edge_type": "abuts"},
+        {"source_column": "ID", "target_column": "ABUTTED_BY", "edge_type": "is_abutted_by"},
+        {"source_column": "ID", "target_column": "BONDED_TO", "edge_type": "is_bonded_to"},
+        {"source_column": "ID", "target_column": "EQUALS", "edge_type": "is_physically_equal_to"}
+    ],
+
+    "phase_definitions": {
+        "Romano": {"period": "Epoca romana", "chronology": "-753 to 476 AD"},
+        "Medievale": {"period": "Medioevo", "chronology": "476 to 1492 AD"},
+        "Moderno": {"period": "Età moderna", "chronology": "1492 to 1789 AD"},
+        "Contemporaneo": {"period": "Età contemporanea", "chronology": "1789 to present"}
+    }
+}

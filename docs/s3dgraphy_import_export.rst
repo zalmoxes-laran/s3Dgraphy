@@ -4,11 +4,10 @@ Import and Export
 This document describes the import and export capabilities of s3dgraphy, the core Python library for managing Extended Matrix graphs.
 
 .. note::
-   s3dgraphy version 0.1.13 currently supports:
-   
+   s3dgraphy version 0.1.31 supports:
+
    - **Import**: GraphML, XLSX (with JSON mapping), SQLite/pyArchInit (with JSON mapping)
-   - **Export**: JSON
-   - **Planned**: GraphML export (future release)
+   - **Export**: JSON, GraphML
 
 Import System
 -------------
@@ -50,8 +49,22 @@ GraphML Import Features
 
 The GraphML importer includes:
 
-- **Automatic node type detection** from GraphML attributes
-- **Edge type mapping** to Extended Matrix connection types
+- **Automatic node type detection** from GraphML attributes and visual properties
+- **Edge type mapping** from visual line styles to semantic types:
+
+  - solid line → ``is_after`` / ``is_before``
+  - double line → ``has_same_time``
+  - dotted line → ``changed_from``
+  - dashed line → ``has_data_provenance``
+  - dashed-dotted line → ``contrasts_with``
+
+- **Container group node support**: group nodes with specific background colours are converted to regular stratigraphic nodes with ``is_part_of`` edges:
+
+  - ``#9B3333`` (dark red) → US container
+  - ``#D86400`` (orange) → USD container
+  - ``#B19F61`` (gold) → VSF container
+
+- **Comment node skipping**: yEd annotation nodes with yellow fill colours (``#FFCC00``, ``#FFFF00``, ``#FFFF99``) are automatically detected and skipped
 - **Attribute preservation** for all node and edge properties
 - **Warning system** for incomplete or malformed data
 - **Support for multilingual content** (name, description fields)
@@ -75,11 +88,107 @@ The GraphML importer includes:
    for node_type, count in node_types.items():
        print(f"  {node_type}: {count}")
    
-   # Count edges by type  
+   # Count edges by type
    edge_types = Counter(edge.edge_type for edge in graph.edges)
    print("\nEdges by type:")
    for edge_type, count in edge_types.items():
        print(f"  {edge_type}: {count}")
+
+UUID Slipback System
+^^^^^^^^^^^^^^^^^^^^
+
+The GraphML importer implements a **slipback mechanism** that automatically writes UUIDs back to the source GraphML file after import. This enables persistent identity across multiple edit-import cycles.
+
+**How it works:**
+
+1. **First import**: Parser generates UUIDs for all nodes and edges
+2. **Slipback**: UUIDs are immediately written to custom ``EMID`` fields in the GraphML file
+3. **Subsequent imports**: Parser reuses existing EMIDs instead of generating new UUIDs
+4. **Edit cycle**: Users can edit the GraphML in yEd and reimport while preserving node/edge identity
+
+**Custom fields:**
+
+- ``EMID`` (Extended Matrix ID): Stores the UUID for nodes and edges
+- ``URI`` (Uniform Resource Identifier): Reserved for future linking capabilities
+
+.. code-block:: python
+
+   from s3dgraphy.importer import GraphMLImporter
+
+   # First import - generates and writes UUIDs
+   importer = GraphMLImporter("site_data.graphml")
+   graph = importer.parse()
+   # Console output: "Generated new UUID: abc123... for node n1"
+   # Console output: "[GraphML Slipback] SUCCESS: Updated 50 nodes and 30 edges"
+
+   # Edit the GraphML file in yEd (rename nodes, add edges, etc.)
+   # ...
+
+   # Second import - reuses existing UUIDs
+   importer2 = GraphMLImporter("site_data.graphml")
+   graph2 = importer2.parse()
+   # Console output: "Reusing existing EMID as node ID: abc123... for node n1"
+
+**Duplicate EMID validation:**
+
+The system includes automatic detection of duplicate EMIDs, which can occur when duplicating nodes in yEd (Ctrl+D):
+
+.. code-block:: text
+
+   [GraphML Parser] Reusing existing EMID as node ID: aaaa-bbbb-cccc for node n1
+   ⚠️  WARNING: Duplicate EMID detected! EMID aaaa-bbbb-cccc... is already used.
+      This usually happens when duplicating nodes in yEd (Ctrl+D).
+      Generating NEW UUID for node n2 to avoid conflicts.
+
+When a duplicate is detected:
+
+- The **first occurrence** (by document order) keeps the original EMID
+- The **second occurrence** receives a new UUID
+- A warning message alerts the user
+- The GraphML file is updated via slipback with the new UUID
+
+.. note::
+   The system cannot distinguish which node is the "original" vs "duplicated" -
+   it only knows that two nodes have the same EMID. The first node encountered
+   in the GraphML file (document order) is considered the original.
+
+**Current limitations:**
+
+1. **Edge recreation**: When you delete and recreate an edge in yEd, yEd does NOT preserve the EMID field. The recreated edge will receive a new UUID, losing its history.
+
+2. **No semantic awareness**: The system uses document order, not semantic information (e.g., node names like "USM100" vs "USM101") to identify duplicates.
+
+3. **yEd ID reuse**: When adding new nodes in yEd, yEd may reuse GraphML node IDs (like ``n5``) from deleted nodes, which can cause confusion (though UUIDs remain unique).
+
+**Recommended workflows:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 30 40
+
+   * - Operation
+     - Safe in yEd?
+     - Notes
+   * - Rename nodes
+     - ✓ Yes
+     - EMID preserved
+   * - Add/remove nodes
+     - ✓ Yes
+     - New nodes get new UUIDs
+   * - Add/remove edges
+     - ✓ Yes
+     - New edges get new UUIDs
+   * - Duplicate nodes (Ctrl+D)
+     - ⚠ Caution
+     - Auto-detected, new UUID generated
+   * - Recreate edges
+     - ✗ No
+     - Loses edge history (new UUID)
+   * - Modify node properties
+     - ✓ Yes
+     - EMID preserved
+
+For advanced editing scenarios (especially edge recreation), consider developing a custom Extended Matrix editor that properly manages EMID fields.
 
 XLSX Import with JSON Mapping
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -586,28 +695,65 @@ For large datasets:
        if e.edge_source == "US001"
    ]
 
-Future Import/Export Features
-------------------------------
-
-Planned for future releases:
-
 GraphML Export
-~~~~~~~~~~~~~~
+--------------
 
-GraphML export functionality is planned for a future release:
+s3dgraphy can export graphs back to GraphML format, enabling full round-trip editing workflows with yEd and other GraphML-compatible tools.
+
+Basic GraphML Export
+~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-   # PLANNED - Not yet implemented
-   from s3dgraphy.exporter import GraphMLExporter
-   
-   exporter = GraphMLExporter("output.graphml")
-   exporter.export_graph(graph.graph_id)
+   from s3dgraphy.exporter.graphml import GraphMLExporter
 
-Additional Export Formats
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+   # Create exporter with the graph to export
+   exporter = GraphMLExporter(graph)
 
-Under consideration:
+   # Export to file
+   exporter.export("output/site_data.graphml")
+
+GraphML Export Features
+~~~~~~~~~~~~~~~~~~~~~~~
+
+The GraphML exporter preserves:
+
+- **Node types and visual properties** (shapes, colours, borders)
+- **Edge types with correct line styles** (solid, dotted, dashed, double, dashed-dotted)
+- **Container group nodes** with correct background colours (US: ``#9B3333``, USD: ``#D86400``, VSF: ``#B19F61``)
+- **Epoch swimlanes and activity groups**
+- **Paradata node groups**
+- **Canvas layout** with node positions
+
+Round-Trip Workflow
+~~~~~~~~~~~~~~~~~~~
+
+The combination of GraphML import (with UUID slipback) and GraphML export enables a complete round-trip:
+
+1. Author a graph in yEd
+2. Import into s3dgraphy (UUIDs written back to the file)
+3. Process, validate, or enrich the graph programmatically
+4. Export back to GraphML for further editing in yEd
+
+.. code-block:: python
+
+   from s3dgraphy import GraphMLImporter
+   from s3dgraphy.exporter.graphml import GraphMLExporter
+
+   # Import
+   importer = GraphMLImporter("site_data.graphml")
+   graph = importer.parse()
+
+   # ... process graph ...
+
+   # Export back
+   exporter = GraphMLExporter(graph)
+   exporter.export("site_data_processed.graphml")
+
+Future Export Formats
+---------------------
+
+Under consideration for future releases:
 
 - **GeoJSON export** for GIS integration
 - **RDF/TTL export** for semantic web (CIDOC-CRM compliance)

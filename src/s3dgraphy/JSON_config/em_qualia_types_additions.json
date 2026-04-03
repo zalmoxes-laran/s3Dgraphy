@@ -1,0 +1,590 @@
+{
+  "metadata": {
+    "version": "3.0-additions",
+    "created": "2025-02-14",
+    "purpose": "Proposed additions to em_qualia_types.json vocabulary",
+    "status": "proposal",
+    "maintainers": ["Emanuel Demetrescu"],
+    "notes": "These additions address gaps identified during AI_EXTRACTION_PROMPT revision. Merge into main vocabulary after review."
+  },
+  "proposed_additions": {
+    "physical_material": {
+      "dimensional": {
+        "qualia_to_add": [
+          {
+            "id": "area",
+            "name": "Area",
+            "description": "Surface area of the unit",
+            "mappings": {
+              "getty_aat": "300055649",
+              "cidoc_crm": "E54_Dimension"
+            },
+            "data_type": "float",
+            "units": ["cm2", "m2"],
+            "suffixes": ["_min", "_max", "_approx", "_preserved", "_reconstructed"],
+            "expected_extractors": ["direct_measurement", "3d_model_measurement", "drawing_measurement", "calculated"]
+          },
+          {
+            "id": "volume",
+            "name": "Volume",
+            "description": "Volumetric measurement of the unit",
+            "mappings": {
+              "getty_aat": "300055652",
+              "cidoc_crm": "E54_Dimension"
+            },
+            "data_type": "float",
+            "units": ["cm3", "m3", "liters"],
+            "suffixes": ["_min", "_max", "_approx", "_preserved", "_reconstructed"],
+            "expected_extractors": ["3d_model_measurement", "calculated", "water_displacement"]
+          },
+          {
+            "id": "perimeter",
+            "name": "Perimeter",
+            "description": "Perimeter measurement of the unit in plan",
+            "mappings": {
+              "getty_aat": "300055644",
+              "cidoc_crm": "E54_Dimension"
+            },
+            "data_type": "float",
+            "units": ["cm", "m"],
+            "suffixes": ["_min", "_max", "_approx", "_preserved"],
+            "expected_extractors": ["direct_measurement", "3d_model_measurement", "drawing_measurement"]
+          }
+        ],
+        "modification_notes": [
+          "All existing dimensional qualia (height, width, length, thickness, depth, diameter) should support suffixes: _min, _max, _approx, _preserved, _reconstructed",
+          "Example: height_min, height_max, height_preserved"
+        ]
+      },
+      "material": {
+        "qualia_to_add": [
+          {
+            "id": "color",
+            "name": "Color",
+            "description": "Visual color of the material",
+            "mappings": {
+              "getty_aat": "300056130",
+              "cidoc_crm": "E55_Type"
+            },
+            "data_type": "string",
+            "expected_extractors": ["visual_inspection", "colorimetry"]
+          },
+          {
+            "id": "color_munsell",
+            "name": "Munsell Color",
+            "description": "Color in Munsell notation (e.g., 10YR 6/4)",
+            "mappings": {
+              "getty_aat": "300056130",
+              "cidoc_crm": "E55_Type"
+            },
+            "data_type": "string",
+            "format": "munsell",
+            "expected_extractors": ["munsell_chart_comparison", "colorimetry"]
+          },
+          {
+            "id": "inclusions",
+            "name": "Inclusions",
+            "description": "Materials included within the matrix (e.g., pottery fragments, charcoal, stones)",
+            "mappings": {
+              "getty_aat": "300010358",
+              "cidoc_crm": "E57_Material"
+            },
+            "data_type": "controlled_vocabulary_multiple",
+            "vocabulary_source": "custom",
+            "values": ["pottery_fragments", "charcoal", "bone", "stone", "shell", "metal", "slag", "organic_material", "brick_fragments", "tile_fragments"],
+            "expected_extractors": ["visual_inspection", "sieving", "microscopic_analysis"]
+          },
+          {
+            "id": "compaction",
+            "name": "Compaction",
+            "description": "Degree of soil/sediment compaction",
+            "mappings": {
+              "getty_aat": "300417183",
+              "cidoc_crm": "E55_Type"
+            },
+            "data_type": "controlled_vocabulary",
+            "vocabulary_source": "custom",
+            "values": ["loose", "friable", "compact", "very_compact", "cemented"],
+            "expected_extractors": ["visual_inspection", "penetrometer"]
+          }
+        ]
+      },
+      "shape": {
+        "name": "Shape Qualia",
+        "description": "Morphological characteristics",
+        "is_new_subcategory": true,
+        "qualia": [
+          {
+            "id": "shape",
+            "name": "Shape",
+            "description": "General three-dimensional form",
+            "mappings": {
+              "getty_aat": "300056273",
+              "cidoc_crm": "E55_Type"
+            },
+            "data_type": "controlled_vocabulary",
+            "vocabulary_source": "custom",
+            "values": ["rectangular", "circular", "oval", "irregular", "linear", "polygonal", "amorphous"],
+            "expected_extractors": ["visual_inspection", "3d_model_analysis"]
+          },
+          {
+            "id": "plan_shape",
+            "name": "Plan Shape",
+            "description": "Shape as seen from above",
+            "mappings": {
+              "getty_aat": "300056273",
+              "cidoc_crm": "E55_Type"
+            },
+            "data_type": "controlled_vocabulary",
+            "vocabulary_source": "custom",
+            "values": ["rectangular", "square", "circular", "oval", "L-shaped", "T-shaped", "irregular", "linear"],
+            "expected_extractors": ["visual_inspection", "plan_drawing", "3d_model_analysis"]
+          },
+          {
+            "id": "section_shape",
+            "name": "Section Shape",
+            "description": "Shape in vertical cross-section",
+            "mappings": {
+              "getty_aat": "300056273",
+              "cidoc_crm": "E55_Type"
+            },
+            "data_type": "controlled_vocabulary",
+            "vocabulary_source": "custom",
+            "values": ["rectangular", "trapezoidal", "U-shaped", "V-shaped", "stepped", "irregular", "lenticular"],
+            "expected_extractors": ["visual_inspection", "section_drawing", "3d_model_analysis"]
+          }
+        ]
+      },
+      "technical": {
+        "qualia_to_add": [
+          {
+            "id": "mortar_type",
+            "name": "Mortar Type",
+            "description": "Type of mortar used in masonry",
+            "mappings": {
+              "getty_aat": "300014741",
+              "cidoc_crm": "E57_Material"
+            },
+            "data_type": "controlled_vocabulary",
+            "vocabulary_source": "custom",
+            "values": ["lime_mortar", "hydraulic_lime", "pozzolanic", "mud_mortar", "gypsum_mortar", "cement", "opus_signinum", "cocciopesto"],
+            "expected_extractors": ["visual_inspection", "laboratory_analysis", "petrographic_analysis"]
+          },
+          {
+            "id": "mortar_composition",
+            "name": "Mortar Composition",
+            "description": "Components of the mortar mix",
+            "mappings": {
+              "getty_aat": "300014741",
+              "cidoc_crm": "E57_Material"
+            },
+            "data_type": "text",
+            "expected_extractors": ["laboratory_analysis", "petrographic_analysis"]
+          },
+          {
+            "id": "bond_pattern",
+            "name": "Bond Pattern",
+            "description": "Brick/stone bonding pattern in masonry",
+            "mappings": {
+              "getty_aat": "300002701",
+              "cidoc_crm": "E55_Type"
+            },
+            "data_type": "controlled_vocabulary",
+            "vocabulary_source": "custom",
+            "values": ["opus_incertum", "opus_reticulatum", "opus_testaceum", "opus_mixtum", "opus_vittatum", "opus_quadratum", "opus_spicatum", "english_bond", "flemish_bond", "stretcher_bond", "header_bond", "random_rubble", "coursed_rubble"],
+            "expected_extractors": ["visual_inspection", "architectural_analysis"]
+          },
+          {
+            "id": "joint_type",
+            "name": "Joint Type",
+            "description": "Type of mortar joint finish",
+            "mappings": {
+              "getty_aat": "300002705",
+              "cidoc_crm": "E55_Type"
+            },
+            "data_type": "controlled_vocabulary",
+            "vocabulary_source": "custom",
+            "values": ["flush", "recessed", "weather_struck", "keyed", "ribbon", "bucket_handle"],
+            "expected_extractors": ["visual_inspection"]
+          },
+          {
+            "id": "coursing_type",
+            "name": "Coursing Type",
+            "description": "Regularity of masonry courses",
+            "mappings": {
+              "getty_aat": "300002695",
+              "cidoc_crm": "E55_Type"
+            },
+            "data_type": "controlled_vocabulary",
+            "vocabulary_source": "custom",
+            "values": ["regular_coursed", "irregular_coursed", "random", "pseudo-isodomic", "isodomic"],
+            "expected_extractors": ["visual_inspection", "architectural_analysis"]
+          },
+          {
+            "id": "brick_dimensions",
+            "name": "Brick Dimensions",
+            "description": "Standard brick module dimensions (L x W x H)",
+            "mappings": {
+              "getty_aat": "300010463",
+              "cidoc_crm": "E54_Dimension"
+            },
+            "data_type": "dimension_set",
+            "components": ["brick_length", "brick_width", "brick_height"],
+            "units": ["cm"],
+            "expected_extractors": ["direct_measurement"]
+          },
+          {
+            "id": "stone_dressing",
+            "name": "Stone Dressing",
+            "description": "Surface finish of stone blocks",
+            "mappings": {
+              "getty_aat": "300053914",
+              "cidoc_crm": "E55_Type"
+            },
+            "data_type": "controlled_vocabulary",
+            "vocabulary_source": "custom",
+            "values": ["rough_hewn", "hammered", "pointed", "tooled", "bush_hammered", "polished", "rusticated", "drafted_margin"],
+            "expected_extractors": ["visual_inspection"]
+          },
+          {
+            "id": "foundation_type",
+            "name": "Foundation Type",
+            "description": "Type of structural foundation",
+            "mappings": {
+              "getty_aat": "300000917",
+              "cidoc_crm": "E55_Type"
+            },
+            "data_type": "controlled_vocabulary",
+            "vocabulary_source": "custom",
+            "values": ["strip_foundation", "pad_foundation", "raft_foundation", "pile_foundation", "stepped_foundation", "rubble_trench"],
+            "expected_extractors": ["excavation", "architectural_analysis"]
+          }
+        ]
+      },
+      "state": {
+        "qualia_to_add": [
+          {
+            "id": "damage_type",
+            "name": "Damage Type",
+            "description": "Type of deterioration or damage observed",
+            "mappings": {
+              "getty_aat": "300379504",
+              "cidoc_crm": "E3_Condition_State"
+            },
+            "data_type": "controlled_vocabulary_multiple",
+            "vocabulary_source": "custom",
+            "values": ["cracks", "spalling", "erosion", "biological_growth", "efflorescence", "discoloration", "deformation", "loss", "abrasion", "fire_damage", "water_damage", "frost_damage", "salt_damage", "mechanical_damage"],
+            "expected_extractors": ["visual_inspection", "condition_assessment"]
+          },
+          {
+            "id": "damage_cause",
+            "name": "Damage Cause",
+            "description": "Identified or hypothesized cause of damage",
+            "mappings": {
+              "getty_aat": "300379504",
+              "cidoc_crm": "E5_Event"
+            },
+            "data_type": "controlled_vocabulary_multiple",
+            "vocabulary_source": "custom",
+            "values": ["weathering", "structural_failure", "seismic", "fire", "flooding", "vandalism", "abandonment", "demolition", "reuse", "biological", "chemical", "thermal_cycling", "root_penetration"],
+            "expected_extractors": ["condition_assessment", "structural_analysis", "historical_research"]
+          },
+          {
+            "id": "damage_extent",
+            "name": "Damage Extent",
+            "description": "Percentage or area affected by damage",
+            "mappings": {
+              "getty_aat": "300379504",
+              "cidoc_crm": "E54_Dimension"
+            },
+            "data_type": "percentage",
+            "range": [0, 100],
+            "expected_extractors": ["condition_assessment", "3d_model_analysis"]
+          },
+          {
+            "id": "restoration_history",
+            "name": "Restoration History",
+            "description": "Previous restoration or conservation interventions",
+            "mappings": {
+              "getty_aat": "300053796",
+              "cidoc_crm": "E11_Modification"
+            },
+            "data_type": "text",
+            "expected_extractors": ["archival_research", "condition_assessment", "visual_inspection"]
+          },
+          {
+            "id": "visible_repairs",
+            "name": "Visible Repairs",
+            "description": "Observable repairs or modifications",
+            "mappings": {
+              "getty_aat": "300053796",
+              "cidoc_crm": "E11_Modification"
+            },
+            "data_type": "text",
+            "expected_extractors": ["visual_inspection", "condition_assessment"]
+          }
+        ]
+      }
+    },
+    "spatiotemporal": {
+      "temporal": {
+        "qualia_to_add": [
+          {
+            "id": "terminus_post_quem",
+            "name": "Terminus Post Quem",
+            "description": "Earliest possible date (date after which the unit was formed)",
+            "mappings": {
+              "getty_aat": "300404284",
+              "cidoc_crm": "E52_Time-Span"
+            },
+            "data_type": "date_or_period",
+            "format": ["YYYY-MM-DD", "YYYY", "century_notation"],
+            "expected_extractors": ["coin_dating", "pottery_dating", "stratigraphy", "c14", "dendrochronology"]
+          },
+          {
+            "id": "terminus_ante_quem",
+            "name": "Terminus Ante Quem",
+            "description": "Latest possible date (date before which the unit was formed)",
+            "mappings": {
+              "getty_aat": "300404284",
+              "cidoc_crm": "E52_Time-Span"
+            },
+            "data_type": "date_or_period",
+            "format": ["YYYY-MM-DD", "YYYY", "century_notation"],
+            "expected_extractors": ["stratigraphy", "historical_sources", "sealing_deposits"]
+          },
+          {
+            "id": "dating_evidence_type",
+            "name": "Dating Evidence Type",
+            "description": "Type of evidence used for dating",
+            "mappings": {
+              "getty_aat": "300054714",
+              "cidoc_crm": "E55_Type"
+            },
+            "data_type": "controlled_vocabulary",
+            "vocabulary_source": "custom",
+            "values": ["coin", "pottery", "inscription", "radiocarbon", "dendrochronology", "archaeomagnetism", "thermoluminescence", "OSL", "historical_document", "stylistic", "epigraphic", "numismatic"],
+            "expected_extractors": ["dating_analysis", "specialist_report"]
+          },
+          {
+            "id": "coin_date",
+            "name": "Coin Date",
+            "description": "Dating based on numismatic evidence",
+            "mappings": {
+              "getty_aat": "300411018",
+              "cidoc_crm": "E52_Time-Span"
+            },
+            "data_type": "date_range",
+            "components": ["mint_date", "circulation_range"],
+            "expected_extractors": ["numismatic_analysis"]
+          },
+          {
+            "id": "pottery_date_range",
+            "name": "Pottery Date Range",
+            "description": "Dating based on ceramic typology",
+            "mappings": {
+              "getty_aat": "300054714",
+              "cidoc_crm": "E52_Time-Span"
+            },
+            "data_type": "date_range",
+            "components": ["earliest_type", "latest_type"],
+            "expected_extractors": ["ceramic_analysis", "typological_analysis"]
+          },
+          {
+            "id": "relative_chronology",
+            "name": "Relative Chronology",
+            "description": "Chronological position relative to other units",
+            "mappings": {
+              "cidoc_crm": "P120_occurs_before"
+            },
+            "data_type": "text",
+            "expected_extractors": ["stratigraphy", "matrix_analysis"]
+          },
+          {
+            "id": "phase",
+            "name": "Phase",
+            "description": "Archaeological phase assignment",
+            "mappings": {
+              "cidoc_crm": "E4_Period"
+            },
+            "data_type": "string",
+            "expected_extractors": ["stratigraphy", "phasing_analysis"]
+          },
+          {
+            "id": "period",
+            "name": "Period",
+            "description": "Historical or cultural period",
+            "mappings": {
+              "getty_aat": "300404284",
+              "cidoc_crm": "E4_Period"
+            },
+            "data_type": "controlled_vocabulary",
+            "vocabulary_source": "getty_aat",
+            "vocabulary_category": "Styles and Periods",
+            "expected_extractors": ["historical_research", "typological_analysis"]
+          }
+        ]
+      },
+      "spatial": {
+        "qualia_to_add": [
+          {
+            "id": "sector",
+            "name": "Sector",
+            "description": "Excavation sector or area designation",
+            "mappings": {
+              "cidoc_crm": "E53_Place"
+            },
+            "data_type": "string",
+            "expected_extractors": ["excavation_records"]
+          },
+          {
+            "id": "grid_reference",
+            "name": "Grid Reference",
+            "description": "Site grid coordinates",
+            "mappings": {
+              "cidoc_crm": "E53_Place"
+            },
+            "data_type": "string",
+            "expected_extractors": ["excavation_records", "survey"]
+          },
+          {
+            "id": "slope",
+            "name": "Slope",
+            "description": "Inclination angle of the surface",
+            "mappings": {
+              "cidoc_crm": "E54_Dimension"
+            },
+            "data_type": "float",
+            "units": ["degrees", "percent"],
+            "expected_extractors": ["inclinometer", "3d_model_analysis"]
+          }
+        ]
+      }
+    },
+    "functional": {
+      "telic": {
+        "qualia_to_add": [
+          {
+            "id": "reuse_evidence",
+            "name": "Reuse Evidence",
+            "description": "Evidence of secondary use or function change",
+            "mappings": {
+              "cidoc_crm": "E7_Activity"
+            },
+            "data_type": "text",
+            "expected_extractors": ["visual_inspection", "stratigraphic_analysis"]
+          },
+          {
+            "id": "abandonment_evidence",
+            "name": "Abandonment Evidence",
+            "description": "Evidence of how/when the structure was abandoned",
+            "mappings": {
+              "cidoc_crm": "E5_Event"
+            },
+            "data_type": "text",
+            "expected_extractors": ["stratigraphic_analysis", "archaeological_interpretation"]
+          }
+        ]
+      }
+    },
+    "contextual": {
+      "finds": {
+        "name": "Finds Qualia",
+        "description": "Associated finds and materials",
+        "is_new_subcategory": true,
+        "qualia": [
+          {
+            "id": "associated_finds",
+            "name": "Associated Finds",
+            "description": "Artifacts found in association with the unit",
+            "mappings": {
+              "cidoc_crm": "P46_is_composed_of"
+            },
+            "data_type": "reference_list",
+            "expected_extractors": ["excavation_records", "finds_catalog"]
+          },
+          {
+            "id": "sample_numbers",
+            "name": "Sample Numbers",
+            "description": "Reference numbers for collected samples",
+            "mappings": {
+              "cidoc_crm": "P48_has_preferred_identifier"
+            },
+            "data_type": "string_list",
+            "expected_extractors": ["excavation_records", "laboratory_records"]
+          },
+          {
+            "id": "ecofacts",
+            "name": "Ecofacts",
+            "description": "Biological remains (seeds, bones, shells)",
+            "mappings": {
+              "cidoc_crm": "E20_Biological_Object"
+            },
+            "data_type": "text",
+            "expected_extractors": ["sieving", "flotation", "specialist_report"]
+          }
+        ]
+      },
+      "documentation": {
+        "name": "Documentation Qualia",
+        "description": "Recording and documentation references",
+        "is_new_subcategory": true,
+        "qualia": [
+          {
+            "id": "photo_ids",
+            "name": "Photo IDs",
+            "description": "Reference numbers for photographs",
+            "mappings": {
+              "cidoc_crm": "P138_represents"
+            },
+            "data_type": "string_list",
+            "expected_extractors": ["photo_register"]
+          },
+          {
+            "id": "drawing_ids",
+            "name": "Drawing IDs",
+            "description": "Reference numbers for drawings (plans, sections)",
+            "mappings": {
+              "cidoc_crm": "P138_represents"
+            },
+            "data_type": "string_list",
+            "expected_extractors": ["drawing_register"]
+          },
+          {
+            "id": "excavation_date",
+            "name": "Excavation Date",
+            "description": "Date when the unit was excavated",
+            "mappings": {
+              "cidoc_crm": "E52_Time-Span"
+            },
+            "data_type": "date_range",
+            "format": "YYYY-MM-DD",
+            "expected_extractors": ["excavation_records"]
+          },
+          {
+            "id": "excavator",
+            "name": "Excavator",
+            "description": "Person who excavated the unit",
+            "mappings": {
+              "cidoc_crm": "E21_Person"
+            },
+            "data_type": "string",
+            "expected_extractors": ["excavation_records"]
+          }
+        ]
+      }
+    }
+  },
+  "measurement_suffix_definitions": {
+    "_min": "Minimum measured/estimated value",
+    "_max": "Maximum measured/estimated value",
+    "_approx": "Approximate value (measurement uncertain)",
+    "_preserved": "Measurement of preserved/surviving portion only",
+    "_reconstructed": "Measurement based on reconstruction/extrapolation"
+  },
+  "integration_notes": {
+    "merge_strategy": "Add new qualia to existing subcategories; create new subcategories where marked is_new_subcategory=true",
+    "backward_compatibility": "All additions are optional; existing data remains valid",
+    "validation": "New qualia should be validated against Getty AAT where mappings are provided"
+  }
+}

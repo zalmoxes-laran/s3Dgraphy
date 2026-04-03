@@ -141,6 +141,26 @@
             },
             "label_position": "over"
         },
+        "serUSD": {
+            "3d_file": "src/3D/serUSD.glb",
+            "2d_file_rast": "src/2D/serUSD.png",
+            "2d_file_vect": "src/2D/serUSD.svg",
+            "style": {
+                "material": {
+                    "color": {
+                        "r": 0.549,
+                        "g": 0.103,
+                        "b": 0.000,
+                        "a": 1.0
+                    }
+                },
+                "border_color": "#D86400",
+                "fill_color": "#FFFFFF",
+                "border_style": "solid",
+                "shape": "ellipse"
+            },
+            "label_position": "over"
+        },
         "serUSVn": {
             "3d_file": "src/3D/serUSV.glb",
             "2d_file_rast": "src/2D/serUSV.png",

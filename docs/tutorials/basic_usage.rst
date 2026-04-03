@@ -35,21 +35,18 @@ Now let's add some stratigraphic units representing different archaeological lay
 
    # Create stratigraphic units
    surface_layer = StratigraphicUnit(
-       node_id="US001", 
-       name="Surface layer", 
-       node_type="US"
+       node_id="US001",
+       name="Surface layer"
    )
-   
+
    medieval_layer = StratigraphicUnit(
-       node_id="US002", 
-       name="Medieval occupation", 
-       node_type="US"
+       node_id="US002",
+       name="Medieval occupation"
    )
-   
+
    roman_floor = StratigraphicUnit(
-       node_id="US003", 
-       name="Roman floor", 
-       node_type="US"
+       node_id="US003",
+       name="Roman floor"
    )
 
 Adding Nodes to the Graph
@@ -74,10 +71,10 @@ The core of stratigraphic analysis is understanding temporal relationships:
 .. code-block:: python
 
    # Add temporal relationships (stratigraphic sequence)
-   # "is_before" means the source is older than the target
-   
-   site_graph.add_edge("rel1", "US002", "US001", "is_before")  # Medieval before Surface
-   site_graph.add_edge("rel2", "US003", "US002", "is_before")  # Roman before Medieval
+   # "is_after" means the source is more recent than the target (canonical direction)
+
+   site_graph.add_edge("rel1", "US001", "US002", "is_after")  # Surface after Medieval
+   site_graph.add_edge("rel2", "US002", "US003", "is_after")  # Medieval after Roman
 
    print(f"Graph now has {len(site_graph.edges)} relationships")
 
@@ -96,9 +93,9 @@ Here's the complete code for this tutorial:
 
    # Create and add stratigraphic units
    units = [
-       StratigraphicUnit("US001", "Surface layer", "US"),
-       StratigraphicUnit("US002", "Medieval occupation", "US"),
-       StratigraphicUnit("US003", "Roman floor", "US")
+       StratigraphicUnit("US001", "Surface layer"),
+       StratigraphicUnit("US002", "Medieval occupation"),
+       StratigraphicUnit("US003", "Roman floor")
    ]
 
    for unit in units:
@@ -106,8 +103,8 @@ Here's the complete code for this tutorial:
 
    # Add stratigraphic relationships
    relationships = [
-       ("rel1", "US002", "US001", "is_before"),
-       ("rel2", "US003", "US002", "is_before")
+       ("rel1", "US001", "US002", "is_after"),
+       ("rel2", "US002", "US003", "is_after")
    ]
 
    for rel_id, source, target, rel_type in relationships:
@@ -119,7 +116,8 @@ Here's the complete code for this tutorial:
    print(f"  - {len(site_graph.edges)} edges")
 
    # Export
-   site_graph.export_graphml("pompeii_forum.graphml")
+   from s3dgraphy.exporter.graphml import GraphMLExporter
+   GraphMLExporter(site_graph).export("pompeii_forum.graphml")
 
 Next Steps
 ----------

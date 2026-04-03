@@ -22,11 +22,12 @@ Adding and Managing Nodes
    nodes = []
    for i in range(100):
        node = StratigraphicUnit(f"US{i:03d}")
-       node.set_attribute("area", "Area_A")
+       node.area = "Area_A"
        nodes.append(node)
 
-   # Use batch operation for better performance
-   graph.add_nodes_batch(nodes)  # More efficient than individual add_node calls
+   # Add all nodes to graph
+   for node in nodes:
+       graph.add_node(node)
 
 Node Queries and Filtering
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -97,25 +98,25 @@ Creating and Validating Relationships
 
    # Basic edge creation with validation
    try:
-       edge = graph.add_edge("rel001", "US001", "US002", "is_before")
+       edge = graph.add_edge("rel001", "US002", "US001", "is_after")
        print(f"Added relationship: {edge}")
    except ValueError as e:
        print(f"Connection invalid: {e}")
 
    # Validate connection before creating
-   source_node = graph.find_node_by_id("US001")
-   target_node = graph.find_node_by_id("US002")
+   source_node = graph.find_node_by_id("US002")
+   target_node = graph.find_node_by_id("US001")
 
-   if Graph.validate_connection(source_node.node_type, target_node.node_type, "is_before"):
-       graph.add_edge("rel001", "US001", "US002", "is_before")
+   if Graph.validate_connection(source_node.node_type, target_node.node_type, "is_after"):
+       graph.add_edge("rel001", "US002", "US001", "is_after")
    else:
        print("Connection not allowed by schema rules")
 
    # Batch edge creation
    relationships = [
-       ("rel001", "US002", "US001", "is_before"),
-       ("rel002", "US003", "US002", "is_before"),
-       ("rel003", "US004", "US003", "is_before"),
+       ("rel001", "US001", "US002", "is_after"),
+       ("rel002", "US002", "US003", "is_after"),
+       ("rel003", "US003", "US004", "is_after"),
        ("rel004", "SF001", "US002", "extracted_from")
    ]
 
@@ -131,7 +132,7 @@ Edge Queries and Analysis
 .. code-block:: python
 
    # Get edges by type (uses indexed lookup)
-   temporal_edges = graph.indices.edges_by_type.get("is_before", [])
+   temporal_edges = graph.indices.edges_by_type.get("is_after", [])
    documentation_edges = graph.indices.edges_by_type.get("has_data_provenance", [])
 
    # Find all edges from a specific node
@@ -161,7 +162,7 @@ Edge Queries and Analysis
 
    # Usage examples
    all_connected = get_connected_nodes(graph, "US001")
-   before_relations = get_connected_nodes(graph, "US001", "is_before")
+   after_relations = get_connected_nodes(graph, "US001", "is_after")
 
 Advanced Graph Analysis
 -----------------------
@@ -173,20 +174,20 @@ Stratigraphic Sequence Analysis
 
    def build_stratigraphic_sequence(graph):
        """Build the complete stratigraphic sequence from temporal relationships"""
-       
+
        # Get all temporal edges
-       temporal_edges = graph.indices.edges_by_type.get("is_before", [])
-       
+       temporal_edges = graph.indices.edges_by_type.get("is_after", [])
+
        # Build adjacency list
-       before_map = {}  # node -> nodes that come before it
-       after_map = {}   # node -> nodes that come after it
-       
+       after_map = {}   # node -> nodes that come after it (more ancient)
+       before_map = {}  # node -> nodes that come before it (more recent)
+
        for edge in temporal_edges:
-           source = edge.edge_source
-           target = edge.edge_target
-           
-           if target not in before_map:
-               before_map[target] = []
+           source = edge.edge_source  # More recent unit
+           target = edge.edge_target  # More ancient unit
+
+           if source not in after_map:
+               after_map[source] = []
            before_map[target].append(source)
            
            if source not in after_map:
@@ -275,6 +276,59 @@ Topological Sorting for Chronology
        for i, node_id in enumerate(chronological_order):
            node = graph.find_node_by_id(node_id)
            print(f"  {i+1}. {node_id}: {node.name if node else 'Unknown'}")
+
+Chronology Calculation (TPQ/TAQ Propagation)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``calculate_chronology`` method performs BFS-based temporal inference on the
+graph, propagating absolute dates from PropertyNodes through stratigraphic relations.
+
+**How it works:**
+
+1. Collects all stratigraphic nodes (US, USVs, USVn, VSF, SF, USD, serSU, etc.)
+2. For each node, looks for connected ``absolute_start_date`` and ``absolute_end_date``
+   PropertyNodes via ``has_property`` edges
+3. Seeds those dates as initial ``CALCUL_START_T`` / ``CALCUL_END_T`` attributes
+4. Uses BFS on ``is_after`` / ``is_before`` edges to propagate:
+   - **TPQ (Terminus Post Quem)**: a node's start date cannot be earlier than the
+     latest start date of the nodes it comes after
+   - **TAQ (Terminus Ante Quem)**: a node's end date cannot be later than the
+     earliest end date of the nodes it comes before
+5. Epoch membership (``has_first_epoch`` / ``survive_in_epoch``) provides fallback
+   date ranges for nodes without direct property dates
+
+.. code-block:: python
+
+   from s3dgraphy import get_graph
+
+   graph = get_graph("my_site")
+
+   # Calculate chronology — propagates TPQ/TAQ through the graph
+   graph.calculate_chronology(graph)
+
+   # Access computed dates on individual nodes
+   for node in graph.nodes:
+       start = node.attributes.get("CALCUL_START_T")
+       end = node.attributes.get("CALCUL_END_T")
+       if start is not None and end is not None:
+           print(f"{node.name}: {start} – {end}")
+
+**PropertyNode matching:** The ``_find_temporal_property`` helper resolves property
+nodes by checking both ``property_type`` and ``name`` fields, since GraphML importers
+may store the property semantics in either field. If the numeric value is stored in
+``description`` instead of ``value``, the method uses the description as fallback.
+
+.. code-block:: python
+
+   # Example: VSF141 has a PropertyNode with:
+   #   name="absolute_start_date", property_type="string",
+   #   description="180", value=""
+   # _find_temporal_property will match by name and use description=180 as value.
+
+**Integration with EM-tools:** In landscape (multi-graph) mode, EM-tools calls
+``calculate_chronology`` on each loaded graph before filtering nodes by CronoFilter
+horizon time ranges. Nodes whose ``[CALCUL_START_T, CALCUL_END_T]`` interval
+overlaps the selected horizon's ``[start_time, end_time]`` are shown.
 
 Paradata Chain Analysis
 ^^^^^^^^^^^^^^^^^^^^^^^

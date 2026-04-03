@@ -4,12 +4,16 @@ from ..graph import Graph
 import os
 import json
 from pathlib import Path
+import re
 
 
 import io
 import tempfile
 import shutil
 import platform
+
+# ✅ PERFORMANCE: Pre-compile regex pattern for column normalization (compiled once, reused forever)
+_COLUMN_NORMALIZE_PATTERN = re.compile(r'[\s\-/\\()\[\].,;:–—]+')
 
 class MappedXLSXImporter(BaseImporter):
     def __init__(self, filepath: str, mapping_name: str, overwrite: bool = False, 
@@ -44,12 +48,15 @@ class MappedXLSXImporter(BaseImporter):
         """
         Parse Excel file with column name normalization.
         Handles differences between Excel column names (with spaces) and mapping names (with underscores).
+
+        OPTIMIZED: Single-pass file reading, vectorized operations, memory-efficient processing.
         """
         temp_file_path = None
         file_content = None
-        
+        excel_file = None
+
         try:
-            
+
             # Get settings from mapping
             table_settings = self.mapping.get('table_settings', {})
             start_row = table_settings.get('start_row', 0)
@@ -63,7 +70,8 @@ class MappedXLSXImporter(BaseImporter):
             
             # ✅ STRATEGIA DOPPIA: Buffer su macOS/Linux, copia temp su Windows
             is_windows = platform.system() == "Windows"
-            
+
+            # ✅ PERFORMANCE: Read file into memory ONCE using optimal strategy
             if is_windows:
                 # ✅ WINDOWS: Copia il file in temp
                 # print(f"Windows detected - using temporary file copy...")
@@ -112,7 +120,7 @@ class MappedXLSXImporter(BaseImporter):
                                 last_error = None
                                 for attempt in range(3):
                                     try:
-                                        time.sleep(0.5)  # Aspetta mezzo secondo
+                                        time.sleep(0.5)
                                         with open(self.filepath, 'rb') as f:
                                             file_bytes = f.read()
                                         # print(f"✅ File read on retry attempt {attempt + 1}")
@@ -123,7 +131,6 @@ class MappedXLSXImporter(BaseImporter):
                                             pass
                                             # print(f"Retry {attempt + 1}/3 failed, waiting...")
                                 else:
-                                    # Tutti i tentativi falliti
                                     raise ImportError(
                                         f"⚠️ CANNOT ACCESS FILE ⚠️\n\n"
                                         f"The file appears to be locked by Excel or another application.\n\n"
@@ -135,17 +142,17 @@ class MappedXLSXImporter(BaseImporter):
                                         f"Location: {os.path.dirname(self.filepath)}\n\n"
                                         f"Technical error: {str(last_error)}"
                                     )
-                    
-                    # ✅ Se siamo arrivati qui, abbiamo i bytes! Scriviamoli nel file temp
+
+                    # Write to temp file
                     with open(temp_file_path, 'wb') as f:
                         f.write(file_bytes)
                     
                     # print(f"✅ Temporary file created successfully")
                     working_path = temp_file_path
-                    
+
                 except Exception as e:
                     raise ImportError(f"Error accessing file: {str(e)}")
-                    
+
             else:
                 # ✅ macOS/Linux: Usa buffer in memoria
                 # print(f"macOS/Linux detected - using memory buffer...")
@@ -252,14 +259,14 @@ class MappedXLSXImporter(BaseImporter):
                 
                 
                 if json_normalized in excel_columns_normalized:
-                    # Trovata corrispondenza!
+                    # Match found
                     actual_excel_col = excel_columns_normalized[json_normalized]
                     json_to_excel_mapping[json_col] = actual_excel_col
                     if len(json_to_excel_mapping) <= 10:  # Mostra solo i primi 10 match
                         pass
                         # print(f"  ✓ Matched: '{json_col}' -> '{actual_excel_col}'")
                 else:
-                    # Nessuna corrispondenza trovata
+                    # No match
                     unmapped_json_cols.append(json_col)
             
             # Log risultati del matching
@@ -273,9 +280,7 @@ class MappedXLSXImporter(BaseImporter):
                 for col in unmapped_json_cols:
                     # print(f"  - {col}")
                     self.warnings.append(f"Column '{col}' not found in Excel (after normalization)")
-            
-            # Verifica che almeno alcune colonne siano state matchate
-            # Modifica: non fallire se almeno l'ID è stato trovato
+
             if not json_to_excel_mapping:
                 # print("\n❌ ERROR: No columns could be matched!")
                 # print("Please check that column names in Excel match those in the mapping.")
@@ -288,13 +293,8 @@ class MappedXLSXImporter(BaseImporter):
                     pass
                     # print(f"  - {norm} (original: {orig})")
                 raise ValueError("No columns could be matched between mapping and Excel file!")
-            
-            # Verifica che almeno l'ID column sia presente
-            id_column_found = False
-            
-            # Trova la colonna ID
-            
-            # Trova la colonna ID
+
+            # Find ID column
             id_column_json = None
             id_column_excel = None
             for col_name, col_config in column_maps.items():
@@ -302,7 +302,7 @@ class MappedXLSXImporter(BaseImporter):
                     id_column_json = col_name
                     id_column_excel = json_to_excel_mapping.get(col_name)
                     break
-            
+
             if not id_column_excel:
                 raise ValueError(f"ID column not found in Excel after normalization")
             
@@ -320,23 +320,21 @@ class MappedXLSXImporter(BaseImporter):
                 total_rows += 1
                 
                 try:
-                    # ✅ IMPORTANTE: Costruisci row_dict usando i nomi JSON come chiavi
-                    # ma prendi i valori dalle colonne Excel corrette
+                    # Build row_dict using JSON column names as keys
+                    # but values from Excel columns (via tuple index)
                     row_dict = {}
-                    
+
                     for json_col, excel_col in json_to_excel_mapping.items():
-                        value = row.get(excel_col)
-                        # Solo aggiungi valori non-null
+                        # Get column index in the filtered dataframe
+                        col_idx = columns_to_keep.index(excel_col)
+                        value = row_tuple[col_idx]
+
+                        # Only add non-null values
                         if pd.notna(value):
                             row_dict[json_col] = value
-                    
-                    # Skip righe senza dati
-                    if not row_dict:
-                        skipped_rows += 1
-                        continue
-                    
-                    # Verifica che l'ID sia presente
-                    if id_column_json not in row_dict:
+
+                    # Skip rows without data (already filtered by ID above, but double-check)
+                    if not row_dict or id_column_json not in row_dict:
                         skipped_rows += 1
                         # print(f"  Row {idx+1}: Skipped (missing ID)")
                         continue
@@ -350,7 +348,7 @@ class MappedXLSXImporter(BaseImporter):
                     
                     # Process the row
                     result_node = self.process_row(row_dict)
-                    
+
                     if result_node is not None:
                         successful_rows += 1
                         if (successful_rows % 10) == 0:
@@ -358,10 +356,10 @@ class MappedXLSXImporter(BaseImporter):
                             # print(f"  Processed {successful_rows} rows...")
                     else:
                         skipped_rows += 1
-                        
+
                 except Exception as e:
                     error_rows += 1
-                    error_msg = f"Error processing row {idx+1}: {str(e)}"
+                    error_msg = f"Error processing row: {str(e)}"
                     self.warnings.append(error_msg)
                     # print(f"  ❌ {error_msg}")
 
@@ -382,10 +380,10 @@ class MappedXLSXImporter(BaseImporter):
             self.warnings.append(f"\nImport summary:")
             self.warnings.append(f"Rows: {successful_rows}/{total_rows} successful")
             self.warnings.append(f"Columns: {len(json_to_excel_mapping)}/{len(column_maps)} matched")
-            
+
             if unmapped_json_cols:
                 self.warnings.append(f"Unmatched columns: {', '.join(unmapped_json_cols[:5])}")
-            
+
             if self.warnings:
                 self.display_warnings()
             
@@ -412,15 +410,15 @@ class MappedXLSXImporter(BaseImporter):
             raise
         
         finally:
-            # ✅ CLEANUP: Chiudi buffer se necessario
+            # ✅ CLEANUP: Close resources and release memory
             if file_content is not None:
                 try:
                     file_content.close()
                     # print("Memory buffer closed")
                 except:
                     pass
-            
-            # ✅ CLEANUP: Rimuovi file temporaneo su Windows
+
+            # ✅ CLEANUP: Remove temporary file on Windows
             if temp_file_path and os.path.exists(temp_file_path):
                 try:
                     os.remove(temp_file_path)

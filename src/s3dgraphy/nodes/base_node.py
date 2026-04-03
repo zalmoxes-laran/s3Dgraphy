@@ -26,7 +26,7 @@ def load_json_mapping(filename):
 
 class Node:
     """
-    Base class to represent a node in the graph with CIDOC mapping.
+    Base class to represent a node in the graph.
 
     Attributes:
         node_id (str): Unique identifier for the node.
@@ -34,7 +34,6 @@ class Node:
         node_type (str): Type of the node.
         description (str): Description of the node.
         attributes (dict): Dictionary for additional attributes.
-        mapping (dict): CIDOC mapping data specific to the node type.
     """
     node_type = "Node"  # Attributo di classe
     node_type_map = {}  # Mappatura tra node_type e classi
@@ -51,17 +50,6 @@ class Node:
         self.description = description
         self.node_type = self.__class__.node_type
         self.attributes = {}
-        self.mapping = self.load_mapping()
 
     def add_attribute(self, key, value):
         self.attributes[key] = value
-
-    def load_mapping(self):
-        """
-        Loads the CIDOC mapping specific to the node type.
-
-        Returns:
-            dict: CIDOC mapping data if found, else an empty dictionary.
-        """
-        mappings = load_json_mapping('em_cidoc_mapping.json')
-        return mappings.get(self.node_type, {})
