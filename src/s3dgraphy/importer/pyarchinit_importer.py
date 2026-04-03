@@ -88,7 +88,7 @@ class PyArchInitImporter(BaseImporter):
                 # ❌ Enriching mode but node not found → SKIP this row
                 warning_msg = f"Node '{node_name}' not found in existing graph - SKIPPED"
                 self.warnings.append(warning_msg)
-                print(f"⊘ {warning_msg}")
+                # print(f"⊘ {warning_msg}")
                 return None
                 
             else:
@@ -173,8 +173,9 @@ class PyArchInitImporter(BaseImporter):
                                 edge_type="has_property"
                             )
                 else:
+                    pass
                     # Valore vuoto o mancante - non creare proprietà
-                    print(f"    ⊘ Skipped property: {col_config['property_name']} (empty value)")
+                    # print(f"    ⊘ Skipped property: {col_config['property_name']} (empty value)")
 
     def _get_description_column(self) -> Optional[str]:
         """Get description column from mapping"""
@@ -230,6 +231,7 @@ class PyArchInitImporter(BaseImporter):
                         successful_rows += 1
                         if (successful_rows % 10) == 0:
                             pass
+                            # print(f"Processed {successful_rows} rows...")
                     else:
                         skipped_rows += 1
                         
@@ -237,7 +239,7 @@ class PyArchInitImporter(BaseImporter):
                     error_rows += 1
                     error_msg = f"Error processing row {idx}: {str(e)}"
                     self.warnings.append(error_msg)
-                    print(f"❌ {error_msg}")
+                    # print(f"❌ {error_msg}")
             
             conn.close()
             

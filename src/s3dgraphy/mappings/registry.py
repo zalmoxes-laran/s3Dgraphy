@@ -102,7 +102,7 @@ class MappingRegistry:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except (json.JSONDecodeError, IOError) as e:
-            print(f"Error loading mapping {mapping_name}: {str(e)}")
+            # print(f"Error loading mapping {mapping_name}: {str(e)}")
             return None
     
     def list_available_mappings(self, mapping_type: str) -> List[tuple]:
@@ -136,12 +136,12 @@ class MappingRegistry:
                                 description = data.get("description", "")
                                 mappings.append((file_id, display_name, description))
                         except Exception as e:
-                            print(f"Error reading mapping {file}: {str(e)}")
+                            # print(f"Error reading mapping {file}: {str(e)}")
                             # Fallback: usa il nome del file
                             mappings.append((file_id, file_id, ""))
                             
             except OSError as e:
-                print(f"Error scanning directory {directory}: {str(e)}")
+                # print(f"Error scanning directory {directory}: {str(e)}")
                 continue
         
         return mappings

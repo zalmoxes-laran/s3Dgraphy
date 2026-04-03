@@ -88,6 +88,7 @@ class EmbargoNode(Node):
 
 """
 Esempio di utilizzo:
+    pass
 
 from datetime import date
 from dateutil.relativedelta import relativedelta

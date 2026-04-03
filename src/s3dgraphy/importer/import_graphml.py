@@ -153,7 +153,8 @@ class GraphMLImporter:
                     
                     break
                 except Exception as e:
-                    print(f"Error extracting graph ID from node label: {e}")
+                    pass
+                    # print(f"Error extracting graph ID from node label: {e}")
         
         # If we didn't find a graph_code, use MISSINGCODE
         if not graph_code or graph_code == "site_id":
@@ -210,6 +211,7 @@ class GraphMLImporter:
         stats = self.graph.connect_paradatagroup_propertynode_to_stratigraphic(verbose=False)
         if stats["connections_created"] > 0:
             pass
+            # print(f"\nCreati {stats['connections_created']} nuovi collegamenti diretti tra unità stratigrafiche e PropertyNode")
 
 
         self.connect_nodes_to_epochs()
@@ -218,20 +220,18 @@ class GraphMLImporter:
         #print(f"\nTotal BR nodes included in the graph: {len(br_nodes)}")
         for node in br_nodes:
             pass
+            # print(f"  BR Node: UUID={node.node_id}, Original ID={node.attributes.get('original_id', 'Unknown')}, y_pos={node.attributes.get('y_pos', 'Unknown')}")
 
         # Verifica se i nodi BR esistono nel grafo
         if len(br_nodes) == 0:
-            print("\nWARNING: No BR (continuity) nodes found in the graph!")
+            # print("\nWARNING: No BR (continuity) nodes found in the graph!")
             # print("Looking for nodes with _continuity in description...")
-
+            
             for node in self.graph.nodes:
                 if hasattr(node, 'description') and '_continuity' in node.description:
                     pass
-
-        # FASE 2: Slipback immediato - scrivi UUID nel GraphML
-        print("\n[GraphML Parser] Performing slipback - writing UUIDs to GraphML...")
-        self.slipback_uuids_to_graphml()
-
+                    # print(f"  Found node with _continuity in description: {node.node_id} (Type: {node.node_type if hasattr(node, 'node_type') else 'Unknown'})")
+        
         return self.graph
 
     def slipback_uuids_to_graphml(self):
@@ -464,6 +464,7 @@ class GraphMLImporter:
             #print(f"Attenzione: rilevati {len(duplicate_ids)} ID di nodi duplicati nel file GraphML:")
             for node_id in duplicate_ids:
                 pass
+                # print(f"  - {node_id}")
         
         # Ora processa i nodi normalmente
         for node_element in tree.findall('.//{http://graphml.graphdrawing.org/xmlns}node'):
@@ -555,15 +556,18 @@ class GraphMLImporter:
                         edge.attributes['URI'] = edge_custom_fields['URI']
                     
                 except Exception as e:
-                    print(f"Error adding edge {original_edge_id} ({edge_type}): {e}")
+                    pass
+                    # print(f"Error adding edge {original_edge_id} ({edge_type}): {e}")
             else:
                 # Report specifico sulla mappatura mancante
                 if source_uuid is None:
-                    print(f"Missing source UUID for edge {original_edge_id}: {original_source_id}")
+                    pass
+                    # print(f"Missing source UUID for edge {original_edge_id}: {original_source_id}")
                 if target_uuid is None:
-                    print(f"Missing target UUID for edge {original_edge_id}: {original_target_id}")
+                    pass
+                    # print(f"Missing target UUID for edge {original_edge_id}: {original_target_id}")
                 
-                print(f"Warning: Could not create edge {original_edge_id} - Source: {original_source_id} -> Target: {original_target_id}")
+                # print(f"Warning: Could not create edge {original_edge_id} - Source: {original_source_id} -> Target: {original_target_id}")
                 
     def process_node_element(self, node_element):
         """
@@ -666,15 +670,15 @@ class GraphMLImporter:
                     if existing_original_id:
                         # Mappa l'ID originale del nuovo documento all'ID originale del documento esistente
                         self.duplicate_id_map[original_id] = existing_original_id
-                        pass
+                        # print(f"Deduplicating document node: {nodename} (Original ID: {original_id} -> {existing_original_id})")
                     else:
                         # Non è stato possibile ottenere l'ID originale, usa l'UUID direttamente
                         self.duplicate_id_map[original_id] = existing_uuid
-                        pass
+                        # print(f"Deduplicating document node: {nodename} (Original ID: {original_id} -> UUID: {existing_uuid})")
                 else:
                     # Non è stato possibile trovare il documento esistente, usa l'UUID direttamente
                     self.duplicate_id_map[original_id] = existing_uuid
-                    pass
+                    # print(f"Deduplicating document node: {nodename} (ID: {original_id} -> {existing_uuid})")
             else:
                 # Crea nuovo documento
                 document_node = DocumentNode(
@@ -974,7 +978,8 @@ class GraphMLImporter:
                             edge_type=edge_type
                         )
                     except Exception as e:
-                        print(f"Error creating edge from {subnode_uuid} to {uuid_id}: {e}")
+                        pass
+                        # print(f"Error creating edge from {subnode_uuid} to {uuid_id}: {e}")
 
     def _handle_stratigraphic_container(self, group_node_type, uuid_id, original_id,
                                          group_name, group_description, group_y_pos,
@@ -1136,7 +1141,7 @@ class GraphMLImporter:
                     # Cerca l'UUID corrispondente
                     uuid_id = self.id_mapping.get(original_id)
                     if not uuid_id:
-                        print(f"WARNING: UUID non trovato per ID originale {original_id}")
+                        # print(f"WARNING: UUID non trovato per ID originale {original_id}")
                         continue
                     
                     # Cerca il nodo epoca usando l'UUID
@@ -1146,9 +1151,9 @@ class GraphMLImporter:
                         row_index = row_id_to_index.get(original_id)
                         if row_index is not None and row_index < len(epoch_nodes):
                             epoch_node = epoch_nodes[row_index]
-                            pass
+                            # print(f"Trovato epoch_node usando indice di fallback: {row_index}")
                         else:
-                            print(f"WARNING: Nodo epoca non trovato per UUID {uuid_id} o indice {row_index}")
+                            # print(f"WARNING: Nodo epoca non trovato per UUID {uuid_id} o indice {row_index}")
                             continue
                     
                     # Aggiorna le proprietà del nodo epoca
@@ -1160,13 +1165,13 @@ class GraphMLImporter:
                         start_value = vocabolario.get('start', -10000)
                         if isinstance(start_value, str) and start_value.lower() in ['xx', 'x']:
                             start_value = 10000
-                            pass
+                            # print(f"Trovato valore placeholder 'XX' per start_time in epoca '{stringa_pulita}', usando valore 10000")
                         
                         # Gestisci i valori 'XX' per end_time
                         end_value = vocabolario.get('end', 10000)
                         if isinstance(end_value, str) and end_value.lower() in ['xx', 'x']:
                             end_value = 10000
-                            pass
+                            # print(f"Trovato valore placeholder 'XX' per end_time in epoca '{stringa_pulita}', usando valore 10000")
                         
                         epoch_node.set_start_time(start_value)
                         epoch_node.set_end_time(end_value)
@@ -1177,7 +1182,8 @@ class GraphMLImporter:
                     epoch_node.set_color(e_color)
                     #print(f"Impostato colore: {e_color}")
             except Exception as e:
-                print(f"ERROR durante l'elaborazione dell'etichetta: {e}")
+                pass
+                # print(f"ERROR durante l'elaborazione dell'etichetta: {e}")
 
     def process_general_data(self, nodelabel, graph):
         """
@@ -1193,13 +1199,17 @@ class GraphMLImporter:
         try:
             # Imposta il nome e l'ID del grafo
             if 'ID' in vocabolario:
+                # print(f"Found ID: {vocabolario['ID']}")
                 graph.graph_id = vocabolario['ID']
             else:
                 # Fallback al nome del file
                 import os
                 graph.graph_id = os.path.splitext(os.path.basename(self.filepath))[0]
+                # print(f"Using filename as graph ID: {graph.graph_id}")
 
             graph.name = {'default': stringa_pulita}
+            # print(f"Set graph ID to: {graph.graph_id}")
+            # print(f"Set graph name to: {graph.name}")
                 
             # Crea il nodo grafo stesso
             from ..nodes.base_node import Node
@@ -1229,6 +1239,7 @@ class GraphMLImporter:
                     name=author_name,
                     surname=author_surname
                 )
+                # print(f"Created author node with ID: {author_id}")
                 
                 # Aggiungi il nodo al grafo
                 graph.add_node(author_node)
@@ -1247,17 +1258,21 @@ class GraphMLImporter:
                     edge_target=graph.graph_id,
                     edge_type="has_author"
                 )
+                # print(f"Added author node and edge: {author_id}")
                     
             # Aggiorna la descrizione del grafo
             if 'description' in vocabolario:
+                # print(f"Found description: {vocabolario['description']}")
                 graph.description = {'default': vocabolario['description']}
                     
             # Gestisce la data di embargo se presente
             if 'embargo' in vocabolario:
+                # print(f"Found embargo: {vocabolario['embargo']}")
                 graph.data['embargo_until'] = vocabolario['embargo']
                     
             # Gestisce la licenza se presente
             if 'license' in vocabolario:
+                # print(f"Found license: {vocabolario['license']}")
                 graph.data['license'] = vocabolario['license']
 
             # print(f"\nGraph data after processing:")
@@ -1268,7 +1283,7 @@ class GraphMLImporter:
             # print(f"Authors: {graph.data.get('authors', [])}")
             
         except Exception as e:
-            print(f"Error processing general data: {e}")
+            # print(f"Error processing general data: {e}")
             import traceback
             traceback.print_exc()
 
@@ -1297,7 +1312,7 @@ class GraphMLImporter:
 
         # print(f"Numero totale di epoche trovate: {len(epochs)}")
         if len(epochs) == 0:
-            print("AVVISO: Nessuna epoca trovata nel grafo")
+            # print("AVVISO: Nessuna epoca trovata nel grafo")
             return
 
         # Crea un dizionario inverso per mappare UUID a ID originali
@@ -1307,7 +1322,7 @@ class GraphMLImporter:
 
         # print(f"Numero totale di epoche trovate: {len(epochs)}")
         if len(epochs) == 0:
-            print("AVVISO: Nessuna epoca trovata nel grafo")
+            # print("AVVISO: Nessuna epoca trovata nel grafo")
             return
 
         # Debug info
@@ -1340,6 +1355,7 @@ class GraphMLImporter:
             
             if connected_continuity_node:
                 pass
+                # print(f"Found continuity for node {node.name} ({node.node_id}): {connected_continuity_node.node_id}")
             
             # Connetti alle epoche appropriate
             for epoch in epochs:
@@ -1349,7 +1365,8 @@ class GraphMLImporter:
                         self.graph.add_edge(edge_id, node.node_id, epoch.node_id, "has_first_epoch")
                         #print(f"Connected node {node.name} to epoch {epoch.name} (first)")
                     except Exception as e:
-                        print(f"Error connecting node {node.name} to epoch {epoch.name} (first): {e}")
+                        pass
+                        # print(f"Error connecting node {node.name} to epoch {epoch.name} (first): {e}")
                     
                 elif connected_continuity_node and hasattr(connected_continuity_node, 'attributes') and 'y_pos' in connected_continuity_node.attributes:
                     y_pos = node.attributes['y_pos']
@@ -1362,7 +1379,8 @@ class GraphMLImporter:
                             self.graph.add_edge(edge_id, node.node_id, epoch.node_id, "survive_in_epoch")
                             #print(f"Connected node {node.name} to epoch {epoch.name} yeee (survive with continuity)")
                         except Exception as e:
-                            print(f"Error connecting node {node.name} to epoch {epoch.name} (survive): {e}")
+                            pass
+                            # print(f"Error connecting node {node.name} to epoch {epoch.name} (survive): {e}")
                     
                 elif hasattr(node, 'node_type') and node.node_type in list_of_physical_stratigraphic_nodes:
                     # L'epoca è più recente del nodo (cioè il max_y dell'epoca è più basso del y_pos del nodo)
@@ -1372,7 +1390,8 @@ class GraphMLImporter:
                             self.graph.add_edge(edge_id, node.node_id, epoch.node_id, "survive_in_epoch")
                             #print(f"Connected node {node.name} to epoch {epoch.name} (physical)")
                         except Exception as e:
-                            print(f"Error connecting node {node.name} to epoch {epoch.name} (physical): {e}")
+                            pass
+                            # print(f"Error connecting node {node.name} to epoch {epoch.name} (physical): {e}")
 
     # Funzioni di supporto per l'estrazione dei dati dai nodi
 
@@ -1722,19 +1741,20 @@ class GraphMLImporter:
             if subnode.attrib.get('key') == url_key:
                 is_url_found = True
                 nodedescription = subnode.text
-
-                # Per SVGNode, estrai la posizione y
-                geometry = subnode.find('.//{http://www.yworks.com/xml/graphml}SVGNode/{http://www.yworks.com/xml/graphml}Geometry')
-                if geometry is not None:
-                    y_str = geometry.attrib.get('y', '0.0')
-                    try:
-                        node_y_pos = float(y_str)
-                    except (ValueError, TypeError):
-                        print(f"Error converting y position to float: {y_str}")
-                        node_y_pos = 0.0
-
-            # Fallback per i nodi non SVG: use nodegraphics key
-            if subnode.attrib.get('key') == ng_key:
+            
+            # Per SVGNode, estrai la posizione y
+            geometry = subnode.find('.//{http://www.yworks.com/xml/graphml}SVGNode/{http://www.yworks.com/xml/graphml}Geometry')
+            if geometry is not None:
+                y_str = geometry.attrib.get('y', '0.0')
+                try:
+                    node_y_pos = float(y_str)
+                    # print(f"Extracted y position from SVGNode: {node_y_pos}")
+                except (ValueError, TypeError):
+                    # print(f"Error converting y position to float: {y_str}")
+                    node_y_pos = 0.0
+            
+            # Fallback per i nodi non SVG
+            if subnode.attrib.get('key') == 'd6':
                 geometry = subnode.find('.//{http://www.yworks.com/xml/graphml}Geometry')
                 if geometry is not None:
                     y_str = geometry.attrib.get('y', '0.0')
@@ -1804,19 +1824,7 @@ class GraphMLImporter:
                 isinstance(target_node, ExtractorNode)):
                 edge_type = "combines"
                 # print(f"Enhanced to combines: CombinerNode -> ExtractorNode")
-
-            # ✅ v1.5.3: StratigraphicNode -> DocumentNode = has_documentation
-            elif (source_type in stratigraphic_types and
-                isinstance(target_node, DocumentNode)):
-                edge_type = "has_documentation"
-                # print(f"Enhanced to has_documentation: {source_type} -> DocumentNode")
-
-            # ✅ v1.5.3: DocumentNode -> StratigraphicNode = is_documentation_of (reverse)
-            elif (isinstance(source_node, DocumentNode) and
-                  target_type in stratigraphic_types):
-                edge_type = "is_documentation_of"
-                # print(f"Enhanced to is_documentation_of: DocumentNode -> {target_type}")
-
+        
         # Post-processing per generic_connection
         elif edge_type == "generic_connection":
             # ✅ v1.5.3: StratigraphicNode -> DocumentNode = has_documentation
@@ -1846,12 +1854,12 @@ class GraphMLImporter:
                 target_type == "ParadataNodeGroup"):
                 edge_type = "is_in_paradata_nodegroup"
                 # print(f"Enhanced to is_in_paradata_nodegroup: {source_type} -> ParadataNodeGroup")
-
+            
             # ParadataNodeGroup collegato a ActivityNodeGroup
             elif source_type == "ParadataNodeGroup" and target_type == "ActivityNodeGroup":
                 edge_type = "has_paradata_nodegroup"
                 # print(f"Enhanced to has_paradata_nodegroup: ParadataNodeGroup -> ActivityNodeGroup")
-
+            
             # Puoi aggiungere altre regole specifiche qui
 
         return edge_type

@@ -45,6 +45,7 @@ class LicenseNode(Node):
         
 """
 Esempio di utilizzo:
+    pass
 
 license_node = LicenseNode(
     node_id="license_cc_by",

@@ -16,9 +16,11 @@ from typing import List
 from .indices import GraphIndices
 
 
-# Load the connections datamodel (v1.5.3+)
-_connections_datamodel = get_connections_datamodel()
-# print(f's3Dgraphy connections datamodel v{_connections_datamodel.get_version()} loaded.')
+# Load the connection rules JSON
+rules_path = os.path.join(os.path.dirname(__file__), "./JSON_config/em_connection_rules.json")
+with open(rules_path) as f:
+    connection_rules = json.load(f)["rules"]
+    # print('s3Dgraphy rules are correctly loaded.')
 
 class Graph:
     """
@@ -223,7 +225,8 @@ class Graph:
         """
         if verbose:
             pass
-        
+            # print("\n=== Connessione PropertyNode dai ParadataNodeGroup alle Unità Stratigrafiche ===")
+
         # Inizializza statistiche
         stats = {
             "paradata_groups_found": 0,
@@ -239,17 +242,19 @@ class Graph:
                             'serUSVn', 'serUSVs', 'TSU', 'SE', 'BR', 'unknown']
         
         # Identifica tutti i nodi ParadataNodeGroup
-        paradata_groups = [node for node in self.nodes 
+        paradata_groups = [node for node in self.nodes
                         if hasattr(node, 'node_type') and node.node_type == "ParadataNodeGroup"]
         stats["paradata_groups_found"] = len(paradata_groups)
-        
+
         if verbose:
             pass
-        
+            # print(f"Trovati {stats['paradata_groups_found']} gruppi ParadataNodeGroup")
+
         # Per ogni ParadataNodeGroup, trova le property contenute e le unità stratigrafiche collegate
         for group in paradata_groups:
             if verbose:
                 pass
+                # print(f"\nAnalisi del gruppo: {group.name} (ID: {group.node_id})")
             
             # Trova i PropertyNode contenuti nel gruppo
             property_nodes = []
@@ -260,6 +265,7 @@ class Graph:
                         property_nodes.append(source_node)
                         if verbose:
                             pass
+                            # print(f"  - PropertyNode {source_node.name} trovato nel gruppo (ID: {group.name})")
             
             stats["property_nodes_found"] += len(property_nodes)
             
@@ -267,6 +273,7 @@ class Graph:
             if not property_nodes:
                 if verbose:
                     pass
+                    # print(f"  Nessun PropertyNode trovato nel gruppo {group.name}")
                 continue
             
             # Trova le unità stratigrafiche collegate al ParadataNodeGroup
@@ -282,6 +289,7 @@ class Graph:
                             stratigraphic_nodes.append(source_node)
                             if verbose:
                                 pass
+                                # print(f"  - Unità stratigrafica collegata al gruppo: {source_node.name} (Tipo: {source_node.node_type})")
             
             # Se non troviamo nulla, proviamo con edge_type "generic_connection"
             if not stratigraphic_nodes:
@@ -289,10 +297,11 @@ class Graph:
                     if edge.edge_target == group.node_id and edge.edge_type == "generic_connection":
                         source_node = self.find_node_by_id(edge.edge_source)
                         if source_node and hasattr(source_node, 'node_type'):
-                                if source_node.node_type in stratigraphic_types:
-                                    stratigraphic_nodes.append(source_node)
-                                    if verbose:
-                                        pass
+                            if source_node.node_type in stratigraphic_types:
+                                stratigraphic_nodes.append(source_node)
+                                if verbose:
+                                    pass
+                                    # print(f"  - Unità stratigrafica collegata al gruppo (generic_connection): {source_node.name} (Tipo: {source_node.node_type})")
             
             stats["stratigraphic_nodes_found"] += len(stratigraphic_nodes)
             
@@ -300,6 +309,7 @@ class Graph:
             if not stratigraphic_nodes:
                 if verbose:
                     pass
+                    # print(f"  Nessuna unità stratigrafica collegata al gruppo {group.name}")
                 continue
             
             # Crea collegamenti diretti tra le unità stratigrafiche e i PropertyNode
@@ -318,7 +328,9 @@ class Graph:
                         stats["connections_already_existing"] += 1
                         if verbose:
                             pass
+                            # print(f"  Collegamento già esistente: {strat_node.name} -> {prop_node.name}")
                     else:
+                        pass
                         # Crea un nuovo edge per collegare direttamente
                         edge_id = f"{strat_node.node_id}_has_property_{prop_node.node_id}"
                         try:
@@ -326,13 +338,23 @@ class Graph:
                             stats["connections_created"] += 1
                             if verbose:
                                 pass
+                                # print(f"  ✅ Nuovo collegamento creato: {strat_node.name} -> {prop_node.name}")
                         except Exception as e:
                             stats["errors"] += 1
                             if verbose:
-                                print(f"  ❌ Errore nella creazione del collegamento: {str(e)}")
+                                pass
+                                # print(f"  ❌ Errore nella creazione del collegamento: {str(e)}")
         
         if verbose:
             pass
+            # print("\n=== Statistiche dell'operazione ===")
+            # print(f"Gruppi ParadataNodeGroup trovati: {stats['paradata_groups_found']}")
+            # print(f"PropertyNode trovati nei gruppi: {stats['property_nodes_found']}")
+            # print(f"Unità stratigrafiche collegate ai gruppi: {stats['stratigraphic_nodes_found']}")
+            # print(f"Nuovi collegamenti creati: {stats['connections_created']}")
+            # print(f"Collegamenti già esistenti: {stats['connections_already_existing']}")
+            # print(f"Errori: {stats['errors']}")
+            # print("=== Completata la connessione PropertyNode dai ParadataNodeGroup ===")
         
         return stats
 
@@ -522,10 +544,16 @@ class Graph:
                 target_node = self.find_node_by_id(edge.edge_target)
                 if target_node and target_node.node_type == "EpochNode":
                     return target_node
+                else:
+                    pass
+                    # print(f"NOT found any epochnode for {node.name} con id {node.node_id}")
             elif (edge.edge_target == node.node_id and edge.edge_type == edge_type):
                 source_node = self.find_node_by_id(edge.edge_source)
                 if source_node and source_node.node_type == "EpochNode":
                     return source_node
+                else:
+                    pass
+                    # print(f"NOT found any epochnode for {node.name} con id {node.id}")
 
         return None
 
@@ -568,10 +596,12 @@ class Graph:
             if (edge.edge_source == node.node_id and edge.edge_type == edge_type):
                 target_node = self.find_node_by_id(edge.edge_target)
                 if target_node and target_node.node_type == "EpochNode":
+                    # print(f"Found connected EpochNode '{target_node.node_id}' via edge type '{edge_type}'.")
                     connected_epoch_nodes.append(target_node)
             elif (edge.edge_target == node.node_id and edge.edge_type == edge_type):
                 source_node = self.find_node_by_id(edge.edge_source)
                 if source_node and source_node.node_type == "EpochNode":
+                    # print(f"Found connected EpochNode '{source_node.node_id}' via edge type '{edge_type}'.")
                     connected_epoch_nodes.append(source_node)
         return connected_epoch_nodes
 
@@ -823,10 +853,14 @@ class Graph:
                 target_node = self.find_node_by_id(edge.edge_target)
                 if target_node:
                     pass
+                    # print(f"  Connection Type: {edge.edge_type} ({edge.label})")
+                    # print(f"    - Target Node: {target_node.name}, Type: {target_node.node_type}")
             elif edge.edge_target == node.node_id:
                 source_node = self.find_node_by_id(edge.edge_source)
                 if source_node:
                     pass
+                    # print(f"  Connection Type: {edge.edge_type} ({edge.label})")
+                    # print(f"    - Source Node: {source_node.name}, Type: {source_node.node_type}")
 
 
     def get_connected_nodes_by_filters(self, node, target_node_type="all", edge_type="all"):
@@ -981,6 +1015,7 @@ class Graph:
                 source_node = self.find_node_by_id(edge.edge_source)
                 if source_node and source_node.node_type == "extractor":
                     extractors.append(source_node)
+                    # print(f"  Trovato estrattore (source): {source_node.name} (edge: {edge.edge_type})")
         
         # Check per estrattori che sono target delle relazioni (nodo -> estrattore)
         for edge in self.edges:
@@ -988,6 +1023,7 @@ class Graph:
                 target_node = self.find_node_by_id(edge.edge_target)
                 if target_node and target_node.node_type == "extractor":
                     extractors.append(target_node)
+                    # print(f"  Trovato estrattore (target): {target_node.name} (edge: {edge.edge_type})")
         
         # Verifica le relazioni inverse (estrattore è source e questo nodo è target)
         for edge in self.edges:
@@ -995,6 +1031,7 @@ class Graph:
                 source_node = self.find_node_by_id(edge.edge_source)
                 if source_node and source_node.node_type == "extractor":
                     extractors.append(source_node)
+                    # print(f"  Trovato estrattore (rel inverse): {source_node.name} (edge: {edge.edge_type})")
         
         # Nel caso specifico dei combiner, verifica anche relazioni di tipo "combines"
         node = self.find_node_by_id(node_id)
@@ -1008,6 +1045,7 @@ class Graph:
                     source_node = self.find_node_by_id(source_id)
                     if source_node and source_node.node_type == "extractor":
                         extractors.append(source_node)
+                        # print(f"  Trovato estrattore da sources: {source_node.name}")
         
         # Rimuovi duplicati
         unique_extractors = []
@@ -1017,6 +1055,7 @@ class Graph:
                 seen.add(extractor.node_id)
                 unique_extractors.append(extractor)
         
+        # print(f"  Totale estrattori trovati: {len(unique_extractors)}")
         return unique_extractors
     
     def get_document_nodes_for_extractor(self, extractor_node_id):
@@ -1044,6 +1083,7 @@ class Graph:
                 target_node = self.find_node_by_id(edge.edge_target)
                 if target_node and target_node.node_type == "document":
                     documents.append(target_node)
+                    # print(f"  Trovato documento (target): {target_node.name} (edge: {edge.edge_type})")
         
         # Cerca relazioni (documento -> estrattore)
         for edge in self.edges:
@@ -1051,6 +1091,7 @@ class Graph:
                 source_node = self.find_node_by_id(edge.edge_source)
                 if source_node and source_node.node_type == "document":
                     documents.append(source_node)
+                    # print(f"  Trovato documento (source): {source_node.name} (edge: {edge.edge_type})")
         
         # Rimuovi duplicati
         unique_documents = []
@@ -1060,6 +1101,7 @@ class Graph:
                 seen.add(doc.node_id)
                 unique_documents.append(doc)
         
+        # print(f"  Totale documenti trovati: {len(unique_documents)}")
         return unique_documents
 
     def get_paradata_chain(self, strat_node_id):
@@ -1220,5 +1262,6 @@ graph.calculate_chronology()  # Calcola la cronologia
 # Filtra i nodi in un intervallo di tempo specifico
 filtered_nodes = graph.filter_nodes_by_time_range(50, 100)
 for node in filtered_nodes:
-    print(f"Node {node.node_id}: Start = {node.attributes.get('CALCUL_START_T')}, End = {node.attributes.get('CALCUL_END_T')}")
+    pass
+    # print(f"Node {node.node_id}: Start = {node.attributes.get('CALCUL_START_T')}, End = {node.attributes.get('CALCUL_END_T')}")
 '''

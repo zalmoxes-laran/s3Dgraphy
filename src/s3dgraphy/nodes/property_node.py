@@ -141,7 +141,7 @@ class PropertyNode(ParadataNode):
         Valida il tipo di proprietà in base al vocabolario. Stampa un avviso se il tipo non è valido.
         """
         if self.property_type not in self.PROPERTY_TYPES:
-            print(f"Warning: Property type '{self.property_type}' is not recognized for node '{self.name}' (ID: {self.node_id}).")
+            # print(f"Warning: Property type '{self.property_type}' is not recognized for node '{self.name}' (ID: {self.node_id}).")
             pass
 
     def get_property_info(self):

@@ -1,5 +1,29 @@
 # 3dgraphy/nodes/base_node.py
 
+import json
+import os
+
+def load_json_mapping(filename):
+    """
+    Load JSON mapping data from a specified file.
+
+    Args:
+        filename (str): Name of the JSON file containing mapping data.
+
+    Returns:
+        dict: Mapping data loaded from the JSON file.
+    """
+    # Construct the absolute path
+    mapping_path = os.path.join(os.path.dirname(__file__), '..', 'JSON_config', filename)
+    mapping_path = os.path.abspath(mapping_path)
+
+    try:
+        with open(mapping_path, 'r') as file:
+            return json.load(file)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        # print(f"Error loading mapping file: {e}")
+        return {}
+
 class Node:
     """
     Base class to represent a node in the graph.
