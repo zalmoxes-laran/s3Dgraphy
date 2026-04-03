@@ -6,6 +6,31 @@ All notable changes to s3dgraphy will be documented in this file.
 The format is based on `Keep a Changelog <https://keepachangelog.com/en/1.0.0/>`_,
 and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0.html>`_.
 
+[0.1.32] - 2026
+----------------
+
+Added
+^^^^^
+- **Chronology calculation engine** (``calculate_chronology``): BFS-based temporal
+  inference that propagates absolute dates (TPQ/TAQ) through stratigraphic relations,
+  storing computed ``CALCUL_START_T`` and ``CALCUL_END_T`` attributes on each node
+- **Temporal property detection**: ``_find_temporal_property`` resolves
+  ``absolute_start_date`` / ``absolute_end_date`` PropertyNodes by matching on
+  ``property_type`` or ``name``, with fallback to ``description`` as value source
+
+Changed
+^^^^^^^
+- ``calculate_chronology`` now collects stratigraphic nodes by their actual
+  ``node_type`` values (US, USVs, USVn, VSF, SF, USD, serSU, serUSD, serUSVn,
+  serUSVs, USM) instead of the former class-name lookup ``"StratigraphicNode"``
+
+Fixed
+^^^^^
+- PropertyNode value resolution when the GraphML importer stores the numeric value
+  in ``description`` rather than ``value``
+- Node type lookup in chronology calculation returning 0 nodes due to mismatch
+  between class name and ``node_type`` attribute
+
 [0.1.31] - 2025
 ----------------
 
@@ -75,6 +100,7 @@ multiple platforms and applications.
 Links
 -----
 
+| [0.1.32]: https://github.com/zalmoxes-laran/s3dgraphy/compare/v0.1.31...v0.1.32
 | [0.1.31]: https://github.com/zalmoxes-laran/s3dgraphy/compare/v0.1.13...v0.1.31
 | [0.1.13]: https://github.com/zalmoxes-laran/s3dgraphy/compare/v0.1.0...v0.1.13
 | [0.1.0]: https://github.com/zalmoxes-laran/s3dgraphy/releases/tag/v0.1.0

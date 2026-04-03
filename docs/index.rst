@@ -1,7 +1,7 @@
 s3dgraphy Documentation
 ========================
 
-.. image:: https://img.shields.io/badge/version-0.1.31-blue.svg
+.. image:: https://img.shields.io/badge/version-0.1.32-blue.svg
    :target: https://pypi.org/project/s3dgraphy/
    :alt: Version
 

@@ -4,7 +4,7 @@ Development Roadmap
 This document outlines the development roadmap for s3dgraphy, the core Python library
 that implements the Extended Matrix formal language for archaeological documentation.
 
-Current Version: 0.1.31
+Current Version: 0.1.32
 ------------------------
 
 Completed Features
@@ -33,6 +33,8 @@ Completed Features
 - [x] PyPI package release
 - [x] Canonical/reverse edge directionality (v1.5.3)
 - [x] has_visual_reference edge type (v1.5.4)
+- [x] **Chronology calculation** (``calculate_chronology``): BFS-based TPQ/TAQ propagation from absolute dates and epoch membership through stratigraphic relations
+- [x] **Temporal property detection** with fallback matching by name and description
 
 Next Priorities
 ~~~~~~~~~~~~~~~

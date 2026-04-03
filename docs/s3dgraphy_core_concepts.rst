@@ -364,6 +364,37 @@ fill colours:
 
 These nodes are silently excluded from the graph and a log message is printed.
 
+Chronology Calculation
+----------------------
+
+s3dgraphy includes a built-in **chronology calculation engine** that infers absolute
+date ranges for every stratigraphic node in the graph. The algorithm combines three
+sources of temporal information:
+
+1. **Absolute dates** from PropertyNodes (``absolute_start_date``,
+   ``absolute_end_date``) connected via ``has_property`` edges
+2. **Epoch membership** from ``has_first_epoch`` / ``survive_in_epoch`` edges, which
+   provide fallback date ranges from EpochNode start/end values
+3. **Stratigraphic relations** (``is_after`` / ``is_before``), which constrain the
+   possible date range of each node through BFS propagation
+
+The result is a pair of computed attributes on each node:
+
+- ``CALCUL_START_T`` — the **Terminus Post Quem (TPQ)**: the earliest possible start
+  date, constrained by predecessors
+- ``CALCUL_END_T`` — the **Terminus Ante Quem (TAQ)**: the latest possible end date,
+  constrained by successors
+
+**Example:** If ``USV132`` is stratigraphically *after* ``VSF141``, and ``VSF141``
+has ``absolute_start_date = 180``, then ``USV132``'s ``CALCUL_START_T`` will be at
+least 180, because it cannot have been created before the unit it sits on top of.
+
+This chronology data is used by EM-tools to:
+
+- Colorize 3D models by temporal horizon in **Visual Manager**
+- Filter stratigraphic lists by horizon time range in **Stratigraphy Manager**
+- Synchronize RM (Representation Model) visibility with horizon ranges
+
 CIDOC-CRM Mapping
 ------------------
 

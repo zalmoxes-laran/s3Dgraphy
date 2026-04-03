@@ -24,18 +24,22 @@ Architecture
    ┌─────────────────────────────────────────────────┐
    │           Blender UI (EM-tools)                 │
    │  - Setup Panel                                  │
-   │  - US/USV Manager                               │
-   │  - Epoch Manager                                │
+   │  - Stratigraphy Manager                         │
+   │  - Epoch Manager / CronoFilter (Horizons)       │
+   │  - Visual Manager                               │
    │  - Paradata Manager                             │
+   │  - Anastylosis Manager / RM Manager             │
    │  - Export Manager                               │
+   │  - Landscape System (multi-graph)               │
    └─────────────────┬───────────────────────────────┘
                      │
                      │ Uses
                      ↓
    ┌─────────────────────────────────────────────────┐
    │            s3dgraphy Library                    │
-   │  - Graph management                             │
+   │  - Graph management (MultiGraphManager)         │
    │  - Node/Edge structures                         │
+   │  - Chronology calculation (TPQ/TAQ)             │
    │  - Import/Export                                │
    │  - CIDOC-CRM mappings                           │
    └─────────────────┬───────────────────────────────┘
@@ -46,6 +50,7 @@ Architecture
    │         Archaeological Graph Data               │
    │  - Stratigraphic relationships                  │
    │  - Temporal sequences (epochs)                  │
+   │  - Computed chronology (CALCUL_START/END_T)     │
    │  - Documentation chains (paradata)              │
    │  - 3D model links                               │
    └─────────────────────────────────────────────────┘
@@ -478,57 +483,61 @@ PyArchInit Import in EM-tools
        
        return graph
 
-Landscape System Integration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Landscape System Integration (Multi-Graph Mode)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-EM-tools includes a "Landscape" mode for managing multiple sites:
+EM-tools includes a **Landscape mode** for managing multiple archaeological graphs
+simultaneously. When activated, all loaded graphs are merged into a single UI list
+with visual differentiation.
+
+**Key concepts:**
+
+- Each list item carries a ``source_graph`` property identifying which graph it
+  belongs to (matched via the graph's ``graph_code`` attribute)
+- A coloured dot icon (``NODE_SOCKET_*``) is assigned to each graph for visual
+  distinction in the list and across all panels
+- Proxy objects in the 3D scene use a ``GRAPH_CODE.NODE_NAME`` naming convention
+  (e.g., ``GT16.USM100``)
+
+**Chronology-based filtering:** In landscape mode, the Epoch Manager is replaced by
+**CronoFilter**, which defines chronological horizons with user-specified start/end
+dates and colours. The Stratigraphy Manager uses ``calculate_chronology`` on each
+graph and filters nodes whose computed ``[CALCUL_START_T, CALCUL_END_T]`` interval
+overlaps the selected horizon.
 
 .. code-block:: python
 
-   # From landscape_system/populate_functions.py
-   
-   from s3dgraphy import get_graph, get_all_graph_ids
-   
-   def load_all_graphs_for_landscape(context):
-       """Load all graphs for landscape multi-site view"""
-       
-       em_tools = context.scene.em_tools
-       loaded_graphs = {}
-       
-       # Iterate through all GraphML files
-       for graph_file in em_tools.graphml_files:
-           try:
-               # Get graph from multi-graph manager
-               graph = get_graph(graph_file.name)
-               
-               if graph and len(graph.nodes) > 0:
-                   graph_code = graph.attributes.get('graph_code', 'UNKNOWN')
-                   loaded_graphs[graph_code] = graph
-                   
-           except Exception as e:
-               print(f"Error loading graph {graph_file.name}: {e}")
-       
-       return loaded_graphs
-   
-   def populate_stratigraphy_list_landscape(context, all_graphs):
-       """Populate UI list with nodes from all graphs"""
-       
-       scene = context.scene
-       
-       for graph_code, graph in all_graphs.items():
-           # Find stratigraphic nodes
-           strat_nodes = [
-               n for n in graph.nodes 
-               if n.node_type in ['US', 'USVs', 'USVn', 'SF', 'VSF']
-           ]
-           
-           for node in strat_nodes:
-               # Create list item with graph prefix
-               item = scene.em_list.add()
-               item.name = f"[{graph_code}] {node.name}"
-               item.id_node = node.node_id
-               item.node_type = node.node_type
-               item.description = node.description
+   # From stratigraphy_manager/filters.py (landscape branch)
+
+   for graph_code, graph in all_graphs.items():
+       # Calculate chronology for this graph
+       graph.calculate_chronology(graph)
+
+       # Collect stratigraphic nodes
+       all_strat_nodes = [
+           node for node in graph.nodes
+           if hasattr(node, 'node_type') and
+           node.node_type in ['US', 'USVs', 'USVn', 'VSF', 'SF', 'USD',
+                              'serSU', 'serUSD', 'serUSVn', 'serUSVs']
+       ]
+
+       # Filter by horizon overlap
+       for node in all_strat_nodes:
+           ns = float(node.attributes.get("CALCUL_START_T", 0))
+           ne = float(node.attributes.get("CALCUL_END_T", 0))
+           if ns <= horizon_end and ne >= horizon_start:
+               # Node overlaps with selected horizon
+               item = strat.units.add()
+               item.name = node.name
+               item.source_graph = graph_code
+
+**Panel behaviour in landscape mode:**
+
+- **Stratigraphy Manager**: merged list with graph badges; filters by horizon
+- **Visual Manager**: "Horizons" display mode using CronoFilter colours
+- **Anastylosis Manager / RM Manager**: show active graph indicator (coloured dot + code)
+- **Activity Manager**: hidden (not yet multi-graph aware)
+- **Proxy Box Creator**: hidden (operates on single-graph proxy geometry)
 
 Visual Manager Integration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
