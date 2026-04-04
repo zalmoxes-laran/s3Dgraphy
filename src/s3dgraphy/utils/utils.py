@@ -305,16 +305,16 @@ def manage_id_prefix(name: str, graph_code: str = None, action: str = 'add', sep
         # If no graph_code provided, return name unchanged
         if not graph_code or graph_code.strip() == '':
             return name
-        
-        # Check if name already has a prefix
-        if separator in name:
-            # Remove existing prefix first
-            base_name = manage_id_prefix(name, None, 'remove', separator)
-            # Add new prefix
-            return f"{graph_code}{separator}{base_name}"
-        else:
-            # No existing prefix, just add it
-            return f"{graph_code}{separator}{name}"
+
+        # Check if name already has this graph_code as prefix
+        if name.startswith(f"{graph_code}{separator}"):
+            # Already has the correct prefix, return as-is
+            return name
+
+        # Simply prepend the graph code — do NOT strip internal separators
+        # from the name. Names like "D.07" contain separators that are part
+        # of the identifier, not a graph prefix to replace.
+        return f"{graph_code}{separator}{name}"
     
     # Should never reach here due to validation above
     return name
