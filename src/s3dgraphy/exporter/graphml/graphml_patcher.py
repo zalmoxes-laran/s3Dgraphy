@@ -62,11 +62,17 @@ EDGE_TYPE_TO_LINE_STYLE = {
 }
 
 # Structural/derived edge types: these should NOT be exported as <edge> elements.
-# They are either represented by XML nesting or inferred during import.
+# They are either represented by XML nesting, inferred during import,
+# or are auxiliary data not part of the EM formal language in GraphML.
 STRUCTURAL_EDGE_TYPES = {
     'is_in_paradata_nodegroup', 'is_in_activity', 'is_in_timebranch',
     'is_part_of', 'has_first_epoch', 'survive_in_epoch',
     'has_linked_resource',
+    # Representation/scene-data edges — auxiliary, not formal EM in GraphML
+    'has_representation_model', 'has_representation_model_doc',
+    'has_representation_model_sf', 'has_semantic_shape',
+    # Documentation edges — auxiliary, come from folder scanning not from GraphML
+    'has_documentation', 'is_documentation_of',
 }
 
 # Node types that should not be exported to GraphML (internal to s3dgraphy)
@@ -112,6 +118,10 @@ class GraphMLPatcher:
         # All node IDs in the XML (to avoid collisions)
         self._existing_xml_node_ids: set = set()
         self._existing_xml_edge_ids: set = set()
+        # All EMIDs already present in the XML (safety check for add_new_nodes)
+        self._existing_xml_emids: set = set()
+        # Counter for new nodes added per epoch (for X spacing)
+        self._new_nodes_per_epoch: Dict[str, int] = {}
 
     def load(self):
         """
@@ -150,6 +160,7 @@ class GraphMLPatcher:
         print(f"  Edge keys: {self.key_map['edge']}")
         print(f"  Existing XML nodes: {len(self._existing_xml_node_ids)}")
         print(f"  Existing XML edges: {len(self._existing_xml_edge_ids)}")
+        print(f"  Existing XML EMIDs: {len(self._existing_xml_emids)}")
 
     def _build_key_mapping(self) -> Dict:
         """
@@ -249,11 +260,18 @@ class GraphMLPatcher:
             self.key_map['edge']['URI'] = f'd{max_id}'
 
     def _collect_existing_ids(self):
-        """Collect all existing node and edge IDs from the XML."""
+        """Collect all existing node and edge IDs and EMIDs from the XML."""
+        emid_key = self.key_map['node'].get('EMID')
+
         for node_elem in self.root.iter(f'{{{NS_GRAPHML}}}node'):
             nid = node_elem.attrib.get('id')
             if nid:
                 self._existing_xml_node_ids.add(nid)
+            # Collect existing EMIDs for safety check in add_new_nodes
+            if emid_key:
+                for data_elem in node_elem.findall(f'{{{NS_GRAPHML}}}data'):
+                    if data_elem.attrib.get('key') == emid_key and data_elem.text:
+                        self._existing_xml_emids.add(data_elem.text.strip())
 
         for edge_elem in self.root.iter(f'{{{NS_GRAPHML}}}edge'):
             eid = edge_elem.attrib.get('id')
@@ -426,7 +444,7 @@ class GraphMLPatcher:
         target_graph = self._find_insertion_graph(graph_elem)
 
         for node in self.graph.nodes:
-            # Skip nodes that already exist in the XML
+            # Skip nodes that already exist in the XML (have original_id from import)
             if node.attributes.get('original_id'):
                 continue
 
@@ -435,17 +453,114 @@ class GraphMLPatcher:
             if node_type in INTERNAL_NODE_TYPES:
                 continue
 
+            # Skip DocumentNodes without original_id: they come from auxiliary
+            # data (folder scanning, representation models) and are not part
+            # of the EM formal language in GraphML
+            if isinstance(node, DocumentNode):
+                continue
+
+            # Safety check: skip nodes whose EMID (node_id) already exists in the XML.
+            # This catches nodes that were imported but lost their original_id
+            # (e.g., deduplicated DocumentNodes, auxiliary imports).
+            if node.node_id in self._existing_xml_emids:
+                print(f"[GraphMLPatcher] Skipping node '{getattr(node, 'name', '?')}' "
+                      f"(type={node_type}): EMID {node.node_id[:12]}... already in XML")
+                continue
+
+            print(f"[GraphMLPatcher] Adding new node: '{getattr(node, 'name', '?')}' "
+                  f"(type={node_type}, id={node.node_id[:12]}...)")
+
+            # Calculate position within the correct epoch lane
+            x, y = self._calculate_node_position(node)
+
             # Generate XML for this node
             new_node_id = self._generate_new_node_id()
             self._uuid_to_new_id[node.node_id] = new_node_id
 
-            node_xml = self._create_node_xml(node, new_node_id)
+            node_xml = self._create_node_xml(node, new_node_id, x, y)
             if node_xml is not None:
                 target_graph.append(node_xml)
                 added += 1
 
         print(f"[GraphMLPatcher] Added {added} new nodes")
         return added
+
+    def _calculate_node_position(self, node: Node) -> Tuple[float, float]:
+        """
+        Calculate (x, y) position for a new node based on its epoch assignment.
+
+        Uses the has_first_epoch edge to find which epoch the node belongs to,
+        then positions it within that epoch's Y range in the swimlane.
+
+        Returns:
+            (x, y) tuple. Falls back to (0.0, 0.0) if no epoch found.
+        """
+        from ...nodes.epoch_node import EpochNode
+
+        # Find connected epochs via has_first_epoch
+        epoch_node = None
+        for edge in self.graph.edges:
+            if edge.edge_source == node.node_id and edge.edge_type == 'has_first_epoch':
+                target = self.graph.find_node_by_id(edge.edge_target)
+                if isinstance(target, EpochNode):
+                    epoch_node = target
+                    break
+            elif edge.edge_target == node.node_id and edge.edge_type == 'has_first_epoch':
+                source = self.graph.find_node_by_id(edge.edge_source)
+                if isinstance(source, EpochNode):
+                    epoch_node = source
+                    break
+
+        if not epoch_node:
+            # Try finding epoch through a connected stratigraphic node
+            # (for paradata nodes connected to a US that has an epoch)
+            parent_us = self._find_parent_stratigraphic_node(node)
+            if parent_us:
+                for edge in self.graph.edges:
+                    if edge.edge_source == parent_us.node_id and edge.edge_type == 'has_first_epoch':
+                        target = self.graph.find_node_by_id(edge.edge_target)
+                        if isinstance(target, EpochNode):
+                            epoch_node = target
+                            break
+
+        if not epoch_node or not hasattr(epoch_node, 'min_y') or not hasattr(epoch_node, 'max_y'):
+            print(f"[GraphMLPatcher] No epoch found for node '{getattr(node, 'name', '?')}', "
+                  f"using default position")
+            return (0.0, 0.0)
+
+        # Calculate Y: center within epoch band
+        y = epoch_node.min_y + (epoch_node.max_y - epoch_node.min_y) / 2.0
+
+        # Calculate X: spread new nodes horizontally within the epoch
+        epoch_key = epoch_node.node_id
+        col = self._new_nodes_per_epoch.get(epoch_key, 0)
+        self._new_nodes_per_epoch[epoch_key] = col + 1
+        x = 100.0 + (col % 8) * 150.0
+
+        print(f"[GraphMLPatcher] Positioned '{getattr(node, 'name', '?')}' in epoch "
+              f"'{epoch_node.name}' at ({x:.0f}, {y:.0f})")
+
+        return (x, y)
+
+    def _find_parent_stratigraphic_node(self, node: Node) -> Optional[StratigraphicNode]:
+        """Find the stratigraphic node connected to this paradata node."""
+        for edge in self.graph.edges:
+            if edge.edge_target == node.node_id and edge.edge_type == 'has_property':
+                source = self.graph.find_node_by_id(edge.edge_source)
+                if isinstance(source, StratigraphicNode):
+                    return source
+            if edge.edge_source == node.node_id and edge.edge_type in (
+                    'is_in_paradata_nodegroup', 'has_paradata_nodegroup'):
+                # Node is in a PD group connected to a US
+                group = self.graph.find_node_by_id(edge.edge_target)
+                if group:
+                    for e2 in self.graph.edges:
+                        if e2.edge_target == group.node_id and \
+                           e2.edge_type == 'has_paradata_nodegroup':
+                            us = self.graph.find_node_by_id(e2.edge_source)
+                            if isinstance(us, StratigraphicNode):
+                                return us
+        return None
 
     def _find_insertion_graph(self, top_graph: ET.Element) -> ET.Element:
         """
@@ -463,26 +578,33 @@ class GraphMLPatcher:
 
         return top_graph
 
-    def _create_node_xml(self, node: Node, xml_id: str) -> Optional[ET.Element]:
+    def _create_node_xml(self, node: Node, xml_id: str,
+                          x: float = 0.0, y: float = 0.0) -> Optional[ET.Element]:
         """
         Create a GraphML <node> XML element for a given node.
 
         Dispatches to type-specific generators based on node_type.
+
+        Args:
+            node: The graph node to create XML for
+            xml_id: The GraphML node ID to assign
+            x: X coordinate within the swimlane
+            y: Y coordinate within the swimlane (determines epoch lane)
         """
         node_type = getattr(node, 'node_type', '')
 
         if isinstance(node, StratigraphicNode):
-            return self._create_stratigraphic_node_xml(node, xml_id)
+            return self._create_stratigraphic_node_xml(node, xml_id, x, y)
         elif isinstance(node, PropertyNode):
-            return self._create_property_node_xml(node, xml_id)
+            return self._create_property_node_xml(node, xml_id, x, y)
         elif isinstance(node, DocumentNode):
-            return self._create_document_node_xml(node, xml_id)
+            return self._create_document_node_xml(node, xml_id, x, y)
         elif isinstance(node, ExtractorNode):
-            return self._create_extractor_node_xml(node, xml_id)
+            return self._create_extractor_node_xml(node, xml_id, x, y)
         elif isinstance(node, CombinerNode):
-            return self._create_combiner_node_xml(node, xml_id)
+            return self._create_combiner_node_xml(node, xml_id, x, y)
         elif isinstance(node, ParadataNodeGroup):
-            return self._create_paradata_group_xml(node, xml_id)
+            return self._create_paradata_group_xml(node, xml_id, x, y)
         elif isinstance(node, EpochNode):
             # Epoch nodes are part of the swimlane structure, skip
             return None
@@ -491,7 +613,9 @@ class GraphMLPatcher:
             return None
 
     def _create_stratigraphic_node_xml(self, node: StratigraphicNode,
-                                        xml_id: str) -> ET.Element:
+                                        xml_id: str,
+                                        x: float = 0.0,
+                                        y: float = 0.0) -> ET.Element:
         """Create ShapeNode XML for a stratigraphic node."""
         from .node_registry import NodeRegistry
         registry = NodeRegistry()
@@ -535,14 +659,14 @@ class GraphMLPatcher:
 
             shape_node = ET.SubElement(data_gfx, f'{{{NS_Y}}}ShapeNode')
 
-            # Geometry (default position - user will re-layout in yEd)
+            # Geometry — positioned within the correct epoch lane
             geometry = ET.SubElement(shape_node, f'{{{NS_Y}}}Geometry')
             geometry.set('height', '30.0')
             label_text = node.name or node.node_type
             width = max(90.0, len(label_text) * 7.0 + 20)
             geometry.set('width', str(width))
-            geometry.set('x', '0.0')
-            geometry.set('y', '0.0')
+            geometry.set('x', str(x))
+            geometry.set('y', str(y))
 
             # Fill
             fill = ET.SubElement(shape_node, f'{{{NS_Y}}}Fill')
@@ -575,7 +699,9 @@ class GraphMLPatcher:
         return node_elem
 
     def _create_property_node_xml(self, node: PropertyNode,
-                                   xml_id: str) -> ET.Element:
+                                   xml_id: str,
+                                   x: float = 0.0,
+                                   y: float = 0.0) -> ET.Element:
         """Create GenericNode BPMN Annotation XML for a PropertyNode."""
         node_elem = ET.Element(f'{{{NS_GRAPHML}}}node')
         node_elem.set('id', xml_id)
@@ -604,8 +730,8 @@ class GraphMLPatcher:
             width = max(62.75, len(label_text) * 6.0 + 20)
             geometry.set('height', '30.0')
             geometry.set('width', str(width))
-            geometry.set('x', '0.0')
-            geometry.set('y', '0.0')
+            geometry.set('x', str(x))
+            geometry.set('y', str(y))
 
             fill = ET.SubElement(generic, f'{{{NS_Y}}}Fill')
             fill.set('color', '#FFFFFFE6')
@@ -643,7 +769,9 @@ class GraphMLPatcher:
         return node_elem
 
     def _create_document_node_xml(self, node: DocumentNode,
-                                   xml_id: str) -> ET.Element:
+                                   xml_id: str,
+                                   x: float = 0.0,
+                                   y: float = 0.0) -> ET.Element:
         """Create GenericNode BPMN Data Object XML for a DocumentNode."""
         node_elem = ET.Element(f'{{{NS_GRAPHML}}}node')
         node_elem.set('id', xml_id)
@@ -667,8 +795,8 @@ class GraphMLPatcher:
             geometry = ET.SubElement(generic, f'{{{NS_Y}}}Geometry')
             geometry.set('height', '63.79')
             geometry.set('width', '42.80')
-            geometry.set('x', '0.0')
-            geometry.set('y', '0.0')
+            geometry.set('x', str(x))
+            geometry.set('y', str(y))
 
             fill = ET.SubElement(generic, f'{{{NS_Y}}}Fill')
             fill.set('color', '#FFFFFFE6')
@@ -708,17 +836,23 @@ class GraphMLPatcher:
         return node_elem
 
     def _create_extractor_node_xml(self, node: ExtractorNode,
-                                    xml_id: str) -> ET.Element:
+                                    xml_id: str,
+                                    x: float = 0.0,
+                                    y: float = 0.0) -> ET.Element:
         """Create SVGNode XML for an ExtractorNode."""
-        return self._create_svg_node_xml(node, xml_id, svg_refid='1')
+        return self._create_svg_node_xml(node, xml_id, svg_refid='1', x=x, y=y)
 
     def _create_combiner_node_xml(self, node: CombinerNode,
-                                   xml_id: str) -> ET.Element:
+                                   xml_id: str,
+                                   x: float = 0.0,
+                                   y: float = 0.0) -> ET.Element:
         """Create SVGNode XML for a CombinerNode."""
-        return self._create_svg_node_xml(node, xml_id, svg_refid='2')
+        return self._create_svg_node_xml(node, xml_id, svg_refid='2', x=x, y=y)
 
     def _create_svg_node_xml(self, node: Node, xml_id: str,
-                              svg_refid: str) -> ET.Element:
+                              svg_refid: str,
+                              x: float = 0.0,
+                              y: float = 0.0) -> ET.Element:
         """Create SVGNode XML for ExtractorNode or CombinerNode."""
         node_elem = ET.Element(f'{{{NS_GRAPHML}}}node')
         node_elem.set('id', xml_id)
@@ -741,8 +875,8 @@ class GraphMLPatcher:
             geometry = ET.SubElement(svg_node, f'{{{NS_Y}}}Geometry')
             geometry.set('height', '25.0')
             geometry.set('width', '25.0')
-            geometry.set('x', '0.0')
-            geometry.set('y', '0.0')
+            geometry.set('x', str(x))
+            geometry.set('y', str(y))
 
             fill = ET.SubElement(svg_node, f'{{{NS_Y}}}Fill')
             fill.set('color', '#CCCCFF')
@@ -770,7 +904,9 @@ class GraphMLPatcher:
         return node_elem
 
     def _create_paradata_group_xml(self, node: ParadataNodeGroup,
-                                    xml_id: str) -> ET.Element:
+                                    xml_id: str,
+                                    x: float = 0.0,
+                                    y: float = 0.0) -> ET.Element:
         """Create ProxyAutoBoundsNode XML for a ParadataNodeGroup."""
         node_elem = ET.Element(f'{{{NS_GRAPHML}}}node')
         node_elem.set('id', xml_id)
@@ -811,6 +947,7 @@ class GraphMLPatcher:
         geometry = ET.SubElement(group_node, f'{{{NS_Y}}}Geometry')
         geometry.set('height', '30.0' if closed else '120.0')
         geometry.set('width', '118.0' if closed else '376.0')
+        # Group geometry is set by yEd auto-bounds; these are defaults
         geometry.set('x', '0.0')
         geometry.set('y', '0.0')
 
