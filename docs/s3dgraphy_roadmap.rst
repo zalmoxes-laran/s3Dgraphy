@@ -4,7 +4,7 @@ Development Roadmap
 This document outlines the development roadmap for s3dgraphy, the core Python library
 that implements the Extended Matrix formal language for archaeological documentation.
 
-Current Version: 0.1.32
+Current Version: 0.1.35
 ------------------------
 
 Completed Features
@@ -35,11 +35,18 @@ Completed Features
 - [x] has_visual_reference edge type (v1.5.4)
 - [x] **Chronology calculation** (``calculate_chronology``): BFS-based TPQ/TAQ propagation from absolute dates and epoch membership through stratigraphic relations
 - [x] **Temporal property detection** with fallback matching by name and description
+- [x] [v0.1.27-0.1.30] **AI extraction capabilities** and prompt templates
+- [x] [v0.1.28] **Qualia Importer** for importing from Qualia templates
+- [x] [v0.1.33] **GraphML Patcher** for round-trip editing (patches existing GraphML files with in-memory graph changes, EMID validation)
+- [x] [v0.1.33] **Graph Merger** with conflict resolution (compares existing graphs with incoming data, produces conflict lists for UI resolution)
+- [x] [v0.1.33] **Master DocumentNode enrichment**
+- [x] [v0.1.34] **Epoch/Relations second-pass processing** for enhanced GraphML handling
+- [x] [v0.1.35] **Import GraphML updates**
 
 Next Priorities
 ~~~~~~~~~~~~~~~
 
-- [ ] Enhanced validation system
+- [~] Enhanced validation system (in progress: EMID validation exists)
 - [ ] Performance optimizations for very large graphs (10,000+ nodes)
 - [ ] Additional CIDOC-CRM mapping refinements
 - [ ] Comprehensive unit test coverage
