@@ -206,6 +206,9 @@ class GraphMLImporter:
         self.parse_nodes(tree)
         self.parse_edges(tree)
 
+        # Arricchisci i master document con i valori delle PropertyNode collegate
+        self._enrich_master_documents()
+
         # Aggiungi qui la nuova funzionalità per collegare PropertyNode dai ParadataNodeGroup
         # Impostare verbose=True per avere output dettagliati durante il debug
         stats = self.graph.connect_paradatagroup_propertynode_to_stratigraphic(verbose=False)
@@ -653,44 +656,78 @@ class GraphMLImporter:
 
         elif self.EM_check_node_document(node_element):
             # Creazione del nodo documento e aggiunta al grafo
-            nodename, node_id, nodedescription, nodeurl, _ = self.EM_extract_document_node(node_element)
-            # Controlla se esiste già un documento con lo stesso nome
+            result = self.EM_extract_document_node(node_element)
+            nodename = result[0]
+            node_id = result[1]
+            nodedescription = result[2]
+            nodeurl = result[3]
+            border_color = result[5]
+            border_width = result[6]
+            doc_y_pos = result[7]
+
+            is_master = self._is_master_document(border_color, border_width)
 
             if nodename in self.document_nodes_map:
-                # Ottieni UUID del documento esistente
+                # Documento già presente nel grafo
                 existing_uuid = self.document_nodes_map[nodename]
-                
-                # Cerca il nodo documento esistente
                 existing_doc = self.graph.find_node_by_id(existing_uuid)
-                
-                if existing_doc and hasattr(existing_doc, 'attributes'):
-                    # Ottieni l'ID originale del documento esistente
+
+                if is_master and existing_doc and not existing_doc.attributes.get('is_master', False):
+                    # Master incontrato dopo un'istanza: aggiorna il nodo esistente
+                    # con i dati del master (descrizione, attributi visivi, posizione)
+                    if nodedescription:
+                        existing_doc.description = nodedescription
+                    if nodeurl:
+                        existing_doc.url = nodeurl
+                    existing_doc.attributes['is_master'] = True
+                    existing_doc.attributes['border_color'] = border_color
+                    existing_doc.attributes['border_width'] = border_width
+                    existing_doc.attributes['certainty_class'] = self._get_certainty_class(border_color)
+                    try:
+                        existing_doc.attributes['y_pos'] = float(doc_y_pos)
+                    except (ValueError, TypeError):
+                        existing_doc.attributes['y_pos'] = 0.0
+                    # Mappa l'ID originale del master per il remapping degli edge
+                    self.id_mapping[original_id] = existing_uuid
                     existing_original_id = existing_doc.attributes.get('original_id')
-                    
                     if existing_original_id:
-                        # Mappa l'ID originale del nuovo documento all'ID originale del documento esistente
                         self.duplicate_id_map[original_id] = existing_original_id
-                        # print(f"Deduplicating document node: {nodename} (Original ID: {original_id} -> {existing_original_id})")
                     else:
-                        # Non è stato possibile ottenere l'ID originale, usa l'UUID direttamente
                         self.duplicate_id_map[original_id] = existing_uuid
-                        # print(f"Deduplicating document node: {nodename} (Original ID: {original_id} -> UUID: {existing_uuid})")
+                    print(f"[GraphML Parser] Master document '{nodename}' upgraded existing instance node ({existing_uuid})")
                 else:
-                    # Non è stato possibile trovare il documento esistente, usa l'UUID direttamente
-                    self.duplicate_id_map[original_id] = existing_uuid
-                    # print(f"Deduplicating document node: {nodename} (ID: {original_id} -> {existing_uuid})")
+                    # Deduplicazione standard: istanza dopo master, o istanza duplicata
+                    if existing_doc and hasattr(existing_doc, 'attributes'):
+                        existing_original_id = existing_doc.attributes.get('original_id')
+                        if existing_original_id:
+                            self.duplicate_id_map[original_id] = existing_original_id
+                        else:
+                            self.duplicate_id_map[original_id] = existing_uuid
+                    else:
+                        self.duplicate_id_map[original_id] = existing_uuid
             else:
-                # Crea nuovo documento
+                # Prima occorrenza: crea nuovo DocumentNode
                 document_node = DocumentNode(
                     node_id=uuid_id,
                     name=nodename,
                     description=nodedescription,
                     url=nodeurl
                 )
-                
+
                 # Aggiungi attributi di tracciamento
                 document_node.attributes['original_id'] = original_id
                 document_node.attributes['graph_id'] = self.graph.graph_id
+
+                # Attributi master document
+                document_node.attributes['is_master'] = is_master
+                if is_master:
+                    document_node.attributes['border_color'] = border_color
+                    document_node.attributes['border_width'] = border_width
+                    document_node.attributes['certainty_class'] = self._get_certainty_class(border_color)
+                    try:
+                        document_node.attributes['y_pos'] = float(doc_y_pos)
+                    except (ValueError, TypeError):
+                        document_node.attributes['y_pos'] = 0.0
 
                 # Aggiungi URI se presente
                 if node_uri:
@@ -1290,6 +1327,36 @@ class GraphMLImporter:
 
 
 
+    def _enrich_master_documents(self):
+        """
+        Dopo il parsing degli edge, copia i valori delle PropertyNode collegate
+        ai master document nel loro dict 'data'.
+        Es: D.70 master connesso a PropertyNode 'absolute_start_date' con valore '1870'
+        -> document_node.data['absolute_start_date'] = '1870'
+        """
+        master_count = 0
+        enriched_count = 0
+        for node in self.graph.nodes:
+            if not isinstance(node, DocumentNode):
+                continue
+            if not node.attributes.get('is_master', False):
+                continue
+            master_count += 1
+
+            # Cerca edge uscenti da questo documento verso PropertyNode
+            for edge in self.graph.edges:
+                if edge.edge_source == node.node_id:
+                    target = self.graph.find_node_by_id(edge.edge_target)
+                    if isinstance(target, PropertyNode):
+                        prop_name = target.name  # es: "absolute_start_date"
+                        prop_value = target.description  # es: "1870"
+                        if prop_name and prop_value:
+                            node.data[prop_name] = prop_value
+                            enriched_count += 1
+
+        if master_count > 0:
+            print(f"[GraphML Parser] Found {master_count} master document(s), enriched with {enriched_count} property value(s)")
+
     def connect_nodes_to_epochs(self):
         """
         Assegna le epoche ai nodi nel grafo in base alla posizione Y e gestisce i nodi continuity.
@@ -1516,10 +1583,40 @@ class GraphMLImporter:
 
         return nodename, nodedescription, nodeurl, nodeshape, node_y_pos, fillcolor, borderstyle
 
+    # Mapping from master document border colors to certainty classes.
+    # Red = direct knowledge/presence, Orange = documentary reconstruction,
+    # Yellow-gold = hypothetical positioning.
+    MASTER_CERTAINTY_CLASSES = {
+        "#9B3333": "direct",
+        "#D86400": "reconstructed",
+        "#D8BD30": "hypothetical",
+    }
+
+    def _is_master_document(self, border_color, border_width):
+        """A master document has a colored (non-black) border with width >= 3.0."""
+        if border_color and border_color.upper() != "#000000" and border_width:
+            try:
+                return float(border_width) >= 3.0
+            except (ValueError, TypeError):
+                return False
+        return False
+
+    def _get_certainty_class(self, border_color):
+        """Map border color to a semantic certainty class."""
+        if not border_color:
+            return "unknown"
+        color_upper = border_color.upper()
+        for known_color, certainty in self.MASTER_CERTAINTY_CLASSES.items():
+            if known_color.upper() == color_upper:
+                return certainty
+        # Colored but unrecognized → still a master, class unknown
+        return "unknown"
+
     def EM_check_node_document(self, node_element):
         try:
-            _, _, _, _, subnode_is_document = self.EM_extract_document_node(node_element)
-        except TypeError:
+            result = self.EM_extract_document_node(node_element)
+            subnode_is_document = result[4]
+        except (TypeError, IndexError):
             subnode_is_document = False
         return subnode_is_document
 
@@ -1529,6 +1626,9 @@ class GraphMLImporter:
         node_description = ""
         nodeurl = ""
         subnode_is_document = False
+        border_color = "#000000"
+        border_width = "1.0"
+        doc_y_pos = "0"
 
         # Usa key_map dinamico
         url_key = self.key_map['node'].get('url')
@@ -1545,6 +1645,12 @@ class GraphMLImporter:
                 for nodetype in subnode.findall('.//{http://www.yworks.com/xml/graphml}Property'):
                     if nodetype.attrib.get('name') == 'com.yworks.bpmn.dataObjectType' and nodetype.attrib.get('value') == 'DATA_OBJECT_TYPE_PLAIN':
                         subnode_is_document = True
+                # Estrai border color, width e posizione Y (per master detection)
+                for border_style in subnode.findall('.//{http://www.yworks.com/xml/graphml}BorderStyle'):
+                    border_color = border_style.attrib.get('color', '#000000')
+                    border_width = border_style.attrib.get('width', '1.0')
+                for geometry in subnode.findall('.//{http://www.yworks.com/xml/graphml}Geometry'):
+                    doc_y_pos = geometry.attrib.get('y', '0')
 
         if subnode_is_document:
             for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
@@ -1555,7 +1661,7 @@ class GraphMLImporter:
                 if description_key and key == description_key:
                     node_description = self.clean_comments(subnode.text) if subnode.text else ''
 
-        return nodename, node_id, node_description, nodeurl, subnode_is_document
+        return nodename, node_id, node_description, nodeurl, subnode_is_document, border_color, border_width, doc_y_pos
 
     def EM_check_node_property(self, node_element):
         try:

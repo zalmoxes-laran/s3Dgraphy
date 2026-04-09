@@ -286,7 +286,7 @@
         "extension_name": "CRMarchaeo"
       },
       "allowed_connections": {
-        "source": ["StratigraphicNode"],
+        "source": ["StratigraphicNode", "DocumentNode"],
         "target": ["PropertyNode"]
       }
     },

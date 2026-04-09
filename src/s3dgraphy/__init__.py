@@ -1,4 +1,4 @@
-__version__ = "0.1.33"
+__version__ = "0.1.35"
 __datamodel_version__ = "1.5.4"  # s3Dgraphy connections datamodel version
 
 # s3Dgraphy/__init__.py

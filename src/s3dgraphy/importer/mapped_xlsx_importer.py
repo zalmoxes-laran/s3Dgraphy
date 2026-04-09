@@ -313,47 +313,37 @@ class MappedXLSXImporter(BaseImporter):
             successful_rows = 0
             skipped_rows = 0
             error_rows = 0
-            
-            # print(f"\nProcessing {len(df)} rows...")
-            
+
+            # Store rows for second-pass processing (epochs, relations)
+            self._stored_rows = []
+
             for idx, row in df.iterrows():
                 total_rows += 1
-                
+
                 try:
                     # Build row_dict using JSON column names as keys
-                    # but values from Excel columns (via tuple index)
+                    # but values from Excel columns
                     row_dict = {}
 
                     for json_col, excel_col in json_to_excel_mapping.items():
-                        # Get column index in the filtered dataframe
-                        col_idx = columns_to_keep.index(excel_col)
-                        value = row_tuple[col_idx]
+                        value = row[excel_col]
 
                         # Only add non-null values
                         if pd.notna(value):
                             row_dict[json_col] = value
 
-                    # Skip rows without data (already filtered by ID above, but double-check)
+                    # Skip rows without data
                     if not row_dict or id_column_json not in row_dict:
                         skipped_rows += 1
-                        # print(f"  Row {idx+1}: Skipped (missing ID)")
                         continue
-                    
-                    # Debug per prime righe
-                    if successful_rows < 3:
-                        # print(f"\n  Row {idx+1} sample data:")
-                        for k, v in list(row_dict.items())[:5]:
-                            pass
-                            # print(f"    {k}: {v}")
-                    
-                    # Process the row
+
+                    # Process the row (first pass: create nodes + properties)
                     result_node = self.process_row(row_dict)
 
                     if result_node is not None:
                         successful_rows += 1
-                        if (successful_rows % 10) == 0:
-                            pass
-                            # print(f"  Processed {successful_rows} rows...")
+                        # Store row for second-pass processing
+                        self._stored_rows.append(row_dict)
                     else:
                         skipped_rows += 1
 
@@ -361,12 +351,11 @@ class MappedXLSXImporter(BaseImporter):
                     error_rows += 1
                     error_msg = f"Error processing row: {str(e)}"
                     self.warnings.append(error_msg)
-                    # print(f"  ❌ {error_msg}")
 
-                    # Debug info for errors
-                    if error_rows <= 3:  # Show details for first 3 errors
-                        pass
-                        # print(f"    Row data sample: {list(row_dict.items())[:3]}")
+            # Second pass: create EpochNodes and stratigraphic relation edges
+            # These require all nodes to exist first (two-pass approach)
+            self._process_epochs()
+            self._process_stratigraphic_relations()
 
             # Summary
             # print(f"\n=== Import Summary ===")

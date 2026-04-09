@@ -44,7 +44,7 @@ class NodeRegistry:
         """Load node datamodel from JSON."""
         json_path = os.path.join(
             os.path.dirname(__file__),
-            '../../JSON_config/s3Dgraphy_node_datamodel .json'
+            '../../JSON_config/s3Dgraphy_node_datamodel.json'
         )
         
         try:

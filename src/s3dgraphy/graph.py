@@ -16,11 +16,9 @@ from typing import List
 from .indices import GraphIndices
 
 
-# Load the connection rules JSON
-rules_path = os.path.join(os.path.dirname(__file__), "./JSON_config/em_connection_rules.json")
-with open(rules_path) as f:
-    connection_rules = json.load(f)["rules"]
-    # print('s3Dgraphy rules are correctly loaded.')
+# Connection rules are managed via s3Dgraphy_connections_datamodel.json
+# (loaded by edges/connections_loader.py)
+_connections_datamodel = get_connections_datamodel()
 
 class Graph:
     """
