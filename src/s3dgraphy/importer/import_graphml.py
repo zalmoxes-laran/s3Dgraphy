@@ -144,13 +144,24 @@ class GraphMLImporter:
                     # Extract ID if present in vocabulary
                     if 'ID' in vocabolario:
                         graph_code = vocabolario['ID']
-                        #print(f"Found graph code from vocabulary: {graph_code}")
-                    
+
                     # If there's a specific ID in the vocabulary, use it
                     if 'graph_id' in vocabolario:
                         graph_id = vocabolario['graph_id']
-                        #print(f"Found specific graph ID: {graph_id}")
-                    
+
+                    # Store graph header metadata for downstream use
+                    header_keys = [
+                        'ORCID', 'author_name', 'author_surname',
+                        'license', 'embargo', 'description'
+                    ]
+                    for key in header_keys:
+                        if key in vocabolario:
+                            self.graph.attributes[key] = vocabolario[key]
+
+                    # Store the clean graph name (without vocabulary)
+                    if stringa_pulita:
+                        self.graph.attributes['graph_label'] = stringa_pulita
+
                     break
                 except Exception as e:
                     pass
