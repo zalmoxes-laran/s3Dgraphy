@@ -239,6 +239,24 @@
               "description": "P3_has_note"
             }
           },
+          "UL": {
+            "class": "WorkingUnit",
+            "parent": "StratigraphicNode",
+            "abbreviation": "UL",
+            "label": "UL",
+            "symbol": "white rectangle with orange border",
+            "description": "Working Unit. Traces of stone working, toolmarks, reworkings on architectural surfaces.",
+            "s3Dgraphy_file": "stratigraphic_node.py",
+            "mapping": {
+              "cidoc": "E12 Production",
+              "cidoc_s3d": null,
+              "alternative": "S19 Encounter Event"
+            },
+            "properties": {
+              "name": "P1_is_identified_by",
+              "description": "P3_has_note"
+            }
+          },
           "BR": {
             "class": "ContinuityNode",
             "parent": "StratigraphicNode",

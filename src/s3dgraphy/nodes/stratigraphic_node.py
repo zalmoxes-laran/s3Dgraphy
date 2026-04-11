@@ -116,6 +116,15 @@ class TransformationStratigraphicUnit(StratigraphicNode):
         self.detailed_description = "Transformation Unit."
 
 
+class WorkingUnit(StratigraphicNode):
+    node_type = "UL"
+    def __init__(self, node_id, name, description=""):
+        super().__init__(node_id, name, description)
+        self.symbol = "white rectangle with orange border"
+        self.label = "UL"
+        self.detailed_description = "Working Unit. Traces of stone working, toolmarks, reworkings on architectural surfaces."
+
+
 class ContinuityNode(StratigraphicNode):
     node_type = "BR"
     def __init__(self, node_id, name, description=""):

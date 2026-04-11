@@ -236,8 +236,8 @@ class Graph:
         }
         
         # Definisci i tipi di unità stratigrafiche riconosciuti
-        stratigraphic_types = ['US', 'USVs', 'SF', 'USVn', 'USD', 'VSF', 'serSU', 
-                            'serUSVn', 'serUSVs', 'TSU', 'SE', 'BR', 'unknown']
+        stratigraphic_types = ['US', 'USVs', 'SF', 'USVn', 'USD', 'VSF', 'serSU',
+                            'serUSVn', 'serUSVs', 'TSU', 'UL', 'SE', 'BR', 'unknown']
         
         # Identifica tutti i nodi ParadataNodeGroup
         paradata_groups = [node for node in self.nodes
@@ -1174,7 +1174,7 @@ class Graph:
 
         # Stratigraphic node types
         stratigraphic_types = ['US', 'USVs', 'USVn', 'VSF', 'SF', 'USD', 'serSU',
-                              'serUSVn', 'serUSVs', 'TSU', 'SE', 'BR', 'unknown']
+                              'serUSVn', 'serUSVs', 'TSU', 'UL', 'SE', 'BR', 'unknown']
 
         refined_count = 0
 

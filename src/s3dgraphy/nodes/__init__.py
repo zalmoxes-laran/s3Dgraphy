@@ -9,7 +9,7 @@ property nodes, and more.
 """
 
 from .base_node import Node
-from .stratigraphic_node import StratigraphicNode
+from .stratigraphic_node import StratigraphicNode, WorkingUnit
 from .epoch_node import EpochNode
 from .property_node import PropertyNode
 from .document_node import DocumentNode
@@ -27,7 +27,8 @@ from .license_node import LicenseNode
 # Define what is available for import when using 'from nodes import *'
 __all__ = [
     "Node", 
-    "StratigraphicNode", 
+    "StratigraphicNode",
+    "WorkingUnit",
     "EpochNode", 
     "PropertyNode", 
     "DocumentNode",

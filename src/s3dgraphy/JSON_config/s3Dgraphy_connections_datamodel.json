@@ -438,7 +438,7 @@
         "extension_name": "CIDOC-S3D"
       },
       "allowed_connections": {
-        "source": ["EpochNode", "StratigraphicNode"],
+        "source": ["EpochNode", "StratigraphicNode", "DocumentNode"],
         "target": ["RepresentationModelNode"]
       }
     },
