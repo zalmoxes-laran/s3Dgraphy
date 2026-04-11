@@ -91,13 +91,14 @@ def debug_graph_structure(graph, node_id=None, max_depth=5, current_depth=0):
             # print(f"  - {etype}: {count} edges")
     # print("=== END DEBUG ===\n")
 
-def convert_shape2type(yedtype, border_style):
+def convert_shape2type(yedtype, border_style, border_type="line"):
     """
     Converts YED node shape and border style to a specific stratigraphic node type.
 
     Args:
         yedtype (str): The shape type of the node in YED.
         border_style (str): The border color of the node.
+        border_type (str): The border line type ('line', 'dashed', etc.).
 
     Returns:
         tuple: A tuple with a short code for the node type and an extended description.
@@ -120,6 +121,8 @@ def convert_shape2type(yedtype, border_style):
         nodetype = ("SF", "Special Find")
     elif yedtype == "octagon" and border_style == "#B19F61":
         nodetype = ("VSF", "Virtual Special Find")
+    elif yedtype == "roundrectangle" and border_type == "dashed":
+        nodetype = ("TSU", "Transformation Stratigraphic Unit")
     elif yedtype == "roundrectangle":
         nodetype = ("USD", "Documentary Stratigraphic Unit")
     else:

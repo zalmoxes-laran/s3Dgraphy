@@ -603,9 +603,9 @@ class GraphMLImporter:
             return
 
         # Salta nodi commento/nota di yEd (sfondo giallo, non sono nodi EM)
-        _, _, _, _, _, fillcolor, _ = self.EM_extract_node_name(node_element)
+        _, _, _, _, _, fillcolor, _, _ = self.EM_extract_node_name(node_element)
         if fillcolor and fillcolor.upper() in ('#FFCC00', '#FFFF00', '#FFFF99'):
-            nodename_check, _, _, _, _, _, _ = self.EM_extract_node_name(node_element)
+            nodename_check, _, _, _, _, _, _, _ = self.EM_extract_node_name(node_element)
             print(f"[GraphML Parser] Skipping comment/note node: '{nodename_check}' (fill={fillcolor})")
             return
 
@@ -637,9 +637,9 @@ class GraphMLImporter:
 
         if self.EM_check_node_us(node_element):
             # Creazione del nodo stratigrafico e aggiunta al grafo
-            nodename, nodedescription, nodeurl, nodeshape, node_y_pos, fillcolor, borderstyle = self.EM_extract_node_name(node_element)
-            
-            stratigraphic_type = convert_shape2type(nodeshape, borderstyle)[0]
+            nodename, nodedescription, nodeurl, nodeshape, node_y_pos, fillcolor, borderstyle, bordertype = self.EM_extract_node_name(node_element)
+
+            stratigraphic_type = convert_shape2type(nodeshape, borderstyle, bordertype)[0]
             node_class = get_stratigraphic_node_class(stratigraphic_type)  # Ottieni la classe usando la funzione
             stratigraphic_node = node_class(
                 node_id=uuid_id,
@@ -1547,7 +1547,7 @@ class GraphMLImporter:
 
     def EM_check_node_us(self, node_element):
         US_nodes_list = ['rectangle', 'parallelogram', 'ellipse', 'hexagon', 'octagon', 'roundrectangle']
-        nodename, _, _, nodeshape, _, _, _ = self.EM_extract_node_name(node_element)
+        nodename, _, _, nodeshape, _, _, _, _ = self.EM_extract_node_name(node_element)
         return nodeshape in US_nodes_list
 
     def EM_extract_node_name(self, node_element):
@@ -1558,6 +1558,7 @@ class GraphMLImporter:
         nodename = None
         fillcolor = None
         borderstyle = None
+        bordertype = 'line'
 
         # Usa key_map dinamico per trovare le chiavi corrette
         url_key = self.key_map['node'].get('url')
@@ -1587,12 +1588,13 @@ class GraphMLImporter:
                     fillcolor = fill_color.attrib['color']
                 for border_style in subnode.findall('.//{http://www.yworks.com/xml/graphml}BorderStyle'):
                     borderstyle = border_style.attrib['color']
+                    bordertype = border_style.attrib.get('type', 'line')
                 for USshape in subnode.findall('.//{http://www.yworks.com/xml/graphml}Shape'):
                     nodeshape = USshape.attrib['type']
                 for geometry in subnode.findall('.//{http://www.yworks.com/xml/graphml}Geometry'):
                     node_y_pos = geometry.attrib['y']
 
-        return nodename, nodedescription, nodeurl, nodeshape, node_y_pos, fillcolor, borderstyle
+        return nodename, nodedescription, nodeurl, nodeshape, node_y_pos, fillcolor, borderstyle, bordertype
 
     # Mapping from master document border colors to certainty classes.
     # Red = direct knowledge/presence, Orange = documentary reconstruction,
