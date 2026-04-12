@@ -9,7 +9,13 @@ property nodes, and more.
 """
 
 from .base_node import Node
-from .stratigraphic_node import StratigraphicNode, WorkingUnit
+from .stratigraphic_node import (
+    StratigraphicNode, WorkingUnit,
+    StratigraphicUnit, TransformationStratigraphicUnit,
+    StructuralVirtualStratigraphicUnit, NonStructuralVirtualStratigraphicUnit,
+    SpecialFindUnit, VirtualSpecialFindUnit, DocumentaryStratigraphicUnit,
+    ContinuityNode, StratigraphicEventNode
+)
 from .epoch_node import EpochNode
 from .property_node import PropertyNode
 from .document_node import DocumentNode
@@ -29,6 +35,15 @@ __all__ = [
     "Node", 
     "StratigraphicNode",
     "WorkingUnit",
+    "StratigraphicUnit",
+    "TransformationStratigraphicUnit",
+    "StructuralVirtualStratigraphicUnit",
+    "NonStructuralVirtualStratigraphicUnit",
+    "SpecialFindUnit",
+    "VirtualSpecialFindUnit",
+    "DocumentaryStratigraphicUnit",
+    "ContinuityNode",
+    "StratigraphicEventNode",
     "EpochNode", 
     "PropertyNode", 
     "DocumentNode",
