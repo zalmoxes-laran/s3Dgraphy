@@ -1806,6 +1806,10 @@ class GraphMLImporter:
     def EM_check_node_continuity(self, node_element):
         """
         Verifica se un nodo è un nodo di continuità (BR).
+        Usa una detection multi-segnale:
+          A) '_continuity' nel campo URL o description
+          B) ShapeNode con shape type 'diamond'
+          C) SVGNode con SVGContent refid='3' (risorsa SVG della palette s3Dgraphy)
 
         Args:
             node_element: Elemento XML del nodo
@@ -1813,32 +1817,36 @@ class GraphMLImporter:
         Returns:
             bool: True se il nodo è di tipo continuity
         """
-        # Use dynamic key mapping for url field (contains _continuity marker)
-        url_key = self.key_map.get('node', {}).get('url', 'd5')
+        url_key = self.key_map.get('node', {}).get('url')
+        description_key = self.key_map.get('node', {}).get('description')
+        nodegraphics_key = self.key_map.get('node', {}).get('nodegraphics')
 
-        # Cerca nei dati del nodo
+        # Signal A: '_continuity' marker nel campo URL o description
         for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-            if subnode.attrib.get('key') == url_key:
-                # Verifica se il testo è "_continuity"
-                if subnode.text and "_continuity" in subnode.text:
-                    # print(f"Found continuity node: {node_element.attrib['id']}")
+            key = subnode.attrib.get('key')
+            if subnode.text and "_continuity" in subnode.text:
+                if key == url_key or key == description_key:
                     return True
 
-        # Verifica se è un SVGNode (alternativa)
-        svg_node = node_element.find('.//{http://graphml.graphdrawing.org/xmlns}data/{http://www.yworks.com/xml/graphml}SVGNode')
-        if svg_node is not None:
-            # Cerca di nuovo nei dati per confermare se è un nodo continuity
-            for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-                if subnode.attrib.get('key') == url_key and subnode.text:
-                    if "_continuity" in subnode.text:
-                        # print(f"Found SVG continuity node: {node_element.attrib['id']}")
-                        return True
+        # Signal B: ShapeNode con shape type 'diamond'
+        _, _, _, nodeshape, _, _, _, _ = self.EM_extract_node_name(node_element)
+        if nodeshape == "diamond":
+            return True
+
+        # Signal C: SVGNode con SVGContent refid='3' (continuity diamond dalla palette)
+        y_ns = '{http://www.yworks.com/xml/graphml}'
+        for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
+            if subnode.attrib.get('key') == nodegraphics_key:
+                svg_content = subnode.find(f'.//{y_ns}SVGNode/{y_ns}SVGModel/{y_ns}SVGContent')
+                if svg_content is not None and svg_content.attrib.get('refid') == '3':
+                    return True
 
         return False
 
     def EM_extract_continuity(self, node_element):
         """
         Estrae informazioni da un nodo continuity.
+        Supporta sia SVGNode che ShapeNode (diamond).
 
         Args:
             node_element: Elemento XML del nodo
@@ -1852,42 +1860,51 @@ class GraphMLImporter:
         node_id = node_element.attrib['id']
 
         # Use dynamic key mapping
-        url_key = self.key_map.get('node', {}).get('url', 'd5')
-        ng_key = self.key_map.get('node', {}).get('nodegraphics', 'd6')
+        url_key = self.key_map.get('node', {}).get('url')
+        description_key = self.key_map.get('node', {}).get('description')
+        ng_key = self.key_map.get('node', {}).get('nodegraphics')
 
-        # Estrai descrizione dal campo url (contains _continuity marker)
+        y_ns = '{http://www.yworks.com/xml/graphml}'
+
         for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-            if subnode.attrib.get('key') == url_key:
+            key = subnode.attrib.get('key')
+
+            # Estrai descrizione dal campo url o description
+            if key == url_key and subnode.text:
                 is_url_found = True
                 nodedescription = subnode.text
-            
-            # Per SVGNode, estrai la posizione y
-            geometry = subnode.find('.//{http://www.yworks.com/xml/graphml}SVGNode/{http://www.yworks.com/xml/graphml}Geometry')
-            if geometry is not None:
-                y_str = geometry.attrib.get('y', '0.0')
-                try:
-                    node_y_pos = float(y_str)
-                    # print(f"Extracted y position from SVGNode: {node_y_pos}")
-                except (ValueError, TypeError):
-                    # print(f"Error converting y position to float: {y_str}")
-                    node_y_pos = 0.0
-            
-            # Fallback per i nodi non SVG
-            if subnode.attrib.get('key') == 'd6':
-                geometry = subnode.find('.//{http://www.yworks.com/xml/graphml}Geometry')
-                if geometry is not None:
-                    y_str = geometry.attrib.get('y', '0.0')
+            elif key == description_key and subnode.text and not is_url_found:
+                nodedescription = subnode.text
+
+            # Estrai y_pos dal nodegraphics (supporta SVGNode e ShapeNode)
+            if key == ng_key:
+                # SVGNode geometry
+                svg_geom = subnode.find(f'.//{y_ns}SVGNode/{y_ns}Geometry')
+                if svg_geom is not None:
                     try:
-                        node_y_pos = float(y_str)
+                        node_y_pos = float(svg_geom.attrib.get('y', '0.0'))
                     except (ValueError, TypeError):
                         node_y_pos = 0.0
 
-        if not is_url_found:
-            nodedescription = ''
+                # ShapeNode geometry (fallback per nodi diamond nativi yEd)
+                shape_geom = subnode.find(f'.//{y_ns}ShapeNode/{y_ns}Geometry')
+                if shape_geom is not None:
+                    try:
+                        node_y_pos = float(shape_geom.attrib.get('y', '0.0'))
+                    except (ValueError, TypeError):
+                        node_y_pos = 0.0
 
-        if nodedescription == "_continuity":
-            #print(f"Extracting continuity node: ID={node_id}, y_pos={node_y_pos}")
-            pass
+                # Fallback generico: qualsiasi Geometry nel data block
+                if node_y_pos == 0.0:
+                    generic_geom = subnode.find(f'.//{y_ns}Geometry')
+                    if generic_geom is not None:
+                        try:
+                            node_y_pos = float(generic_geom.attrib.get('y', '0.0'))
+                        except (ValueError, TypeError):
+                            node_y_pos = 0.0
+
+        if not is_url_found and nodedescription is None:
+            nodedescription = ''
 
         return nodedescription, node_y_pos, node_id
 

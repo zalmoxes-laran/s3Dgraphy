@@ -125,6 +125,8 @@ def convert_shape2type(yedtype, border_style, border_type="line"):
         nodetype = ("TSU", "Transformation Stratigraphic Unit")
     elif yedtype == "roundrectangle":
         nodetype = ("USD", "Documentary Stratigraphic Unit")
+    elif yedtype == "diamond":
+        nodetype = ("BR", "Continuity Node")
     else:
         # print(f"Unrecognized node type and style: yedtype='{yedtype}', border_style='{border_style}'")
         nodetype = ("unknown", "Unrecognized node")
