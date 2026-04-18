@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **AI extraction prompt rewritten for the unified schema** (v5.0,
+  breaking change). The StratiMiner prompt at
+  ``s3dgraphy/data/AI_EXTRACTION_PROMPT_v4.md`` (filename kept for
+  backward-compatible imports) now describes the single-file
+  ``em_data.xlsx`` output with 5 sheets, explicit
+  ``AUTHOR_KIND_N ∈ {author, extractor}`` distinguishing claims
+  transcribed from the document author vs claims newly derived by the
+  AI, and per-claim attribution on stratigraphic relations. Ships an
+  updated validation script that checks cross-sheet referential
+  integrity, duplicate triples, missing COMBINER_REASONING, and
+  stratigraphic cycles. Also documents a **stratigraphy-only mode**
+  for legacy archaeological databases where paradata attribution is
+  not yet available (curator as sole author, no extractor chain).
+
 ### Added
 
 - **Unified xlsx pipeline** (Phase B — DP-02 / DP-49). Single-file
