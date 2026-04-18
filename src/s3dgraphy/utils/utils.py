@@ -399,30 +399,41 @@ def _strip_html_comments(text: str) -> str:
 
 def get_ai_prompt(
     language: str = None,
-    include_part_a: bool = True,
-    include_part_b: bool = True,
-    include_part_c: bool = False,
-    include_part_d: bool = False,
+    include_validation: bool = True,
     include_checklist: bool = True,
-    include_validation: bool = False,
+    include_stratigraphy_only: bool = False,
+    documents_folder: str = None,
+    document_list: list = None,
 ) -> str:
     """
-    Build and return the AI extraction prompt for stratigraphic data (v4.1).
+    Build and return the StratiMiner extraction prompt (v5.0 schema).
 
-    Reads ``AI_EXTRACTION_PROMPT_v4.md`` bundled inside the s3dgraphy package,
-    assembles the requested sections, substitutes the language placeholder, and
-    prepends a language instruction line.
+    Reads ``StratiMiner_Extraction_Prompt.md`` bundled inside the s3dgraphy
+    package and produces a ready-to-paste prompt that instructs an AI
+    assistant (Claude, ChatGPT, Gemini, ...) to output a single
+    ``em_data.xlsx`` file with the 5 typed sheets (Units, Epochs, Claims,
+    Authors, Documents).
+
+    The prompt is a single coherent document — the old PART_A / PART_B /
+    PART_C / PART_D split of the v4.x two-file schema has been retired.
+    Only three optional toggles remain:
 
     Args:
-        language: Working language. If None / empty / "the same as the original
-            document", the AI is instructed to keep the source document's language.
-        include_part_a: Include Part A (Stratigraphy extraction). Default True.
-        include_part_b: Include Part B (Paradata extraction). Default True.
-        include_part_c: Include Part C (ParadataEpochs). Default False.
-        include_part_d: Include Part D (Sources list). Default False.
-        include_checklist: Include Part E (end-of-session checklist). Default True.
-        include_validation: Include the embedded Python validation script and
-            related checklist items (FLAG: VALIDAZIONE_FINALE). Default False.
+        language: Working language. ``None`` / empty / "the same as the
+            original document" → the AI is instructed to keep the source
+            document's language.
+        include_validation: Include the embedded Python validation script
+            (``FLAG: VALIDAZIONE_FINALE``). Default True.
+        include_checklist: Include the end-of-session checklist. Default True.
+        include_stratigraphy_only: Include the STRATIGRAPHY_ONLY appendix
+            that describes the minimal flow for pre-existing archaeological
+            databases (curator as sole author, no paradata chain). Default
+            False — the typical AI-extraction user does not need it.
+        documents_folder: Optional path to a folder of source PDFs; when
+            provided, appended to the prompt so the AI knows where to look.
+        document_list: Optional list of document descriptors (each either a
+            string or a dict with ``id`` / ``title`` / ``path``). Appended
+            to the prompt as a pre-catalogued sources list.
 
     Returns:
         str: The assembled prompt ready to paste into an AI assistant.
@@ -431,11 +442,11 @@ def get_ai_prompt(
         FileNotFoundError: If the bundled prompt file cannot be located.
     """
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-    prompt_path = os.path.join(data_dir, 'AI_EXTRACTION_PROMPT_v4.md')
+    prompt_path = os.path.join(data_dir, 'StratiMiner_Extraction_Prompt.md')
 
     if not os.path.exists(prompt_path):
         raise FileNotFoundError(
-            f"AI extraction prompt not found at: {prompt_path}. "
+            f"StratiMiner extraction prompt not found at: {prompt_path}. "
             "Ensure s3dgraphy is installed correctly."
         )
 
@@ -453,13 +464,10 @@ def get_ai_prompt(
     # 2. Flags (nested inside sections — must be processed first)
     result = _process_flag(result, 'VALIDAZIONE_FINALE', include_validation)
 
-    # 3. Sections
+    # 3. Optional sections (the v5.0 schema uses these IDs)
     for section_id, include in [
-        ('PART_A',    include_part_a),
-        ('PART_B',    include_part_b),
-        ('PART_C',    include_part_c),
-        ('PART_D',    include_part_d),
-        ('CHECKLIST', include_checklist),
+        ('STRATIGRAPHY_ONLY', include_stratigraphy_only),
+        ('CHECKLIST',         include_checklist),
     ]:
         result = _process_section(result, section_id, include)
 
@@ -477,4 +485,46 @@ def get_ai_prompt(
             f"IMPORTANT: Write all descriptions and properties in {lang_str}."
         )
 
-    return f"{lang_instruction}\n\n{result.strip()}"
+    # 6. Append sources context (folder path and/or pre-catalogued list)
+    sources_block = _build_sources_block(documents_folder, document_list)
+
+    return f"{lang_instruction}\n\n{result.strip()}{sources_block}"
+
+
+def _build_sources_block(documents_folder: str, document_list: list) -> str:
+    """Format an optional "SOURCES PROVIDED" appendix to the prompt.
+
+    ``documents_folder`` is rendered as a single line pointing the AI at
+    a directory it should enumerate. ``document_list`` (when provided)
+    takes precedence and produces a numbered listing with whatever
+    fields each entry carries (id/title/path).
+
+    Returns an empty string when neither argument is supplied.
+    """
+    if not documents_folder and not document_list:
+        return ""
+
+    lines = ["\n\n---\n\n## SOURCES PROVIDED\n"]
+    if documents_folder:
+        lines.append(
+            f"The source documents are in the folder:\n\n"
+            f"    {documents_folder}\n\n"
+            "Enumerate the files inside, map them to ``Documents`` rows "
+            "(one ``D.XX`` id each) and cite them in the ``DOCUMENT_N`` "
+            "columns of ``Claims`` rows.\n"
+        )
+
+    if document_list:
+        lines.append("\nPre-catalogued documents (use these IDs verbatim):\n")
+        for i, item in enumerate(document_list, 1):
+            if isinstance(item, dict):
+                parts = []
+                for key in ("id", "title", "path"):
+                    val = item.get(key)
+                    if val:
+                        parts.append(f"{key}={val}")
+                lines.append(f"  {i}. " + " | ".join(parts))
+            else:
+                lines.append(f"  {i}. {item}")
+        lines.append("")
+    return "\n".join(lines)
