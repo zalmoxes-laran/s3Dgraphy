@@ -99,24 +99,72 @@ CHRONOLOGY_END_RULE = PropagationRule(
 # Author — stub ready for DP-51. Node/swimlane getters are inert for now.
 # ---------------------------------------------------------------------------
 
+def _first_connected_target(graph, node, edge_type, target_cls_name):
+    """Return the first node connected via ``edge_type`` whose class name
+    (or node_type) matches ``target_cls_name``, or None. Tolerates missing
+    get_connected_edges.
+    """
+    try:
+        edges = graph.get_connected_edges(node.node_id)
+    except Exception:
+        return None
+    for edge in edges:
+        if getattr(edge, "edge_type", None) != edge_type or edge.edge_source != node.node_id:
+            continue
+        target = graph.find_node_by_id(edge.edge_target)
+        if target is None:
+            continue
+        if target.__class__.__name__ == target_cls_name:
+            return target
+        # Accept subclasses (AuthorAINode inherits from AuthorNode)
+        for base in type(target).__mro__:
+            if base.__name__ == target_cls_name:
+                return target
+    return None
+
+
+def _format_author(author_node):
+    """Stable display string for an AuthorNode/AuthorAINode."""
+    if author_node is None:
+        return None
+    data = getattr(author_node, "data", {}) or {}
+    name = data.get("name")
+    surname = data.get("surname")
+    # Skip sentinel defaults (noname/nosurname) inherited from pre-existing code
+    if name and name != "noname" and surname and surname != "nosurname":
+        return f"{name} {surname}".strip()
+    if name and name != "noname":
+        return name
+    if surname and surname != "nosurname":
+        return surname
+    # Fallback to node display name
+    return getattr(author_node, "name", None)
+
+
 def _author_node_level(graph, node):
-    # Will be wired to has_author edges / AuthorNode when DP-51 lands in yEd.
-    # Until then, a node.attributes override is honored if present.
-    return node.attributes.get("author") if hasattr(node, "attributes") else None
+    """Follow a has_author edge from the node. Honors any node.attributes
+    override if importers already populated it (legacy).
+    """
+    if hasattr(node, "attributes") and node.attributes.get("author"):
+        return node.attributes["author"]
+    author = _first_connected_target(graph, node, "has_author", "AuthorNode")
+    return _format_author(author)
 
 
 def _author_swimlane_level(graph, epoch):
-    # Will read from the Swimlane Paradata Node Group (DP-19). For now, honor
-    # an explicit attribute if an importer already puts one there.
-    return getattr(epoch, "attributes", {}).get("author")
+    """Follow a has_author edge from the EpochNode (swimlane-level). DP-19
+    will emit these edges when a Swimlane Paradata Node Group contains an
+    AuthorNode.
+    """
+    attrs = getattr(epoch, "attributes", {}) or {}
+    if attrs.get("author"):
+        return attrs["author"]
+    author = _first_connected_target(graph, epoch, "has_author", "AuthorNode")
+    return _format_author(author)
 
 
 def _author_graph_level(graph):
-    """Canvas-header author from DP-40.
-
-    Composes ``author_name`` + ``author_surname`` when both are present,
-    otherwise returns whichever is available. ``None`` if neither is set.
-    """
+    """Canvas-header author from DP-40. Composes author_name+surname."""
     attrs = getattr(graph, "attributes", {}) or {}
     name = attrs.get("author_name")
     surname = attrs.get("author_surname")
@@ -135,8 +183,96 @@ AUTHOR_RULE = PropagationRule(
 
 
 # ---------------------------------------------------------------------------
+# License — node-level via has_license, graph-level legacy via canvas header
+# ---------------------------------------------------------------------------
+
+def _format_license(license_node):
+    if license_node is None:
+        return None
+    data = getattr(license_node, "data", {}) or {}
+    t = data.get("license_type")
+    url = data.get("url")
+    if t and url:
+        return f"{t} ({url})"
+    return t or url or getattr(license_node, "name", None)
+
+
+def _license_node_level(graph, node):
+    if hasattr(node, "attributes") and node.attributes.get("license"):
+        return node.attributes["license"]
+    return _format_license(_first_connected_target(graph, node, "has_license", "LicenseNode"))
+
+
+def _license_swimlane_level(graph, epoch):
+    attrs = getattr(epoch, "attributes", {}) or {}
+    if attrs.get("license"):
+        return attrs["license"]
+    return _format_license(_first_connected_target(graph, epoch, "has_license", "LicenseNode"))
+
+
+def _license_graph_level(graph):
+    attrs = getattr(graph, "attributes", {}) or {}
+    return attrs.get("license") or None
+
+
+LICENSE_RULE = PropagationRule(
+    id="license",
+    label="License",
+    node_getter=_license_node_level,
+    swimlane_getter=_license_swimlane_level,
+    graph_getter=_license_graph_level,
+)
+
+
+# ---------------------------------------------------------------------------
+# Embargo — node-level via has_embargo (can be direct or chained via license)
+# ---------------------------------------------------------------------------
+
+def _format_embargo(embargo_node):
+    if embargo_node is None:
+        return None
+    data = getattr(embargo_node, "data", {}) or {}
+    start = data.get("embargo_start") or getattr(embargo_node, "embargo_start", None)
+    end = data.get("embargo_end") or getattr(embargo_node, "embargo_end", None)
+    reason = data.get("reason") or getattr(embargo_node, "reason", "")
+    if start and end:
+        return f"{start}..{end}" + (f" ({reason})" if reason else "")
+    if start:
+        return f"from {start}" + (f" ({reason})" if reason else "")
+    return getattr(embargo_node, "name", None)
+
+
+def _embargo_node_level(graph, node):
+    if hasattr(node, "attributes") and node.attributes.get("embargo"):
+        return node.attributes["embargo"]
+    return _format_embargo(_first_connected_target(graph, node, "has_embargo", "EmbargoNode"))
+
+
+def _embargo_swimlane_level(graph, epoch):
+    attrs = getattr(epoch, "attributes", {}) or {}
+    if attrs.get("embargo"):
+        return attrs["embargo"]
+    return _format_embargo(_first_connected_target(graph, epoch, "has_embargo", "EmbargoNode"))
+
+
+def _embargo_graph_level(graph):
+    attrs = getattr(graph, "attributes", {}) or {}
+    return attrs.get("embargo") or None
+
+
+EMBARGO_RULE = PropagationRule(
+    id="embargo",
+    label="Embargo",
+    node_getter=_embargo_node_level,
+    swimlane_getter=_embargo_swimlane_level,
+    graph_getter=_embargo_graph_level,
+)
+
+
+# ---------------------------------------------------------------------------
 # Register on import
 # ---------------------------------------------------------------------------
 
-for _r in (CHRONOLOGY_START_RULE, CHRONOLOGY_END_RULE, AUTHOR_RULE):
+for _r in (CHRONOLOGY_START_RULE, CHRONOLOGY_END_RULE,
+           AUTHOR_RULE, LICENSE_RULE, EMBARGO_RULE):
     register_rule(_r)

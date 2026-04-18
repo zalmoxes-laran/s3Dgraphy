@@ -13,11 +13,49 @@ from ..nodes.property_node import PropertyNode
 from ..nodes.epoch_node import EpochNode
 from ..nodes.group_node import GroupNode, ParadataNodeGroup, ActivityNodeGroup, TimeBranchNodeGroup
 from ..nodes.link_node import *
+from ..nodes.author_node import AuthorNode, AuthorAINode
+from ..nodes.license_node import LicenseNode
+from ..nodes.embargo_node import EmbargoNode
 from ..edges.edge import Edge, EDGE_TYPES
 from ..edges import get_connections_datamodel
 from ..utils.utils import convert_shape2type, get_stratigraphic_node_class
 import re
 import uuid
+import os
+import json
+import hashlib
+
+# Yworks XML namespace (used when scanning y:ImageNode / y:Resource elements)
+_Y_NS = '{http://www.yworks.com/xml/graphml}'
+
+# --- Palette icon signature registry (DP-51 paradata image nodes) -----------
+# Load the palette icon hash → node_type mapping at import time. The config
+# file lives alongside the other JSON datamodels and can be extended without
+# touching Python code.
+
+def _load_palette_icons_config():
+    """Load em_palette_icons.json as a plain dict. Returns empty dicts if
+    the config is missing or unreadable, so importer behavior degrades to
+    the (weaker) label-prefix detection.
+    """
+    config_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "JSON_config",
+        "em_palette_icons.json",
+    )
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("icons", {}), data.get("label_prefixes", {})
+    except (OSError, json.JSONDecodeError):
+        return {}, {}
+
+
+_PALETTE_ICON_HASHES, _PALETTE_LABEL_PREFIXES = _load_palette_icons_config()
+
+# Inline description/URL marker used for explicit round-trip identification.
+# Example marker value: "_s3d_node_type:AuthorAINode"
+_S3D_NODE_TYPE_MARKER = "_s3d_node_type:"
 
 class GraphMLImporter:
     """
@@ -195,6 +233,11 @@ class GraphMLImporter:
 
         # Costruisci la mappa dinamica delle chiavi GraphML
         self.key_map = self.build_key_mapping(tree)
+
+        # Pre-load palette image resources (y:Resource id=N) into a
+        # local map refid → node_type for the paradata image detector.
+        # Only hashes known in em_palette_icons.json yield a type.
+        self._palette_refid_types = self._build_palette_refid_map(tree)
 
         # Prima estrai il codice del grafo
         graph_id, graph_code = self.extract_graph_id_and_code(tree)
@@ -825,7 +868,7 @@ class GraphMLImporter:
                 name="continuity_node",
                 description=nodedescription
             )
-            
+
             # Aggiungi attributi di tracciamento
             continuity_node.attributes['original_id'] = original_id
             continuity_node.attributes['graph_id'] = self.graph.graph_id
@@ -837,6 +880,21 @@ class GraphMLImporter:
 
             #print(f"Adding continuity node to graph: {continuity_node.node_id} (Original ID: {original_id})")
             self.graph.add_node(continuity_node)
+
+        elif self.EM_check_node_paradata_image(node_element):
+            # Paradata image nodes (AuthorNode / AuthorAINode / LicenseNode / EmbargoNode).
+            # Detection uses explicit marker → palette icon hash → label prefix.
+            detected_type, label_text, node_description, nodeurl = \
+                self.EM_extract_paradata_image_node(node_element)
+            self._create_paradata_image_node(
+                detected_type=detected_type,
+                uuid_id=uuid_id,
+                label_text=label_text,
+                node_description=node_description,
+                nodeurl=nodeurl,
+                original_id=original_id,
+                node_uri=node_uri,
+            )
 
         else:
             # Creazione di un nodo generico
@@ -1907,6 +1965,164 @@ class GraphMLImporter:
             nodedescription = ''
 
         return nodedescription, node_y_pos, node_id
+
+    # ------------------------------------------------------------------
+    # Paradata image nodes (AuthorNode / AuthorAINode / LicenseNode /
+    # EmbargoNode) — multi-signal detection
+    # ------------------------------------------------------------------
+
+    def _build_palette_refid_map(self, tree):
+        """Scan <y:Resource id="N"> blocks and return {refid: node_type}.
+
+        A resource matches a node type when its base64 payload has a SHA-256
+        prefix listed in em_palette_icons.json. Non-matching resources are
+        not in the returned map (so unknown refids fall back to label / type
+        detection in :meth:`_detect_paradata_image_type`).
+        """
+        refid_map = {}
+        if not _PALETTE_ICON_HASHES:
+            return refid_map
+        for resource in tree.iter(f'{_Y_NS}Resource'):
+            rid = resource.attrib.get('id')
+            payload = (resource.text or "")
+            if not payload:
+                continue
+            stripped = re.sub(r"\s+", "", payload)
+            if not stripped:
+                continue
+            digest = hashlib.sha256(stripped.encode("ascii", errors="ignore")).hexdigest()[:16]
+            match = _PALETTE_ICON_HASHES.get(digest)
+            if match:
+                refid_map[rid] = match.get("node_type")
+        return refid_map
+
+    def _detect_paradata_image_type(self, node_element):
+        """Return the paradata node_type for an ImageNode, or ``None``.
+
+        Signals, in order of strength:
+          1. Description / URL carries ``_s3d_node_type:<NodeType>`` marker
+             (explicit round-trip).
+          2. <y:ImageNode> <y:Image refid="N"/> and N is a known palette hash
+             (strong, robust to renames).
+          3. <y:ImageNode> + label starts with a known palette prefix
+             (weak fallback).
+        """
+        url_key = self.key_map.get('node', {}).get('url')
+        description_key = self.key_map.get('node', {}).get('description')
+
+        # Signal 1: explicit marker
+        for subnode in node_element.findall(
+                './/{http://graphml.graphdrawing.org/xmlns}data'):
+            if not subnode.text:
+                continue
+            key = subnode.attrib.get('key')
+            if key not in (url_key, description_key):
+                continue
+            idx = subnode.text.find(_S3D_NODE_TYPE_MARKER)
+            if idx >= 0:
+                tail = subnode.text[idx + len(_S3D_NODE_TYPE_MARKER):]
+                explicit = re.match(r"([A-Za-z_][A-Za-z0-9_]*)", tail)
+                if explicit:
+                    return explicit.group(1)
+
+        # Only ImageNodes can match signals 2 and 3.
+        image_nodes = node_element.findall(f'.//{_Y_NS}ImageNode')
+        if not image_nodes:
+            return None
+        image_node = image_nodes[0]
+
+        # Signal 2: icon hash
+        image_ref = image_node.find(f'.//{_Y_NS}Image')
+        if image_ref is not None:
+            refid = image_ref.attrib.get('refid')
+            if refid:
+                detected = getattr(self, '_palette_refid_types', {}).get(refid)
+                if detected:
+                    return detected
+
+        # Signal 3: label prefix fallback — order matters ("AI." must beat "A.")
+        label_elem = image_node.find(f'.//{_Y_NS}NodeLabel')
+        label_text = (label_elem.text or "").strip() if label_elem is not None else ""
+        # Check prefixes longest-first to avoid "A." matching "AI.*"
+        for prefix in sorted(_PALETTE_LABEL_PREFIXES.keys(), key=len, reverse=True):
+            if label_text.startswith(prefix):
+                return _PALETTE_LABEL_PREFIXES[prefix]
+
+        return None
+
+    def EM_check_node_paradata_image(self, node_element):
+        """True if this element is an Author/AuthorAI/License/Embargo node."""
+        return self._detect_paradata_image_type(node_element) is not None
+
+    def EM_extract_paradata_image_node(self, node_element):
+        """Extract (detected_type, label, description, url) for a paradata image node.
+
+        The caller is expected to have already confirmed the type via
+        :meth:`EM_check_node_paradata_image` (or, equivalently, by calling
+        :meth:`_detect_paradata_image_type` directly).
+        """
+        detected_type = self._detect_paradata_image_type(node_element)
+        url_key = self.key_map.get('node', {}).get('url')
+        description_key = self.key_map.get('node', {}).get('description')
+        nodegraphics_key = self.key_map.get('node', {}).get('nodegraphics')
+
+        label_text = ""
+        node_description = ""
+        nodeurl = ""
+
+        for subnode in node_element.findall(
+                './/{http://graphml.graphdrawing.org/xmlns}data'):
+            key = subnode.attrib.get('key')
+            if nodegraphics_key and key == nodegraphics_key:
+                label_elem = subnode.find(f'.//{_Y_NS}NodeLabel')
+                if label_elem is not None and label_elem.text:
+                    label_text = label_elem.text.strip()
+            elif url_key and key == url_key and subnode.text:
+                nodeurl = self._check_if_empty(subnode.text)
+            elif description_key and key == description_key and subnode.text:
+                node_description = self.clean_comments(
+                    self._check_if_empty(subnode.text)
+                )
+
+        return detected_type, label_text, node_description, nodeurl
+
+    def _create_paradata_image_node(self, detected_type, uuid_id, label_text,
+                                    node_description, nodeurl,
+                                    original_id, node_uri):
+        """Instantiate the correct node class for ``detected_type`` and add
+        it to the graph. Returns the created node (or ``None`` for unknown
+        types).
+        """
+        # Strip the short label prefix (e.g. "A. Giulia Rossi" → "Giulia Rossi")
+        clean_name = label_text
+        for prefix in sorted(_PALETTE_LABEL_PREFIXES.keys(), key=len, reverse=True):
+            if clean_name.startswith(prefix):
+                clean_name = clean_name[len(prefix):].strip()
+                break
+        if not clean_name:
+            clean_name = detected_type
+
+        if detected_type == "AuthorNode":
+            node = AuthorNode(node_id=uuid_id, name=clean_name,
+                              description=node_description)
+        elif detected_type == "AuthorAINode":
+            node = AuthorAINode(node_id=uuid_id, name=clean_name,
+                                description=node_description)
+        elif detected_type == "LicenseNode":
+            node = LicenseNode(node_id=uuid_id, name=clean_name,
+                               description=node_description, url=nodeurl)
+        elif detected_type == "EmbargoNode":
+            node = EmbargoNode(node_id=uuid_id, name=clean_name,
+                               description=node_description)
+        else:
+            return None
+
+        node.attributes['original_id'] = original_id
+        node.attributes['graph_id'] = self.graph.graph_id
+        if node_uri:
+            node.attributes['URI'] = node_uri
+        self.graph.add_node(node)
+        return node
 
     def enhance_edge_type(self, edge_type, source_node, target_node):
         """

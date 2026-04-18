@@ -369,7 +369,7 @@
     "has_author": {
       "name": "has_author",
       "label": "Has author",
-      "description": "Represents the connection of a node with its author.",
+      "description": "Represents the connection of a node with its author. Target can be an AuthorNode (human) or AuthorAINode (AI-assisted authoring). Source covers the full range of EM node types so that the resolver can walk from any scope level down to the author.",
       "reverse": {
         "name": "is_author_of",
         "label": "Is author of"
@@ -381,8 +381,8 @@
         "extension_name": "CRMdig"
       },
       "allowed_connections": {
-        "source": ["GraphNode", "StratigraphicNode", "ParadataNode", "GroupNode", "DocumentNode", "ExtractorNode", "CombinerNode", "PropertyNode"],
-        "target": ["AuthorNode"]
+        "source": ["GraphNode", "StratigraphicNode", "ParadataNode", "GroupNode", "DocumentNode", "ExtractorNode", "CombinerNode", "PropertyNode", "EpochNode"],
+        "target": ["AuthorNode", "AuthorAINode"]
       }
     },
     "has_geoposition": {
@@ -559,7 +559,7 @@
     "has_embargo": {
       "name": "has_embargo",
       "label": "Has embargo",
-      "description": "Indicates that a license has a temporal embargo associated.",
+      "description": "Indicates that an element is subject to a temporal embargo. Source can be any node (GraphNode for canvas-wide embargo, LicenseNode for license-scoped embargo, or any node for node-scoped embargo), mirroring has_license.",
       "reverse": {
         "name": "is_embargo_of",
         "label": "Is embargo of"
@@ -571,7 +571,7 @@
         "extension_name": null
       },
       "allowed_connections": {
-        "source": ["LicenseNode"],
+        "source": ["Node", "GraphNode", "LicenseNode"],
         "target": ["EmbargoNode"]
       }
     },
