@@ -631,12 +631,52 @@ class Graph:
         for t in _STRAT_TYPES:
             strat_nodes.extend(self.get_nodes_by_type(t))
 
+        # Pass 0: stratigraphic cycle detection. AI-extracted graphs can
+        # close loops (A is_after B is_after A); the TPQ/TAQ BFS handles
+        # them via a visited set but the user must be told. Each cycle is
+        # reported with per-node attribution so the right extractor can
+        # be audited.
+        self._warn_on_stratigraphic_cycles()
+
         # Pass 1: calculate base times (epoch + specific properties)
         for node in strat_nodes:
             self._calculate_base_chronology(node)
 
         # Pass 2: propagate TPQ/TAQ constraints
         self._propagate_tpq_taq(strat_nodes)
+
+    def _warn_on_stratigraphic_cycles(self):
+        """Detect cycles in the stratigraphic ``is_after`` / ``cuts`` /
+        ``overlies`` / ``fills`` partial order and emit a warning per
+        cycle, including per-node attribution (who claimed which end of
+        each offending relation).
+        """
+        from .diagnostics import detect_stratigraphic_cycles, format_attribution
+
+        cycles = detect_stratigraphic_cycles(self)
+        for cycle in cycles:
+            names = []
+            for nid in cycle:
+                n = self.find_node_by_id(nid)
+                label = getattr(n, "name", None) or nid
+                attr = ""
+                if n is not None:
+                    # Attribute by the start-date claim on this node
+                    # (end-date attribution would be symmetric; one side
+                    # is enough to point the user at the extractor).
+                    attr = format_attribution(self, n, "absolute_time_start")
+                names.append(f"{label}{attr}")
+            if len(cycle) == 1:
+                self.warnings.append(
+                    f"[stratigraphic cycle] self-loop on {names[0]}. "
+                    f"Physically impossible; review the extraction."
+                )
+            else:
+                chain = " → ".join(names) + f" → {names[0]}"
+                self.warnings.append(
+                    f"[stratigraphic cycle] {chain}. "
+                    f"Physically impossible; review the extractors involved."
+                )
 
     def _calculate_base_chronology(self, node):
         """
@@ -802,10 +842,14 @@ class Graph:
                 # but the user declared a strictly-smaller seed on this neighbor.
                 declared = explicit_start.get(neighbor_id)
                 if declared is not None and start_t > declared:
+                    from .diagnostics import format_attribution
+                    attr = format_attribution(self, neighbor, "absolute_time_start")
+                    neighbor_label = getattr(neighbor, "name", None) or neighbor_id
+                    node_label = getattr(node, "name", None) or node.node_id
                     self.warnings.append(
-                        f"[chronology paradox] node '{neighbor_id}' declares "
-                        f"absolute_time_start={declared} but is stratigraphically "
-                        f"more recent than '{node.node_id}' whose start_time={start_t}. "
+                        f"[chronology paradox] node '{neighbor_label}' declares "
+                        f"absolute_time_start={declared}{attr} but is stratigraphically "
+                        f"more recent than '{node_label}' whose start_time={start_t}. "
                         f"Keeping declared value; TPQ propagation is stopped at this node."
                     )
                     # Hard policy: do not overwrite, do not traverse further.
@@ -842,10 +886,14 @@ class Graph:
                 # but the user declared a strictly-larger seed on this neighbor.
                 declared = explicit_end.get(neighbor_id)
                 if declared is not None and end_t < declared:
+                    from .diagnostics import format_attribution
+                    attr = format_attribution(self, neighbor, "absolute_time_end")
+                    neighbor_label = getattr(neighbor, "name", None) or neighbor_id
+                    node_label = getattr(node, "name", None) or node.node_id
                     self.warnings.append(
-                        f"[chronology paradox] node '{neighbor_id}' declares "
-                        f"absolute_time_end={declared} but is stratigraphically "
-                        f"more ancient than '{node.node_id}' whose end_time={end_t}. "
+                        f"[chronology paradox] node '{neighbor_label}' declares "
+                        f"absolute_time_end={declared}{attr} but is stratigraphically "
+                        f"more ancient than '{node_label}' whose end_time={end_t}. "
                         f"Keeping declared value; TAQ propagation is stopped at this node."
                     )
                     # Hard policy: do not overwrite, do not traverse further.

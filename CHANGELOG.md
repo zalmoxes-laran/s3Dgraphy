@@ -9,6 +9,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Unified xlsx pipeline** (Phase B — DP-02 / DP-49). Single-file
+  replacement for the legacy ``stratigraphy.xlsx`` + ``em_paradata.xlsx``
+  two-step flow:
+  - New template ``s3dgraphy/templates/em_data_template.xlsx`` with
+    5 typed sheets: ``Units`` (skeleton), ``Epochs`` (swimlanes),
+    ``Claims`` (long-table, one row per asserted fact), ``Authors``
+    (normalized catalog with a ``KIND`` column distinguishing human
+    authors from AI extractors), ``Documents`` (normalized catalog).
+  - New importer ``s3dgraphy.importer.unified_xlsx_importer.UnifiedXLSXImporter``
+    builds a complete graph from one xlsx in a single pass: author /
+    document catalogs, epochs, stratigraphic units, and all claim
+    rows (scalar qualia, temporal qualia, epoch membership via
+    ``belongs_to_epoch``, and stratigraphic relations via
+    ``is_after`` / ``overlies`` / ``cuts`` / ``fills`` / ``abuts`` /
+    ``bonded_to`` / ``equals``). Each claim row carries its own
+    attribution triple(s): ``EXTRACTOR_i`` / ``DOCUMENT_i`` /
+    ``AUTHOR_i`` / ``AUTHOR_KIND_i``. Relational claims store the
+    attribution on the edge's ``attributes`` dict; PropertyNode
+    claims use the standard paradata chain.
+  - Multi-source (Combiner) rows: when both
+    ``EXTRACTOR_1`` / ``EXTRACTOR_2`` and ``COMBINER_REASONING`` are
+    populated, a ``CombinerNode`` is inserted between the
+    ``PropertyNode`` and the two ``ExtractorNode`` instances.
+  - 6 synthetic test scenarios in ``test_unified_xlsx_importer.py``
+    (catalog creation, relation attribution, SL_PD chronology
+    override, author vs AI-extractor attribution, combiner structure,
+    A.1 compaction invariance on xlsx-sourced graphs).
+- **Diagnostics attribution now follows the ``has_data_provenance``
+  chain** (xlsx pipeline). Previously ``attribute_property_node``
+  walked only the ``is_in_paradata_nodegroup`` sibling-extractor
+  path, which works for yEd-sourced graphs but misses the xlsx
+  in-memory pattern (``PN → has_data_provenance → Extractor →
+  has_author``, or through a ``CombinerNode``). The walk order is now:
+  direct ``has_author`` → provenance chain (extractor / combiner) →
+  paradata-group siblings. Unifies attribution coverage across import
+  sources.
+- **Chronology diagnostics with claim attribution** (DP-02 / DP-32
+  Phase A.2). New module ``s3dgraphy.diagnostics`` providing:
+  - ``attribute_property_node(graph, pn)`` and
+    ``attribute_temporal_claim(graph, strat_node, temporal_type)`` —
+    walk the paradata chain to find who made a specific claim. Resolution
+    order: direct ``has_author`` on the PropertyNode → sibling
+    ``ExtractorNode`` in the containing ParadataNodeGroup →
+    ``has_author`` on that extractor. Returns ``(display_text, kind,
+    author_uuid)`` where ``kind`` is ``"author"`` (transcribed from the
+    PDF author; the claim is in the source) or ``"extractor"`` (derived
+    by an AI tool like StratiMiner; the claim is new).
+  - ``detect_stratigraphic_cycles(graph)`` — Tarjan SCC over the
+    ``is_after`` / ``cuts`` / ``overlies`` / ``fills`` / ``is_before``
+    edges, returning every loop (and self-loop) in the stratigraphic
+    order. AI extractors occasionally close these loops; the BFS in
+    ``_propagate_tpq_taq`` already survives them via a visited set but
+    the user must be notified.
+- **Paradox warnings now carry attribution**. The ``[chronology
+  paradox]`` messages emitted by ``_propagate_tpq_taq`` include a
+  trailing ``[attributed to <name> (<kind>)]`` suffix when the
+  offending PropertyNode can be traced to an author or an extractor.
+  This lets the user decide whether to audit the original document
+  author or the AI extractor that produced the bad inference.
+- **Stratigraphic cycle warnings emitted automatically**.
+  ``Graph.calculate_chronology()`` now runs a cycle-detection pass
+  before TPQ/TAQ propagation and appends one
+  ``[stratigraphic cycle]`` warning per loop, with per-node
+  attribution so the user can pinpoint the right extractor. Tests:
+  9 scenarios in ``test_diagnostics.py`` covering human/AI
+  attribution, sibling-extractor resolution, missing attribution,
+  2- and 3-node cycles, linear chain (no false positives), end-to-end
+  paradox warning with attribution.
+
 - **Reverse-propagation compaction** (DP-32 / DP-49 Phase A.1). New module
   ``s3dgraphy.transforms.compact`` exposing three functions for pre-export
   metadata formalization:
