@@ -51,12 +51,30 @@ class PropagationRule:
 # Core resolve() API
 # ---------------------------------------------------------------------------
 
+def _is_epoch_node(node):
+    """Duck-typed EpochNode check that avoids a hard import cycle."""
+    for base in type(node).__mro__:
+        if base.__name__ == "EpochNode":
+            return True
+    return False
+
+
 def _iter_connected_epochs(graph, node):
     """All EpochNodes a node belongs to (has_first_epoch + survive_in_epoch).
+
+    When ``node`` is itself an EpochNode, it acts as its own swimlane: the
+    result is ``[node]``. This lets callers resolve swimlane-level properties
+    (chronology, author, license, embargo) directly on an EpochNode without
+    a dedicated ``EpochNode`` code path in every consumer. A stratigraphic
+    unit that walks ``has_first_epoch`` / ``survive_in_epoch`` behaves
+    identically to before.
 
     Returns an empty list if the graph has no such edges or the node has no
     epoch associations.
     """
+    if _is_epoch_node(node):
+        return [node]
+
     epochs: List[Any] = []
     for edge_type in ("has_first_epoch", "survive_in_epoch"):
         try:
