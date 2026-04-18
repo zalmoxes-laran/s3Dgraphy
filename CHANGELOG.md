@@ -25,6 +25,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **GraphMerger extended for the paradata layer** (Phase B — xlsx ↔
+  graphml merge). The existing ``s3dgraphy.merge.graph_merger.GraphMerger``
+  now covers every node/edge class produced by the unified xlsx
+  pipeline, not just stratigraphic units. New conflict types:
+  - ``qualia_added``, ``qualia_changed``,
+    ``qualia_attribution_added`` — PropertyNode claims (matched per
+    ``(unit_name, property_type)``).
+  - ``author_added`` / ``author_changed`` and ``document_added`` /
+    ``document_changed`` — catalog entries matched by short code
+    (``A.01``, ``D.01``). ``AuthorAINode`` vs ``AuthorNode`` kind drift
+    is flagged but not auto-applied.
+  - ``epoch_added`` / ``epoch_changed`` — Epoch matched by name;
+    differences in ``start_time`` / ``end_time`` / color are each
+    reported as a dedicated conflict with a ``subfield`` hint in
+    ``Conflict.extra``.
+  - ``edge_attribution_added`` / ``edge_attribution_changed`` — diffs
+    on the ``edge.attributes`` dict (``authored_by_N``,
+    ``authored_kind_N``, ``document_N``) of relation edges; lets the
+    merger propagate per-claim relation attribution from an incoming
+    xlsx into an existing graphml.
+  - ``Conflict.extra: Dict[str, Any]`` — new field on the dataclass
+    (default empty) that carries per-conflict payload (property type,
+    target endpoint, attribute key, subfield, …). Backward-compatible
+    for existing callers.
+  - ``apply_resolutions`` handles all new types: qualia changes copy
+    the full PropertyNode subtree (PN + provenance chain) from the
+    incoming graph, with catalog nodes (Author / Document) reused
+    from the host to avoid duplication. Catalog/epoch add-and-change
+    apply directly; edge attribution writes to ``edge.attributes``.
+  - Locked in by 8 synthetic scenarios (``test_graph_merger.py``)
+    plus a real-data smoke test on the Templu Mare graphml
+    (export → modify → re-import → merge) covering author rename,
+    author addition, and new qualia row.
+- **Unified xlsx writer** (Phase B — complete round-trip). New module
+  ``s3dgraphy.exporter.unified_xlsx_exporter`` exporting a full graph
+  back to an ``em_data.xlsx`` with the 5-sheet schema. It is the
+  inverse of :class:`UnifiedXLSXImporter`: walks the in-memory graph
+  and emits Units / Epochs / Authors / Documents catalogs plus a
+  long-table Claims sheet that reconstructs the paradata chain
+  (``PropertyNode → has_data_provenance → Extractor / Combiner →
+  has_author``) as ``(EXTRACTOR_i, DOCUMENT_i, AUTHOR_i,
+  AUTHOR_KIND_i)`` triples. Combiner rows get 2 triples plus
+  ``COMBINER_REASONING``; stratigraphic relations read their
+  attribution from the edge's ``attributes`` dict. Only the
+  canonical direction of each relation pair is emitted (``overlies``
+  but not ``is_overlain_by``) — the inverse is recovered at
+  re-import. Disambiguates duplicate unit names with a short uuid
+  suffix and logs a warning so round-trip fidelity is preserved even
+  on legacy graphs with data-quality issues. Legacy GraphML sources
+  whose PropertyNodes all carry the sentinel ``property_type =
+  "string"`` are normalized: the actual qualia type comes from
+  ``PN.name`` and the value from ``PN.description`` when
+  ``PN.value`` is empty. Locked in by 4 round-trip scenarios in
+  ``test_unified_xlsx_roundtrip.py`` covering the resolver
+  fingerprint invariance, Combiner preservation, relation
+  attribution preservation, and a real-data smoke test on the Great
+  Temple graphml (102 units → export → re-import → 102 units).
 - **Unified xlsx pipeline** (Phase B — DP-02 / DP-49). Single-file
   replacement for the legacy ``stratigraphy.xlsx`` + ``em_paradata.xlsx``
   two-step flow:
