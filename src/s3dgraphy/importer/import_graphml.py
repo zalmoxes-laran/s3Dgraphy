@@ -239,6 +239,11 @@ class GraphMLImporter:
         # Only hashes known in em_palette_icons.json yield a type.
         self._palette_refid_types = self._build_palette_refid_map(tree)
 
+        # Build the XML-level parent map (original_id → parent original_id)
+        # so the post-import auto-edge inference can find the containing
+        # node of every paradata image node.
+        self._original_parent_of = self._build_original_parent_map(tree)
+
         # Prima estrai il codice del grafo
         graph_id, graph_code = self.extract_graph_id_and_code(tree)
         
@@ -269,6 +274,13 @@ class GraphMLImporter:
         if stats["connections_created"] > 0:
             pass
             # print(f"\nCreati {stats['connections_created']} nuovi collegamenti diretti tra unità stratigrafiche e PropertyNode")
+
+        # Infer has_author / has_license / has_embargo edges from paradata
+        # image nodes living inside a ParadataNodeGroup (DP-19 / DP-43
+        # auto-connect). Source is the first non-ParadataNodeGroup ancestor
+        # present in the graph; canvas-level groups are skipped because
+        # graph.attributes already carries author/license/embargo via DP-40.
+        self._infer_paradata_image_edges()
 
 
         self.connect_nodes_to_epochs()
@@ -2085,6 +2097,126 @@ class GraphMLImporter:
                 )
 
         return detected_type, label_text, node_description, nodeurl
+
+    def _build_original_parent_map(self, tree):
+        """Return ``{original_id: parent_original_id}`` built from the XML
+        tree. Used by the post-import auto-edge inference to find the
+        containing node of each paradata image node.
+        """
+        parent_of = {}
+        graphml_ns = '{http://graphml.graphdrawing.org/xmlns}'
+        node_tag = f'{graphml_ns}node'
+
+        def walk(elem, current_parent):
+            new_parent = current_parent
+            if elem.tag == node_tag:
+                nid = elem.attrib.get('id')
+                if nid is not None:
+                    if current_parent is not None:
+                        parent_of[nid] = current_parent
+                    new_parent = nid
+            for child in elem:
+                walk(child, new_parent)
+
+        walk(tree.getroot(), None)
+        return parent_of
+
+    def _infer_paradata_image_edges(self):
+        """Emit has_author / has_license / has_embargo edges for paradata
+        image nodes that live inside a ParadataNodeGroup.
+
+        Rule: the edge source is the nearest ancestor (walking the XML
+        parent chain) that is already present in the graph as a
+        non-ParadataNodeGroup node. If the first graph-visible ancestor is
+        a ParadataNodeGroup, keep walking up. This way:
+
+        - SL_PD inside a swimlane (EpochNode) → edges from that EpochNode
+        - USV104_PD (DP-43 node-level group) inside a stratigraphic unit →
+          edges from that stratigraphic unit
+        - Canvas-level SL_PD whose parent is not a graph node → skipped
+          (covered by graph.attributes via DP-40 canvas header).
+
+        Duplicate edges (same source/target/type already present) are
+        silently skipped.
+        """
+        if not getattr(self, '_original_parent_of', None):
+            return
+
+        # Map uuid → node for quick lookup
+        nodes_by_uuid = {n.node_id: n for n in self.graph.nodes}
+        # Reverse id_mapping: uuid → original_id (node may have multiple? no: 1→1)
+        original_by_uuid = {v: k for k, v in self.id_mapping.items()}
+
+        # Type -> edge type
+        edge_type_by_target_cls = {
+            "AuthorNode": "has_author",
+            "AuthorAINode": "has_author",
+            "LicenseNode": "has_license",
+            "EmbargoNode": "has_embargo",
+        }
+
+        # Pre-compute the existing edges to skip duplicates
+        existing = {
+            (e.edge_source, e.edge_target, e.edge_type) for e in self.graph.edges
+        }
+
+        created = 0
+        for node in list(self.graph.nodes):
+            cls_name = node.__class__.__name__
+            edge_type = edge_type_by_target_cls.get(cls_name)
+            if not edge_type:
+                continue
+
+            target_uuid = node.node_id
+            target_original = original_by_uuid.get(target_uuid)
+            if target_original is None:
+                continue
+
+            # Walk up the XML parent chain looking for the first ancestor
+            # that is in the graph AND is not a ParadataNodeGroup.
+            ancestor_original = self._original_parent_of.get(target_original)
+            source_uuid = None
+            while ancestor_original is not None:
+                candidate_uuid = self.id_mapping.get(ancestor_original)
+                if candidate_uuid is not None:
+                    candidate_node = nodes_by_uuid.get(candidate_uuid)
+                    if candidate_node is not None:
+                        if candidate_node.__class__.__name__ != "ParadataNodeGroup":
+                            source_uuid = candidate_uuid
+                            break
+                        # Else: ParadataNodeGroup is transparent, continue walking up
+                ancestor_original = self._original_parent_of.get(ancestor_original)
+
+            if source_uuid is None:
+                # No graph-visible ancestor (likely canvas-level): skip.
+                continue
+
+            key = (source_uuid, target_uuid, edge_type)
+            if key in existing:
+                continue
+
+            try:
+                self.graph.add_edge(
+                    edge_id=f"{source_uuid}_{edge_type}_{target_uuid}",
+                    edge_source=source_uuid,
+                    edge_target=target_uuid,
+                    edge_type=edge_type,
+                )
+                existing.add(key)
+                created += 1
+            except Exception as exc:
+                # Validation can reject if connection rules forbid it; log
+                # to warnings rather than crash.
+                self.graph.add_warning(
+                    f"[paradata auto-edge] Could not create "
+                    f"{edge_type} from {source_uuid[:8]} to {target_uuid[:8]}: {exc}"
+                )
+
+        if created:
+            self.graph.add_warning(
+                f"[paradata auto-edge] Inferred {created} has_author / "
+                f"has_license / has_embargo edges from paradata groups."
+            )
 
     def _create_paradata_image_node(self, detected_type, uuid_id, label_text,
                                     node_description, nodeurl,
