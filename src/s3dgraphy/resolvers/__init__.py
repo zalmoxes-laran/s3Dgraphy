@@ -11,7 +11,7 @@ property at each level. Resolving a property walks the levels in order and
 returns the first non-null value.
 
 Built-in rules live in :mod:`s3dgraphy.resolvers.builtin_rules` and cover
-chronology (``chronology_start``, ``chronology_end``) and authorship
+chronology (``absolute_time_start``, ``absolute_time_end``) and authorship
 (``author``). Consumers can register their own rules via
 :func:`register_rule`.
 """

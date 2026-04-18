@@ -1,7 +1,7 @@
 # s3dgraphy/resolvers/builtin_rules.py
 """Built-in PropagationRules registered at import time.
 
-- ``chronology_start`` / ``chronology_end``: feed Layer B (TPQ/TAQ closure)
+- ``absolute_time_start`` / ``absolute_time_end``: feed Layer B (TPQ/TAQ closure)
   and reproduce the behavior of the previous hardcoded
   ``Graph._calculate_base_chronology``.
 - ``author``: declaration of the authorship property. Node-level and
@@ -58,12 +58,12 @@ def _node_temporal_property(graph, node, property_type):
     return None
 
 
-def _chronology_start_node(graph, node):
-    return _node_temporal_property(graph, node, "absolute_start_date")
+def _absolute_time_start_node(graph, node):
+    return _node_temporal_property(graph, node, "absolute_time_start")
 
 
-def _chronology_end_node(graph, node):
-    return _node_temporal_property(graph, node, "absolute_end_date")
+def _absolute_time_end_node(graph, node):
+    return _node_temporal_property(graph, node, "absolute_time_end")
 
 
 def _epoch_start(graph, epoch):
@@ -77,9 +77,9 @@ def _epoch_end(graph, epoch):
 
 
 CHRONOLOGY_START_RULE = PropagationRule(
-    id="chronology_start",
+    id="absolute_time_start",
     label="Chronology — start",
-    node_getter=_chronology_start_node,
+    node_getter=_absolute_time_start_node,
     swimlane_getter=_epoch_start,
     swimlane_aggregate=min,   # earliest start across all connected epochs
     # No graph-level default for chronology today.
@@ -87,9 +87,9 @@ CHRONOLOGY_START_RULE = PropagationRule(
 
 
 CHRONOLOGY_END_RULE = PropagationRule(
-    id="chronology_end",
+    id="absolute_time_end",
     label="Chronology — end",
-    node_getter=_chronology_end_node,
+    node_getter=_absolute_time_end_node,
     swimlane_getter=_epoch_end,
     swimlane_aggregate=max,   # latest end across all connected epochs
 )

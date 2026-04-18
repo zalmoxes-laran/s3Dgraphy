@@ -1,29 +1,6 @@
 {
-  "s3Dgraphy_palette_icons_version": "1.5.5",
-  "description": "Stable SHA-256[:16] hashes of the PNG/SVG images bundled with the s3Dgraphy yEd palette, indexed by the node type they represent. The hash is computed on the y:Resource payload after stripping all whitespace. Entries are used by the GraphML importer as the primary (strong) signal to identify image-based paradata nodes (AuthorNode, AuthorAINode, LicenseNode, EmbargoNode, ...). Fallbacks: yEd node type + label prefix; explicit _s3d_node_type marker in the node description.",
-  "_hash_note": "Hashes are SHA-256[:16] of the y:Resource payload AFTER XML entity decoding (as performed by ElementTree) and whitespace stripping. ASCII-only bytes are hashed (encode with errors='ignore').",
-  "icons": {
-    "c7ad497cfe418537": {
-      "node_type": "AuthorAINode",
-      "palette_label": "AI.",
-      "notes": "Author AI icon — Templu Mare palette, April 2026."
-    },
-    "cbee5ca1a5c22485": {
-      "node_type": "AuthorNode",
-      "palette_label": "A.",
-      "notes": "Author (human) icon — Templu Mare palette, April 2026."
-    },
-    "a25b9763cc19dcd5": {
-      "node_type": "LicenseNode",
-      "palette_label": "LI.",
-      "notes": "License icon — Templu Mare palette, April 2026."
-    },
-    "fff7e92b0886c0f9": {
-      "node_type": "EmbargoNode",
-      "palette_label": "EB.",
-      "notes": "Embargo icon — Templu Mare palette, April 2026."
-    }
-  },
+  "s3Dgraphy_palette_prefixes_version": "1.5.6",
+  "description": "Label-prefix registry for paradata image nodes (AuthorNode, AuthorAINode, LicenseNode, EmbargoNode). The primary detection signal in the GraphML importer is the label prefix of a <y:ImageNode> (longest-first to avoid 'AI.' being shadowed by 'A.'). Explicit '_s3d_node_type:<NodeType>' marker in the node description/URL overrides everything and is used by the exporter for round-trip stability. Hash-based detection has been removed because palette icons may be redrawn / reshipped between versions; the label convention is instead stable across the EM ecosystem and matches how ExtractorNode (D.) and CombinerNode (C.) are identified.",
   "label_prefixes": {
     "AI.": "AuthorAINode",
     "A.":  "AuthorNode",
@@ -32,7 +9,6 @@
   },
   "detection_order": [
     "description_marker",
-    "icon_hash",
     "label_prefix"
   ]
 }

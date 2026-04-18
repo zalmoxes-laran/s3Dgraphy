@@ -619,7 +619,7 @@ class Graph:
 
         Protocol (hierarchy: specific > local > general):
         1. Assign base times from epoch associations (has_first_epoch, survive_in_epoch)
-        2. Override with specific property values (absolute_start_date, absolute_end_date)
+        2. Override with specific property values (absolute_time_start, absolute_time_end)
         3. Propagate TPQ/TAQ constraints through stratigraphic relations
 
         Args:
@@ -643,18 +643,18 @@ class Graph:
         Calculate base chronological times for a node from epochs and properties.
 
         Delegates to the generic 3-level resolver (DP-32 Layer A) via the
-        ``chronology_start`` / ``chronology_end`` PropagationRules. The
+        ``absolute_time_start`` / ``absolute_time_end`` PropagationRules. The
         resolution order is identical to the previous hardcoded logic:
 
-            1. Node-level PropertyNode (absolute_start_date / absolute_end_date)
+            1. Node-level PropertyNode (absolute_time_start / absolute_time_end)
             2. Swimlane-level EpochNode attributes (min of start_time,
                max of end_time across has_first_epoch + survive_in_epoch)
             3. Graph-level (currently no chronology default; rule returns None)
         """
         from .resolvers import resolve, get_rule
 
-        start_time = resolve(self, node, get_rule("chronology_start"))
-        end_time = resolve(self, node, get_rule("chronology_end"))
+        start_time = resolve(self, node, get_rule("absolute_time_start"))
+        end_time = resolve(self, node, get_rule("absolute_time_end"))
 
         self._set_calculated_times(node, start_time, end_time)
 
@@ -671,7 +671,7 @@ class Graph:
 
         Args:
             node: The stratigraphic node to search from.
-            property_type: The property type to find (e.g. "absolute_start_date").
+            property_type: The property type to find (e.g. "absolute_time_start").
 
         Returns:
             PropertyNode or None (with value guaranteed set if found)
@@ -703,7 +703,7 @@ class Graph:
         Example::
 
             author = graph.get_property(node, "author")
-            start  = graph.get_property(node, "chronology_start")
+            start  = graph.get_property(node, "absolute_time_start")
 
         Args:
             node: The node to resolve the property for.
@@ -743,7 +743,7 @@ class Graph:
 
         Paradox policy (Hard):
             If a node carries an explicit user-declared seed (a PropertyNode
-            absolute_start_date / absolute_end_date) and the incoming
+            absolute_time_start / absolute_time_end) and the incoming
             stratigraphic constraint would modify that declared value, the
             propagation is *blocked* at that node: the declared seed is kept,
             a warning is appended to ``self.warnings``, and BFS does not
@@ -754,8 +754,8 @@ class Graph:
         # Values that came from swimlane/graph fallback are derived and freely
         # overwritable by Layer B tightening.
         from .resolvers import get_rule
-        start_rule = get_rule("chronology_start")
-        end_rule = get_rule("chronology_end")
+        start_rule = get_rule("absolute_time_start")
+        end_rule = get_rule("absolute_time_end")
 
         explicit_start = {}  # node_id -> float declared at node level
         explicit_end = {}
@@ -804,7 +804,7 @@ class Graph:
                 if declared is not None and start_t > declared:
                     self.warnings.append(
                         f"[chronology paradox] node '{neighbor_id}' declares "
-                        f"absolute_start_date={declared} but is stratigraphically "
+                        f"absolute_time_start={declared} but is stratigraphically "
                         f"more recent than '{node.node_id}' whose start_time={start_t}. "
                         f"Keeping declared value; TPQ propagation is stopped at this node."
                     )
@@ -844,7 +844,7 @@ class Graph:
                 if declared is not None and end_t < declared:
                     self.warnings.append(
                         f"[chronology paradox] node '{neighbor_id}' declares "
-                        f"absolute_end_date={declared} but is stratigraphically "
+                        f"absolute_time_end={declared} but is stratigraphically "
                         f"more ancient than '{node.node_id}' whose end_time={end_t}. "
                         f"Keeping declared value; TAQ propagation is stopped at this node."
                     )

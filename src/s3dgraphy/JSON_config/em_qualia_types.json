@@ -281,8 +281,8 @@
             "description": "Temporal characteristics and dating",
             "qualia": [
               {
-                "id": "absolute_start_date",
-                "name": "Absolute Start Date",
+                "id": "absolute_time_start",
+                "name": "Absolute Time — Start",
                 "mappings": {
                   "getty_aat": "300404284",
                   "cidoc_crm": "E52_Time-Span"
@@ -291,8 +291,8 @@
                 "format": "YYYY-MM-DD"
               },
               {
-                "id": "absolute_end_date",
-                "name": "Absolute End Date",
+                "id": "absolute_time_end",
+                "name": "Absolute Time — End",
                 "mappings": {
                   "getty_aat": "300404284",
                   "cidoc_crm": "E52_Time-Span"

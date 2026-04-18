@@ -23,20 +23,22 @@ import re
 import uuid
 import os
 import json
-import hashlib
 
-# Yworks XML namespace (used when scanning y:ImageNode / y:Resource elements)
+# Yworks XML namespace (used when scanning y:ImageNode elements)
 _Y_NS = '{http://www.yworks.com/xml/graphml}'
 
-# --- Palette icon signature registry (DP-51 paradata image nodes) -----------
-# Load the palette icon hash → node_type mapping at import time. The config
-# file lives alongside the other JSON datamodels and can be extended without
-# touching Python code.
+# --- Paradata image node prefix registry (DP-51) ----------------------------
+# Hash-based detection was dropped: palette PNGs may be redrawn or
+# re-exported between versions. Label prefixes are instead the stable
+# convention across the EM ecosystem (matches how ExtractorNode ``D.`` and
+# CombinerNode ``C.`` are already identified).
 
-def _load_palette_icons_config():
-    """Load em_palette_icons.json as a plain dict. Returns empty dicts if
-    the config is missing or unreadable, so importer behavior degrades to
-    the (weaker) label-prefix detection.
+def _load_palette_prefix_config():
+    """Return the label_prefix → node_type map from em_palette_icons.json.
+
+    Returns an empty dict if the config is missing or unreadable, in which
+    case paradata image detection falls back to the explicit description
+    marker only.
     """
     config_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -46,15 +48,16 @@ def _load_palette_icons_config():
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return data.get("icons", {}), data.get("label_prefixes", {})
+        return data.get("label_prefixes", {})
     except (OSError, json.JSONDecodeError):
-        return {}, {}
+        return {}
 
 
-_PALETTE_ICON_HASHES, _PALETTE_LABEL_PREFIXES = _load_palette_icons_config()
+_PALETTE_LABEL_PREFIXES = _load_palette_prefix_config()
 
 # Inline description/URL marker used for explicit round-trip identification.
-# Example marker value: "_s3d_node_type:AuthorAINode"
+# Written by the s3Dgraphy GraphML exporter when it emits paradata image
+# nodes; takes precedence over label-prefix detection on the import side.
 _S3D_NODE_TYPE_MARKER = "_s3d_node_type:"
 
 class GraphMLImporter:
@@ -233,11 +236,6 @@ class GraphMLImporter:
 
         # Costruisci la mappa dinamica delle chiavi GraphML
         self.key_map = self.build_key_mapping(tree)
-
-        # Pre-load palette image resources (y:Resource id=N) into a
-        # local map refid → node_type for the paradata image detector.
-        # Only hashes known in em_palette_icons.json yield a type.
-        self._palette_refid_types = self._build_palette_refid_map(tree)
 
         # Build the XML-level parent map (original_id → parent original_id)
         # so the post-import auto-edge inference can find the containing
@@ -1412,8 +1410,8 @@ class GraphMLImporter:
         """
         Dopo il parsing degli edge, copia i valori delle PropertyNode collegate
         ai master document nel loro dict 'data'.
-        Es: D.70 master connesso a PropertyNode 'absolute_start_date' con valore '1870'
-        -> document_node.data['absolute_start_date'] = '1870'
+        Es: D.70 master connesso a PropertyNode 'absolute_time_start' con valore '1870'
+        -> document_node.data['absolute_time_start'] = '1870'
         """
         master_count = 0
         enriched_count = 0
@@ -1429,7 +1427,7 @@ class GraphMLImporter:
                 if edge.edge_source == node.node_id:
                     target = self.graph.find_node_by_id(edge.edge_target)
                     if isinstance(target, PropertyNode):
-                        prop_name = target.name  # es: "absolute_start_date"
+                        prop_name = target.name  # es: "absolute_time_start"
                         prop_value = target.description  # es: "1870"
                         if prop_name and prop_value:
                             node.data[prop_name] = prop_value
@@ -1983,41 +1981,15 @@ class GraphMLImporter:
     # EmbargoNode) — multi-signal detection
     # ------------------------------------------------------------------
 
-    def _build_palette_refid_map(self, tree):
-        """Scan <y:Resource id="N"> blocks and return {refid: node_type}.
-
-        A resource matches a node type when its base64 payload has a SHA-256
-        prefix listed in em_palette_icons.json. Non-matching resources are
-        not in the returned map (so unknown refids fall back to label / type
-        detection in :meth:`_detect_paradata_image_type`).
-        """
-        refid_map = {}
-        if not _PALETTE_ICON_HASHES:
-            return refid_map
-        for resource in tree.iter(f'{_Y_NS}Resource'):
-            rid = resource.attrib.get('id')
-            payload = (resource.text or "")
-            if not payload:
-                continue
-            stripped = re.sub(r"\s+", "", payload)
-            if not stripped:
-                continue
-            digest = hashlib.sha256(stripped.encode("ascii", errors="ignore")).hexdigest()[:16]
-            match = _PALETTE_ICON_HASHES.get(digest)
-            if match:
-                refid_map[rid] = match.get("node_type")
-        return refid_map
-
     def _detect_paradata_image_type(self, node_element):
         """Return the paradata node_type for an ImageNode, or ``None``.
 
         Signals, in order of strength:
           1. Description / URL carries ``_s3d_node_type:<NodeType>`` marker
-             (explicit round-trip).
-          2. <y:ImageNode> <y:Image refid="N"/> and N is a known palette hash
-             (strong, robust to renames).
-          3. <y:ImageNode> + label starts with a known palette prefix
-             (weak fallback).
+             (explicit round-trip, written by the s3Dgraphy exporter).
+          2. ``<y:ImageNode>`` + label starts with a known prefix from
+             ``em_palette_icons.json`` (``AI.``, ``A.``, ``LI.``, ``EB.``).
+             Longest-first to avoid ``A.`` shadowing ``AI.``.
         """
         url_key = self.key_map.get('node', {}).get('url')
         description_key = self.key_map.get('node', {}).get('description')
@@ -2037,25 +2009,15 @@ class GraphMLImporter:
                 if explicit:
                     return explicit.group(1)
 
-        # Only ImageNodes can match signals 2 and 3.
+        # Signal 2: ImageNode + label prefix
         image_nodes = node_element.findall(f'.//{_Y_NS}ImageNode')
         if not image_nodes:
             return None
         image_node = image_nodes[0]
 
-        # Signal 2: icon hash
-        image_ref = image_node.find(f'.//{_Y_NS}Image')
-        if image_ref is not None:
-            refid = image_ref.attrib.get('refid')
-            if refid:
-                detected = getattr(self, '_palette_refid_types', {}).get(refid)
-                if detected:
-                    return detected
-
-        # Signal 3: label prefix fallback — order matters ("AI." must beat "A.")
         label_elem = image_node.find(f'.//{_Y_NS}NodeLabel')
         label_text = (label_elem.text or "").strip() if label_elem is not None else ""
-        # Check prefixes longest-first to avoid "A." matching "AI.*"
+        # Longest prefix first so "AI." wins over "A."
         for prefix in sorted(_PALETTE_LABEL_PREFIXES.keys(), key=len, reverse=True):
             if label_text.startswith(prefix):
                 return _PALETTE_LABEL_PREFIXES[prefix]
@@ -2122,40 +2084,71 @@ class GraphMLImporter:
         return parent_of
 
     def _infer_paradata_image_edges(self):
-        """Emit has_author / has_license / has_embargo edges for paradata
-        image nodes that live inside a ParadataNodeGroup.
+        """Emit has_author / has_license / has_embargo / has_property edges
+        for paradata nodes that live inside a **free** ParadataNodeGroup.
 
-        Rule: the edge source is the nearest ancestor (walking the XML
-        parent chain) that is already present in the graph as a
-        non-ParadataNodeGroup node. If the first graph-visible ancestor is
-        a ParadataNodeGroup, keep walking up. This way:
+        Two kinds of ParadataNodeGroup coexist in an EM graph:
 
-        - SL_PD inside a swimlane (EpochNode) → edges from that EpochNode
-        - USV104_PD (DP-43 node-level group) inside a stratigraphic unit →
-          edges from that stratigraphic unit
-        - Canvas-level SL_PD whose parent is not a graph node → skipped
-          (covered by graph.attributes via DP-40 canvas header).
+        1. **Claimed** (node-level, DP-43 pattern). The group is attached to
+           a specific stratigraphic unit / document via an explicit
+           ``has_paradata_nodegroup`` edge drawn by the author in yEd.
+           The existing ``Graph.connect_paradatagroup_propertynode_to_stratigraphic``
+           already wires PropertyNodes in these groups to the claimer. We
+           **skip** these groups here to avoid double-wiring.
 
-        Duplicate edges (same source/target/type already present) are
-        silently skipped.
+        2. **Free** (swimlane- or canvas-level, DP-19 pattern). The group
+           has NO incoming ``has_paradata_nodegroup`` edge. By convention
+           its name starts with ``SL_`` (e.g. ``SL_PD``, ``SL_Metadata``).
+           For each paradata image / PropertyNode inside, we emit the
+           corresponding ``has_*`` edge from the first graph-visible,
+           non-ParadataNodeGroup ancestor (typically an EpochNode for a
+           swimlane-level group). If the first ancestor with XML-nesting is
+           the canvas itself (no graph node), nothing is emitted — DP-40
+           canvas-header attributes already cover that scope.
+
+        Edge type per target class:
+          - AuthorNode / AuthorAINode → ``has_author``
+          - LicenseNode              → ``has_license``
+          - EmbargoNode              → ``has_embargo``
+          - PropertyNode             → ``has_property``  (DP-32 Layer A,
+            feeds chronology and other propagation rules.)
+
+        Duplicate edges (same source/target/type) are silently skipped.
         """
         if not getattr(self, '_original_parent_of', None):
             return
 
-        # Map uuid → node for quick lookup
         nodes_by_uuid = {n.node_id: n for n in self.graph.nodes}
-        # Reverse id_mapping: uuid → original_id (node may have multiple? no: 1→1)
         original_by_uuid = {v: k for k, v in self.id_mapping.items()}
 
-        # Type -> edge type
         edge_type_by_target_cls = {
-            "AuthorNode": "has_author",
+            "AuthorNode":   "has_author",
             "AuthorAINode": "has_author",
-            "LicenseNode": "has_license",
-            "EmbargoNode": "has_embargo",
+            "LicenseNode":  "has_license",
+            "EmbargoNode":  "has_embargo",
+            "PropertyNode": "has_property",
         }
 
-        # Pre-compute the existing edges to skip duplicates
+        # Pre-compute "claimed" ParadataNodeGroup uuids: any PD group that
+        # is the *target* of an incoming has_paradata_nodegroup edge is
+        # considered node-level and is skipped here.
+        claimed_groups = set()
+        for edge in self.graph.edges:
+            if edge.edge_type == "has_paradata_nodegroup":
+                claimed_groups.add(edge.edge_target)
+
+        def _is_free_pd_group(uuid_id):
+            """True if the node is a ParadataNodeGroup with no incoming
+            has_paradata_nodegroup AND whose name starts with 'SL_'.
+            """
+            node = nodes_by_uuid.get(uuid_id)
+            if node is None or node.__class__.__name__ != "ParadataNodeGroup":
+                return False
+            if uuid_id in claimed_groups:
+                return False
+            name = (getattr(node, "name", "") or "").upper()
+            return name.startswith("SL_")
+
         existing = {
             (e.edge_source, e.edge_target, e.edge_type) for e in self.graph.edges
         }
@@ -2172,9 +2165,21 @@ class GraphMLImporter:
             if target_original is None:
                 continue
 
-            # Walk up the XML parent chain looking for the first ancestor
-            # that is in the graph AND is not a ParadataNodeGroup.
-            ancestor_original = self._original_parent_of.get(target_original)
+            # The IMMEDIATE XML parent must be a free (SL_*) PD group;
+            # otherwise this paradata node either lives in a claimed PD
+            # group (DP-43 handled elsewhere) or free-standing in the
+            # canvas and should stay untouched.
+            immediate_parent_original = self._original_parent_of.get(target_original)
+            if immediate_parent_original is None:
+                continue
+            parent_uuid = self.id_mapping.get(immediate_parent_original)
+            if parent_uuid is None or not _is_free_pd_group(parent_uuid):
+                continue
+
+            # Walk further up to find the first non-ParadataNodeGroup
+            # ancestor that is in the graph: that is the edge source.
+            ancestor_original = self._original_parent_of.get(
+                immediate_parent_original)
             source_uuid = None
             while ancestor_original is not None:
                 candidate_uuid = self.id_mapping.get(ancestor_original)
@@ -2184,11 +2189,10 @@ class GraphMLImporter:
                         if candidate_node.__class__.__name__ != "ParadataNodeGroup":
                             source_uuid = candidate_uuid
                             break
-                        # Else: ParadataNodeGroup is transparent, continue walking up
                 ancestor_original = self._original_parent_of.get(ancestor_original)
 
             if source_uuid is None:
-                # No graph-visible ancestor (likely canvas-level): skip.
+                # Canvas-level free group: DP-40 attributes already cover it.
                 continue
 
             key = (source_uuid, target_uuid, edge_type)
@@ -2205,8 +2209,6 @@ class GraphMLImporter:
                 existing.add(key)
                 created += 1
             except Exception as exc:
-                # Validation can reject if connection rules forbid it; log
-                # to warnings rather than crash.
                 self.graph.add_warning(
                     f"[paradata auto-edge] Could not create "
                     f"{edge_type} from {source_uuid[:8]} to {target_uuid[:8]}: {exc}"
@@ -2215,7 +2217,8 @@ class GraphMLImporter:
         if created:
             self.graph.add_warning(
                 f"[paradata auto-edge] Inferred {created} has_author / "
-                f"has_license / has_embargo edges from paradata groups."
+                f"has_license / has_embargo / has_property edges from "
+                f"free (SL_*) paradata groups."
             )
 
     def _create_paradata_image_node(self, detected_type, uuid_id, label_text,
