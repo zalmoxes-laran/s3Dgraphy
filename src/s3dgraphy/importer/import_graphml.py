@@ -280,6 +280,13 @@ class GraphMLImporter:
         # graph.attributes already carries author/license/embargo via DP-40.
         self._infer_paradata_image_edges()
 
+        # Warn when an EpochNode carries two disagreeing declarations of
+        # absolute_time_start / absolute_time_end (one from the swimlane
+        # header, one from a PropertyNode inside SL_PD). The resolver
+        # already prefers the PropertyNode; this warning gives the user
+        # a chance to reconcile the yEd source.
+        self._warn_on_epoch_chronology_mismatch()
+
 
         self.connect_nodes_to_epochs()
 
@@ -2221,6 +2228,74 @@ class GraphMLImporter:
                 f"free (SL_*) paradata groups."
             )
 
+    def _warn_on_epoch_chronology_mismatch(self):
+        """Check each EpochNode for a disagreeing pair of declarations.
+
+        Header start/end (``epoch.start_time`` / ``epoch.end_time``) comes
+        from the yEd swimlane title; PropertyNode values come from a
+        PropertyNode connected via ``has_property`` (typically inside an
+        SL_PD, auto-edged by :meth:`_infer_paradata_image_edges`).
+
+        When both are declared AND disagree, the resolver already keeps
+        the PropertyNode as the winner (node-level beats swimlane-level);
+        this method emits a warning so the user can reconcile the source
+        in yEd.
+        """
+        from ..nodes.epoch_node import EpochNode
+        from ..resolvers.builtin_rules import _node_temporal_property
+
+        for n in self.graph.nodes:
+            if not isinstance(n, EpochNode):
+                continue
+
+            header_start = getattr(n, "start_time", None)
+            header_end = getattr(n, "end_time", None)
+            prop_start = _node_temporal_property(
+                self.graph, n, "absolute_time_start")
+            prop_end = _node_temporal_property(
+                self.graph, n, "absolute_time_end")
+
+            def _disagree(a, b):
+                if a is None or b is None:
+                    return False
+                try:
+                    return float(a) != float(b)
+                except (ValueError, TypeError):
+                    return False
+
+            if _disagree(header_start, prop_start):
+                self.graph.add_warning(
+                    f"[chronology mismatch] EpochNode "
+                    f"'{getattr(n, 'name', n.node_id)}' has start_time="
+                    f"{header_start} from the swimlane header but a "
+                    f"PropertyNode 'absolute_time_start'={prop_start} from "
+                    f"SL_PD. Resolver prefers the PropertyNode. Reconcile "
+                    f"in yEd to remove the warning."
+                )
+            if _disagree(header_end, prop_end):
+                self.graph.add_warning(
+                    f"[chronology mismatch] EpochNode "
+                    f"'{getattr(n, 'name', n.node_id)}' has end_time="
+                    f"{header_end} from the swimlane header but a "
+                    f"PropertyNode 'absolute_time_end'={prop_end} from "
+                    f"SL_PD. Resolver prefers the PropertyNode. Reconcile "
+                    f"in yEd to remove the warning."
+                )
+
+    @staticmethod
+    def _strip_s3d_marker(text):
+        """Remove the round-trip ``_s3d_node_type:<Name>`` marker so that
+        the cleaned text is safe to show in UIs as the human description.
+        """
+        if not text:
+            return text
+        cleaned = re.sub(
+            r"\s*" + re.escape(_S3D_NODE_TYPE_MARKER) + r"[A-Za-z_][A-Za-z0-9_]*\s*",
+            " ",
+            text,
+        )
+        return cleaned.strip(" \t\r\n")
+
     def _create_paradata_image_node(self, detected_type, uuid_id, label_text,
                                     node_description, nodeurl,
                                     original_id, node_uri):
@@ -2228,27 +2303,26 @@ class GraphMLImporter:
         it to the graph. Returns the created node (or ``None`` for unknown
         types).
         """
-        # Strip the short label prefix (e.g. "A. Giulia Rossi" → "Giulia Rossi")
-        clean_name = label_text
-        for prefix in sorted(_PALETTE_LABEL_PREFIXES.keys(), key=len, reverse=True):
-            if clean_name.startswith(prefix):
-                clean_name = clean_name[len(prefix):].strip()
-                break
-        if not clean_name:
-            clean_name = detected_type
+        # The ``name`` is kept verbatim from the yEd label (e.g. the
+        # short code "A.01" defined by the 1.5 dev9 palette convention).
+        # The description is the human-readable content — we strip only
+        # the round-trip ``_s3d_node_type:`` marker so it does not leak
+        # into UIs.
+        clean_name = (label_text or "").strip() or detected_type
+        clean_description = self._strip_s3d_marker(node_description)
 
         if detected_type == "AuthorNode":
             node = AuthorNode(node_id=uuid_id, name=clean_name,
-                              description=node_description)
+                              description=clean_description)
         elif detected_type == "AuthorAINode":
             node = AuthorAINode(node_id=uuid_id, name=clean_name,
-                                description=node_description)
+                                description=clean_description)
         elif detected_type == "LicenseNode":
             node = LicenseNode(node_id=uuid_id, name=clean_name,
-                               description=node_description, url=nodeurl)
+                               description=clean_description, url=nodeurl)
         elif detected_type == "EmbargoNode":
             node = EmbargoNode(node_id=uuid_id, name=clean_name,
-                               description=node_description)
+                               description=clean_description)
         else:
             return None
 

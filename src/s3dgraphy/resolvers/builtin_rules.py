@@ -100,67 +100,108 @@ CHRONOLOGY_END_RULE = PropagationRule(
 # ---------------------------------------------------------------------------
 
 def _first_connected_target(graph, node, edge_type, target_cls_name):
-    """Return the first node connected via ``edge_type`` whose class name
-    (or node_type) matches ``target_cls_name``, or None. Tolerates missing
-    get_connected_edges.
+    """First node connected via ``edge_type`` matching ``target_cls_name``
+    (or any of its superclasses), or None.
+    """
+    for t in _all_connected_targets(graph, node, edge_type, target_cls_name):
+        return t
+    return None
+
+
+def _all_connected_targets(graph, node, edge_type, target_cls_name):
+    """All nodes connected via ``edge_type`` matching ``target_cls_name``
+    (or any of its superclasses). Yields in stable edge order.
     """
     try:
         edges = graph.get_connected_edges(node.node_id)
     except Exception:
-        return None
+        return
     for edge in edges:
         if getattr(edge, "edge_type", None) != edge_type or edge.edge_source != node.node_id:
             continue
         target = graph.find_node_by_id(edge.edge_target)
         if target is None:
             continue
-        if target.__class__.__name__ == target_cls_name:
-            return target
-        # Accept subclasses (AuthorAINode inherits from AuthorNode)
         for base in type(target).__mro__:
             if base.__name__ == target_cls_name:
-                return target
-    return None
+                yield target
+                break
 
+
+# Users of the yEd palette (1.5 dev9+ convention) store a short code as the
+# AuthorNode name (e.g. ``A.01``) and the full human data (name, surname,
+# ORCID) in the description. Keeping the description as the display value
+# matches what the user wants to see in every panel.
 
 def _format_author(author_node):
-    """Stable display string for an AuthorNode/AuthorAINode."""
+    """Stable display string for an AuthorNode/AuthorAINode.
+
+    Precedence:
+      1. ``description`` — the human-readable content filled in yEd
+         (e.g. ``Giulia Rossi, ORCID:0000-...``). This is the canonical
+         display according to the 1.5 dev9 palette convention.
+      2. ``data["name"] + data["surname"]`` — populated by the legacy
+         AuthorNode constructor when explicit first/last names are set.
+      3. ``node.name`` — the short code (``A.01``, ``AI.01``) as last
+         resort, so at least the identifier appears in the UI.
+    """
     if author_node is None:
         return None
+
+    description = (getattr(author_node, "description", "") or "").strip()
+    if description:
+        return description
+
     data = getattr(author_node, "data", {}) or {}
     name = data.get("name")
     surname = data.get("surname")
-    # Skip sentinel defaults (noname/nosurname) inherited from pre-existing code
+    # Skip sentinel defaults from the legacy constructor
     if name and name != "noname" and surname and surname != "nosurname":
         return f"{name} {surname}".strip()
     if name and name != "noname":
         return name
     if surname and surname != "nosurname":
         return surname
-    # Fallback to node display name
+
     return getattr(author_node, "name", None)
 
 
-def _author_node_level(graph, node):
-    """Follow a has_author edge from the node. Honors any node.attributes
-    override if importers already populated it (legacy).
+_AUTHOR_SEPARATOR = " ; "
+
+
+def _collect_authors(graph, origin, edge_type="has_author"):
+    """Return the joined display string for all AuthorNodes reachable from
+    ``origin`` through ``edge_type``. Returns None if there are none.
+
+    Multi-author handling: authors are joined with ``_AUTHOR_SEPARATOR``.
+    Duplicate display strings are deduplicated while preserving order.
     """
+    seen = set()
+    parts = []
+    for target in _all_connected_targets(graph, origin, edge_type, "AuthorNode"):
+        text = _format_author(target)
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        parts.append(text)
+    if not parts:
+        return None
+    return _AUTHOR_SEPARATOR.join(parts)
+
+
+def _author_node_level(graph, node):
+    """Follow has_author edges from the node; join multiple authors."""
     if hasattr(node, "attributes") and node.attributes.get("author"):
         return node.attributes["author"]
-    author = _first_connected_target(graph, node, "has_author", "AuthorNode")
-    return _format_author(author)
+    return _collect_authors(graph, node)
 
 
 def _author_swimlane_level(graph, epoch):
-    """Follow a has_author edge from the EpochNode (swimlane-level). DP-19
-    will emit these edges when a Swimlane Paradata Node Group contains an
-    AuthorNode.
-    """
+    """Follow has_author edges from the EpochNode; join multiple authors."""
     attrs = getattr(epoch, "attributes", {}) or {}
     if attrs.get("author"):
         return attrs["author"]
-    author = _first_connected_target(graph, epoch, "has_author", "AuthorNode")
-    return _format_author(author)
+    return _collect_authors(graph, epoch)
 
 
 def _author_graph_level(graph):

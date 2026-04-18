@@ -23,10 +23,15 @@ from ...nodes.property_node import PropertyNode
 from ...nodes.document_node import DocumentNode
 from ...nodes.extractor_node import ExtractorNode
 from ...nodes.combiner_node import CombinerNode
+from ...nodes.author_node import AuthorNode, AuthorAINode
+from ...nodes.license_node import LicenseNode
+from ...nodes.embargo_node import EmbargoNode
 from ...nodes.group_node import GroupNode, ParadataNodeGroup, ActivityNodeGroup, TimeBranchNodeGroup
 from ...nodes.epoch_node import EpochNode
 from ...nodes.base_node import Node
 from ...edges.edge import Edge
+from . import palette_resources
+from .paradata_image_generator import ParadataImageNodeGenerator
 
 
 # Namespace constants
@@ -603,6 +608,16 @@ class GraphMLPatcher:
             return self._create_extractor_node_xml(node, xml_id, x, y)
         elif isinstance(node, CombinerNode):
             return self._create_combiner_node_xml(node, xml_id, x, y)
+        # Paradata image nodes (DP-51). isinstance(AuthorNode) covers
+        # AuthorAINode via subclass; tested explicitly first for clarity.
+        elif isinstance(node, AuthorAINode):
+            return self._create_paradata_image_node_xml(node, "AuthorAINode", xml_id, x, y)
+        elif isinstance(node, AuthorNode):
+            return self._create_paradata_image_node_xml(node, "AuthorNode", xml_id, x, y)
+        elif isinstance(node, LicenseNode):
+            return self._create_paradata_image_node_xml(node, "LicenseNode", xml_id, x, y)
+        elif isinstance(node, EmbargoNode):
+            return self._create_paradata_image_node_xml(node, "EmbargoNode", xml_id, x, y)
         elif isinstance(node, ParadataNodeGroup):
             return self._create_paradata_group_xml(node, xml_id, x, y)
         elif isinstance(node, EpochNode):
@@ -901,6 +916,192 @@ class GraphMLPatcher:
             svg_content = ET.SubElement(svg_model, f'{{{NS_Y}}}SVGContent')
             svg_content.set('refid', svg_refid)
 
+        return node_elem
+
+    # ------------------------------------------------------------------
+    # Paradata image nodes (AuthorNode / AuthorAINode / LicenseNode /
+    # EmbargoNode) — DP-51
+    # ------------------------------------------------------------------
+
+    def _paradata_refid_for(self, node_type: str) -> str:
+        """Return the ``<y:Image refid="N">`` value to use for ``node_type``
+        in the host file being patched.
+
+        Strategy:
+          1. Scan existing ``<y:ImageNode>`` elements; if one has the
+             palette's label prefix for this type, reuse its refid.
+          2. Otherwise inject the palette template's ``<y:Resource>`` into
+             the host's ``<y:Resources>`` block, under a fresh refid, and
+             return that refid.
+
+        The second path also remembers the mapping so subsequent calls in
+        the same patch session don't re-inject.
+        """
+        cache = getattr(self, "_paradata_refid_cache", None)
+        if cache is None:
+            cache = {}
+            self._paradata_refid_cache = cache
+        if node_type in cache:
+            return cache[node_type]
+
+        entry = palette_resources.get_palette_entry(node_type)
+        if entry is None:
+            raise RuntimeError(
+                f"No palette entry for {node_type}; cannot write its "
+                f"image node without an icon refid."
+            )
+
+        # Try to reuse an existing refid in the host file by matching
+        # the label prefix of already-present ImageNodes.
+        prefix = entry.label_prefix
+        for image_node in self.tree.iter(f"{{{NS_Y}}}ImageNode"):
+            label_elem = image_node.find(f"{{{NS_Y}}}NodeLabel")
+            label_text = (label_elem.text or "").strip() if label_elem is not None else ""
+            if not label_text.startswith(prefix):
+                continue
+            image_ref = image_node.find(f"{{{NS_Y}}}Image")
+            if image_ref is not None and image_ref.attrib.get("refid"):
+                rid = image_ref.attrib["refid"]
+                cache[node_type] = rid
+                return rid
+
+        # Inject the resource from the palette template at a fresh refid.
+        resources_parent = self._ensure_resources_block()
+        used_ids = {
+            r.attrib.get("id")
+            for r in resources_parent.iter(f"{{{NS_Y}}}Resource")
+            if r.attrib.get("id")
+        }
+        # Pick the smallest positive integer not in used_ids
+        i = 1
+        while str(i) in used_ids:
+            i += 1
+        new_refid = str(i)
+
+        # Parse the palette resource XML and clone it with the new refid.
+        # The XML has xmlns:y default via the wrapper parsing trick.
+        wrapped = ET.fromstring(
+            f'<wrap xmlns:y="{NS_Y}">{entry.resource_xml}</wrap>'
+        )
+        for r in wrapped:
+            r.set("id", new_refid)
+            resources_parent.append(r)
+            break
+
+        cache[node_type] = new_refid
+        return new_refid
+
+    def _ensure_resources_block(self) -> ET.Element:
+        """Return the ``<y:Resources>`` element of the host tree,
+        creating the enclosing ``<data key="d9">`` + ``<y:Resources>``
+        structure if it is missing.
+        """
+        root = self.tree.getroot()
+
+        # Find the resources key id (commonly d9). We locate it via the
+        # key declaration with yfiles.type="resources".
+        resources_key = None
+        for k in root.findall(f"{{{NS_GRAPHML}}}key"):
+            if k.attrib.get("yfiles.type") == "resources":
+                resources_key = k.attrib.get("id")
+                break
+        if resources_key is None:
+            resources_key = "d9"  # yEd default; should match importer expectations
+            new_key = ET.SubElement(root, f"{{{NS_GRAPHML}}}key")
+            new_key.set("id", resources_key)
+            new_key.set("for", "graphml")
+            new_key.set("yfiles.type", "resources")
+
+        # Find existing <data key="{resources_key}">
+        for data in root.findall(f"{{{NS_GRAPHML}}}data"):
+            if data.attrib.get("key") == resources_key:
+                existing = data.find(f"{{{NS_Y}}}Resources")
+                if existing is not None:
+                    return existing
+                # Create if the data block has no <y:Resources>
+                return ET.SubElement(data, f"{{{NS_Y}}}Resources")
+
+        # No data block yet — append one at the root level.
+        data = ET.SubElement(root, f"{{{NS_GRAPHML}}}data")
+        data.set("key", resources_key)
+        return ET.SubElement(data, f"{{{NS_Y}}}Resources")
+
+    def _create_paradata_image_node_xml(self, node: Node, node_type: str,
+                                         xml_id: str,
+                                         x: float = 0.0,
+                                         y: float = 0.0) -> ET.Element:
+        """Create ``<node>`` XML for an Author/AuthorAI/License/Embargo node,
+        reusing or injecting the palette resource as needed.
+        """
+        refid = self._paradata_refid_for(node_type)
+
+        # Use the generator (returns lxml Element) then convert to stdlib
+        # ElementTree Element so it fits the patcher's output flow.
+        try:
+            from lxml import etree as LET
+            gen = ParadataImageNodeGenerator()
+            lxml_el = gen.generate_from_node(
+                node, node_id_override=xml_id, x=x, y=y, refid=refid,
+            )
+            if lxml_el is None:
+                return None
+            serialized = LET.tostring(lxml_el).decode("utf-8")
+            node_elem = ET.fromstring(serialized)
+        except ImportError:
+            # lxml unavailable: build directly with stdlib ET using the
+            # same structure the generator produces.
+            node_elem = self._build_paradata_image_node_stdlib(
+                node=node, node_type=node_type, xml_id=xml_id,
+                x=x, y=y, refid=refid,
+            )
+
+        return node_elem
+
+    def _build_paradata_image_node_stdlib(self, node, node_type, xml_id,
+                                          x, y, refid):
+        """Fallback builder for paradata image nodes using stdlib
+        xml.etree (mirrors :class:`ParadataImageNodeGenerator` without
+        lxml). Only executed when lxml is not importable.
+        """
+        entry = palette_resources.get_palette_entry(node_type)
+        prefix = entry.label_prefix if entry else ""
+        display = (getattr(node, "name", None) or node_type).strip()
+        label_text = display if display.startswith(prefix) else f"{prefix} {display}"
+        desc = (getattr(node, "description", "") or "").strip()
+        marker = f"_s3d_node_type:{node_type}"
+        description_with_marker = f"{desc}\n{marker}" if desc else marker
+
+        node_elem = ET.Element(f"{{{NS_GRAPHML}}}node")
+        node_elem.set("id", xml_id)
+
+        description_key = self.key_map['node'].get('description') or "d5"
+        self._set_data_element(node_elem, description_key, description_with_marker)
+
+        gfx_key = self.key_map['node'].get('nodegraphics') or "d6"
+        data_gfx = ET.SubElement(node_elem, f"{{{NS_GRAPHML}}}data")
+        data_gfx.set("key", gfx_key)
+
+        image_node = ET.SubElement(data_gfx, f"{{{NS_Y}}}ImageNode")
+        for tag, attrs in [
+            ("Geometry", {"height": "25.0", "width": "25.0",
+                          "x": str(x), "y": str(y)}),
+            ("Fill", {"color": "#CCCCFF", "transparent": "false"}),
+            ("BorderStyle", {"color": "#000000", "type": "line", "width": "1.0"}),
+        ]:
+            e = ET.SubElement(image_node, f"{{{NS_Y}}}{tag}")
+            for k, v in attrs.items():
+                e.set(k, v)
+
+        label = ET.SubElement(image_node, f"{{{NS_Y}}}NodeLabel")
+        label.set("alignment", "center")
+        label.set("modelName", "corners")
+        label.set("modelPosition", "nw")
+        label.set("fontSize", "12")
+        label.set("visible", "true")
+        label.text = label_text
+
+        image = ET.SubElement(image_node, f"{{{NS_Y}}}Image")
+        image.set("refid", refid)
         return node_elem
 
     def _create_paradata_group_xml(self, node: ParadataNodeGroup,
