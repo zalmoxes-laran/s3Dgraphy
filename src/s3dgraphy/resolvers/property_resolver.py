@@ -111,11 +111,20 @@ def resolve_with_source(graph, node, rule: PropagationRule,
     Returns a ``(value, source)`` tuple where ``source`` is one of
     ``"node"``, ``"swimlane"``, ``"graph"`` or ``None`` (when the default was
     used).
+
+    **EpochNode query semantics.** When ``node`` is itself an EpochNode,
+    the node- and swimlane-level collapse to the same lookup: a value
+    declared on the Epoch *is* the swimlane value. To match the user
+    mental model (and the Epoch Manager UI, which thinks of the Epoch
+    as a swimlane), the node-level call is skipped for Epochs and the
+    returned source is always ``"swimlane"`` (or ``"graph"``) — never
+    ``"node"``.
     """
-    # --- node level ---
-    v = rule.node_getter(graph, node)
-    if v is not None:
-        return v, "node"
+    # --- node level (skipped for EpochNode: it IS its own swimlane) ---
+    if not _is_epoch_node(node):
+        v = rule.node_getter(graph, node)
+        if v is not None:
+            return v, "node"
 
     # --- swimlane level ---
     epochs = _iter_connected_epochs(graph, node)

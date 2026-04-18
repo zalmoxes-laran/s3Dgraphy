@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Reverse-propagation compaction** (DP-32 / DP-49 Phase A.1). New module
+  ``s3dgraphy.transforms.compact`` exposing three functions for pre-export
+  metadata formalization:
+  - ``prune_redundant_propagative_edges(graph)`` — removes per-node
+    ``has_author`` / ``has_license`` / ``has_embargo`` edges and
+    ``has_property`` edges to temporal PropertyNodes when the
+    swimlane-level resolver returns the same value anyway.
+  - ``hoist_propagative_metadata(graph)`` — when every stratigraphic
+    unit whose primary swimlane is Epoch E declares the same single
+    target for ``has_author`` / ``has_license`` / ``has_embargo``, promotes
+    the declaration to an SL_PD anchored to E (created if missing) and
+    removes the per-unit edges. Chronology is pruned but never hoisted
+    (PropertyNode deduplication is out of scope).
+  - ``compact_propagative_metadata(graph)`` — runs hoist then prune.
+  Both passes preserve the resolver output for every node (lossless
+  reformulation). Conservative rules: no hoist on partial overlap, no
+  hoist on divergent targets, no hoist on multi-epoch nodes
+  (``survive_in_epoch``). Locked in by 8 synthetic scenarios in
+  ``test_compact_metadata.py`` including idempotence of
+  ``compact_propagative_metadata``.
 - **Dashed-connector reclassification** (DP-51). The yEd palette has no
   dedicated connector style for ``has_author`` / ``has_license`` /
   ``has_embargo``. The importer's ``enhance_edge_type`` now inspects the
@@ -20,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Refined
 
+- **EpochNode queries report [swimlane], never [node]**. When the resolver
+  is invoked directly on an EpochNode, node-level and swimlane-level
+  collapse to the same lookup (the Epoch IS the swimlane). The generic
+  resolver now skips the node-level call for Epoch inputs and always
+  tags the result ``"swimlane"`` (or ``"graph"`` for canvas-header
+  fallbacks). Matches the Epoch Manager UI mental model where values
+  shown on an epoch come from the swimlane-level Paradata Node Group.
 - **SL_PD auto-edge supports top-level layout** (DP-19). The paradata
   auto-edge inference previously required the SL_PD group to be XML-
   nested inside an EpochNode's swimlane column. Now also supported: an
