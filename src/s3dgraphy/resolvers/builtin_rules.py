@@ -67,11 +67,31 @@ def _absolute_time_end_node(graph, node):
 
 
 def _epoch_start(graph, epoch):
+    """Swimlane-level start for chronology.
+
+    A PropertyNode named ``absolute_time_start`` attached to the EpochNode
+    via ``has_property`` (typically placed inside an SL_PD free paradata
+    group, auto-edged by the importer) wins over the header
+    ``epoch.start_time`` declared in the yEd swimlane title. The two
+    declarations should agree; when they don't, the importer also emits
+    a ``[chronology mismatch]`` warning so the user can reconcile the
+    source.
+    """
+    pn_val = _node_temporal_property(graph, epoch, "absolute_time_start")
+    if pn_val is not None:
+        return pn_val
     val = getattr(epoch, "start_time", None)
     return float(val) if val is not None else None
 
 
 def _epoch_end(graph, epoch):
+    """Swimlane-level end for chronology. Mirrors :func:`_epoch_start`: a
+    PropertyNode ``absolute_time_end`` on the Epoch wins over the header
+    ``epoch.end_time``.
+    """
+    pn_val = _node_temporal_property(graph, epoch, "absolute_time_end")
+    if pn_val is not None:
+        return pn_val
     val = getattr(epoch, "end_time", None)
     return float(val) if val is not None else None
 

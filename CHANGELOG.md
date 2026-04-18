@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Dashed-connector reclassification** (DP-51). The yEd palette has no
+  dedicated connector style for ``has_author`` / ``has_license`` /
+  ``has_embargo``. The importer's ``enhance_edge_type`` now inspects the
+  target class of a ``has_data_provenance`` edge (the dashed connector's
+  default semantic): ``AuthorNode`` / ``AuthorAINode`` → ``has_author``,
+  ``LicenseNode`` → ``has_license``, ``EmbargoNode`` → ``has_embargo``.
+  Covers legacy EM graphs that connect strat units directly to paradata
+  image nodes with a generic dashed edge.
+
+### Refined
+
+- **SL_PD auto-edge supports top-level layout** (DP-19). The paradata
+  auto-edge inference previously required the SL_PD group to be XML-
+  nested inside an EpochNode's swimlane column. Now also supported: an
+  SL_PD that sits at the canvas top level and draws an explicit
+  ``has_first_epoch`` edge to the target Epoch, with its children
+  connected via ``is_in_paradata_nodegroup``. Resolution order for the
+  containing group: immediate XML parent → ``is_in_paradata_nodegroup``
+  edge. Resolution order for the anchor: first non-ParadataNodeGroup XML
+  ancestor → ``has_first_epoch`` outgoing from the group. The pass is
+  now scheduled **after** ``connect_nodes_to_epochs`` so that a
+  Y-position-derived ``has_first_epoch`` from the SL_PD is available.
+- **Swimlane chronology honours SL_PD PropertyNodes**. The
+  ``absolute_time_start`` / ``absolute_time_end`` rules' swimlane
+  getters (``_epoch_start`` / ``_epoch_end``) now prefer a PropertyNode
+  attached to the Epoch (typically auto-edged from an SL_PD) over the
+  header ``epoch.start_time`` / ``end_time`` declared in the yEd
+  swimlane title. A stratigraphic unit in that epoch therefore inherits
+  the refined window when a PropertyNode is declared in the
+  swimlane-level paradata group. The ``[chronology mismatch]`` warning
+  still surfaces header/PN disagreements so the user can reconcile yEd.
+
+### Changed
+
+- **Dropped legacy ``absolute_start_date`` / ``absolute_end_date``
+  aliases** across the codebase. The canonical (and sole) pair of
+  chronology qualia is now ``absolute_time_start`` /
+  ``absolute_time_end``. Consumers updated: the EM-blender-tools
+  PropertyGroup fields (``em_base_props.py``, ``document_manager/data.py``,
+  ``document_manager/ui.py``, ``paradata_manager/ui.py``,
+  ``populate_lists.py``), the s3dgraphy core-concepts and operators-guide
+  docs, and the current AI extraction prompt (v4). Existing GraphML
+  sources with the old names must be migrated manually. Archived AI
+  prompts v2/v3 are left as-is.
+
 ### Refined
 
 - **EpochNode resolves as its own swimlane** (DP-32 Priority 4). Passing an

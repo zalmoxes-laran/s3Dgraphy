@@ -273,11 +273,21 @@ class GraphMLImporter:
             pass
             # print(f"\nCreati {stats['connections_created']} nuovi collegamenti diretti tra unità stratigrafiche e PropertyNode")
 
-        # Infer has_author / has_license / has_embargo edges from paradata
-        # image nodes living inside a ParadataNodeGroup (DP-19 / DP-43
-        # auto-connect). Source is the first non-ParadataNodeGroup ancestor
-        # present in the graph; canvas-level groups are skipped because
-        # graph.attributes already carries author/license/embargo via DP-40.
+        # Assign stratigraphic units (and free paradata groups) to epochs
+        # based on their Y position in the swimlane layout. This must run
+        # BEFORE _infer_paradata_image_edges so that a top-level SL_PD
+        # gains the has_first_epoch edge to its swimlane Epoch; the DP-19
+        # auto-edge pass then uses that edge to find the target of the
+        # paradata nodes contained in the group.
+        self.connect_nodes_to_epochs()
+
+        # Infer has_author / has_license / has_embargo / has_property edges
+        # from paradata image nodes living inside a free ParadataNodeGroup
+        # (DP-19 pattern). Target is the first non-ParadataNodeGroup XML
+        # ancestor, or (fallback) the node pointed to by has_first_epoch
+        # from the group itself. Canvas-level free groups with no anchor
+        # are skipped because graph.attributes already carries
+        # author/license/embargo via DP-40.
         self._infer_paradata_image_edges()
 
         # Warn when an EpochNode carries two disagreeing declarations of
@@ -286,9 +296,6 @@ class GraphMLImporter:
         # already prefers the PropertyNode; this warning gives the user
         # a chance to reconcile the yEd source.
         self._warn_on_epoch_chronology_mismatch()
-
-
-        self.connect_nodes_to_epochs()
 
         br_nodes = [n for n in self.graph.nodes if hasattr(n, 'node_type') and n.node_type == "BR"]
         #print(f"\nTotal BR nodes included in the graph: {len(br_nodes)}")
@@ -2107,13 +2114,21 @@ class GraphMLImporter:
            has NO incoming ``has_paradata_nodegroup`` edge. By convention
            its name starts with ``SL_`` (e.g. ``SL_PD``, ``SL_Metadata``).
            For each paradata image / PropertyNode inside, we emit the
-           corresponding ``has_*`` edge from the first graph-visible,
-           non-ParadataNodeGroup ancestor (typically an EpochNode for a
-           swimlane-level group). If the first ancestor with XML-nesting is
-           the canvas itself (no graph node), nothing is emitted — DP-40
-           canvas-header attributes already cover that scope.
+           corresponding ``has_*`` edge from the target node of the group.
 
-        Edge type per target class:
+        Two yEd layouts are supported, both interoperable:
+
+        * **XML-nested layout**: paradata items are visually placed inside
+          the SL_PD group in yEd (the group contains them in the XML tree).
+          The target node is the first non-ParadataNodeGroup XML ancestor
+          (typically an EpochNode in a swimlane column).
+        * **Top-level layout**: the SL_PD sits at canvas top level and
+          draws a ``has_first_epoch`` edge towards its target Epoch;
+          children are connected via ``is_in_paradata_nodegroup`` edges.
+          In this case the target is the node pointed to by that
+          ``has_first_epoch`` edge.
+
+        Edge type per paradata-node class:
           - AuthorNode / AuthorAINode → ``has_author``
           - LicenseNode              → ``has_license``
           - EmbargoNode              → ``has_embargo``
@@ -2122,9 +2137,6 @@ class GraphMLImporter:
 
         Duplicate edges (same source/target/type) are silently skipped.
         """
-        if not getattr(self, '_original_parent_of', None):
-            return
-
         nodes_by_uuid = {n.node_id: n for n in self.graph.nodes}
         original_by_uuid = {v: k for k, v in self.id_mapping.items()}
 
@@ -2156,61 +2168,104 @@ class GraphMLImporter:
             name = (getattr(node, "name", "") or "").upper()
             return name.startswith("SL_")
 
+        # --- Step 1: find the containing PD group for every candidate ---
+        # A candidate node (AuthorNode/AuthorAINode/LicenseNode/EmbargoNode/
+        # PropertyNode) belongs to at most one PD group, via either the XML
+        # nesting chain (immediate parent) or an is_in_paradata_nodegroup
+        # edge (top-level layout). XML nesting wins if both are present.
+        parent_of = self._original_parent_of or {}
+
+        containing_group = {}  # candidate_uuid -> pd_group_uuid
+        for node in self.graph.nodes:
+            if node.__class__.__name__ not in edge_type_by_target_cls:
+                continue
+            candidate_original = original_by_uuid.get(node.node_id)
+            if candidate_original is None:
+                continue
+            parent_original = parent_of.get(candidate_original)
+            if parent_original is None:
+                continue
+            parent_uuid = self.id_mapping.get(parent_original)
+            if parent_uuid is None:
+                continue
+            parent_node = nodes_by_uuid.get(parent_uuid)
+            if parent_node is not None and parent_node.__class__.__name__ == "ParadataNodeGroup":
+                containing_group[node.node_id] = parent_uuid
+
+        for edge in self.graph.edges:
+            if edge.edge_type != "is_in_paradata_nodegroup":
+                continue
+            src_uuid = edge.edge_source
+            if src_uuid in containing_group:
+                continue  # XML nesting already assigned
+            src_node = nodes_by_uuid.get(src_uuid)
+            if src_node is None or src_node.__class__.__name__ not in edge_type_by_target_cls:
+                continue
+            tgt_uuid = edge.edge_target
+            tgt_node = nodes_by_uuid.get(tgt_uuid)
+            if tgt_node is None or tgt_node.__class__.__name__ != "ParadataNodeGroup":
+                continue
+            containing_group[src_uuid] = tgt_uuid
+
+        # --- Step 2: find the target node for every free PD group ---
+        # Target resolution order:
+        #   (a) XML ancestor walk: first non-ParadataNodeGroup ancestor
+        #   (b) has_first_epoch outgoing edge from the group
+        target_by_group = {}
+        free_groups = {g for g in set(containing_group.values()) if _is_free_pd_group(g)}
+        for group_uuid in free_groups:
+            group_original = original_by_uuid.get(group_uuid)
+            target_uuid = None
+
+            # (a) XML ancestor walk
+            ancestor_original = parent_of.get(group_original) if group_original else None
+            while ancestor_original is not None:
+                candidate_uuid = self.id_mapping.get(ancestor_original)
+                if candidate_uuid is not None:
+                    candidate_node = nodes_by_uuid.get(candidate_uuid)
+                    if candidate_node is not None and candidate_node.__class__.__name__ != "ParadataNodeGroup":
+                        target_uuid = candidate_uuid
+                        break
+                ancestor_original = parent_of.get(ancestor_original)
+
+            # (b) has_first_epoch outgoing from the group itself
+            if target_uuid is None:
+                for edge in self.graph.edges:
+                    if edge.edge_source == group_uuid and edge.edge_type == "has_first_epoch":
+                        target_uuid = edge.edge_target
+                        break
+
+            if target_uuid is not None:
+                target_by_group[group_uuid] = target_uuid
+
+        # --- Step 3: emit the auto-edges ---
         existing = {
             (e.edge_source, e.edge_target, e.edge_type) for e in self.graph.edges
         }
 
         created = 0
         for node in list(self.graph.nodes):
-            cls_name = node.__class__.__name__
-            edge_type = edge_type_by_target_cls.get(cls_name)
+            edge_type = edge_type_by_target_cls.get(node.__class__.__name__)
             if not edge_type:
                 continue
-
-            target_uuid = node.node_id
-            target_original = original_by_uuid.get(target_uuid)
-            if target_original is None:
+            group_uuid = containing_group.get(node.node_id)
+            if group_uuid is None or group_uuid not in free_groups:
                 continue
-
-            # The IMMEDIATE XML parent must be a free (SL_*) PD group;
-            # otherwise this paradata node either lives in a claimed PD
-            # group (DP-43 handled elsewhere) or free-standing in the
-            # canvas and should stay untouched.
-            immediate_parent_original = self._original_parent_of.get(target_original)
-            if immediate_parent_original is None:
-                continue
-            parent_uuid = self.id_mapping.get(immediate_parent_original)
-            if parent_uuid is None or not _is_free_pd_group(parent_uuid):
-                continue
-
-            # Walk further up to find the first non-ParadataNodeGroup
-            # ancestor that is in the graph: that is the edge source.
-            ancestor_original = self._original_parent_of.get(
-                immediate_parent_original)
-            source_uuid = None
-            while ancestor_original is not None:
-                candidate_uuid = self.id_mapping.get(ancestor_original)
-                if candidate_uuid is not None:
-                    candidate_node = nodes_by_uuid.get(candidate_uuid)
-                    if candidate_node is not None:
-                        if candidate_node.__class__.__name__ != "ParadataNodeGroup":
-                            source_uuid = candidate_uuid
-                            break
-                ancestor_original = self._original_parent_of.get(ancestor_original)
-
+            source_uuid = target_by_group.get(group_uuid)
             if source_uuid is None:
-                # Canvas-level free group: DP-40 attributes already cover it.
+                # Canvas-level free group with no Epoch anchor: DP-40
+                # attributes already cover it.
                 continue
 
-            key = (source_uuid, target_uuid, edge_type)
+            key = (source_uuid, node.node_id, edge_type)
             if key in existing:
                 continue
 
             try:
                 self.graph.add_edge(
-                    edge_id=f"{source_uuid}_{edge_type}_{target_uuid}",
+                    edge_id=f"{source_uuid}_{edge_type}_{node.node_id}",
                     edge_source=source_uuid,
-                    edge_target=target_uuid,
+                    edge_target=node.node_id,
                     edge_type=edge_type,
                 )
                 existing.add(key)
@@ -2218,7 +2273,7 @@ class GraphMLImporter:
             except Exception as exc:
                 self.graph.add_warning(
                     f"[paradata auto-edge] Could not create "
-                    f"{edge_type} from {source_uuid[:8]} to {target_uuid[:8]}: {exc}"
+                    f"{edge_type} from {source_uuid[:8]} to {node.node_id[:8]}: {exc}"
                 )
 
         if created:
@@ -2359,8 +2414,19 @@ class GraphMLImporter:
 
         # Logica per has_data_provenance
         if edge_type == "has_data_provenance":
+            # v1.5 dev10 (DP-51): the yEd palette has no dedicated connector
+            # style for has_author / has_license / has_embargo, so the generic
+            # dashed ``has_data_provenance`` is reclassified here based on the
+            # paradata image target. AuthorAINode is a subclass of AuthorNode
+            # and is covered by the same branch.
+            if isinstance(target_node, AuthorNode):
+                edge_type = "has_author"
+            elif isinstance(target_node, LicenseNode):
+                edge_type = "has_license"
+            elif isinstance(target_node, EmbargoNode):
+                edge_type = "has_embargo"
             # Se il source è un nodo stratigrafico e il target è una property
-            if source_type in stratigraphic_types and target_type == "property":
+            elif source_type in stratigraphic_types and target_type == "property":
                 edge_type = "has_property"
                 # print(f"Enhanced to has_property: {source_type} -> PropertyNode")
 

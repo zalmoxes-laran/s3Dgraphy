@@ -211,7 +211,7 @@ Questa situazione emerge quando i documenti storici descrivono strutture reali s
 
 **Materiale / tecnica:** `material_type`, `construction_technique`, `mortar_type`, `color`, `texture`, `surface_treatment`
 
-**Cronologia:** `absolute_start_date`, `absolute_end_date`, `terminus_post_quem`, `terminus_ante_quem`, `period_interpretation`
+**Cronologia:** `absolute_time_start`, `absolute_time_end`, `terminus_post_quem`, `terminus_ante_quem`, `period_interpretation`
 
 **Interpretazione:** `function_interpretation`, `primary_function`, `cult_interpretation`, `phase_interpretation`, `construction_phase`
 

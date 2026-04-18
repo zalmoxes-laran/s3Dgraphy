@@ -371,8 +371,8 @@ s3dgraphy includes a built-in **chronology calculation engine** that infers abso
 date ranges for every stratigraphic node in the graph. The algorithm combines three
 sources of temporal information:
 
-1. **Absolute dates** from PropertyNodes (``absolute_start_date``,
-   ``absolute_end_date``) connected via ``has_property`` edges
+1. **Absolute dates** from PropertyNodes (``absolute_time_start``,
+   ``absolute_time_end``) connected via ``has_property`` edges
 2. **Epoch membership** from ``has_first_epoch`` / ``survive_in_epoch`` edges, which
    provide fallback date ranges from EpochNode start/end values
 3. **Stratigraphic relations** (``is_after`` / ``is_before``), which constrain the
@@ -386,7 +386,7 @@ The result is a pair of computed attributes on each node:
   constrained by successors
 
 **Example:** If ``USV132`` is stratigraphically *after* ``VSF141``, and ``VSF141``
-has ``absolute_start_date = 180``, then ``USV132``'s ``CALCUL_START_T`` will be at
+has ``absolute_time_start = 180``, then ``USV132``'s ``CALCUL_START_T`` will be at
 least 180, because it cannot have been created before the unit it sits on top of.
 
 This chronology data is used by EM-tools to:
