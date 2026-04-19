@@ -1,4 +1,4 @@
-# StratiMiner Extraction Prompt — v5.1
+# StratiMiner Extraction Prompt — v5.3
 **Extended Matrix (EM) — Unified xlsx schema for StratiMiner (DP-02)**
 *Schema: `em_data.xlsx` (5 sheets)*
 
@@ -182,7 +182,7 @@ One row per asserted fact. **14 fixed columns**:
 | # | Column | Notes |
 |---|--------|-------|
 | 1 | `TARGET_ID` | Subject of the claim. Usually a `Units.ID`; for claims about an epoch itself, an `Epochs.ID`. For relations, the "source" endpoint. |
-| 2 | `TARGET2_ID` | Only for relational claims or `belongs_to_epoch`. Empty for scalar qualia. |
+| 2 | `TARGET2_ID` | Only for relational claims or `has_first_epoch`. Empty for scalar qualia. |
 | 3 | `PROPERTY_TYPE` | Controlled vocabulary (§VOCABULARY). |
 | 4 | `VALUE` | Scalar value (string / number). Empty for relational claims. |
 | 5 | `UNITS` | Unit of measure for numeric values (`m`, `cm`, `kg`, `AD`, `BC`). Optional. |
@@ -219,7 +219,45 @@ EXTRACTOR empty is weakly attributed (see §PREAMBLE rule 4: acceptable
 only when `AUTHOR_KIND_N = "extractor"` and you explicitly own the
 inference).
 
-**Worked examples:**
+#### Minimal-snippet rule — critical
+
+**`EXTRACTOR_i` must be the MINIMAL verbatim prose that directly
+supports the specific claim of THAT ROW** — one sentence, one clause,
+a few words plus the page pointer. It is **not** a container for
+context. If the source paragraph contains five distinct claims
+(definition + length + thickness + color + period), you must emit
+**five rows**, each with its own **distinct** `EXTRACTOR_i` snippet
+isolating the phrase that carries that one datum. Never paste the
+whole paragraph into every row — that is a hallucinated
+justification, not a quotation of the source.
+
+The only legitimate reason two rows of the same `TARGET_ID` can
+share an identical `EXTRACTOR_i` is when **one sentence literally
+states both values** (see the `length` + `width` case below).
+
+**WRONG — do NOT do this** (C05 pattern — all five rows copy the
+whole paragraph):
+
+| `TARGET_ID` | `PROPERTY_TYPE` | `VALUE` | `EXTRACTOR_1` |
+|---|---|---|---|
+| `C05` | `definition` | `Occasional hearth, pre-Roman` | `"C05. – S1. It is an occasional hearth, red in the centre and grey at the edges, probably pre-Roman. No archaeological material … dimensions of L 0.75 m, thickness 0.05 m" [D.05 p.4]` |
+| `C05` | `length` | `0.75` | `"C05. – S1. It is an occasional hearth, red in the centre and grey at the edges, probably pre-Roman. No archaeological material … dimensions of L 0.75 m, thickness 0.05 m" [D.05 p.4]` |
+| `C05` | `thickness_max` | `0.05` | `"C05. – S1. It is an occasional hearth, red in the centre and grey at the edges, probably pre-Roman. No archaeological material … dimensions of L 0.75 m, thickness 0.05 m" [D.05 p.4]` |
+| `C05` | `color` | `red / grey` | `"C05. – S1. It is an occasional hearth, red in the centre and grey at the edges, probably pre-Roman. No archaeological material … dimensions of L 0.75 m, thickness 0.05 m" [D.05 p.4]` |
+| `C05` | `period_interpretation` | `pre-Roman` | `"C05. – S1. It is an occasional hearth, red in the centre and grey at the edges, probably pre-Roman. No archaeological material … dimensions of L 0.75 m, thickness 0.05 m" [D.05 p.4]` |
+
+**RIGHT — do this** (each row carries the minimal phrase for its
+own claim, all from the same paragraph but distilled):
+
+| `TARGET_ID` | `PROPERTY_TYPE` | `VALUE` | `EXTRACTOR_1` |
+|---|---|---|---|
+| `C05` | `definition` | `Occasional hearth, pre-Roman, included in C05` | `"Este o vatră de foc ocazional … probabil anterioară epocii romane" [D.05 p.4]` |
+| `C05` | `length` | `0.75` | `"are dimensiunile de L 0,75 m" [D.05 p.4]` |
+| `C05` | `thickness_max` | `0.05` | `"grosimea fiind de 0,05m" [D.05 p.4]` |
+| `C05` | `color` | `red (centre) / grey (edges)` | `"are o culoare roșie în centru și gri pe margini" [D.05 p.4]` |
+| `C05` | `period_interpretation` | `Pre-Roman; no archaeological material associated` | `"probabil anterioară epocii romane. Nu are material arheologic" [D.05 p.4]` |
+
+**Worked examples (acceptable shared-excerpt case):**
 
 | `TARGET_ID` | `PROPERTY_TYPE` | `VALUE` | `UNITS` | `EXTRACTOR_1` |
 |---|---|---|---|---|
@@ -229,6 +267,11 @@ inference).
 | `TM_VESTIBULUM` | `length` | `5.60` | `m` | `"The vestibule, about 5.60 m long, opens on the east side of the cella" [p. 12]` |
 | `USV104` | `material_type` | `limestone` | `` | `"The columns are made of local limestone, with shell fragments visible on the surface" [p. 14]` |
 
+`USV100.length` and `USV100.width` share their `EXTRACTOR_1` because
+one literal sentence states both numbers — the minimal snippet
+happens to cover two rows. This is the **only** legitimate duplication:
+same sentence, same values stated together.
+
 When the source expresses the value as a range, choose the midpoint
 or the most representative figure for `VALUE` and carry the original
 range verbatim in `EXTRACTOR_N` (e.g. `VALUE = "0.22"` for "20-25 cm
@@ -237,7 +280,10 @@ thick" with `UNITS = "m"` and the full quote in the excerpt).
 When the source gives multiple dimensions on one sentence ("9.7 x
 14.5 meters"), split them into **one row per qualia** (`length`,
 `width`) that **reuse the same EXTRACTOR_1 text** (the same excerpt
-legitimately supports both rows).
+legitimately supports both rows). But `definition`, `color` and
+`period_interpretation` of the same unit are **different claims**
+and must carry different snippets even when they live in the same
+paragraph.
 
 <!-- /SECTION: OUTPUT -->
 
@@ -295,8 +341,11 @@ epoch, they act as swimlane-level overrides of the header chronology.
 
 ### 3. Epoch membership (structure, not value)
 
-- `belongs_to_epoch` — ties a unit to an epoch. `TARGET_ID =
-  Units.ID`, `TARGET2_ID = Epochs.ID`. `VALUE` stays empty.
+- `has_first_epoch` — ties a unit to the epoch in which it first
+  appears. `TARGET_ID = Units.ID`, `TARGET2_ID = Epochs.ID`.
+  `VALUE` stays empty. This is the canonical s3Dgraphy edge name;
+  the xlsx PROPERTY_TYPE string matches the edge type one-to-one so
+  readers never have to translate between layers.
 
 ### 4. Stratigraphic relations (structure, not value)
 
@@ -464,11 +513,11 @@ for idx, row in enumerate(wb['Claims'].iter_rows(min_row=2, values_only=True), s
         continue
 
     # target existence
-    if prop == 'belongs_to_epoch':
+    if prop == 'has_first_epoch':
         if tgt not in units:
             issues.append(f'row {idx}: TARGET_ID {tgt!r} not in Units')
         if (tgt2 or value) and (tgt2 or value) not in epochs:
-            issues.append(f'row {idx}: belongs_to_epoch refers to unknown epoch {(tgt2 or value)!r}')
+            issues.append(f'row {idx}: has_first_epoch refers to unknown epoch {(tgt2 or value)!r}')
     elif prop in ALL_RELATIONS:
         if tgt not in units and tgt not in epochs:
             issues.append(f'row {idx}: TARGET_ID {tgt!r} not declared')
@@ -606,6 +655,14 @@ source / extractor attributions.
       measurement hidden inside the quote — the downstream tools
       cannot extract it from prose. See §VALUE vs §EXTRACTOR for
       worked examples.
+- [ ] **Each `EXTRACTOR_i` is the MINIMAL snippet supporting THAT
+      specific claim.** Across rows with the same `TARGET_ID`, the
+      `EXTRACTOR_1` strings must be **distinct** (one snippet per
+      claim, distilled from the paragraph). The only exception is
+      when one literal sentence states two values that become two
+      rows (e.g. `length`+`width` stated together). Copying the
+      entire paragraph into every row of the same unit is a
+      hallucinated justification — refuse it.
 
 **Stratigraphic relations**
 - [ ] No cycles (`A cuts B` AND `B cuts A`, etc.) — the validation
@@ -621,4 +678,4 @@ source / extractor attributions.
 
 ---
 
-*End of StratiMiner Extraction Prompt v5.1 — unified `em_data.xlsx` schema.*
+*End of StratiMiner Extraction Prompt v5.2 — unified `em_data.xlsx` schema.*

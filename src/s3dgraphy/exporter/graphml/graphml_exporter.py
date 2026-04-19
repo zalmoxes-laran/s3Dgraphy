@@ -117,11 +117,18 @@ class GraphMLExporter:
         # 3c. Get ambiguous relations (bonded_to, equals) → has_same_time edges
         ambiguous_edges = engine.get_ambiguous_relations(self.graph)
 
-        # 3d. Build final edge list for export
+        # 3d. Build final edge list for export.
+        # Topological *and* direct temporal relations are filtered here:
+        # the exporter re-expresses all of them as the minimal `is_after`
+        # set produced by the temporal reduction below. If we kept the
+        # originals in addition, `is_before` on an edge would survive
+        # alongside its reduction-inferred `is_after` — a visual cycle in
+        # yEd between the same two nodes.
         TOPOLOGICAL_EDGE_TYPES = {
             'overlies', 'is_overlain_by', 'cuts', 'is_cut_by',
             'fills', 'is_filled_by', 'abuts', 'is_abutted_by',
-            'is_bonded_to', 'is_physically_equal_to'
+            'is_bonded_to', 'is_physically_equal_to',
+            'is_before', 'is_after',
         }
 
         # Paradata internal edges — handled by ParadataNodeGroup structure,

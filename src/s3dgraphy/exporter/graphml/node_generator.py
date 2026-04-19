@@ -150,8 +150,24 @@ class NodeGenerator:
         node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
         node_elem.set('id', nested_id)
 
-        # Add description (d5) — property value
-        description = getattr(node, 'description', '')
+        # Add description (d5) — property value.
+        # The yEd convention renders PropertyNode content from d5. Graphs
+        # built by the unified xlsx pipeline store the distilled datum in
+        # ``node.value`` (with optional ``attributes['units']``) and leave
+        # ``description`` empty. Fall back to ``value`` (+ units) so the
+        # node ships its distilled content instead of appearing empty in
+        # yEd.
+        description = getattr(node, 'description', '') or ''
+        if not description:
+            value = getattr(node, 'value', '') or ''
+            units = ''
+            attrs = getattr(node, 'attributes', None) or {}
+            if isinstance(attrs, dict):
+                units = attrs.get('units', '') or ''
+            if value and units:
+                description = f"{value} {units}"
+            elif value:
+                description = str(value)
         if description:
             data_d5 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
             data_d5.set('key', 'd5')
