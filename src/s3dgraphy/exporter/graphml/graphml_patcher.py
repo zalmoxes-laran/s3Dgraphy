@@ -1471,16 +1471,51 @@ class GraphMLPatcher:
     # Convenience: full patch pipeline
     # -------------------------------------------------------------------------
 
-    def patch(self, output_path: str = None) -> Tuple[int, int, int, List[str]]:
+    def patch(self, output_path: str = None,
+              persist_auxiliary: bool = False
+              ) -> Tuple[int, int, int, List[str]]:
         """
         Run the complete patch pipeline.
 
         Args:
-            output_path: Optional output path (None = overwrite original)
+            output_path: Optional output path (None = overwrite original).
+            persist_auxiliary: Hybrid-C auxiliary-lifecycle policy (see
+                ``docs/dev-projects/HYBRID_C_AUXILIARY_LIFECYCLE.md``).
+                ``False`` (default, **volatile save**): drop nodes/edges
+                tagged ``injected_by`` and revert aux-overridden attributes
+                whose current value still matches the aux value, keeping
+                attributes the user manually re-edited in Blender. ``True``
+                (**bake**): emit everything verbatim and clear
+                ``injected_by`` / ``_aux_overrides`` tags so the enrichment
+                layer becomes graph-native.
 
         Returns:
             Tuple of (nodes_updated, nodes_added, edges_added, emid_problems)
         """
+        # Apply the Hybrid-C policy before patching, so the XML pass
+        # sees the post-policy in-memory graph.
+        from ...transforms.aux_tracking import (
+            apply_override_reversal_policy, strip_injected_content,
+            clear_aux_tags)
+        if persist_auxiliary:
+            report = clear_aux_tags(self.graph)
+            if report["injected_cleared"] or report["overrides_cleared"]:
+                print(f"[GraphMLPatcher] BAKE: cleared "
+                      f"{report['injected_cleared']} injected_by tags, "
+                      f"{report['overrides_cleared']} _aux_overrides entries")
+        else:
+            rev = apply_override_reversal_policy(self.graph)
+            if any(rev.values()):
+                print(f"[GraphMLPatcher] volatile: "
+                      f"{rev['reverted']} attrs reverted, "
+                      f"{rev['kept']} kept (user re-edited), "
+                      f"{rev['unseen']} unseen (kept)")
+            strip = strip_injected_content(self.graph)
+            if strip["nodes"] or strip["edges"]:
+                print(f"[GraphMLPatcher] volatile: stripped "
+                      f"{strip['nodes']} injected nodes, "
+                      f"{strip['edges']} injected edges")
+
         self.load()
         problems = self.validate_emids()
         nodes_updated = self.update_existing_nodes()

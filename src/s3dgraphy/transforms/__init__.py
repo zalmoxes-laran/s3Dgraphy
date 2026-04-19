@@ -13,8 +13,35 @@ from .compact import (
     compact_propagative_metadata,
 )
 
+from .aux_tracking import (
+    mark_as_injected,
+    is_injected,
+    record_attribute_override,
+    freeze_aux_value,
+    aux_overridden_attrs,
+    strip_injected_content,
+    apply_override_reversal_policy,
+    clear_aux_tags,
+    push_orphan,
+    iter_orphans,
+    clear_orphans,
+    MISSING_SENTINEL,
+)
+
 __all__ = [
     "prune_redundant_propagative_edges",
     "hoist_propagative_metadata",
     "compact_propagative_metadata",
+    "mark_as_injected",
+    "is_injected",
+    "record_attribute_override",
+    "freeze_aux_value",
+    "aux_overridden_attrs",
+    "strip_injected_content",
+    "apply_override_reversal_policy",
+    "clear_aux_tags",
+    "push_orphan",
+    "iter_orphans",
+    "clear_orphans",
+    "MISSING_SENTINEL",
 ]

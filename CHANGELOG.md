@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Hybrid-C auxiliary lifecycle (Phase 1 + 3)**. New module
+  ``s3dgraphy.transforms.aux_tracking`` providing the bookkeeping
+  primitives that let the GraphML exporters distinguish **graph-
+  native** content from **auxiliary-injected** content (DosCo, emdb,
+  pyArchInit, sources-list, resource-folders):
+  - ``mark_as_injected(obj, injector_id)`` / ``is_injected(obj)``
+    — tag enrichment children (PropertyNodes, LinkNodes, etc.)
+    added by an auxiliary.
+  - ``record_attribute_override(node, attr, injector_id, original_value)``
+    + ``freeze_aux_value(node, attr)`` — capture the pre-aux value
+    when an auxiliary mutates a host-node attribute (e.g. DosCo
+    setting ``DocumentNode.url``).
+  - ``apply_override_reversal_policy(graph)`` — per-attribute
+    policy used by the **volatile** save: if the current value
+    still matches the aux value, revert to the pre-aux original;
+    if the user re-edited the attribute afterwards, keep the
+    user value and drop the override record.
+  - ``strip_injected_content(graph)`` — remove every node/edge
+    tagged ``injected_by`` (volatile save).
+  - ``clear_aux_tags(graph)`` — drop all ``injected_by`` and
+    ``_aux_overrides`` records (bake save, promotion to graph-
+    native).
+  - Orphan reporting: ``push_orphan`` / ``iter_orphans`` /
+    ``clear_orphans`` — track aux rows whose key ID did not match
+    any host in the graph (UI surfacing deferred to Phase 2).
+- **``GraphMLExporter.export(path, persist_auxiliary=False)``** and
+  **``GraphMLPatcher.patch(path, persist_auxiliary=False)``** new
+  ``persist_auxiliary`` parameter:
+  - ``False`` (default, **volatile**): apply the reversal policy
+    and strip injected content before emitting. The on-disk
+    GraphML reflects only graph-native state; on next reload the
+    auxiliaries re-inject cleanly.
+  - ``True`` (**bake**): emit everything verbatim and clear the
+    ``injected_by`` / ``_aux_overrides`` bookkeeping. The
+    enrichment layer becomes graph-native going forward.
+- **User's Blender-native edits never lost**. The volatile save
+  preserves new nodes the user adds in Blender (no ``injected_by``
+  tag) and keeps attribute values the user manually re-edited
+  after an auxiliary applied (detected by comparing current value
+  to frozen aux value).
+- Locked in by 7 unit scenarios in ``test_aux_tracking.py`` and 3
+  end-to-end round-trips on the Great Temple GraphML
+  (``test_aux_roundtrip_graphml.py``), covering scenarios α
+  (volatile revert), β (user re-edit wins), γ (Blender-native
+  additions survive) and bake-then-reload idempotence.
+- **Phase 1b hookup plan** for the existing auxiliary importers
+  (DosCo / emdb / pyArchInit / sources-list / resource-folders)
+  documented in
+  ``docs/dev-projects/HYBRID_C_PHASE_1B_IMPORTER_HOOKS.md``;
+  code changes deferred to the next sprint.
+
 ### Changed
 
 - **AI extraction prompt rewritten for the unified schema** (v5.0,

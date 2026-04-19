@@ -30,7 +30,7 @@ class GraphMLExporter:
         self.node_registry = NodeRegistry()
         self.id_manager = IDManager()
 
-    def export(self, output_path: str):
+    def export(self, output_path: str, persist_auxiliary: bool = False):
         """
         Export Graph to GraphML Extended Matrix format.
 
@@ -39,9 +39,44 @@ class GraphMLExporter:
         TempluMare reference structure where the swimlane is the root container.
 
         Args:
-            output_path: Path where to save the GraphML file
+            output_path: Path where to save the GraphML file.
+            persist_auxiliary: Hybrid-C auxiliary-lifecycle policy (see
+                ``docs/dev-projects/HYBRID_C_AUXILIARY_LIFECYCLE.md``).
+                ``False`` (default, **volatile save**): drop nodes/edges
+                tagged ``injected_by`` and revert aux-overridden attributes
+                whose current value still matches the aux value, keeping
+                attributes the user manually re-edited in Blender. ``True``
+                (**bake**): emit everything verbatim and clear
+                ``injected_by`` / ``_aux_overrides`` tags so the enrichment
+                layer becomes graph-native.
         """
-        print(f"Starting GraphML export to {output_path}")
+        print(f"Starting GraphML export to {output_path} "
+              f"({'BAKE' if persist_auxiliary else 'volatile'} mode)")
+
+        # Apply the Hybrid-C policy BEFORE generating XML so every
+        # downstream pass sees the post-policy graph.
+        from ...transforms.aux_tracking import (
+            apply_override_reversal_policy, strip_injected_content,
+            clear_aux_tags)
+        if persist_auxiliary:
+            bake_report = clear_aux_tags(self.graph)
+            if bake_report["injected_cleared"] or bake_report["overrides_cleared"]:
+                print(f"  [bake] cleared {bake_report['injected_cleared']} "
+                      f"injected_by tags, {bake_report['overrides_cleared']} "
+                      f"_aux_overrides entries")
+        else:
+            # Volatile: revert aux-overridden attrs (per-attr policy),
+            # then drop injected children.
+            rev_report = apply_override_reversal_policy(self.graph)
+            if any(rev_report.values()):
+                print(f"  [volatile] attribute overrides: "
+                      f"{rev_report['reverted']} reverted, "
+                      f"{rev_report['kept']} kept (user re-edited), "
+                      f"{rev_report['unseen']} unseen (kept)")
+            strip_report = strip_injected_content(self.graph)
+            if strip_report["nodes"] or strip_report["edges"]:
+                print(f"  [volatile] stripped {strip_report['nodes']} "
+                      f"injected nodes and {strip_report['edges']} edges")
 
         # 1. Generate root XML with correct key definitions
         canvas = CanvasGenerator()
