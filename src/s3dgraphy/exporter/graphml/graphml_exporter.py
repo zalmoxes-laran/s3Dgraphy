@@ -1026,6 +1026,11 @@ class GraphMLExporter:
         local_author_copies: Dict[str, any] = {}
         author_nodes_list: List = []
         author_attachments: List = []
+        # Dedupe key: (source_local.node_id, original_author_uuid). Documents
+        # cited by multiple extractors would otherwise re-discover the same
+        # document→author edge once per chain, yielding parallel duplicate
+        # edges in the exported graphml.
+        seen_attachments: set = set()
 
         # Build a quick node_id → node map once (avoids O(N) re-scans).
         id_to_node = {n.node_id: n for n in self.graph.nodes}
@@ -1038,6 +1043,10 @@ class GraphMLExporter:
                 tgt = id_to_node.get(e.edge_target)
                 if tgt is None or not isinstance(tgt, AuthorNode):
                     continue
+                pair = (source_local.node_id, tgt.node_id)
+                if pair in seen_attachments:
+                    continue
+                seen_attachments.add(pair)
                 if tgt.node_id not in local_author_copies:
                     klass = tgt.__class__  # AuthorNode OR AuthorAINode
                     local = klass(

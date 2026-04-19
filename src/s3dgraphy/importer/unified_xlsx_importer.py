@@ -239,17 +239,21 @@ class UnifiedXLSXImporter:
                 f"Missing required sheets in {self.filepath}: "
                 f"{', '.join(missing)}. Expected: {', '.join(self._SHEETS)}."
             )
+        normalised: List[str] = []
         for sheet_name, aliases in self._COLUMN_ALIASES.items():
             df = sheets[sheet_name]
             rename = {col: aliases[col] for col in df.columns
                       if col in aliases and aliases[col] not in df.columns}
             if rename:
                 df.rename(columns=rename, inplace=True)
-                for src, dst in rename.items():
-                    self.warnings.append(
-                        f"{sheet_name}: column '{src}' normalised to '{dst}' "
-                        f"(accepted alias)."
-                    )
+                pairs = ", ".join(f"{src}→{dst}" for src, dst in rename.items())
+                normalised.append(f"{sheet_name} ({pairs})")
+        if normalised:
+            self.warnings.append(
+                "Column-name aliases accepted (consider updating your "
+                "StratiMiner prompt to use canonical names): "
+                + "; ".join(normalised)
+            )
         return sheets
 
     # ------------------------------------------------------------------
