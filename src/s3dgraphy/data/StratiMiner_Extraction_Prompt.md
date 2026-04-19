@@ -1,63 +1,142 @@
-# EM Extraction Prompt — v5.0
+# StratiMiner Extraction Prompt — v5.1
 **Extended Matrix (EM) — Unified xlsx schema for StratiMiner (DP-02)**
-*Version: 5.0 | Schema: em_data.xlsx (5 sheets)*
+*Schema: `em_data.xlsx` (5 sheets)*
 
 ---
 
 <!-- SECTION: PREAMBLE -->
 ## PREAMBLE
 
-**Lingua di lavoro:** `[LINGUA]`
-Tutto il testo estratto (VALUE, COMBINER_REASONING, citazioni EXTRACTOR) deve restare nella lingua del documento sorgente (romeno, italiano, francese, latino). I valori di PROPERTY_TYPE e AUTHOR_KIND restano in inglese: costituiscono un vocabolario controllato.
+**Working language.** All meta-instructions in this prompt are in English so you
+can follow them unambiguously regardless of the source document's language.
 
-**Contesto tecnico:** Questo prompt è progettato per essere usato con `openpyxl` in Python 3. L'output è un **singolo file `em_data.xlsx`** con 5 sheet tipizzati — un salto rispetto alle versioni v4.x che producevano due file distinti (`stratigraphy.xlsx` + `em_paradata.xlsx`). Il template vuoto, con header corretti e tooltip per ogni colonna, è in `s3dgraphy/templates/em_data_template.xlsx`: prendilo come base.
+**Output language policy.** All text you write into the xlsx — `VALUE`,
+`COMBINER_REASONING`, `EXTRACTOR_N` verbatim excerpts, `DISPLAY_NAME`,
+document titles — must be in: `[OUTPUT_LANGUAGE]`.
 
-**Doppio controllo obbligatorio prima del salvataggio:**
-1. I 5 sheet (`Units`, `Epochs`, `Claims`, `Authors`, `Documents`) sono tutti presenti con gli header corretti.
-2. Ogni riga `Claims` ha 14 colonne. Le colonne `EXTRACTOR_N`, `DOCUMENT_N`, `AUTHOR_N`, `AUTHOR_KIND_N` vanno sempre insieme come quadripla.
-3. Se è presente una seconda fonte (`EXTRACTOR_2` non vuoto), `COMBINER_REASONING` è **obbligatorio**.
-4. Ogni `VALUE` scalare e ogni citazione `EXTRACTOR_N` è tratta da un passo reale della fonte: **nessuna parafrasi, nessuna invenzione**.
-5. Ogni `AUTHOR_N` referenzia un `ID` presente nel sheet `Authors`; ogni `DOCUMENT_N` referenzia un `ID` presente in `Documents`.
-6. Esiste **una sola riga** per la stessa tripla (`TARGET_ID`, `TARGET2_ID`, `PROPERTY_TYPE`).
+Values of `PROPERTY_TYPE` and `AUTHOR_KIND` always stay in English (they
+are a controlled vocabulary).
+
+**Technical context.** The output file is a single `em_data.xlsx`
+produced with `openpyxl` (Python 3). Its schema is described below;
+the empty template (with column tooltips) ships at
+`s3dgraphy/templates/em_data_template.xlsx` — use it as the starting
+point.
+
+**Non-negotiable output constraints (check before saving):**
+
+1. All five sheets are present with the exact headers given below:
+   `Units`, `Epochs`, `Claims`, `Authors`, `Documents`.
+2. Every `Claims` row has exactly 14 columns. The quadruple
+   `(EXTRACTOR_N, DOCUMENT_N, AUTHOR_N, AUTHOR_KIND_N)` always moves
+   together.
+3. If `EXTRACTOR_2` is populated, `COMBINER_REASONING` is **mandatory**.
+4. Every `VALUE` and every `EXTRACTOR_N` excerpt is taken from a real
+   passage of the source: **no paraphrase, no invention**. If no
+   verbatim excerpt exists to support a claim, leave `EXTRACTOR_i`
+   **empty** and set `AUTHOR_KIND_i = "extractor"` — the claim is
+   your inference, clearly marked. Never synthesize a pseudo-excerpt
+   or a self-justifying sentence.
+5. Every `AUTHOR_N` references an `ID` present in the `Authors` sheet;
+   every `DOCUMENT_N` references an `ID` present in the `Documents`
+   sheet.
+6. There is **exactly one row** per triple (`TARGET_ID`, `TARGET2_ID`,
+   `PROPERTY_TYPE`).
+
+<!-- /SECTION: PREAMBLE -->
 
 ---
 
 <!-- SECTION: ATTRIBUTION -->
-## CONCETTO CHIAVE — ATTRIBUZIONE PER-CLAIM
+## KEY CONCEPT — PER-CLAIM ATTRIBUTION
 
-Ogni riga in `Claims` è una **asserzione** (fatto dichiarato su un'unità). Ogni asserzione ha uno o due **agenti attribuibili** — chi l'ha fatta — classificati dalla colonna `AUTHOR_KIND_N`:
+Each row in `Claims` is an **assertion** (a declared fact about a unit).
+Each assertion has one or two **attributable agents** — who said it —
+classified by the `AUTHOR_KIND_N` column:
 
-- **`author`** — la claim è **trascritta verbatim** o parafrasata minimamente dall'autore del PDF. Esempio: il PDF dice "US001 is dated to 100 A.D. based on ceramic fragment" → `AUTHOR_KIND_1 = author`, `AUTHOR_1` = il codice dell'autore del PDF.
-- **`extractor`** — la claim è **dedotta da te** (l'AI, StratiMiner) partendo dal testo del PDF, ma non è dichiarata esplicitamente dall'autore. Esempio: il PDF descrive solo ceramica datata, tu inferisci la datazione dell'US → `AUTHOR_KIND_1 = extractor`, `AUTHOR_1` = il tuo codice `AI.01`.
+- **`author`** — the claim is **transcribed verbatim** (or minimally
+  paraphrased) from the PDF author. Example: the PDF says "US001 is
+  dated to 100 A.D. based on ceramic fragment" → `AUTHOR_KIND_1 =
+  author`, `AUTHOR_1 = <the PDF author's Authors.ID>`.
+- **`extractor`** — the claim is **inferred by you** (the AI,
+  StratiMiner) from the text, but is not explicitly stated by the
+  author. Example: the PDF describes ceramic sherds of a specific
+  style, and you infer the dating → `AUTHOR_KIND_1 = extractor`,
+  `AUTHOR_1 = AI.01` (your id in the `Authors` sheet).
 
-Questa distinzione è **critica**: i diagnostics di s3Dgraphy usano `AUTHOR_KIND_N` per capire chi ha introdotto un'eventuale incoerenza cronologica o un ciclo stratigrafico. Mai attribuire all'autore del PDF una deduzione tua.
+This distinction is **critical**: the s3Dgraphy diagnostics layer uses
+`AUTHOR_KIND_N` to route chronology paradoxes and stratigraphic cycles
+to the right reviewer. Never attribute your own inference to the PDF
+author.
+
+<!-- /SECTION: ATTRIBUTION -->
 
 ---
 
 <!-- SECTION: OUTPUT -->
-## FORMATO DI OUTPUT — `em_data.xlsx` (5 sheet)
+## OUTPUT FORMAT — `em_data.xlsx` (5 sheets)
 
-### Sheet 1 — `Units` (scheletro stratigrafico)
+### Sheet 1 — `Units` (stratigraphic skeleton)
 
-| # | Colonna | Note |
-|---|---------|------|
-| 1 | ID | Identificatore unità (`C01`, `TM_USM01`, ecc.) |
-| 2 | TYPE | `US`, `USVs`, `USVn`, `SF`, `VSF`, `USD`, `serSU`, `serUSD`, `serUSVn`, `serUSVs`, `TSU`, `SE`, `BR` |
-| 3 | NAME | Etichetta breve (opzionale). Se vuota, viene usato `ID`. |
+| # | Column | Notes |
+|---|--------|-------|
+| 1 | `ID` | Unit identifier (`C01`, `TM_USM01`, …) |
+| 2 | `TYPE` | Stratigraphic class — see §TYPE POLICY below |
+| 3 | `NAME` | Short label (optional). Falls back to `ID` when empty. |
 
-**Nota importante**: questo sheet contiene **solo dichiarazioni di esistenza**. Ogni fatto sull'unità (dimensioni, materiali, datazione, rapporti stratigrafici) va in `Claims`.
+**Only declare the unit's existence here.** Every fact about it
+(dimensions, materials, dating, relationships) goes into `Claims`.
 
-### Sheet 2 — `Epochs` (swimlane / fasi non sovrapposte)
+### §TYPE POLICY — choosing between US / USD / USVs / USVn
 
-| # | Colonna | Note |
-|---|---------|------|
-| 1 | ID | `E1`, `E2`, ..., oppure `PH0`, `PH1`, ... (codici di fase) |
-| 2 | NAME | Etichetta leggibile (`"II A.D."`, `"PH2 – Temple construction and use"`) |
-| 3 | START | Anno iniziale, intero (negativo = a.C.) |
-| 4 | END | Anno finale |
-| 5 | COLOR | Colore swimlane in hex `#RRGGBB` (opzionale) |
+These four types are not interchangeable. Apply the following rules
+strictly; when in doubt prefer the more concrete type (`US` > `USD`
+> `USVs` > `USVn`):
 
-**Fasi obbligatorie** per questa case-study (tutte non sovrapposte):
+- **`US`** — *real, preserved, physically present*. You can see and
+  measure it on site today. A wall that still stands, a layer of
+  earth still in place, a stone foundation visible in the trench.
+
+- **`USD`** — *real, preserved, known only through documentation*.
+  The physical object existed and is described by past excavation
+  reports or archival sources, but you cannot observe it today
+  (covered by later layers, destroyed, removed to a museum, only
+  present in photographs or drawings). Documentary reconstruction
+  of a real unit.
+
+- **`USVs`** — *virtual reconstruction of a non-preserved element
+  **that has left a physical trace***. The element itself no longer
+  exists, but there is concrete evidence of it on preserved neighbours:
+  the missing upper drum of a column (with its lower drum still in
+  place), the stone slabs that covered a pavement (whose impressions
+  are preserved in the mortar substrate), the roof tiles inferred
+  from collapse layers. The trace is physical, not only textual.
+
+- **`USVn`** — *virtual reconstruction of a non-existing element
+  with **no physical trace***. A purely hypothetical element
+  postulated on typological grounds, comparanda, or architectural
+  treatises. No material evidence on site. Use sparingly — this is
+  the least concrete type and should be used only when a
+  reconstruction hypothesis has no preserved correlate.
+
+Other stratigraphic classes: `SF` (Special Find, real portable
+object), `VSF` (Virtual Special Find, hypothetical object),
+`serSU` / `serUSD` / `serUSVn` / `serUSVs` (series of similar
+units), `TSU` (Technical SU, a working-unit for analyses), `SE`
+(Stratigraphic Event), `BR` (Continuity / bridge node).
+
+### Sheet 2 — `Epochs` (swimlanes / non-overlapping phases)
+
+| # | Column | Notes |
+|---|--------|-------|
+| 1 | `ID` | `E1`, `E2`, …, or phase codes `PH0`, `PH1`, … |
+| 2 | `NAME` | Human-readable (e.g. `"II A.D."`) |
+| 3 | `START` | Integer year (negative = BCE) |
+| 4 | `END` | Integer year |
+| 5 | `COLOR` | Swimlane fill `#RRGGBB` (optional) |
+
+Epochs **must be non-overlapping**. For this case study (Templu Mare,
+Sarmizegetusa Regia), five phases are recommended:
 
 | ID | NAME | START | END |
 |----|------|-------|-----|
@@ -67,163 +146,285 @@ Questa distinzione è **critica**: i diagnostics di s3Dgraphy usano `AUTHOR_KIND
 | PH3 | PH3 – Post-Roman disturbance | 271 | 1974 |
 | PH4 | PH4 – Modern archaeological documentation | 1975 | 2015 |
 
-Per aggiungere nuove epoche: inserirle in `Epochs` e giustificarle in `Claims` con una riga `PROPERTY_TYPE = epoch_start_rationale` / `epoch_end_rationale` (vedere §PART E).
+To add a non-standard epoch, declare it here and justify it via
+`Claims` rows with `PROPERTY_TYPE = epoch_start_rationale` /
+`epoch_end_rationale` (see §VOCABULARY).
 
-### Sheet 3 — `Authors` (catalogo normalizzato)
+### Sheet 3 — `Authors` (normalized catalog)
 
-| # | Colonna | Note |
-|---|---------|------|
-| 1 | ID | `A.01`, `A.02`, ... per umani. `AI.01`, `AI.02`, ... per AI. |
-| 2 | KIND | `author` (umano) o `extractor` (AI). Deve concordare col prefisso in `ID`. |
-| 3 | DISPLAY_NAME | Nome per UI, es. `"Diaconescu, Alexandru"` o `"StratiMiner-v1"`. |
-| 4 | ORCID | Per umani; versione modello / pipeline-id per AI. Opzionale. |
-| 5 | AFFILIATION | Opzionale. |
+| # | Column | Notes |
+|---|--------|-------|
+| 1 | `ID` | `A.01`, `A.02`, … for humans. `AI.01`, `AI.02`, … for AI agents. |
+| 2 | `KIND` | `author` (human) or `extractor` (AI). Must match the ID prefix. |
+| 3 | `DISPLAY_NAME` | Display name |
+| 4 | `ORCID` | ORCID for humans; model version / pipeline id for AI. Optional. |
+| 5 | `AFFILIATION` | Optional. |
 
-Devi registrare **te stesso** (StratiMiner) in questo sheet con una riga `AI.01` / `KIND=extractor` / `DISPLAY_NAME=StratiMiner-v1` (o la versione corrente). Tutte le righe `Claims` con `AUTHOR_KIND_N=extractor` referenziano questa riga.
+**You must register yourself** in this sheet with a row
+`AI.01` / `KIND = extractor` / `DISPLAY_NAME = StratiMiner-vX` (use
+your current model version). Every `Claims` row with
+`AUTHOR_KIND_N = extractor` references this row.
 
-### Sheet 4 — `Documents` (catalogo fonti)
+### Sheet 4 — `Documents` (source catalog)
 
-| # | Colonna | Note |
-|---|---------|------|
-| 1 | ID | `D.01`, `D.02`, ... |
-| 2 | FILENAME | Nome file su disco. |
-| 3 | TITLE | Titolo bibliografico completo. |
-| 4 | YEAR | Anno di pubblicazione (intero). |
-| 5 | AUTHOR_IDS | ID degli autori del DOCUMENTO (virgola-separati), dal sheet `Authors`. Distinto dagli autori delle singole claim. |
+| # | Column | Notes |
+|---|--------|-------|
+| 1 | `ID` | `D.01`, `D.02`, … (see §SOURCES PROVIDED for the numbering policy) |
+| 2 | `FILENAME` | Filename on disk. |
+| 3 | `TITLE` | Full bibliographic title. |
+| 4 | `YEAR` | Integer publication year. |
+| 5 | `AUTHOR_IDS` | `Authors.ID`s of the DOCUMENT authors (comma-separated). Distinct from the per-claim authors! |
 
-### Sheet 5 — `Claims` (la tabella principale — long-table)
+### Sheet 5 — `Claims` (the main table — long-table)
 
-Una riga per ogni fatto asserito. **14 colonne fisse**:
+One row per asserted fact. **14 fixed columns**:
 
-| # | Colonna | Note |
-|---|---------|------|
-| 1 | TARGET_ID | Soggetto della claim. Di solito un `Units.ID`. Per claim sull'epoca stessa, un `Epochs.ID`. Per relazioni stratigrafiche, l'estremo "source". |
-| 2 | TARGET2_ID | Solo per claim relazionali o `belongs_to_epoch`. Vuoto per claim scalari. |
-| 3 | PROPERTY_TYPE | Vocabolario controllato (§VOCABULARY). |
-| 4 | VALUE | Valore scalare (stringa o numero). Vuoto per claim relazionali. |
-| 5 | UNITS | Unità di misura per valori numerici (`m`, `cm`, `kg`, `AD`, `BC`). Opzionale. |
-| 6 | COMBINER_REASONING | Obbligatorio se `EXTRACTOR_2` popolato. Spiega come le due fonti si combinano. |
-| 7 | EXTRACTOR_1 | Citazione verbatim + puntatore dalla fonte 1 (es. `"Groapă care taie C02" [p. 5]`). |
-| 8 | DOCUMENT_1 | `Documents.ID` della fonte 1. |
-| 9 | AUTHOR_1 | `Authors.ID` dell'agente che ha fatto **questa claim** (non necessariamente l'autore del documento). |
-| 10 | AUTHOR_KIND_1 | `author` o `extractor`. |
-| 11 | EXTRACTOR_2 | Opzionale: seconda fonte. |
-| 12 | DOCUMENT_2 | Id documento seconda fonte. |
-| 13 | AUTHOR_2 | Id autore seconda fonte. |
-| 14 | AUTHOR_KIND_2 | `author` o `extractor` per la seconda fonte. |
+| # | Column | Notes |
+|---|--------|-------|
+| 1 | `TARGET_ID` | Subject of the claim. Usually a `Units.ID`; for claims about an epoch itself, an `Epochs.ID`. For relations, the "source" endpoint. |
+| 2 | `TARGET2_ID` | Only for relational claims or `belongs_to_epoch`. Empty for scalar qualia. |
+| 3 | `PROPERTY_TYPE` | Controlled vocabulary (§VOCABULARY). |
+| 4 | `VALUE` | Scalar value (string / number). Empty for relational claims. |
+| 5 | `UNITS` | Unit of measure for numeric values (`m`, `cm`, `kg`, `AD`, `BC`). Optional. |
+| 6 | `COMBINER_REASONING` | Mandatory iff `EXTRACTOR_2` is populated. Explains how the two sources are combined. |
+| 7 | `EXTRACTOR_1` | Verbatim excerpt + pointer from source 1 (e.g. `"groapă care taie C02" [p. 5]`). Empty if the claim is pure inference. |
+| 8 | `DOCUMENT_1` | `Documents.ID` for source 1. |
+| 9 | `AUTHOR_1` | `Authors.ID` of the agent who made **this claim** (not necessarily the document author). |
+| 10 | `AUTHOR_KIND_1` | `author` or `extractor`. |
+| 11 | `EXTRACTOR_2` | Optional second source. |
+| 12 | `DOCUMENT_2` | Second source document id. |
+| 13 | `AUTHOR_2` | Second source author id. |
+| 14 | `AUTHOR_KIND_2` | `author` or `extractor` for source 2. |
+
+### §VALUE vs §EXTRACTOR — how to populate them correctly
+
+This is the single most common mistake in automated extraction. The
+two columns serve **different roles** and must **both** be filled
+for scalar qualia:
+
+- `VALUE` is the **distilled fact**: the concrete datum a downstream
+  consumer will render in a UI or a chart. For a `length` qualia,
+  `VALUE = "14.5"` (and `UNITS = "m"`). For `material_type`,
+  `VALUE = "limestone"`. For `definition`, `VALUE = "Foundation of
+  the colonnade"`.
+- `EXTRACTOR_N` is the **verbatim excerpt** from the source that
+  supports the value, including a page/figure pointer in square
+  brackets. For the length example:
+  `EXTRACTOR_1 = "foundation USV100 has dimension 9.7 x 14.5 meters" [sec. Virtual Activity 4]`.
+
+Always produce **both**. A row with EXTRACTOR populated but VALUE
+empty is incomplete — the downstream tools cannot read the numeric
+datum out of free-form prose. A row with VALUE populated but
+EXTRACTOR empty is weakly attributed (see §PREAMBLE rule 4: acceptable
+only when `AUTHOR_KIND_N = "extractor"` and you explicitly own the
+inference).
+
+**Worked examples:**
+
+| `TARGET_ID` | `PROPERTY_TYPE` | `VALUE` | `UNITS` | `EXTRACTOR_1` |
+|---|---|---|---|---|
+| `USV100` | `length` | `14.5` | `m` | `"foundation USV100 has dimension 9.7 x 14.5 meters" [sec. VAct 4]` |
+| `USV100` | `width` | `9.7` | `m` | `"foundation USV100 has dimension 9.7 x 14.5 meters" [sec. VAct 4]` |
+| `SU003` | `conservation_state` | `Heavily destroyed, constant descending slope S-N` | `` | `"All of these but the entrance suffered a deep destruction … constant descending slope from South to North" [sec. VAct 1]` |
+| `TM_VESTIBULUM` | `length` | `5.60` | `m` | `"The vestibule, about 5.60 m long, opens on the east side of the cella" [p. 12]` |
+| `USV104` | `material_type` | `limestone` | `` | `"The columns are made of local limestone, with shell fragments visible on the surface" [p. 14]` |
+
+When the source expresses the value as a range, choose the midpoint
+or the most representative figure for `VALUE` and carry the original
+range verbatim in `EXTRACTOR_N` (e.g. `VALUE = "0.22"` for "20-25 cm
+thick" with `UNITS = "m"` and the full quote in the excerpt).
+
+When the source gives multiple dimensions on one sentence ("9.7 x
+14.5 meters"), split them into **one row per qualia** (`length`,
+`width`) that **reuse the same EXTRACTOR_1 text** (the same excerpt
+legitimately supports both rows).
+
+<!-- /SECTION: OUTPUT -->
 
 ---
 
 <!-- SECTION: VOCABULARY -->
 ## VOCABULARY — `PROPERTY_TYPE`
 
-Il valore di `PROPERTY_TYPE` determina la semantica della riga. Quattro famiglie:
+The `PROPERTY_TYPE` value determines the row semantics. Four families:
 
-### 1. Qualia scalari (VALUE = stringa o numero)
+### 1. Scalar qualia (`VALUE` = string or number)
 
-**Definizione / identità:** `definition`, `description`, `interpretation`, `function_interpretation`, `primary_function`, `cult_interpretation`, `building_type`, `conservation_state`, `artistic_style`
+**Definition / identity:** `definition`, `description`, `interpretation`,
+`function_interpretation`, `primary_function`, `cult_interpretation`,
+`building_type`, `conservation_state`, `artistic_style`
 
-**Geometria / dimensioni:** `length`, `width`, `height`, `thickness_min`, `thickness_max`, `area`, `depth_from_surface`, `foundation_offset`, `height_approx`, `capital_height`, `shaft_height`, `base_height`, `portico_length`, `portico_width`, `corridor_width`, `column_grid`, `intercolumnium`, `module_column`, `step_dimensions`, `elevation_top`, `elevation_difference`
+**Geometry / dimensions:** `length`, `width`, `height`, `thickness_min`,
+`thickness_max`, `area`, `depth_from_surface`, `foundation_offset`,
+`height_approx`, `capital_height`, `shaft_height`, `base_height`,
+`portico_length`, `portico_width`, `corridor_width`, `column_grid`,
+`intercolumnium`, `module_column`, `step_dimensions`, `elevation_top`,
+`elevation_difference`
 
-**Materiale / tecnica:** `material_type`, `construction_technique`, `mortar_type`, `color`, `texture`, `surface_treatment`, `proportional_system`, `capital_proportion_note`, `imoscapo_position`, `construction_error`, `survey_precision`
+**Material / technique:** `material_type`, `construction_technique`,
+`mortar_type`, `color`, `texture`, `surface_treatment`,
+`proportional_system`, `capital_proportion_note`, `imoscapo_position`,
+`construction_error`, `survey_precision`
 
-**Interpretazione archeologica:** `comparanda`, `phase_interpretation`, `construction_phase`, `absolute_position`, `spoliation_evidence`, `inauguratio_evidence`, `interpretation_alternative`, `lintel_alternative`, `repositioning_note`, `restoration_note`, `dimensions_note`, `shape`
+**Archaeological interpretation:** `comparanda`, `phase_interpretation`,
+`construction_phase`, `absolute_position`, `spoliation_evidence`,
+`inauguratio_evidence`, `interpretation_alternative`,
+`lintel_alternative`, `repositioning_note`, `restoration_note`,
+`dimensions_note`, `shape`
 
-**Flag editoriali (meta-claim):**
-- `ocr_error_note` — VALUE contiene il testo OCR errato; una riga separata con il valore corretto dev'essere presente.
-- `unit_id_note` — VALUE documenta che l'ID è virtuale (assegnato da te, non dall'autore originale).
-- `stratigraphic_note` — VALUE giustifica un'identificazione EQUALS o un ragionamento stratigrafico complesso.
+**Editorial flags (meta-claims):**
+- `ocr_error_note` — `VALUE` is the wrong OCR text; a separate row with
+  the corrected value must also be present.
+- `unit_id_note` — documents that the unit ID is virtual (assigned by
+  you, not by the original excavators).
+- `stratigraphic_note` — justifies an `equals` identification or a
+  complex stratigraphic reasoning.
 
-### 2. Temporali (VALUE = anno intero o stringa con UNITS)
+### 2. Temporal qualia (`VALUE` = integer year or string with `UNITS`)
 
-- `absolute_time_start` — seed cronologico per il Terminus Post Quem (TPQ).
-- `absolute_time_end` — seed cronologico per il Terminus Ante Quem (TAQ).
-- `terminus_post_quem`, `terminus_ante_quem`, `period_interpretation` — giudizi cronologici morbidi, non entrano nel solver ma documentano il ragionamento.
-- `epoch_start_rationale`, `epoch_end_rationale` — giustificano i confini di un'epoca (TARGET_ID = un `Epochs.ID`).
+- `absolute_time_start` — TPQ seed for the chronology solver.
+- `absolute_time_end` — TAQ seed for the chronology solver.
+- `terminus_post_quem`, `terminus_ante_quem`, `period_interpretation`
+  — soft chronological judgements; not consumed by the solver but
+  documented.
+- `epoch_start_rationale`, `epoch_end_rationale` — justify epoch
+  boundaries (use `TARGET_ID = Epochs.ID`).
 
-Le claim temporali possono avere come `TARGET_ID` un'US **oppure** un'epoca. Quando sono sull'epoca, funzionano come override swimlane-level della cronologia dichiarata nell'header di `Epochs` (il resolver di s3Dgraphy preferisce il PropertyNode rispetto all'header).
+Temporal claims can have `TARGET_ID` = a unit OR an epoch. When on an
+epoch, they act as swimlane-level overrides of the header chronology.
 
-### 3. Appartenenza a epoca (struttura, non valore)
+### 3. Epoch membership (structure, not value)
 
-- `belongs_to_epoch` — collega un'US a un'epoca. `TARGET_ID` = `Units.ID`, `TARGET2_ID` = `Epochs.ID`. `VALUE` lasciato vuoto.
+- `belongs_to_epoch` — ties a unit to an epoch. `TARGET_ID =
+  Units.ID`, `TARGET2_ID = Epochs.ID`. `VALUE` stays empty.
 
-### 4. Relazioni stratigrafiche (struttura, non valore)
+### 4. Stratigraphic relations (structure, not value)
 
-Una riga per ogni rapporto. `TARGET_ID` = unità "source", `TARGET2_ID` = unità "target". `VALUE` lasciato vuoto. Tipi supportati:
+One row per relationship. `TARGET_ID` = source endpoint,
+`TARGET2_ID` = target endpoint. `VALUE` stays empty. Supported types:
 
-| PROPERTY_TYPE | Semantica |
-|---------------|-----------|
-| `overlies` | A sta sopra B; A più recente di B |
-| `is_overlain_by` | inverso di `overlies` |
-| `cuts` | A taglia B; A più recente di B |
-| `is_cut_by` | inverso di `cuts` |
-| `fills` | A riempie B; A più recente di B |
-| `is_filled_by` | inverso di `fills` |
-| `abuts` | A si appoggia a B; A più recente di B |
-| `is_abutted_by` | inverso di `abuts` |
-| `bonded_to` | A legato fisicamente a B (bidirezionale) |
-| `equals` | A è la stessa entità fisica di B (bidirezionale, ma vedere §EQUALS) |
-| `is_after` | A più recente di B (generica) |
-| `is_before` | A più ancient di B (inverso) |
+| PROPERTY_TYPE | Semantics |
+|---|---|
+| `overlies` | A rests above B; A is more recent than B |
+| `is_overlain_by` | inverse of `overlies` |
+| `cuts` | A cuts B; A is more recent than B |
+| `is_cut_by` | inverse of `cuts` |
+| `fills` | A fills B; A is more recent than B |
+| `is_filled_by` | inverse of `fills` |
+| `abuts` | A leans on B; A is more recent than B |
+| `is_abutted_by` | inverse of `abuts` |
+| `bonded_to` | A is physically bonded to B (bidirectional) |
+| `equals` | A is the same physical entity as B (bidirectional; see §EQUALS) |
+| `is_after` | A is more recent than B (generic) |
+| `is_before` | A is more ancient than B (inverse) |
 
-**Regola di simmetria**: per rapporti direzionali (`overlies/is_overlain_by`, `cuts/is_cut_by`, `fills/is_filled_by`, `abuts/is_abutted_by`), genera **solo una direzione** — l'importer deriva automaticamente l'inverso a import time. Preferisci sempre la direzione primaria (`overlies`, `cuts`, `fills`, `abuts`). Le relazioni bidirezionali (`bonded_to`, `equals`) vanno registrate una sola volta.
+**Symmetry rule:** for directional relations
+(`overlies/is_overlain_by`, `cuts/is_cut_by`, `fills/is_filled_by`,
+`abuts/is_abutted_by`), output **only the primary direction** —
+the importer derives the inverse automatically. Prefer the primary
+form (`overlies`, `cuts`, `fills`, `abuts`). Bidirectional relations
+(`bonded_to`, `equals`) are recorded once.
+
+<!-- /SECTION: VOCABULARY -->
 
 ---
 
 <!-- SECTION: MULTISOURCE -->
-## REGOLA MULTI-SORGENTE (Combiner)
+## MULTI-SOURCE RULE (Combiner)
 
-Quando due fonti supportano la stessa claim — es. Diaconescu 2013 e Demetrescu 2012 concordano sulla datazione di US001 — **non aggiungere righe separate**. Una sola riga `Claims` con:
+When two sources support the same claim — say Diaconescu 2013 and
+Demetrescu 2012 agree on the dating of US001 — **do not add separate
+rows**. A single `Claims` row with:
 
-- `EXTRACTOR_1` / `DOCUMENT_1` / `AUTHOR_1` / `AUTHOR_KIND_1` = prima fonte
-- `EXTRACTOR_2` / `DOCUMENT_2` / `AUTHOR_2` / `AUTHOR_KIND_2` = seconda fonte
-- `COMBINER_REASONING` = sintesi: le fonti concordano/divergono/si contraddicono; quale valore è stato scelto come canonico e perché.
+- `EXTRACTOR_1` / `DOCUMENT_1` / `AUTHOR_1` / `AUTHOR_KIND_1` = first source
+- `EXTRACTOR_2` / `DOCUMENT_2` / `AUTHOR_2` / `AUTHOR_KIND_2` = second source
+- `COMBINER_REASONING` = synthesis: agree / partial disagreement /
+  contradict; which value was chosen as canonical and why.
 
-L'importer s3Dgraphy crea un `CombinerNode` che lega le due fonti.
+The s3Dgraphy importer builds a `CombinerNode` linking the two
+sources. If **more than two** sources agree, pick the two most
+authoritative for the `_1` / `_2` slots and cite the others in
+`COMBINER_REASONING`.
 
-Se **più di due fonti** concordano: sceglierne le due più autorevoli per le colonne EXTRACTOR_1/2 e citare le altre nel testo di `COMBINER_REASONING`.
+<!-- /SECTION: MULTISOURCE -->
 
 ---
 
 <!-- SECTION: EQUALS -->
-## PROTOCOLLO EQUALS
+## EQUALS PROTOCOL
 
-`equals` collega due US distinte che rappresentano **la stessa entità fisica** documentata indipendentemente da campagne di scavo / ricercatori diversi.
+`equals` links two distinct unit IDs that represent the **same
+physical entity** documented independently by different excavation
+campaigns or researchers.
 
-**Quando usare `equals`:**
-- Due campagne hanno assegnato codici diversi alla stessa deposizione, muro o struttura.
-- Una ricerca archivistica successiva conferma l'identità (non solo la somiglianza) di due unità separate.
+**When to use `equals`:**
+- Two campaigns assigned different codes to the same deposit, wall,
+  or structure.
+- Archival research later confirmed the identity (not just similarity)
+  of two separately-catalogued units.
 
-**Quando NON usare `equals`:**
-- Due descrizioni della stessa unità in due fonti diverse → sono righe multi-sorgente nel sheet `Claims` (vedere §MULTISOURCE).
-- Unità spazialmente vicine o funzionalmente simili ma non dimostratamente identiche.
-- Identificazioni speculative non documentate in almeno una fonte.
+**When NOT to use `equals`:**
+- Two descriptions of the same unit by two different sources →
+  multi-source row (see §MULTISOURCE).
+- Units that are spatially close or functionally similar but not
+  demonstrably identical.
+- Speculative identifications not documented in at least one source.
 
-**Obbligo di documentazione:** ogni relazione `equals` deve essere accompagnata da **almeno una** riga `Claims` con `PROPERTY_TYPE = stratigraphic_note` sul `TARGET_ID` coinvolto, che spiega l'identificazione con citazione verbatim o riferimento incrociato esplicito. Se l'identificazione è un'inferenza editoriale tua, aggiungi anche una riga `unit_id_note` con `AUTHOR_KIND = extractor`.
+**Documentation requirement:** every `equals` relationship must be
+accompanied by **at least one** `Claims` row with `PROPERTY_TYPE =
+stratigraphic_note` on one of the involved `TARGET_ID`s, explaining
+the identification with a verbatim quote or explicit cross-reference.
+If the identification is your own editorial inference, also add a
+`unit_id_note` row with `AUTHOR_KIND = extractor`.
+
+<!-- /SECTION: EQUALS -->
 
 ---
 
 <!-- SECTION: VIRTUAL -->
-## POLITICA DEGLI ID VIRTUALI
+## VIRTUAL IDs POLICY
 
-Alcune unità in questo dataset hanno **ID virtuali** assegnati dalla sessione di documentazione EM, non dai rapporti di scavo originali (es. `TM_USM01–08`, `TM_VESTIBULUM`, `TM_PRONAOS`, `TM_NAOS`, `TM_CUBICULA`, `TM_CANALE_FASE2`, `TM_SE_DESTRUCTION170`, `TM_SF01`, `TM_SF02`).
+Some units have **virtual IDs** assigned by the documentation session,
+not by the original excavation reports (e.g. `TM_USM01–08`,
+`TM_VESTIBULUM`, `TM_PRONAOS`, `TM_NAOS`, `TM_CUBICULA`). This happens
+when historical documents describe real structures without assigning
+them a systematic stratigraphic numbering.
 
-Succede quando i documenti storici descrivono strutture reali senza assegnare loro una numerazione stratigrafica sistematica.
+**Obligations:**
+1. Declare the unit in `Units` as usual.
+2. Add a `Claims` row with `PROPERTY_TYPE = unit_id_note`,
+   `AUTHOR_KIND_1 = extractor`, `AUTHOR_1 = AI.01` (or your code),
+   `VALUE` explaining the identification reasoning and stating that
+   the original authors do not use this ID.
+3. The physical unit is real (or virtually reconstructed per the
+   §TYPE POLICY); only the code is yours.
+4. If a later campaign documented the same structure with a
+   different code, add a `Claims` row with `PROPERTY_TYPE = equals`
+   plus a supporting `stratigraphic_note`.
 
-**Obblighi:**
-1. Dichiara l'unità in `Units` come al solito.
-2. Aggiungi una riga `Claims` con `PROPERTY_TYPE = unit_id_note`, `AUTHOR_KIND_1 = extractor`, `AUTHOR_1 = AI.01` (o il tuo codice), `VALUE` che spiega il ragionamento identificativo e precisa che gli autori originali non usano questo ID.
-3. L'unità stratigrafica fisica è reale; solo il codice identificativo è tuo.
-4. Se una campagna successiva ha documentato la stessa struttura con un codice diverso, aggiungi una riga `Claims` con `PROPERTY_TYPE = equals` + una `stratigraphic_note` di supporto.
+**Naming convention:** campaign prefix + type + progressive number
+(`TM_USM08`, `TM_US09`). **Do not** embed phase suffixes in the ID
+itself (avoid `TM_USM05_FASE2`): each phase of a structural element
+is a distinct unit with its own ID in the series.
 
-**Naming convention:** prefisso campagna + tipo + numero progressivo (`TM_USM08`, `TM_US09`). Non inserire suffissi di fase nel nome (evita `TM_USM05_FASE2`): ogni fase di un elemento è un'unità distinta con il suo ID.
+<!-- /SECTION: VIRTUAL -->
+
+---
+
+<!-- SECTION: SOURCES_PROVIDED -->
+## SOURCES PROVIDED
+
+[SOURCES_BLOCK]
+
+<!-- /SECTION: SOURCES_PROVIDED -->
 
 ---
 
 <!-- SECTION: VALIDATION -->
-## VALIDAZIONE FINALE
+## FINAL VALIDATION
 
-Eseguire questo script prima del salvataggio. I risultati vengono scritti su stdout. Correggere ogni problema segnalato prima di consegnare.
+Run this script before saving. Results go to stdout. Fix every reported
+issue before delivering.
 
 ```python
 from openpyxl import load_workbook
@@ -327,66 +528,97 @@ else:
 ---
 
 <!-- SECTION: STRATIGRAPHY_ONLY -->
-## MODALITÀ STRATIGRAPHY-ONLY (opzionale, per preparazione manuale)
+## STRATIGRAPHY-ONLY MODE (optional, for manual legacy migration)
 
-Per dataset archeologici preesistenti con rapporti stratigrafici già espliciti (banche dati PyArchInit, schede cartacee digitalizzate, ecc.) è possibile generare un `em_data.xlsx` **minimale** senza attribuzioni paradata:
+For pre-existing archaeological datasets with already-explicit
+stratigraphic relations (PyArchInit databases, digitised paper
+records, etc.) it is possible to build a **minimal** `em_data.xlsx`
+without a paradata chain:
 
-1. Compila `Units`, `Epochs` e `Authors` (solo 1 riga: l'editor umano, `A.01`).
-2. Compila `Documents` solo se esistono fonti citabili.
-3. In `Claims`, inserisci solo:
-   - righe `belongs_to_epoch` (epoch membership)
-   - righe per le relazioni stratigrafiche (`overlies`, `cuts`, ecc.)
-   - opzionalmente, una riga `definition` per US con descrizione breve
+1. Fill `Units`, `Epochs` and `Authors` (a single row: the human
+   curator, `A.01`).
+2. Fill `Documents` only if citable sources exist.
+3. In `Claims`, include only:
+   - `belongs_to_epoch` rows (epoch membership)
+   - stratigraphic-relation rows (`overlies`, `cuts`, …)
+   - optionally one `definition` row per unit with a short description.
 
-In tutte le righe, `AUTHOR_1 = A.01`, `AUTHOR_KIND_1 = author`, `EXTRACTOR_1` / `DOCUMENT_1` = `""` (vuoti). Il grafo risultante avrà la struttura stratigrafica completa ma nessuna catena paradata; l'importer s3Dgraphy crea i PropertyNode con `has_author` diretto al curatore umano. Puoi arricchire il paradata in un secondo tempo aggiungendo righe con fonti / extractor.
+In every row, `AUTHOR_1 = A.01`, `AUTHOR_KIND_1 = author`,
+`EXTRACTOR_1` / `DOCUMENT_1` = `""` (empty). The resulting graph has
+the full stratigraphic structure but no paradata chain; the s3Dgraphy
+importer wires the PropertyNodes with a direct `has_author` edge to
+the curator. You can enrich the paradata later by adding rows with
+source / extractor attributions.
 
 <!-- /SECTION: STRATIGRAPHY_ONLY -->
 
 ---
 
 <!-- SECTION: CHECKLIST -->
-## CHECKLIST DI FINE SESSIONE
+## END-OF-SESSION CHECKLIST
 
-**Struttura file**
-- [ ] `em_data.xlsx` contiene i 5 sheet obbligatori con header esatti.
-- [ ] Nessuno sheet extra o residuo da bozze precedenti.
+**File structure**
+- [ ] `em_data.xlsx` contains the 5 required sheets with exact headers.
+- [ ] No extra / stray sheets.
 
 **Units**
-- [ ] Ogni US ha un ID unico e un TYPE tra quelli dichiarati.
-- [ ] Ogni unità virtuale ha una riga `unit_id_note` in `Claims` con `AUTHOR_KIND_1 = extractor`.
+- [ ] Every unit has a unique ID and a TYPE from the declared set.
+- [ ] Types follow the §TYPE POLICY (`US` / `USD` / `USVs` / `USVn`):
+      no unit is marked `USVs` unless a physical trace of the
+      non-preserved element exists on a preserved neighbour.
+- [ ] Every virtual unit has a `unit_id_note` row in `Claims` with
+      `AUTHOR_KIND_1 = extractor`.
 
 **Epochs**
-- [ ] Le 5 fasi PH0–PH4 sono dichiarate (o le epoche equivalenti per il dataset).
-- [ ] Ogni nuova epoca non-standard ha `epoch_start_rationale` + `epoch_end_rationale` in `Claims`.
+- [ ] Phases are declared (PH0–PH4 for Templu Mare, or equivalent).
+- [ ] Every non-standard epoch has `epoch_start_rationale` +
+      `epoch_end_rationale` rows in `Claims`.
 
 **Authors**
-- [ ] Tu (StratiMiner-vX) sei in `Authors` come `AI.01` con `KIND=extractor`.
-- [ ] Ogni autore umano referenziato è in `Authors`.
-- [ ] `KIND` concorda col prefisso `ID` (A. → author, AI. → extractor).
+- [ ] You (StratiMiner-vX) are in `Authors` as `AI.01` /
+      `KIND = extractor`.
+- [ ] Every human author referenced is in `Authors`.
+- [ ] `KIND` matches the ID prefix (A. → author, AI. → extractor).
 
 **Documents**
-- [ ] Ogni documento referenziato ha una riga con `FILENAME` e `AUTHOR_IDS`.
+- [ ] Every referenced document has a row with `FILENAME` and
+      `AUTHOR_IDS`.
 
 **Claims**
-- [ ] Ogni riga ha 14 colonne.
-- [ ] Ogni `TARGET_ID` è in `Units` o `Epochs`.
-- [ ] Ogni claim relazionale ha `TARGET2_ID` valido.
-- [ ] Ogni `AUTHOR_N` referenzia `Authors.ID`; ogni `DOCUMENT_N` referenzia `Documents.ID`.
-- [ ] Ogni `AUTHOR_KIND_N` è `author` o `extractor` e concorda col sheet `Authors`.
-- [ ] Claim dedotte da te portano `AUTHOR_KIND = extractor`; claim trascritte dall'autore del PDF portano `AUTHOR_KIND = author`.
-- [ ] `COMBINER_REASONING` è popolato sse `EXTRACTOR_2` è popolato.
-- [ ] Nessuna tripla (`TARGET_ID`, `TARGET2_ID`, `PROPERTY_TYPE`) duplicata.
+- [ ] Every row has 14 columns.
+- [ ] Every `TARGET_ID` exists in `Units` or `Epochs`.
+- [ ] Every relational claim has a valid `TARGET2_ID`.
+- [ ] Every `AUTHOR_N` references `Authors.ID`; every `DOCUMENT_N`
+      references `Documents.ID`.
+- [ ] Every `AUTHOR_KIND_N` is `author` or `extractor` and matches
+      the `Authors` sheet.
+- [ ] Claims derived by you carry `AUTHOR_KIND = extractor`; claims
+      transcribed from the PDF author carry `AUTHOR_KIND = author`.
+- [ ] `COMBINER_REASONING` is filled iff `EXTRACTOR_2` is filled.
+- [ ] No duplicate (`TARGET_ID`, `TARGET2_ID`, `PROPERTY_TYPE`) triples.
+- [ ] No synthesized / self-justifying `EXTRACTOR_N` content. If no
+      verbatim excerpt exists, `EXTRACTOR_N` is empty and
+      `AUTHOR_KIND_N = extractor`.
+- [ ] **For every scalar qualia row, both `VALUE` and `EXTRACTOR_1`
+      are populated.** `VALUE` holds the distilled fact (a number,
+      unit-less; use `UNITS` for the measure); `EXTRACTOR_1` holds
+      the verbatim excerpt. Never leave `VALUE` empty with the
+      measurement hidden inside the quote — the downstream tools
+      cannot extract it from prose. See §VALUE vs §EXTRACTOR for
+      worked examples.
 
-**Relazioni stratigrafiche**
-- [ ] Nessun ciclo (`A cuts B` AND `B cuts A`, ecc.) — lo script di validazione li segnala.
-- [ ] Rapporti direzionali inseriti in una sola direzione (la preferita); gli inversi sono dedotti a import time.
-- [ ] Ogni relazione `equals` ha una `stratigraphic_note` di supporto.
+**Stratigraphic relations**
+- [ ] No cycles (`A cuts B` AND `B cuts A`, etc.) — the validation
+      script above flags them.
+- [ ] Directional relations inserted in one direction only (the
+      primary form); the inverse is derived at import time.
+- [ ] Every `equals` relationship has a supporting `stratigraphic_note`.
 
-**Validazione**
-- [ ] Lo script di §VALIDATION ha segnalato zero errori.
+**Validation**
+- [ ] The §VALIDATION script reported zero errors.
 
 <!-- /SECTION: CHECKLIST -->
 
 ---
 
-*Fine del prompt di estrazione EM v5.0 — schema unificato `em_data.xlsx`.*
+*End of StratiMiner Extraction Prompt v5.1 — unified `em_data.xlsx` schema.*

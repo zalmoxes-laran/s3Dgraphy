@@ -404,9 +404,11 @@ def get_ai_prompt(
     include_stratigraphy_only: bool = False,
     documents_folder: str = None,
     document_list: list = None,
+    dosco_in_place: bool = True,
+    ai_has_filesystem_access: bool = True,
 ) -> str:
     """
-    Build and return the StratiMiner extraction prompt (v5.0 schema).
+    Build and return the StratiMiner extraction prompt (v5.1 schema).
 
     Reads ``StratiMiner_Extraction_Prompt.md`` bundled inside the s3dgraphy
     package and produces a ready-to-paste prompt that instructs an AI
@@ -414,26 +416,40 @@ def get_ai_prompt(
     ``em_data.xlsx`` file with the 5 typed sheets (Units, Epochs, Claims,
     Authors, Documents).
 
-    The prompt is a single coherent document — the old PART_A / PART_B /
-    PART_C / PART_D split of the v4.x two-file schema has been retired.
-    Only three optional toggles remain:
+    The prompt is now fully written in English: meta-instructions are
+    universal, while the AI's textual output (VALUE, EXTRACTOR excerpts,
+    COMBINER_REASONING) is controlled by the ``language`` argument,
+    substituted at the ``[OUTPUT_LANGUAGE]`` placeholder inside the
+    prompt.
 
     Args:
-        language: Working language. ``None`` / empty / "the same as the
-            original document" → the AI is instructed to keep the source
-            document's language.
-        include_validation: Include the embedded Python validation script
-            (``FLAG: VALIDAZIONE_FINALE``). Default True.
+        language: Output language for the values the AI writes into the
+            xlsx (VALUE, EXTRACTOR, COMBINER_REASONING, DISPLAY_NAME).
+            ``None`` / empty / "the same as the original document" →
+            the AI is instructed to preserve each document's original
+            language on a per-claim basis.
+        include_validation: Include the embedded Python validation script.
+            Default True.
         include_checklist: Include the end-of-session checklist. Default True.
         include_stratigraphy_only: Include the STRATIGRAPHY_ONLY appendix
             that describes the minimal flow for pre-existing archaeological
             databases (curator as sole author, no paradata chain). Default
-            False — the typical AI-extraction user does not need it.
+            False.
         documents_folder: Optional path to a folder of source PDFs; when
-            provided, appended to the prompt so the AI knows where to look.
-        document_list: Optional list of document descriptors (each either a
-            string or a dict with ``id`` / ``title`` / ``path``). Appended
-            to the prompt as a pre-catalogued sources list.
+            provided, appended to the SOURCES PROVIDED section so the AI
+            knows where to look.
+        document_list: Optional pre-catalogued document descriptors (each
+            either a string or a dict with ``id`` / ``title`` / ``path``).
+        dosco_in_place: When True (default) the AI renames files in place
+            inside ``documents_folder`` with the ``D.NN_`` prefix and
+            uses the folder as the DosCo. When False the AI must treat
+            the folder as read-only and produce the document catalog
+            without actually renaming — the user will copy+rename offline.
+        ai_has_filesystem_access: When True (default) the AI is instructed
+            to enumerate and read files from ``documents_folder``. When
+            False, the AI is told it won't have filesystem access and
+            should ask the user to upload the files into the conversation
+            directly, with a data-sovereignty disclaimer.
 
     Returns:
         str: The assembled prompt ready to paste into an AI assistant.
@@ -453,18 +469,24 @@ def get_ai_prompt(
     with open(prompt_path, 'r', encoding='utf-8') as f:
         source_md = f.read()
 
-    # Resolve language
+    # Resolve output language
     _default = "the same as the original document"
     lang = language.strip() if language else ""
     lang_str = lang if (lang and lang.lower() != _default.lower()) else _default
 
-    # 1. Language placeholder
-    result = source_md.replace('[LINGUA]', lang_str)
+    # 1. Output-language placeholder
+    result = source_md.replace('[OUTPUT_LANGUAGE]', lang_str)
 
-    # 2. Optional sections (the v5.0 schema uses these IDs).
-    # The FLAG:VALIDAZIONE_FINALE wrapper of older versions has been
-    # collapsed into the SECTION:VALIDATION block — a single toggle now
-    # controls the whole validation-script section.
+    # 2. Sources block placeholder (replace regardless, even with empty)
+    sources_text = _build_sources_block(
+        documents_folder=documents_folder,
+        document_list=document_list,
+        dosco_in_place=dosco_in_place,
+        ai_has_filesystem_access=ai_has_filesystem_access,
+    )
+    result = result.replace('[SOURCES_BLOCK]', sources_text)
+
+    # 3. Optional sections
     for section_id, include in [
         ('VALIDATION',        include_validation),
         ('STRATIGRAPHY_ONLY', include_stratigraphy_only),
@@ -475,57 +497,146 @@ def get_ai_prompt(
     # 4. Strip any remaining HTML comment markers
     result = _strip_html_comments(result)
 
-    # 5. Prepend language instruction
-    if lang_str == _default:
-        lang_instruction = (
-            "IMPORTANT: Write all descriptions and properties in the same "
-            "language as the original document."
-        )
-    else:
-        lang_instruction = (
-            f"IMPORTANT: Write all descriptions and properties in {lang_str}."
-        )
-
-    # 6. Append sources context (folder path and/or pre-catalogued list)
-    sources_block = _build_sources_block(documents_folder, document_list)
-
-    return f"{lang_instruction}\n\n{result.strip()}{sources_block}"
+    return result.strip()
 
 
-def _build_sources_block(documents_folder: str, document_list: list) -> str:
-    """Format an optional "SOURCES PROVIDED" appendix to the prompt.
+def _build_sources_block(documents_folder: str,
+                          document_list: list,
+                          dosco_in_place: bool,
+                          ai_has_filesystem_access: bool) -> str:
+    """Format the SOURCES PROVIDED body inserted at ``[SOURCES_BLOCK]``.
 
-    ``documents_folder`` is rendered as a single line pointing the AI at
-    a directory it should enumerate. ``document_list`` (when provided)
-    takes precedence and produces a numbered listing with whatever
-    fields each entry carries (id/title/path).
+    Covers three degrees of information:
 
-    Returns an empty string when neither argument is supplied.
+    * ``documents_folder`` alone: instruct the AI to enumerate the
+      folder, respect existing ``D.NN_`` prefixes, fill gaps, and use
+      1000+ for comparative sources.
+    * ``document_list``: pre-catalogued entries take precedence over
+      folder enumeration (the AI re-uses the declared IDs verbatim).
+    * ``ai_has_filesystem_access = False``: replace the enumeration
+      instructions with a request to upload files into the conversation
+      and a data-sovereignty disclaimer.
+
+    Returns a string ready to be dropped into the SOURCES PROVIDED
+    section; it is always non-empty — if nothing is supplied, it
+    contains a single line telling the AI that no documents have been
+    attached yet.
     """
-    if not documents_folder and not document_list:
-        return ""
+    lines = []
 
-    lines = ["\n\n---\n\n## SOURCES PROVIDED\n"]
-    if documents_folder:
+    if not documents_folder and not document_list:
         lines.append(
-            f"The source documents are in the folder:\n\n"
-            f"    {documents_folder}\n\n"
-            "Enumerate the files inside, map them to ``Documents`` rows "
-            "(one ``D.XX`` id each) and cite them in the ``DOCUMENT_N`` "
-            "columns of ``Claims`` rows.\n"
+            "_No source documents have been attached to this prompt._ "
+            "The user must either paste a documents-folder path into the "
+            "prompt before sending it, or upload the files directly "
+            "into this conversation."
         )
+        return "\n".join(lines)
 
     if document_list:
-        lines.append("\nPre-catalogued documents (use these IDs verbatim):\n")
-        for i, item in enumerate(document_list, 1):
+        lines.append("### Pre-catalogued documents")
+        lines.append("")
+        lines.append(
+            "Use these IDs verbatim; do not re-number. Additional "
+            "documents discovered in the folder extend this list "
+            "using the numbering rules below."
+        )
+        lines.append("")
+        for item in document_list:
             if isinstance(item, dict):
                 parts = []
                 for key in ("id", "title", "path"):
                     val = item.get(key)
                     if val:
                         parts.append(f"{key}={val}")
-                lines.append(f"  {i}. " + " | ".join(parts))
+                lines.append("- " + " | ".join(parts))
             else:
-                lines.append(f"  {i}. {item}")
+                lines.append(f"- {item}")
         lines.append("")
+
+    if documents_folder and ai_has_filesystem_access:
+        lines.append("### Source folder")
+        lines.append("")
+        lines.append("The source documents are in the folder:")
+        lines.append("")
+        lines.append(f"    {documents_folder}")
+        lines.append("")
+        if dosco_in_place:
+            lines.append(
+                "This folder is the **DosCo** (Document Corpus) for the "
+                "project. Treat it in-place:"
+            )
+        else:
+            lines.append(
+                "This folder holds the raw source files. Do **not** "
+                "rename or copy them — the user will perform a separate "
+                "copy/rename pass after your output. Just enumerate."
+            )
+        lines.append("")
+        lines.append("**Document numbering rules:**")
+        lines.append("")
+        lines.append(
+            "1. If a filename already starts with `D.NN_` (e.g. "
+            "`D.02_Diaconescu.pdf`), **re-use that number** as the "
+            "`Documents.ID`. Do not re-number."
+        )
+        lines.append(
+            "2. Otherwise, assign the next available integer in the "
+            "`D.NN` sequence, **filling gaps**: if `D.01`, `D.02`, "
+            "`D.04` exist, assign `D.03` to the next new document "
+            "before going to `D.05`."
+        )
+        lines.append(
+            "3. **Comparative / parallel sources** (documents about "
+            "other sites, theoretical treatises, typological "
+            "references — not about the site itself) use IDs from "
+            "`D.1000` upward to keep them visibly separate from the "
+            "analytical sources of the site."
+        )
+        if dosco_in_place:
+            lines.append(
+                "4. When you report each document in the `Documents` "
+                "sheet, include a note in `TITLE` if you propose a "
+                "rename (e.g. `TITLE = \"Diaconescu 2013 Templu Mare \""
+                "— proposed rename D.03_Diaconescu_2013.pdf`). The "
+                "user will apply the in-place rename after reviewing."
+            )
+        lines.append("")
+    elif documents_folder and not ai_has_filesystem_access:
+        lines.append("### Source documents")
+        lines.append("")
+        lines.append(
+            f"The user has a documents folder at `{documents_folder}` "
+            "but you do **not** have filesystem access in this "
+            "conversation. Ask the user to upload the files directly "
+            "into the chat."
+        )
+        lines.append("")
+        lines.append("**Data-sovereignty notice to return to the user:**")
+        lines.append("")
+        lines.append(
+            "> Before uploading archaeological PDFs into this "
+            "conversation, verify that you have the rights to share "
+            "them and that this AI provider is compliant with your "
+            "organization's data-handling policies. Document content "
+            "is processed by the AI vendor, not by StratiMiner."
+        )
+        lines.append("")
+        lines.append(
+            "Once the files are uploaded, apply the numbering rules "
+            "below (same as for a filesystem folder):"
+        )
+        lines.append("")
+        lines.append(
+            "1. If a filename already starts with `D.NN_`, re-use that "
+            "number."
+        )
+        lines.append(
+            "2. Otherwise, next available integer, filling gaps."
+        )
+        lines.append(
+            "3. Comparative sources from `D.1000` upward."
+        )
+        lines.append("")
+
     return "\n".join(lines)
