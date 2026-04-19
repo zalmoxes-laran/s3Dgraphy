@@ -588,7 +588,7 @@ without a paradata chain:
    curator, `A.01`).
 2. Fill `Documents` only if citable sources exist.
 3. In `Claims`, include only:
-   - `belongs_to_epoch` rows (epoch membership)
+   - `has_first_epoch` rows (epoch membership)
    - stratigraphic-relation rows (`overlies`, `cuts`, …)
    - optionally one `definition` row per unit with a short description.
 
@@ -678,4 +678,4 @@ source / extractor attributions.
 
 ---
 
-*End of StratiMiner Extraction Prompt v5.2 — unified `em_data.xlsx` schema.*
+*End of StratiMiner Extraction Prompt v5.3 — unified `em_data.xlsx` schema.*

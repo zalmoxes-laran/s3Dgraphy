@@ -38,8 +38,10 @@ Each Claims row is one of:
   same as scalar, but the PropertyNode's ``property_type`` is set so
   the DP-32 resolver and A.1 compaction pick it up.
 
-* **Epoch membership** (``PROPERTY_TYPE`` = ``belongs_to_epoch``):
-  creates a ``has_first_epoch`` edge from ``TARGET_ID`` (unit) to
+* **Epoch membership** (``PROPERTY_TYPE`` = ``has_first_epoch``,
+  or the deprecated alias ``belongs_to_epoch`` — kept for backward
+  compat with prompt ≤ v5.2): creates a ``has_first_epoch`` edge
+  from ``TARGET_ID`` (unit) to
   the Epochs row identified by ``VALUE`` or ``TARGET2_ID``.
 
 * **Stratigraphic relation** (``PROPERTY_TYPE`` ∈ ``_RELATION_TYPES``):
@@ -341,7 +343,16 @@ class UnifiedXLSXImporter:
             target2 = _str(row.get("TARGET2_ID"))
 
             # Dispatch by semantic class of PROPERTY_TYPE.
-            if prop_type == "belongs_to_epoch":
+            # ``has_first_epoch`` is the canonical name (matches the graph
+            # edge type); ``belongs_to_epoch`` is kept as a deprecated alias
+            # for xlsx files written against prompt v5.2 and earlier.
+            if prop_type in ("has_first_epoch", "belongs_to_epoch"):
+                if prop_type == "belongs_to_epoch":
+                    self.warnings.append(
+                        f"Row {idx + 2}: PROPERTY_TYPE 'belongs_to_epoch' is "
+                        f"deprecated — use 'has_first_epoch' instead "
+                        f"(accepted for backward compat)."
+                    )
                 self._handle_belongs_to_epoch(
                     target_node, target2 or value_str, row, idx + 2)
             elif prop_type in _RELATION_TYPES:
