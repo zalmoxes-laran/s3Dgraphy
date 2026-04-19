@@ -223,8 +223,6 @@ Succede quando i documenti storici descrivono strutture reali senza assegnare lo
 <!-- SECTION: VALIDATION -->
 ## VALIDAZIONE FINALE
 
-<!-- FLAG: VALIDAZIONE_FINALE -->
-
 Eseguire questo script prima del salvataggio. I risultati vengono scritti su stdout. Correggere ogni problema segnalato prima di consegnare.
 
 ```python
@@ -324,7 +322,7 @@ else:
     print('VALIDATION OK — zero errors.')
 ```
 
-<!-- /FLAG: VALIDAZIONE_FINALE -->
+<!-- /SECTION: VALIDATION -->
 
 ---
 
@@ -341,6 +339,8 @@ Per dataset archeologici preesistenti con rapporti stratigrafici già espliciti 
    - opzionalmente, una riga `definition` per US con descrizione breve
 
 In tutte le righe, `AUTHOR_1 = A.01`, `AUTHOR_KIND_1 = author`, `EXTRACTOR_1` / `DOCUMENT_1` = `""` (vuoti). Il grafo risultante avrà la struttura stratigrafica completa ma nessuna catena paradata; l'importer s3Dgraphy crea i PropertyNode con `has_author` diretto al curatore umano. Puoi arricchire il paradata in un secondo tempo aggiungendo righe con fonti / extractor.
+
+<!-- /SECTION: STRATIGRAPHY_ONLY -->
 
 ---
 
@@ -384,6 +384,8 @@ In tutte le righe, `AUTHOR_1 = A.01`, `AUTHOR_KIND_1 = author`, `EXTRACTOR_1` / 
 
 **Validazione**
 - [ ] Lo script di §VALIDATION ha segnalato zero errori.
+
+<!-- /SECTION: CHECKLIST -->
 
 ---
 

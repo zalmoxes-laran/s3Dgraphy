@@ -90,7 +90,19 @@ full = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-s3dgraphy = ["*.json", "*.yaml", "data/*", "data/*.md"]
+s3dgraphy = [
+    "*.json",
+    "*.yaml",
+    "data/*",
+    "data/*.md",
+    "templates/*",
+    "templates/*.graphml",
+    "templates/*.xlsx",
+    "JSON_config/*",
+    "JSON_config/*.json",
+    "mappings/*",
+    "mappings/*.json",
+]
 
 [tool.black]
 line-length = 88

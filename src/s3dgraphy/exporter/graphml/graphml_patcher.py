@@ -1226,6 +1226,19 @@ class GraphMLPatcher:
                 if source_node and isinstance(source_node, PropertyNode):
                     property_nodes_in_groups.add(e.edge_source)
 
+        # Build set of EpochNode UUIDs. Edges touching an epoch node are
+        # always importer-derived (has_first_epoch comes from Y-position
+        # matching, and has_author / has_license / has_embargo /
+        # has_property from the SL_PD auto-edge inference). Their
+        # original_id in the source GraphML is ``row_N`` — a yEd Table
+        # row layout identifier, NOT a connectable node id — so writing
+        # them out as <edge source="row_N"…> produces a GraphML that
+        # cannot be reopened in yEd. Drop them here and rely on the
+        # importer to reconstruct them from the swimlane layout + SL_PD
+        # structure on next load.
+        epoch_uuids = {n.node_id for n in self.graph.nodes
+                       if isinstance(n, EpochNode)}
+
         # Find the insertion graph (same as nodes — typically inside swimlane)
         target_graph = self._find_insertion_graph(graph_elem)
 
@@ -1242,6 +1255,12 @@ class GraphMLPatcher:
             # (the relationship is already represented by US → ParadataNodeGroup)
             if (edge.edge_type == 'has_property'
                     and edge.edge_target in property_nodes_in_groups):
+                continue
+
+            # Skip any edge that touches an EpochNode — re-derived at
+            # import time from swimlane Y-positions and SL_PD auto-edge.
+            if (edge.edge_source in epoch_uuids
+                    or edge.edge_target in epoch_uuids):
                 continue
 
             # Resolve source and target IDs

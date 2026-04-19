@@ -461,11 +461,12 @@ def get_ai_prompt(
     # 1. Language placeholder
     result = source_md.replace('[LINGUA]', lang_str)
 
-    # 2. Flags (nested inside sections — must be processed first)
-    result = _process_flag(result, 'VALIDAZIONE_FINALE', include_validation)
-
-    # 3. Optional sections (the v5.0 schema uses these IDs)
+    # 2. Optional sections (the v5.0 schema uses these IDs).
+    # The FLAG:VALIDAZIONE_FINALE wrapper of older versions has been
+    # collapsed into the SECTION:VALIDATION block — a single toggle now
+    # controls the whole validation-script section.
     for section_id, include in [
+        ('VALIDATION',        include_validation),
         ('STRATIGRAPHY_ONLY', include_stratigraphy_only),
         ('CHECKLIST',         include_checklist),
     ]:
