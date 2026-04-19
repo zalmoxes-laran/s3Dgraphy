@@ -76,6 +76,27 @@ author.
 <!-- SECTION: OUTPUT -->
 ## OUTPUT FORMAT — `em_data.xlsx` (5 sheets)
 
+### §COLUMN NAMING — strict, no aliases
+
+The downstream importer reads sheets by exact column name. Use the
+names listed in each sheet schema **verbatim**:
+
+- Do **NOT** prefix `ID` with the sheet name (wrong: `UNIT_ID`,
+  `EPOCH_ID`, `DOC_ID`, `AUTHOR_ID`; right: just `ID`).
+- Do **NOT** replace `DOCUMENT_1` / `DOCUMENT_2` with `DOC_ID_1` /
+  `DOC_ID_2` or similar.
+- Do **NOT** replace `AUTHOR_1` / `AUTHOR_2` with `AUTHOR_ID_1` /
+  `AUTHOR_ID_2`.
+- Do **NOT** add surplus columns such as `CLAIM_ID`, row numbers,
+  or "helpful" indices. The 14 `Claims` columns are fixed; extra
+  columns are discarded and may mis-align readers.
+- Do **NOT** rename `KIND` to `AUTHOR_KIND` in the `Authors` sheet.
+
+The first row of each sheet is the header. The column order does not
+matter as long as the spellings match. An aliased column name will
+be accepted with a deprecation warning, but forcing the correct
+name is expected — drift compounds.
+
 ### Sheet 1 — `Units` (stratigraphic skeleton)
 
 | # | Column | Notes |

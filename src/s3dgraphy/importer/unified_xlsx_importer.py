@@ -185,6 +185,47 @@ class UnifiedXLSXImporter:
     # Sheet loading
     # ------------------------------------------------------------------
 
+    # Per-sheet column aliases. AI agents (and legacy xlsx files) drift
+    # toward variant spellings like ``UNIT_ID`` instead of ``ID``,
+    # ``DOC_ID_1`` instead of ``DOCUMENT_1`` or a surplus ``CLAIM_ID``
+    # first column. Normalising on load means every parser downstream
+    # can read canonical names without worrying about drift.
+    _COLUMN_ALIASES: Dict[str, Dict[str, str]] = {
+        "Units": {
+            "UNIT_ID": "ID",
+            "UNITS_ID": "ID",
+            "UNIT_TYPE": "TYPE",
+        },
+        "Epochs": {
+            "EPOCH_ID": "ID",
+            "EPOCHS_ID": "ID",
+        },
+        "Authors": {
+            "AUTHOR_ID": "ID",
+            "AUTHORS_ID": "ID",
+            "AUTHOR_KIND": "KIND",
+        },
+        "Documents": {
+            "DOC_ID": "ID",
+            "DOCUMENT_ID": "ID",
+            "DOCUMENTS_ID": "ID",
+        },
+        "Claims": {
+            # Per-triple document / author variants.
+            "DOC_ID_1": "DOCUMENT_1",
+            "DOCUMENT_ID_1": "DOCUMENT_1",
+            "DOC_1": "DOCUMENT_1",
+            "DOC_ID_2": "DOCUMENT_2",
+            "DOCUMENT_ID_2": "DOCUMENT_2",
+            "DOC_2": "DOCUMENT_2",
+            "AUTHOR_ID_1": "AUTHOR_1",
+            "AUTHOR_ID_2": "AUTHOR_2",
+            # Surplus first column some AIs add for row-level keys; harmless,
+            # rename to a reserved slot so it does not collide.
+            "CLAIM_ID": "_CLAIM_ID",
+        },
+    }
+
     def _load_sheets(self) -> Dict[str, pd.DataFrame]:
         sheets = pd.read_excel(
             self.filepath,
@@ -198,6 +239,17 @@ class UnifiedXLSXImporter:
                 f"Missing required sheets in {self.filepath}: "
                 f"{', '.join(missing)}. Expected: {', '.join(self._SHEETS)}."
             )
+        for sheet_name, aliases in self._COLUMN_ALIASES.items():
+            df = sheets[sheet_name]
+            rename = {col: aliases[col] for col in df.columns
+                      if col in aliases and aliases[col] not in df.columns}
+            if rename:
+                df.rename(columns=rename, inplace=True)
+                for src, dst in rename.items():
+                    self.warnings.append(
+                        f"{sheet_name}: column '{src}' normalised to '{dst}' "
+                        f"(accepted alias)."
+                    )
         return sheets
 
     # ------------------------------------------------------------------
