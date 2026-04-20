@@ -324,19 +324,22 @@ class GraphMLExporter:
                 )
                 nested_graph.append(doc_xml)
 
-            # Author nodes (per-group copies of AuthorNode / AuthorAINode)
-            author_x_base = doc_x_base + (
+            # Paradata image nodes (per-group copies of Author /
+            # AuthorAI / License / Embargo). One unified loop covers all
+            # four palette types — the generator picks the right icon
+            # from the node's class name.
+            image_x_base = doc_x_base + (
                 len(group_data.get('document_nodes', [])) * 50.0)
-            for i, author_local in enumerate(
-                    group_data.get('author_nodes', [])):
-                author_xml = self._generate_paradata_image_node(
-                    author_local,
-                    x=author_x_base + (i * 50.0),
+            for i, image_local in enumerate(
+                    group_data.get('paradata_image_nodes', [])):
+                image_xml = self._generate_paradata_image_node(
+                    image_local,
+                    x=image_x_base + (i * 50.0),
                     y=internal_y,
                     parent_id=group_nested_id,
                 )
-                if author_xml is not None:
-                    nested_graph.append(author_xml)
+                if image_xml is not None:
+                    nested_graph.append(image_xml)
 
             # --- Internal edges using chain associations (all dashed) ---
             # Each chain records: property → [combiner →] extractor → document
@@ -396,15 +399,17 @@ class GraphMLExporter:
                             nested_graph.append(
                                 self._create_internal_pd_edge(edge_id, ext_nid, doc_nid))
 
-            # has_author edges: source (property / combiner / extractor /
-            # document local copy) → per-group Author local copy. Drawn as
-            # dashed lines to match the paradata family's visual style.
-            for source_local, author_local in group_data.get(
-                    'author_attachments', []):
+            # has_author / has_license / has_embargo edges: source
+            # (property / combiner / extractor / document local copy) →
+            # per-group paradata-image local copy. All three edge types
+            # use the same dashed-line style as the rest of the paradata
+            # family, so a single emission loop suffices.
+            for source_local, image_local in group_data.get(
+                    'paradata_image_attachments', []):
                 src_nid = self.id_manager.uuid_to_nested.get(
                     source_local.node_id)
                 tgt_nid = self.id_manager.uuid_to_nested.get(
-                    author_local.node_id)
+                    image_local.node_id)
                 if not src_nid or not tgt_nid:
                     continue
                 edge_id = f"{group_nested_id}::e{internal_edge_counter}"
@@ -895,13 +900,15 @@ class GraphMLExporter:
                 # Collect all unique local document copies for node generation
                 document_nodes = list(local_doc_copies.values())
 
-                # --- Collect AuthorNode / AuthorAINode referenced by this
-                # PD group's chain elements. Each author is copied locally
-                # (fresh uuid) so every PD group that cites the same author
-                # gets its own yEd image node inside its own container —
-                # matching the per-group document pattern used above. ---
-                author_nodes_list, author_attachments = \
-                    self._collect_authors_for_group(
+                # --- Collect paradata image nodes (Author / AuthorAI /
+                # License / Embargo) referenced by this PD group's chain
+                # elements via has_author / has_license / has_embargo.
+                # Each target is copied locally (fresh uuid) so every PD
+                # group that cites the same paradata image node gets its
+                # own yEd image node inside its own container — matching
+                # the per-group document pattern used above. ---
+                image_nodes_list, image_attachments = \
+                    self._collect_paradata_image_attachments(
                         chains=chains,
                         local_doc_copies=local_doc_copies,
                     )
@@ -913,8 +920,8 @@ class GraphMLExporter:
                     'document_nodes': document_nodes,
                     'combiner_nodes': combiner_nodes,
                     'chains': chains,
-                    'author_nodes': author_nodes_list,
-                    'author_attachments': author_attachments,
+                    'paradata_image_nodes': image_nodes_list,
+                    'paradata_image_attachments': image_attachments,
                 }
                 groups.append(group_data)
 
@@ -995,70 +1002,90 @@ class GraphMLExporter:
                         'document_nodes': document_nodes,
                         'combiner_nodes': [],
                         'chains': [legacy_chain],
-                        # Legacy path: no graph-native author attribution.
-                        'author_nodes': [],
-                        'author_attachments': [],
+                        # Legacy path: no graph-native paradata attribution.
+                        'paradata_image_nodes': [],
+                        'paradata_image_attachments': [],
                     }
 
                     groups.append(group_data)
 
         return groups
 
-    def _collect_authors_for_group(self, chains, local_doc_copies):
-        """
-        For a single PD group, walk ``has_author`` edges from every chain
-        element (property, combiner, extractor, document) and return:
+    # Mapping used by the paradata-image collector: edge type → expected
+    # target node class. ``has_author`` accepts AuthorNode AND its subclass
+    # AuthorAINode (the class check uses ``isinstance(tgt, klass)``).
+    _PARADATA_EDGE_TO_CLASS = None  # populated lazily in the collector
 
-        - ``author_nodes``: unique list of per-group ``AuthorNode`` /
-          ``AuthorAINode`` copies (preserves subclass).
-        - ``author_attachments``: list of ``(source_local_node,
-          author_local_node)`` tuples that describe the internal
-          ``has_author`` edges to emit inside the group.
+    def _collect_paradata_image_attachments(self, chains, local_doc_copies):
+        """
+        For a single PD group, walk the three paradata-image edge types
+        — ``has_author``, ``has_license``, ``has_embargo`` — from every
+        chain element (property, combiner, extractor, document) and
+        return:
+
+        - ``image_nodes``: unique list of per-group local copies
+          (``AuthorNode`` / ``AuthorAINode`` / ``LicenseNode`` /
+          ``EmbargoNode``). Each copy preserves its origin subclass so
+          the palette picker still selects the right icon.
+        - ``image_attachments``: list of ``(source_local_node,
+          target_local_node)`` tuples that describe the internal
+          dashed edges (has_author / has_license / has_embargo) to emit
+          inside the group.
 
         The *source* node is the node visible in the graphml — for
         documents that means the per-group local copy; for property /
         extractor / combiner it is the original graph node. The lookup
         against ``self.graph.edges`` always uses the original ``node_id``.
+
+        Duplicate edges (same source, same target) are deduped so that a
+        document cited by N extractors still yields a single
+        document→author edge.
         """
         from ...nodes.author_node import AuthorNode
+        from ...nodes.license_node import LicenseNode
+        from ...nodes.embargo_node import EmbargoNode
         from .utils import generate_uuid
 
-        local_author_copies: Dict[str, any] = {}
-        author_nodes_list: List = []
-        author_attachments: List = []
-        # Dedupe key: (source_local.node_id, original_author_uuid). Documents
-        # cited by multiple extractors would otherwise re-discover the same
-        # document→author edge once per chain, yielding parallel duplicate
-        # edges in the exported graphml.
+        # Edge type → list of accepted target classes.
+        edge_type_classes = {
+            'has_author':  (AuthorNode,),    # also catches AuthorAINode
+            'has_license': (LicenseNode,),
+            'has_embargo': (EmbargoNode,),
+        }
+
+        local_copies: Dict[str, any] = {}
+        image_nodes_list: List = []
+        image_attachments: List = []
         seen_attachments: set = set()
 
-        # Build a quick node_id → node map once (avoids O(N) re-scans).
         id_to_node = {n.node_id: n for n in self.graph.nodes}
 
         def _collect(source_local, original_uuid):
             for e in self.graph.edges:
-                if (e.edge_source != original_uuid
-                        or e.edge_type != 'has_author'):
+                if e.edge_source != original_uuid:
+                    continue
+                accepted = edge_type_classes.get(e.edge_type)
+                if accepted is None:
                     continue
                 tgt = id_to_node.get(e.edge_target)
-                if tgt is None or not isinstance(tgt, AuthorNode):
+                if tgt is None or not isinstance(tgt, accepted):
                     continue
                 pair = (source_local.node_id, tgt.node_id)
                 if pair in seen_attachments:
                     continue
                 seen_attachments.add(pair)
-                if tgt.node_id not in local_author_copies:
-                    klass = tgt.__class__  # AuthorNode OR AuthorAINode
+                if tgt.node_id not in local_copies:
+                    klass = tgt.__class__  # preserve AuthorAINode vs Author etc.
                     local = klass(
                         node_id=generate_uuid(),
                         name=tgt.name,
                         description=tgt.description,
                     )
                     local.original_emid = tgt.node_id
-                    local_author_copies[tgt.node_id] = local
-                    author_nodes_list.append(local)
-                author_attachments.append(
-                    (source_local, local_author_copies[tgt.node_id])
+                    local_copies[tgt.node_id] = local
+                    image_nodes_list.append(local)
+                image_attachments.append(
+                    (source_local, local_copies[tgt.node_id])
                 )
 
         for chain in chains:
@@ -1071,10 +1098,11 @@ class GraphMLExporter:
                 doc_local = ext_info.get('document')
                 if doc_local is not None:
                     # ``original_emid`` is the uuid of the document in the
-                    # in-memory graph — that is where ``has_author``
-                    # originates for document→author attribution.
+                    # in-memory graph — that is where has_author /
+                    # has_license / has_embargo originate for document-level
+                    # attribution.
                     original_doc_uuid = getattr(
                         doc_local, 'original_emid', doc_local.node_id)
                     _collect(doc_local, original_doc_uuid)
 
-        return author_nodes_list, author_attachments
+        return image_nodes_list, image_attachments
