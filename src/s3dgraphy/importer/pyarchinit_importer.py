@@ -45,6 +45,13 @@ class PyArchInitImporter(BaseImporter):
             self._use_existing_graph = False
             # print(f"PyArchInitImporter: Created new unregistered graph (caller must register)")
 
+        # Structured list of rows whose stratigraphic node name could
+        # not be matched in the host graph (only meaningful in
+        # enriching mode). Each entry is ``{"key_id": str, "payload":
+        # dict}``. Neutral data exposed to any caller; the EMtools
+        # Hybrid-C adapter maps it to graph.attributes['aux_orphans'].
+        self.orphans = []
+
         self.validate_mapping()
 
     def process_row(self, row_dict: Dict[str, Any]) -> Optional[Node]:
@@ -88,7 +95,16 @@ class PyArchInitImporter(BaseImporter):
                 # ❌ Enriching mode but node not found → SKIP this row
                 warning_msg = f"Node '{node_name}' not found in existing graph - SKIPPED"
                 self.warnings.append(warning_msg)
-                # print(f"⊘ {warning_msg}")
+                # Record the orphan as neutral data. The EMtools
+                # Hybrid-C adapter promotes these into
+                # graph.attributes['aux_orphans']; other consumers
+                # (CLI, headless viewers) can inspect self.orphans
+                # directly.
+                self.orphans.append({
+                    "key_id": node_name,
+                    "payload": {"source": "pyarchinit",
+                                "row": dict(row_dict)},
+                })
                 return None
                 
             else:
@@ -114,7 +130,7 @@ class PyArchInitImporter(BaseImporter):
                 
                 self.graph.add_node(new_node)
                 # print(f"  → Node created with ID: {new_node.node_id}")
-                
+
                 # Process properties for new node
                 self._process_pyarchinit_properties(row_dict, new_node)
                 return new_node
@@ -162,7 +178,7 @@ class PyArchInitImporter(BaseImporter):
                         )
                         self.graph.add_node(property_node)
                         # print(f"    + Created property: {col_config['property_name']} = '{value}'")
-                        
+
                         # Create edge between stratigraphic node and property
                         edge_id = f"{strat_node.node_id}_has_property_{property_id}"
                         if not self.graph.find_edge_by_id(edge_id):

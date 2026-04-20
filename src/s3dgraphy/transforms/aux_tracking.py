@@ -361,6 +361,112 @@ def clear_orphans(graph, injector_id: Optional[str] = None) -> int:
     return removed
 
 
+def revert_injector(graph, injector_id: str) -> Dict[str, int]:
+    """Remove every node / edge injected by ``injector_id`` and apply
+    the volatile-save reversal policy for the attribute overrides
+    attributed to the same injector only. Other injectors' content
+    stays untouched.
+
+    Semantics (scoped variant of the strip + policy pair used by
+    :class:`GraphMLExporter` on volatile save):
+
+    * A node / edge carrying ``attributes["injected_by"] == injector_id``
+      is removed. Edges touching a removed host-node endpoint are also
+      dropped to avoid dangling references.
+    * For each host-node attribute in ``_aux_overrides`` where the
+      recorded injector matches ``injector_id``:
+
+      - current value == frozen aux value → restore the original
+        pre-aux value;
+      - current value differs → user re-edited after the aux applied
+        → keep current value, drop the override record;
+      - no ``aux_value`` frozen → conservatively keep the current
+        value and drop the override record.
+
+    * Orphan entries filed under this injector are cleared.
+
+    Returns a report ``{"nodes", "edges", "reverted", "kept",
+    "unseen", "orphans_cleared"}``.
+
+    This is the helper used when the user unregisters a single
+    auxiliary without rebuilding the whole graph — for example the
+    DosCo importer exposing an "Unregister DosCo" button in the UI.
+    Unlike :func:`strip_injected_content`, which removes **all**
+    injected content regardless of source, this preserves content
+    from other auxiliaries so multi-aux setups behave predictably.
+    """
+    nodes_removed = 0
+    edges_removed = 0
+
+    # Collect ids of nodes injected by this specific injector.
+    target_node_ids: Set[str] = set()
+    for n in graph.nodes:
+        if is_injected(n) == injector_id:
+            target_node_ids.add(n.node_id)
+
+    # Remove edges tagged by this injector OR touching one of the
+    # removed host nodes.
+    keep_edges = []
+    for e in graph.edges:
+        if is_injected(e) == injector_id:
+            edges_removed += 1
+            continue
+        if (e.edge_source in target_node_ids
+                or e.edge_target in target_node_ids):
+            edges_removed += 1
+            continue
+        keep_edges.append(e)
+    graph.edges = keep_edges
+
+    # Remove nodes tagged by this injector.
+    keep_nodes = []
+    for n in graph.nodes:
+        if n.node_id in target_node_ids:
+            nodes_removed += 1
+            continue
+        keep_nodes.append(n)
+    graph.nodes = keep_nodes
+    if hasattr(graph, "_indices_dirty"):
+        graph._indices_dirty = True
+
+    # Apply the reversal policy only on overrides this injector filed.
+    reverted = 0
+    kept = 0
+    unseen = 0
+    for n in graph.nodes:
+        attrs = getattr(n, "attributes", None) or {}
+        overrides = attrs.get("_aux_overrides")
+        if not overrides:
+            continue
+        for attr_name, record in list(overrides.items()):
+            if record.get("injector") != injector_id:
+                continue
+            if "aux_value" not in record:
+                unseen += 1
+                del overrides[attr_name]
+                continue
+            current = _read_attr(n, attr_name)
+            if current == record["aux_value"]:
+                _write_attr(n, attr_name, record["original"])
+                reverted += 1
+            else:
+                kept += 1
+            del overrides[attr_name]
+        if not overrides:
+            del attrs["_aux_overrides"]
+
+    orphans_cleared = clear_orphans(graph, injector_id=injector_id)
+
+    return {
+        "nodes": nodes_removed,
+        "edges": edges_removed,
+        "reverted": reverted,
+        "kept": kept,
+        "unseen": unseen,
+        "orphans_cleared": orphans_cleared,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Attribute accessor utilities
 # ---------------------------------------------------------------------------
