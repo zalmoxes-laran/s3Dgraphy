@@ -1,6 +1,7 @@
 # s3Dgraphy/utils/utils.py
 import os
 import json
+from importlib.resources import files
 
 """
 Utilities for the s3Dgraphy library.
@@ -178,24 +179,29 @@ def get_material_color(matname, rules_path=None):
         tuple: (R, G, B, A) con valori tra 0 e 1 o None se il nodo non prevede
         un materiale
     """
-    if rules_path is None:
-        rules_path = os.path.join(os.path.dirname(__file__), 
-                                "../JSON_config/em_visual_rules.json")
-    
     try:
-        with open(rules_path, 'r') as f:
-            rules = json.load(f)
-            node_style = rules["node_styles"].get(matname, {})
-            style = node_style.get("style", {})
-            
-            # Se non c'è la sezione material, restituisce None
-            if "material" not in style:
-                return None
-                
-            color = style["material"]["color"]
-            return (color["r"], color["g"], color["b"], color.get("a", 1.0))
-            
-    except (KeyError, FileNotFoundError, json.JSONDecodeError):
+        if rules_path is None:
+            rules_resource = files("s3dgraphy").joinpath(
+                "JSON_config/em_visual_rules.json"
+            )
+            with rules_resource.open('r', encoding='utf-8') as f:
+                rules = json.load(f)
+        else:
+            with open(rules_path, 'r', encoding='utf-8') as f:
+                rules = json.load(f)
+
+        node_style = rules["node_styles"].get(matname, {})
+        style = node_style.get("style", {})
+
+        # Se non c'è la sezione material, restituisce None
+        if "material" not in style:
+            return None
+
+        color = style["material"]["color"]
+        return (color["r"], color["g"], color["b"], color.get("a", 1.0))
+
+    except (KeyError, FileNotFoundError, json.JSONDecodeError, ModuleNotFoundError) as e:
+        print(f"[s3dgraphy] get_material_color('{matname}') fallback: {type(e).__name__}: {e}")
         # Fallback solo per i nodi che dovrebbero avere un materiale
         if matname in ['US', 'USVs', 'USVn', 'VSF', 'SF', 'USD']:
             return (0.5, 0.5, 0.5, 1.0)
@@ -457,17 +463,19 @@ def get_ai_prompt(
     Raises:
         FileNotFoundError: If the bundled prompt file cannot be located.
     """
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-    prompt_path = os.path.join(data_dir, 'StratiMiner_Extraction_Prompt.md')
+    prompt_resource = files("s3dgraphy").joinpath(
+        'data/StratiMiner_Extraction_Prompt.md'
+    )
 
-    if not os.path.exists(prompt_path):
+    try:
+        with prompt_resource.open('r', encoding='utf-8') as f:
+            source_md = f.read()
+    except (FileNotFoundError, ModuleNotFoundError) as e:
         raise FileNotFoundError(
-            f"StratiMiner extraction prompt not found at: {prompt_path}. "
+            f"StratiMiner extraction prompt not found in s3dgraphy package "
+            f"(data/StratiMiner_Extraction_Prompt.md): {e}. "
             "Ensure s3dgraphy is installed correctly."
         )
-
-    with open(prompt_path, 'r', encoding='utf-8') as f:
-        source_md = f.read()
 
     # Resolve output language
     _default = "the same as the original document"

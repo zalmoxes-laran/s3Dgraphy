@@ -19,6 +19,7 @@ Version: 1.5.3
 
 import json
 import os
+from importlib.resources import files
 from typing import Dict, Optional, List, Tuple
 
 
@@ -42,13 +43,14 @@ class ConnectionsDatamodel:
                           If None, uses the default location in JSON_config.
         """
         if datamodel_path is None:
-            # Default path relative to this file
-            datamodel_path = os.path.join(
-                os.path.dirname(__file__),
-                "../JSON_config/s3Dgraphy_connections_datamodel.json"
+            # Default: use importlib.resources to locate the packaged JSON.
+            # This is portable across OSes and works when installed from a wheel
+            # (unlike __file__-relative paths with "../" which can fail on Windows).
+            self.datamodel_path = files("s3dgraphy").joinpath(
+                "JSON_config/s3Dgraphy_connections_datamodel.json"
             )
-
-        self.datamodel_path = datamodel_path
+        else:
+            self.datamodel_path = datamodel_path
         self._canonical_edges = {}  # Canonical edge definitions from JSON
         self._expanded_edges = {}   # All edges (canonical + generated reverse entries)
         self._version = None
@@ -57,8 +59,13 @@ class ConnectionsDatamodel:
     def _load_datamodel(self):
         """Load the connections datamodel from JSON and build edge dictionaries."""
         try:
-            with open(self.datamodel_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+            if hasattr(self.datamodel_path, 'open'):
+                # Traversable from importlib.resources
+                with self.datamodel_path.open('r', encoding='utf-8') as f:
+                    data = json.load(f)
+            else:
+                with open(self.datamodel_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
 
             self._version = data.get("s3Dgraphy_connections_model_version", "unknown")
             edge_types = data.get("edge_types", {})

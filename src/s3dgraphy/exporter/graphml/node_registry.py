@@ -7,6 +7,7 @@ visual properties from em_palette_template.graphml.
 
 import json
 import os
+from importlib.resources import files, as_file
 from typing import Dict, Tuple, Optional
 from lxml import etree as ET
 from dataclasses import dataclass
@@ -42,29 +43,28 @@ class NodeRegistry:
 
     def _load_datamodel(self):
         """Load node datamodel from JSON."""
-        json_path = os.path.join(
-            os.path.dirname(__file__),
-            '../../JSON_config/s3Dgraphy_node_datamodel.json'
-        )
-        
         try:
-            with open(json_path, 'r', encoding='utf-8') as f:
+            resource = files("s3dgraphy").joinpath(
+                "JSON_config/s3Dgraphy_node_datamodel.json"
+            )
+            with resource.open('r', encoding='utf-8') as f:
                 data = json.load(f)
                 self.datamodel = data.get('nodes', {})
-        except FileNotFoundError:
-            print(f"Warning: Node datamodel not found at {json_path}")
+        except (FileNotFoundError, ModuleNotFoundError) as e:
+            print(f"[s3dgraphy] Warning: Node datamodel not found: {type(e).__name__}: {e}")
             self.datamodel = {}
 
     def _load_palette_template(self):
         """Load visual properties from palette template GraphML."""
-        template_path = os.path.join(
-            os.path.dirname(__file__),
-            '../../templates/em_palette_template.graphml'
-        )
-        
         try:
-            tree = ET.parse(template_path)
-            root = tree.getroot()
+            resource = files("s3dgraphy").joinpath(
+                "templates/em_palette_template.graphml"
+            )
+            # lxml.etree.parse needs a real filesystem path or a file object.
+            # Use as_file() to materialize the resource if it's inside a zip.
+            with as_file(resource) as template_path:
+                tree = ET.parse(str(template_path))
+                root = tree.getroot()
             
             # Parse nodes from palette
             ns = {'graphml': 'http://graphml.graphdrawing.org/xmlns',
@@ -101,11 +101,11 @@ class NodeRegistry:
                     text_color='#FFFFFF'
                 )
             
-        except FileNotFoundError:
-            print(f"Warning: Palette template not found at {template_path}")
+        except (FileNotFoundError, ModuleNotFoundError) as e:
+            print(f"[s3dgraphy] Warning: Palette template not found: {type(e).__name__}: {e}")
             self._load_default_visual_properties()
         except Exception as e:
-            print(f"Warning: Error loading palette template: {e}")
+            print(f"[s3dgraphy] Warning: Error loading palette template: {e}")
             self._load_default_visual_properties()
 
     def _extract_visual_properties(self, node_elem: ET.Element, ns: Dict) -> Optional[NodeVisualProperties]:
