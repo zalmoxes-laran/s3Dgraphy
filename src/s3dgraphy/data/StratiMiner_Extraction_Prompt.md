@@ -1,4 +1,4 @@
-# StratiMiner Extraction Prompt — v5.3
+# StratiMiner Extraction Prompt — v5.4
 **Extended Matrix (EM) — Unified xlsx schema for StratiMiner (DP-02)**
 *Schema: `em_data.xlsx` (5 sheets)*
 
@@ -195,6 +195,65 @@ your current model version). Every `Claims` row with
 | 3 | `TITLE` | Full bibliographic title. |
 | 4 | `YEAR` | Integer publication year. |
 | 5 | `AUTHOR_IDS` | `Authors.ID`s of the DOCUMENT authors (comma-separated). Distinct from the per-claim authors! |
+| 6 | `ROLE` | Three-axis document classification — axis 1. See §DOCUMENT CLASSIFICATION. Empty when unknown. |
+| 7 | `CONTENT_NATURE` | Three-axis document classification — axis 2. See §DOCUMENT CLASSIFICATION. Empty when unknown. |
+| 8 | `GEOMETRY` | Three-axis document classification — axis 3. See §DOCUMENT CLASSIFICATION. **Empty when the document has no Representation Model** (e.g. a PDF article). |
+
+### §DOCUMENT CLASSIFICATION — three orthogonal axes (EM 1.6)
+
+Every document in the source catalog can be classified along three
+independent axes. All three columns are optional; leave empty when the
+source does not give you evidence to decide. **Never guess** — an
+empty cell is better than a wrong value.
+
+**Axis 1 — `ROLE` (how the document participates in the reasoning)**
+
+- `analytical` — primary source for reasoning directly about THIS
+  context (e.g. the site being reconstructed). The typical case for
+  excavation reports, photos of the site, drawings of the walls you
+  are reconstructing.
+- `comparative` — external reference used for comparison (another
+  site, another epoch, a typology study). The document has its own
+  subject and is brought in as analogy / model.
+
+**Axis 2 — `CONTENT_NATURE` (what the document IS)**
+
+- `2d_object` — image, drawing, photograph, textual document, PDF,
+  map, plan, section.
+- `3d_object` — three-dimensional model: photogrammetric mesh, laser
+  scan, CAD model, BIM export.
+
+**Axis 3 — `GEOMETRY` (how the document's RM is spatialized in 3D)**
+
+This axis applies only when the document has (or will have) a
+Representation Model in the 3D scene. A PDF article, a bibliography,
+a purely textual source has **no RM** — leave `GEOMETRY` empty. Same
+applies to documents you cannot judge from the source text.
+
+- `reality_based` — robust sensor / algorithmic positioning.
+  Examples: a photogrammetric model, a photo from a calibrated
+  photogrammetric sequence (so its 3D pose is known), an
+  instrumentally-surveyed special find.
+- `observable` — positioning reconstructed with approximation from
+  rigorous archaeological documentation (a measured plan, a
+  cross-section, an orthophoto). Criterion-based, residual uncertainty.
+- `asserted` — compositional positioning asserted by the operator,
+  without claim of restitution. Typical for comparative material
+  placed in the scene for analytical purposes, or drawings that are
+  not metrically correct.
+
+**Decision sketch:**
+
+| Source type | ROLE | CONTENT_NATURE | GEOMETRY |
+|---|---|---|---|
+| Site excavation report (PDF) | analytical | 2d_object | *(empty — no RM)* |
+| Orthophoto of the site | analytical | 2d_object | reality_based |
+| Archaeological plan (measured) | analytical | 2d_object | observable |
+| Photogrammetric mesh of a wall | analytical | 3d_object | reality_based |
+| Sketch drawing (not metric) | analytical | 2d_object | asserted |
+| Journal article (general) | analytical | 2d_object | *(empty)* |
+| Capital from another site | comparative | 3d_object | asserted |
+| Typology plate | comparative | 2d_object | asserted |
 
 ### Sheet 5 — `Claims` (the main table — long-table)
 

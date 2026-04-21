@@ -85,7 +85,10 @@ from ..graph import Graph
 from ..nodes.stratigraphic_node import StratigraphicUnit
 from ..nodes.epoch_node import EpochNode
 from ..nodes.author_node import AuthorNode, AuthorAINode
-from ..nodes.document_node import DocumentNode
+from ..nodes.document_node import (
+    DocumentNode, DOCUMENT_ROLES, DOCUMENT_CONTENT_NATURES,
+    DOCUMENT_GEOMETRIES,
+)
 from ..nodes.extractor_node import ExtractorNode
 from ..nodes.combiner_node import CombinerNode
 from ..nodes.property_node import PropertyNode
@@ -209,6 +212,14 @@ class UnifiedXLSXImporter:
             "DOC_ID": "ID",
             "DOCUMENT_ID": "ID",
             "DOCUMENTS_ID": "ID",
+            # EM 1.6 three-axis classification — canonical columns are
+            # ROLE, CONTENT_NATURE, GEOMETRY.
+            "DOCUMENT_ROLE": "ROLE",
+            "DOC_ROLE": "ROLE",
+            "NATURE": "CONTENT_NATURE",
+            "CONTENT": "CONTENT_NATURE",
+            "DOC_CONTENT_NATURE": "CONTENT_NATURE",
+            "DOC_GEOMETRY": "GEOMETRY",
         },
         "Claims": {
             # Per-triple document / author variants.
@@ -299,6 +310,25 @@ class UnifiedXLSXImporter:
             self.graph.add_node(node)
             self._author_by_id[aid] = node
 
+    def _normalise_doc_axis(self, raw, allowed, doc_id: str,
+                             column_label: str) -> Optional[str]:
+        """Lowercase + validate a row value for a three-axis
+        classification column. Returns ``None`` for empty cells and
+        for values that do not match the allowed vocabulary (with a
+        warning appended so the user can fix the xlsx).
+        """
+        s = _str(raw)
+        if not s:
+            return None
+        v = s.strip().lower()
+        if v in allowed:
+            return v
+        self.warnings.append(
+            f"Document '{doc_id}': unknown {column_label} value "
+            f"{s!r} — expected one of {list(allowed)}. Ignored."
+        )
+        return None
+
     def _parse_documents(self, df: pd.DataFrame) -> None:
         for _, row in df.iterrows():
             did = _str(row.get("ID"))
@@ -309,9 +339,27 @@ class UnifiedXLSXImporter:
             year = _str(row.get("YEAR"))
             author_ids = _str(row.get("AUTHOR_IDS"))
 
+            # EM 1.6 three-axis classification. Normalise to lowercase
+            # and validate against the canonical vocabularies; unknown
+            # values are ignored with a warning rather than aborting
+            # the whole import.
+            role = self._normalise_doc_axis(
+                row.get("ROLE"), DOCUMENT_ROLES, did, "ROLE")
+            content_nature = self._normalise_doc_axis(
+                row.get("CONTENT_NATURE"), DOCUMENT_CONTENT_NATURES,
+                did, "CONTENT_NATURE")
+            geometry = self._normalise_doc_axis(
+                row.get("GEOMETRY"), DOCUMENT_GEOMETRIES,
+                did, "GEOMETRY")
+
             desc_parts = [p for p in (filename, title, year) if p]
-            doc = DocumentNode(node_id=str(uuid.uuid4()), name=did,
-                               description=" | ".join(desc_parts))
+            doc = DocumentNode(
+                node_id=str(uuid.uuid4()), name=did,
+                description=" | ".join(desc_parts),
+                role=role,
+                content_nature=content_nature,
+                geometry=geometry,
+            )
             self.graph.add_node(doc)
             self._document_by_id[did] = doc
 
