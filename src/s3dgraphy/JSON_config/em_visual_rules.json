@@ -541,42 +541,48 @@
             "label_position": "center"
         }
     },
+    "document_roles": {
+        "_comment": "Axis 1 of the three-axis Master-Document classification (EM 1.6). Declares how this document participates in the reconstructive reasoning. 'analytical' = primary source for direct reasoning about this context. 'comparative' = external comparison material (other sites, epochs, typologies). Not visualized as colour — metadata only.",
+        "analytical": {
+            "description": "Primary source for direct reconstructive reasoning about this context."
+        },
+        "comparative": {
+            "description": "External document used as comparative reference (other sites, other epochs, typologies)."
+        }
+    },
+    "document_content_natures": {
+        "_comment": "Axis 2 of the three-axis Master-Document classification (EM 1.6). Describes the intrinsic nature of the document's content. '2d_object' = image, drawing, photograph, text. '3d_object' = three-dimensional model. Not visualized as colour — metadata only.",
+        "2d_object": {
+            "description": "Image, drawing, photograph, or textual document."
+        },
+        "3d_object": {
+            "description": "Three-dimensional model (mesh, laser scan, photogrammetric reconstruction)."
+        }
+    },
     "document_variant_styles": {
-        "_comment": "Two-axis classification of Master Documents (EM 1.5.4+). The first axis (role) distinguishes documents about THIS context (analytical) from external reference material (comparative). The second axis (spatial_confidence) — only meaningful for analytical — grades the certainty of spatial positioning. The renderer derives the border_color from the composite key 'role.spatial_confidence' (or just 'comparative' when role=comparative). A DocumentNode whose role/spatial_confidence are unset falls back to the 'default' entry — same neutral styling as before. Colors and border_width are kept in sync with the reference nodes in templates/em_palette_template.graphml (n37, n38, n39).",
+        "_comment": "Axis 3 of the three-axis Master-Document classification (EM 1.6). Declares how the document's Representation Model (RM) is spatialized in the 3D scene. The 'geometry' property drives both the GraphML DocumentNode border colour (in yEd) and the RM contour colour in the 3D viewport (per the v1.6 toggle). Documents without an RM (e.g. PDF articles, bibliographies) omit the geometry property entirely — no node, no colour. Colours follow the EM certainty scale (red / orange / yellow) reinterpreted as geometric-quality grading. Kept in sync with the reference nodes in templates/em_palette_template.graphml (n37 red, n39 orange, n38 yellow).",
         "default": {
             "border_color": "#000000",
             "border_style": "solid",
             "border_width": 1.0
         },
-        "analytical.photogrammetric": {
+        "reality_based": {
             "border_color": "#9B3333",
             "border_style": "solid",
             "border_width": 4.0,
-            "description": "Metrically positionable: camera-calibrated photograph, orthophoto, photogrammetric render."
+            "description": "Robust sensor / algorithmic positioning: photogrammetric model, photo from a calibrated photogrammetric sequence, instrumentally-surveyed special find."
         },
-        "analytical.observable": {
+        "observable": {
             "border_color": "#D86400",
             "border_style": "solid",
             "border_width": 4.0,
-            "description": "Positioned via landmarks observable inside the document itself; manual but criterion-based. Residual uncertainty remains."
+            "description": "Position reconstructed with approximation from rigorous archaeological documentation (plans, sections, measured drawings). Criterion-based, residual uncertainty remains."
         },
-        "analytical.asserted": {
+        "asserted": {
             "border_color": "#D8BD30",
             "border_style": "solid",
             "border_width": 4.0,
-            "description": "Operator-asserted position; the document (e.g. a drawing not metrically correct) cannot be metrically placed — attribution is explicit but fluid."
-        },
-        "analytical.textual": {
-            "border_color": "#666666",
-            "border_style": "solid",
-            "border_width": 4.0,
-            "description": "Non-spatial analytical document: e.g. a journal article, bibliography, or textual reference that describes the context but makes no spatial claim. No position to grade."
-        },
-        "comparative": {
-            "border_color": "#2E8B57",
-            "border_style": "solid",
-            "border_width": 4.0,
-            "description": "External comparative material: a document with its own geometry used as a model / analogy / reference for the current context. Not positioned on the context itself."
+            "description": "Compositional positioning asserted by the operator, without claim of restitution (e.g. placing a comparative element in the scene for analytical purposes)."
         }
     },
     "edge_style": {

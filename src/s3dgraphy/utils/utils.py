@@ -231,44 +231,52 @@ def _load_visual_rules():
 
 
 def get_document_vocabularies():
-    """Derive ``(DOCUMENT_ROLES, DOCUMENT_SPATIAL_CONFIDENCES)`` tuples
-    from the keys of ``em_visual_rules.json → document_variant_styles``.
+    """Derive the three canonical Master-Document vocabularies from
+    ``em_visual_rules.json``.
 
-    Each key is either a standalone role (e.g. ``comparative``) or a
-    composite ``role.spatial_confidence`` (e.g. ``analytical.textual``).
-    Special keys ``default`` and any ``_comment`` field are ignored.
+    Returns ``(DOCUMENT_ROLES, DOCUMENT_CONTENT_NATURES,
+    DOCUMENT_GEOMETRIES)`` as tuples, reading from:
+
+    - ``document_roles`` → keys (e.g. ``analytical``, ``comparative``)
+    - ``document_content_natures`` → keys (e.g. ``2d_object``)
+    - ``document_variant_styles`` → keys *excluding* ``default`` and
+      any ``_comment`` entry (e.g. ``reality_based``, ``observable``,
+      ``asserted``)
+
     The JSON is the single source of truth for the Master-Document
-    classification vocabulary; adding a new variant to the JSON flows
-    through to constructor validation and UI dropdowns automatically.
+    classification vocabulary; adding a new value there flows through
+    to constructor validation and UI dropdowns automatically.
     """
     _role_order = ("analytical", "comparative")
-    _sc_order = ("photogrammetric", "observable", "asserted", "textual")
+    _nature_order = ("2d_object", "3d_object")
+    _geometry_order = ("reality_based", "observable", "asserted")
     rules = _load_visual_rules()
-    variants = rules.get("document_variant_styles", {}) or {}
-    roles: set = set()
-    scs: set = set()
-    for key in variants:
-        if not key or key.startswith("_") or key == "default":
-            continue
-        if "." in key:
-            r, s = key.split(".", 1)
-            roles.add(r)
-            scs.add(s)
-        else:
-            roles.add(key)
-    roles_t = tuple(r for r in _role_order if r in roles) + tuple(
-        sorted(r for r in roles if r not in _role_order))
-    scs_t = tuple(s for s in _sc_order if s in scs) + tuple(
-        sorted(s for s in scs if s not in _sc_order))
-    return roles_t or _role_order, scs_t or _sc_order
+
+    def _keys(section_name):
+        section = rules.get(section_name, {}) or {}
+        return {k for k in section
+                if k and not k.startswith("_") and k != "default"}
+
+    roles = _keys("document_roles")
+    natures = _keys("document_content_natures")
+    geoms = _keys("document_variant_styles")
+
+    def _ordered(values, preferred):
+        return tuple(v for v in preferred if v in values) + tuple(
+            sorted(v for v in values if v not in preferred))
+
+    roles_t = _ordered(roles, _role_order) or _role_order
+    natures_t = _ordered(natures, _nature_order) or _nature_order
+    geoms_t = _ordered(geoms, _geometry_order) or _geometry_order
+    return roles_t, natures_t, geoms_t
 
 
 def get_document_variant_style(variant_key: str) -> dict:
     """Return the render-style dict for a DocumentNode variant key.
 
-    ``variant_key`` is one of ``"analytical.photogrammetric"``,
-    ``"analytical.observable"``, ``"analytical.asserted"``,
-    ``"comparative"`` or ``"default"`` — see
+    In EM 1.6 ``variant_key`` is a ``geometry`` value
+    (``"reality_based"``, ``"observable"``, ``"asserted"``) or
+    ``"default"`` when the document has no RM — see
     :meth:`DocumentNode.variant_style_key`.
 
     The returned dict includes at least ``border_color``,

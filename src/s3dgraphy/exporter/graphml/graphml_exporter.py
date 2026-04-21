@@ -859,9 +859,9 @@ class GraphMLExporter:
                                     # original node_id as EMID so all copies of
                                     # the same document share the same EMID.
                                     # Also preserve the Master-Document
-                                    # classification (role /
-                                    # spatial_confidence) so the exporter
-                                    # can pick the correct border colour.
+                                    # classification (role / content_nature
+                                    # / geometry) so the exporter can pick
+                                    # the correct border colour.
                                     if doc.node_id not in local_doc_copies:
                                         local_doc = DocumentNode(
                                             node_id=generate_uuid(),
@@ -870,11 +870,7 @@ class GraphMLExporter:
                                         )
                                         local_doc.original_emid = doc.node_id
                                         _src_data = getattr(doc, "data", None) or {}
-                                        if "role" in _src_data:
-                                            local_doc.data["role"] = _src_data["role"]
-                                        if "spatial_confidence" in _src_data:
-                                            local_doc.data["spatial_confidence"] = \
-                                                _src_data["spatial_confidence"]
+                                        local_doc.data.update(_src_data)
                                         local_doc_copies[doc.node_id] = local_doc
                                     chain['extractors'].append({
                                         'extractor': ext,
@@ -900,11 +896,7 @@ class GraphMLExporter:
                                     )
                                     local_doc.original_emid = doc.node_id
                                     _src_data = getattr(doc, "data", None) or {}
-                                    if "role" in _src_data:
-                                        local_doc.data["role"] = _src_data["role"]
-                                    if "spatial_confidence" in _src_data:
-                                        local_doc.data["spatial_confidence"] = \
-                                            _src_data["spatial_confidence"]
+                                    local_doc.data.update(_src_data)
                                     local_doc_copies[doc.node_id] = local_doc
                                 chain['extractors'].append({
                                     'extractor': ext,

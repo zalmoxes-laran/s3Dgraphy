@@ -406,12 +406,9 @@ class NodeGenerator:
         fill.set('color', '#FFFFFFE6')
         fill.set('transparent', 'false')
 
-        # BorderStyle — driven by the Master-Document variant when the
-        # node's role / spatial_confidence classify it (EM 1.5.4+).
-        # Unclassified documents fall back to the "default" entry in
-        # ``em_visual_rules.json`` (identical to the historical
-        # black / solid / 1.0 styling, so existing graphs are
-        # unaffected).
+        # BorderStyle — driven by the Master-Document ``geometry`` axis
+        # (EM 1.6). Documents without an RM fall back to the "default"
+        # entry in ``em_visual_rules.json`` (black / solid / 1.0).
         try:
             from ...utils.utils import get_document_variant_style
             if hasattr(node, "variant_style_key"):

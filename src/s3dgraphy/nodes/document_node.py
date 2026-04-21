@@ -4,49 +4,60 @@ from .paradata_node import ParadataNode
 from ..utils.utils import get_document_vocabularies
 
 
-# Canonical vocabularies for the two-axis Master-Document classification
-# (EM 1.5.4+). Derived from ``em_visual_rules.json → document_variant_styles``
-# so the JSON remains the single source of truth — add a variant there to
-# extend constructor validation, dialog dropdowns, and renderer styling
-# in one shot.
-DOCUMENT_ROLES, DOCUMENT_SPATIAL_CONFIDENCES = get_document_vocabularies()
+# Canonical vocabularies for the three-axis Master-Document classification
+# (EM 1.6). Derived from ``em_visual_rules.json`` so the JSON remains the
+# single source of truth — add or remove a value there to extend the
+# constructor validation, dialog dropdowns, and renderer styling in one
+# shot.
+#
+#   Axis 1 — role             (analytical / comparative)
+#   Axis 2 — content_nature   (2d_object / 3d_object)
+#   Axis 3 — geometry         (reality_based / observable / asserted
+#                              / None when the document has no RM)
+DOCUMENT_ROLES, DOCUMENT_CONTENT_NATURES, DOCUMENT_GEOMETRIES = \
+    get_document_vocabularies()
 
 
 class DocumentNode(ParadataNode):
-    """
-    Represents a document or source attached to the graph.
+    """Represents a document in the Extended Matrix.
 
-    Two orthogonal axes classify a Master Document:
+    Every document is a *functional wrapper* — elevating an entity to
+    document status makes it operationalizable for information extraction
+    via Extractor nodes.
 
-    1. ``role`` — is the document *about* this context (``analytical``)
-       or does it provide external comparison material (``comparative``,
-       e.g. the facade of another temple used as a reference model)?
-    2. ``spatial_confidence`` — only meaningful for analytical documents,
-       expresses how confident we are that the document can be placed in
-       space relative to this context:
+    A document is classified along three orthogonal axes:
 
-       - ``photogrammetric`` — camera-calibrated, metrically verifiable.
-       - ``observable``      — positioned via landmarks internal to the
-         document (manual but criterion-based; residual uncertainty).
-       - ``asserted``        — operator-attributed; the document (e.g. a
-         drawing) is not metrically correct, position is fluid.
+    1. ``role`` — how this document participates in the reconstructive
+       reasoning: ``analytical`` (primary source about this context)
+       or ``comparative`` (external reference / analogy — e.g. the
+       facade of another temple used as a model).
 
-    The renderer maps these to border colours (red / orange / yellow for
-    analytical by descending certainty, green for comparative) via
-    ``em_visual_rules.json``. The resolver does not consume them — they
-    are metadata for humans and diagnostic UIs.
+    2. ``content_nature`` — what the document is: ``2d_object``
+       (image, drawing, photograph, text) or ``3d_object`` (mesh,
+       laser scan, photogrammetric model).
 
-    Legacy convention (D.0-999 = analytical, D.1000+ = comparative) is
-    honoured as a **fallback** by :meth:`effective_role` when neither
-    attribute is set explicitly.
+    3. ``geometry`` — how the document's Representation Model (RM) is
+       spatialized in the 3D scene:
 
-    Attributes:
-        data (dict): Additional metadata. Canonical keys:
+       - ``reality_based``  — sensor / algorithmic positioning
+         (photogrammetry, calibrated photo sequence, instrumentally
+         surveyed find).
+       - ``observable``     — reconstructed from rigorous archaeological
+         documentation (plans, sections). Criterion-based, residual
+         uncertainty.
+       - ``asserted``       — compositional positioning asserted by the
+         operator, without claim of restitution.
+       - ``None``           — the document has no RM (e.g. a PDF
+         article, a bibliography); the ``geometry`` node is simply
+         absent from the graph.
 
-            - ``url`` / ``url_type`` — legacy
-            - ``role`` ∈ :data:`DOCUMENT_ROLES` or None
-            - ``spatial_confidence`` ∈ :data:`DOCUMENT_SPATIAL_CONFIDENCES`
-              or None (must be None when role='comparative')
+    The renderer maps ``geometry`` to border colours (red / orange /
+    yellow) via ``em_visual_rules.json``. ``role`` and
+    ``content_nature`` are metadata only — they do not drive visuals.
+
+    Legacy convention (``D.NNN`` with ``NNN >= 1000`` → comparative)
+    is honoured as a **fallback** by :meth:`effective_role` when no
+    explicit attribute is set.
     """
 
     node_type = "document"
@@ -55,7 +66,7 @@ class DocumentNode(ParadataNode):
     _COMPARATIVE_ID_THRESHOLD = 1000
 
     def __init__(self, node_id, name, description="", url=None, data=None,
-                 role=None, spatial_confidence=None):
+                 role=None, content_nature=None, geometry=None):
         super().__init__(node_id, name, description=description, url=url)
         self.data = data if data is not None else {}
         if role is not None:
@@ -64,20 +75,19 @@ class DocumentNode(ParadataNode):
                     f"DocumentNode role must be one of {DOCUMENT_ROLES} "
                     f"or None, got {role!r}")
             self.data["role"] = role
-        if spatial_confidence is not None:
-            if spatial_confidence not in DOCUMENT_SPATIAL_CONFIDENCES:
+        if content_nature is not None:
+            if content_nature not in DOCUMENT_CONTENT_NATURES:
                 raise ValueError(
-                    f"DocumentNode spatial_confidence must be one of "
-                    f"{DOCUMENT_SPATIAL_CONFIDENCES} or None, got "
-                    f"{spatial_confidence!r}")
-            # Invariant: comparative documents do not carry a spatial
-            # confidence — the document has its own geometry, the
-            # "spatial placement" concept does not apply.
-            if self.data.get("role") == "comparative":
+                    f"DocumentNode content_nature must be one of "
+                    f"{DOCUMENT_CONTENT_NATURES} or None, got "
+                    f"{content_nature!r}")
+            self.data["content_nature"] = content_nature
+        if geometry is not None:
+            if geometry not in DOCUMENT_GEOMETRIES:
                 raise ValueError(
-                    "DocumentNode with role='comparative' cannot carry a "
-                    "spatial_confidence value")
-            self.data["spatial_confidence"] = spatial_confidence
+                    f"DocumentNode geometry must be one of "
+                    f"{DOCUMENT_GEOMETRIES} or None, got {geometry!r}")
+            self.data["geometry"] = geometry
 
     # ------------------------------------------------------------------
     # Effective classification (explicit attribute → fallback to legacy
@@ -99,27 +109,35 @@ class DocumentNode(ParadataNode):
             return "comparative"
         return "analytical"
 
-    def effective_spatial_confidence(self):
-        """Return the canonical spatial_confidence, or ``None`` when
-        comparative / unset. Applies the role invariant automatically.
+    def effective_content_nature(self):
+        """Return ``data['content_nature']`` when set, else ``None``.
+
+        No legacy fallback — older graphs simply have no declared
+        content nature.
         """
-        if self.effective_role() == "comparative":
-            return None
-        v = self.data.get("spatial_confidence")
-        return v if v in DOCUMENT_SPATIAL_CONFIDENCES else None
+        v = self.data.get("content_nature")
+        return v if v in DOCUMENT_CONTENT_NATURES else None
+
+    def effective_geometry(self):
+        """Return ``data['geometry']`` when set, else ``None``.
+
+        A ``None`` return means the document has no Representation
+        Model — the renderer omits the border-colour variant and any
+        downstream RM viewport styling.
+        """
+        v = self.data.get("geometry")
+        return v if v in DOCUMENT_GEOMETRIES else None
 
     def variant_style_key(self) -> str:
         """Return the lookup key for
         :func:`em_visual_rules.json → document_variant_styles`.
 
-        Composite key ``"role.spatial_confidence"`` for analytical
-        documents, just ``"comparative"`` for comparative, and
-        ``"default"`` when neither axis resolves to a known value.
+        In EM 1.6 the border colour is driven by ``geometry`` alone:
+        the key is the geometry value, or ``"default"`` when the
+        document has no RM. Role and content_nature are metadata and
+        do not affect the border.
         """
-        role = self.effective_role()
-        if role == "comparative":
-            return "comparative"
-        sc = self.effective_spatial_confidence()
-        if sc is None:
+        g = self.effective_geometry()
+        if g is None:
             return "default"
-        return f"analytical.{sc}"
+        return g
