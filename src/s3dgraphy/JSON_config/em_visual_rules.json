@@ -541,6 +541,44 @@
             "label_position": "center"
         }
     },
+    "document_variant_styles": {
+        "_comment": "Two-axis classification of Master Documents (EM 1.5.4+). The first axis (role) distinguishes documents about THIS context (analytical) from external reference material (comparative). The second axis (spatial_confidence) — only meaningful for analytical — grades the certainty of spatial positioning. The renderer derives the border_color from the composite key 'role.spatial_confidence' (or just 'comparative' when role=comparative). A DocumentNode whose role/spatial_confidence are unset falls back to the 'default' entry — same neutral styling as before. Colors and border_width are kept in sync with the reference nodes in templates/em_palette_template.graphml (n37, n38, n39).",
+        "default": {
+            "border_color": "#000000",
+            "border_style": "solid",
+            "border_width": 1.0
+        },
+        "analytical.photogrammetric": {
+            "border_color": "#9B3333",
+            "border_style": "solid",
+            "border_width": 4.0,
+            "description": "Metrically positionable: camera-calibrated photograph, orthophoto, photogrammetric render."
+        },
+        "analytical.observable": {
+            "border_color": "#D86400",
+            "border_style": "solid",
+            "border_width": 4.0,
+            "description": "Positioned via landmarks observable inside the document itself; manual but criterion-based. Residual uncertainty remains."
+        },
+        "analytical.asserted": {
+            "border_color": "#D8BD30",
+            "border_style": "solid",
+            "border_width": 4.0,
+            "description": "Operator-asserted position; the document (e.g. a drawing not metrically correct) cannot be metrically placed — attribution is explicit but fluid."
+        },
+        "analytical.textual": {
+            "border_color": "#666666",
+            "border_style": "solid",
+            "border_width": 4.0,
+            "description": "Non-spatial analytical document: e.g. a journal article, bibliography, or textual reference that describes the context but makes no spatial claim. No position to grade."
+        },
+        "comparative": {
+            "border_color": "#2E8B57",
+            "border_style": "solid",
+            "border_width": 4.0,
+            "description": "External comparative material: a document with its own geometry used as a model / analogy / reference for the current context. Not positioned on the context itself."
+        }
+    },
     "edge_style": {
         "is_before": {
             "style": {

@@ -206,7 +206,88 @@ def get_material_color(matname, rules_path=None):
         if matname in ['US', 'USVs', 'USVn', 'VSF', 'SF', 'USD']:
             return (0.5, 0.5, 0.5, 1.0)
         return None
-    
+
+
+# Cache for the loaded visual rules file. Loaded lazily; reloadable
+# for tests via ``_reload_visual_rules``.
+_VISUAL_RULES_CACHE = None
+
+
+def _load_visual_rules():
+    global _VISUAL_RULES_CACHE
+    if _VISUAL_RULES_CACHE is not None:
+        return _VISUAL_RULES_CACHE
+    try:
+        rules_resource = files("s3dgraphy").joinpath(
+            "JSON_config/em_visual_rules.json")
+        with rules_resource.open('r', encoding='utf-8') as f:
+            _VISUAL_RULES_CACHE = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError,
+            ModuleNotFoundError) as e:
+        print(f"[s3dgraphy] _load_visual_rules fallback: "
+              f"{type(e).__name__}: {e}")
+        _VISUAL_RULES_CACHE = {}
+    return _VISUAL_RULES_CACHE
+
+
+def get_document_vocabularies():
+    """Derive ``(DOCUMENT_ROLES, DOCUMENT_SPATIAL_CONFIDENCES)`` tuples
+    from the keys of ``em_visual_rules.json → document_variant_styles``.
+
+    Each key is either a standalone role (e.g. ``comparative``) or a
+    composite ``role.spatial_confidence`` (e.g. ``analytical.textual``).
+    Special keys ``default`` and any ``_comment`` field are ignored.
+    The JSON is the single source of truth for the Master-Document
+    classification vocabulary; adding a new variant to the JSON flows
+    through to constructor validation and UI dropdowns automatically.
+    """
+    _role_order = ("analytical", "comparative")
+    _sc_order = ("photogrammetric", "observable", "asserted", "textual")
+    rules = _load_visual_rules()
+    variants = rules.get("document_variant_styles", {}) or {}
+    roles: set = set()
+    scs: set = set()
+    for key in variants:
+        if not key or key.startswith("_") or key == "default":
+            continue
+        if "." in key:
+            r, s = key.split(".", 1)
+            roles.add(r)
+            scs.add(s)
+        else:
+            roles.add(key)
+    roles_t = tuple(r for r in _role_order if r in roles) + tuple(
+        sorted(r for r in roles if r not in _role_order))
+    scs_t = tuple(s for s in _sc_order if s in scs) + tuple(
+        sorted(s for s in scs if s not in _sc_order))
+    return roles_t or _role_order, scs_t or _sc_order
+
+
+def get_document_variant_style(variant_key: str) -> dict:
+    """Return the render-style dict for a DocumentNode variant key.
+
+    ``variant_key`` is one of ``"analytical.photogrammetric"``,
+    ``"analytical.observable"``, ``"analytical.asserted"``,
+    ``"comparative"`` or ``"default"`` — see
+    :meth:`DocumentNode.variant_style_key`.
+
+    The returned dict includes at least ``border_color``,
+    ``border_style`` and ``border_width``; callers consume whichever
+    they need to emit yEd XML. An unknown key falls back to
+    ``"default"`` so an exporter is never left without a style.
+    """
+    rules = _load_visual_rules()
+    variants = rules.get("document_variant_styles", {}) or {}
+    style = variants.get(variant_key)
+    if style is None:
+        style = variants.get("default", {})
+    return {
+        "border_color": style.get("border_color", "#000000"),
+        "border_style": style.get("border_style", "solid"),
+        "border_width": float(style.get("border_width", 1.0)),
+    }
+
+
 def get_original_node_id(node):
     """
     Recupera l'ID originale di un nodo.

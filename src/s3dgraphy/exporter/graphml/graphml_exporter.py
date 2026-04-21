@@ -265,13 +265,13 @@ class GraphMLExporter:
             # All on same y-line, just below the US node.
             # This keeps the PD group compact and within the epoch row.
             #
-            # Node heights: property=30, extractor=25, document=63.79
+            # Node heights: property=30, extractor=25, document=55.0
             # The tallest (document) must fit within the epoch row.
             # US node is at us_y (centered in epoch row).
             # Place all internal nodes at us_y (same baseline).
 
             # All internal nodes at the same y as US node.
-            # The tallest internal node is document (63.79px).
+            # The tallest internal node is document (55.0px).
             # Position so they don't extend beyond the US node's bottom edge.
             # US node: height=60, so bottom at us_y+60.
             # Place internal nodes at us_y, same as US (they're inside a
@@ -418,6 +418,72 @@ class GraphMLExporter:
                     self._create_internal_pd_edge(edge_id, src_nid, tgt_nid))
 
             internal_edge_total += internal_edge_counter
+
+        # 7b. Emit swimlane-level paradata groups (SL_PDs).
+        #
+        # These are free ParadataNodeGroups anchored to an EpochNode via a
+        # ``has_first_epoch`` outgoing edge — typically introduced by the
+        # :mod:`s3dgraphy.transforms.compact` hoist pass when author /
+        # license / embargo / temporal PropertyNodes are uniform across
+        # an epoch's stratigraphic units. Emitting them ONCE at the
+        # swimlane level instead of N per-US copies matches the EM
+        # formalism and keeps the GraphML compact and readable.
+        sl_pd_groups = self._build_swimlane_paradata_groups(epoch_nodes)
+        for sl_data in sl_pd_groups:
+            sl_pd = sl_data['sl_pd']
+            epoch = sl_data['epoch']
+
+            # Position the SL_PD at the left margin of the epoch row so
+            # it does not collide with US nodes laid out by
+            # calculate_epoch_positions. The epoch's row geometry is
+            # captured on the cached row-heights map populated during
+            # position calculation.
+            epoch_row_h = self._row_heights.get(
+                epoch.node_id, 150.0) if hasattr(self, "_row_heights") else 150.0
+            # approximate row top in canvas coords: sum of preceding rows + title inset.
+            top_y = 50.0
+            for e in epoch_gen._sort_epochs_by_time(epoch_nodes):
+                if e.node_id == epoch.node_id:
+                    break
+                top_y += self._row_heights.get(e.node_id, 150.0) if \
+                    hasattr(self, "_row_heights") else 150.0
+            sl_pd_y = top_y + (epoch_row_h / 2.0) - 30.0
+            sl_pd_x = 40.0  # far left of the swimlane row
+
+            group_xml = group_gen.generate_paradata_group(
+                sl_data, x=sl_pd_x, y=sl_pd_y, parent_id=swimlane_id)
+            swimlane_graph.append(group_xml)
+
+            group_nested_id = sl_data['group_nested_id']
+            nested_graph = group_xml.find(
+                './/{http://graphml.graphdrawing.org/xmlns}graph')
+            if nested_graph is None:
+                continue
+
+            # Emit the SL_PD's image-node children (Author / License /
+            # Embargo local copies) + temporal PropertyNodes.
+            internal_y = sl_pd_y + 30.0
+            x_cursor = sl_pd_x + 15.0
+
+            for prop_node in sl_data.get('property_nodes', []):
+                prop_xml = node_gen.generate_property_node(
+                    prop_node, x=x_cursor, y=internal_y,
+                    parent_id=group_nested_id)
+                nested_graph.append(prop_xml)
+                x_cursor += 90.0
+
+            for image_local in sl_data.get('paradata_image_nodes', []):
+                image_xml = self._generate_paradata_image_node(
+                    image_local, x=x_cursor, y=internal_y,
+                    parent_id=group_nested_id)
+                if image_xml is not None:
+                    nested_graph.append(image_xml)
+                    x_cursor += 50.0
+
+            # No internal edges needed: SL_PD membership is via XML
+            # nesting, and the importer's DP-19 auto-edge pass will
+            # re-derive has_author / has_license / has_embargo from
+            # the group at load time.
 
         # 8. Generate US → ParadataNodeGroup dashed edges
         print("Generating US→ParadataNodeGroup edges...")
@@ -792,6 +858,10 @@ class GraphMLExporter:
                                     # Uses unique UUID for nesting but preserves
                                     # original node_id as EMID so all copies of
                                     # the same document share the same EMID.
+                                    # Also preserve the Master-Document
+                                    # classification (role /
+                                    # spatial_confidence) so the exporter
+                                    # can pick the correct border colour.
                                     if doc.node_id not in local_doc_copies:
                                         local_doc = DocumentNode(
                                             node_id=generate_uuid(),
@@ -799,6 +869,12 @@ class GraphMLExporter:
                                             description=doc.description
                                         )
                                         local_doc.original_emid = doc.node_id
+                                        _src_data = getattr(doc, "data", None) or {}
+                                        if "role" in _src_data:
+                                            local_doc.data["role"] = _src_data["role"]
+                                        if "spatial_confidence" in _src_data:
+                                            local_doc.data["spatial_confidence"] = \
+                                                _src_data["spatial_confidence"]
                                         local_doc_copies[doc.node_id] = local_doc
                                     chain['extractors'].append({
                                         'extractor': ext,
@@ -815,6 +891,7 @@ class GraphMLExporter:
                             docs = self.graph.get_document_nodes_for_extractor(ext.node_id)
                             for doc in docs:
                                 # Create per-group copy of document node
+                                # (preserves Master-Document classification).
                                 if doc.node_id not in local_doc_copies:
                                     local_doc = DocumentNode(
                                         node_id=generate_uuid(),
@@ -822,6 +899,12 @@ class GraphMLExporter:
                                         description=doc.description
                                     )
                                     local_doc.original_emid = doc.node_id
+                                    _src_data = getattr(doc, "data", None) or {}
+                                    if "role" in _src_data:
+                                        local_doc.data["role"] = _src_data["role"]
+                                    if "spatial_confidence" in _src_data:
+                                        local_doc.data["spatial_confidence"] = \
+                                            _src_data["spatial_confidence"]
                                     local_doc_copies[doc.node_id] = local_doc
                                 chain['extractors'].append({
                                     'extractor': ext,
@@ -906,11 +989,15 @@ class GraphMLExporter:
                 # Each target is copied locally (fresh uuid) so every PD
                 # group that cites the same paradata image node gets its
                 # own yEd image node inside its own container — matching
-                # the per-group document pattern used above. ---
+                # the per-group document pattern used above. The host
+                # US node itself is also a valid attribution source
+                # (pre-compaction graphs carry has_author directly on
+                # the US). ---
                 image_nodes_list, image_attachments = \
                     self._collect_paradata_image_attachments(
                         chains=chains,
                         local_doc_copies=local_doc_copies,
+                        us_node=us_node,
                     )
 
                 group_data = {
@@ -1016,7 +1103,165 @@ class GraphMLExporter:
     # AuthorAINode (the class check uses ``isinstance(tgt, klass)``).
     _PARADATA_EDGE_TO_CLASS = None  # populated lazily in the collector
 
-    def _collect_paradata_image_attachments(self, chains, local_doc_copies):
+    def _build_swimlane_paradata_groups(self, epoch_nodes: List) -> List[Dict]:
+        """
+        Collect swimlane-level ParadataNodeGroups (SL_PDs) that exist
+        in the graph and are anchored — via an outgoing
+        ``has_first_epoch`` edge — to one of the epochs currently
+        being displayed. For each, gather its image-node children
+        (Author / License / Embargo reachable via ``has_author`` /
+        ``has_license`` / ``has_embargo`` from the group) plus any
+        temporal PropertyNodes attached via ``has_property``.
+
+        SL_PDs are typically introduced by
+        :func:`s3dgraphy.transforms.compact.hoist_propagative_metadata`
+        — it hoists a shared per-node declaration into a single group
+        per epoch. The GraphML exporter simply emits what it finds;
+        running compaction is the caller's opt-in.
+
+        A "free" SL_PD, per the DP-19 auto-edge convention, is a
+        ParadataNodeGroup whose name starts with ``SL_`` and that has
+        no incoming ``has_paradata_nodegroup`` edge.
+
+        Returns a list of dicts with the same shape used by
+        :meth:`GroupNodeGenerator.generate_paradata_group` plus
+        ``epoch`` for positioning:
+
+        - ``sl_pd``: the SL_PD ParadataNodeGroup
+        - ``us_node``: a pseudo-node used only for labelling — we
+          pass the SL_PD itself so the label text becomes
+          ``"SL_PD_PD"``, but the generator's label formatter does
+          not care about the node class.
+        - ``epoch``: the EpochNode the SL_PD is anchored to
+        - ``property_nodes``: temporal PropertyNodes owned by the
+          SL_PD via ``has_property``
+        - ``paradata_image_nodes``: per-group copies of Author /
+          AuthorAI / License / Embargo instances cited by the SL_PD
+        - ``extractor_nodes`` / ``document_nodes`` / ``combiner_nodes``
+          / ``chains``: empty for now (SL_PD top-level attribution is
+          a compact form — the chain, if needed, stays at US-level).
+        """
+        from ...nodes.author_node import AuthorNode
+        from ...nodes.license_node import LicenseNode
+        from ...nodes.embargo_node import EmbargoNode
+        from ...nodes.property_node import PropertyNode
+        from .utils import generate_uuid
+
+        epoch_ids = {e.node_id for e in epoch_nodes}
+        id_to_node = {n.node_id: n for n in self.graph.nodes}
+
+        # Edges incoming as has_paradata_nodegroup → marks a PD as
+        # claimed by a strat unit (a "bound" PD, not a free SL_PD).
+        claimed_pd_ids = {e.edge_target for e in self.graph.edges
+                          if e.edge_type == "has_paradata_nodegroup"}
+
+        sl_pd_class_names = {"ParadataNodeGroup"}
+        edge_to_class = {
+            "has_author":  (AuthorNode,),
+            "has_license": (LicenseNode,),
+            "has_embargo": (EmbargoNode,),
+        }
+
+        groups: List[Dict] = []
+        for node in self.graph.nodes:
+            if node.__class__.__name__ not in sl_pd_class_names:
+                continue
+            if node.node_id in claimed_pd_ids:
+                continue
+            # Free PD group. The canonical SL_ naming convention and
+            # a has_first_epoch outgoing edge into a displayed epoch
+            # are the two signals that mark a swimlane-level group.
+            name = (getattr(node, "name", "") or "").upper()
+            if not name.startswith("SL"):
+                continue
+
+            target_epoch = None
+            for edge in self.graph.edges:
+                if (edge.edge_source == node.node_id
+                        and edge.edge_type == "has_first_epoch"
+                        and edge.edge_target in epoch_ids):
+                    target_epoch = id_to_node.get(edge.edge_target)
+                    break
+            if target_epoch is None:
+                continue
+
+            # Gather image-node members. The compact hoist pass links
+            # members to the SL_PD via ``is_in_paradata_nodegroup``
+            # (reverse direction: member → SL_PD). A second path, used
+            # by the DP-19 auto-edge importer layout, is outgoing
+            # ``has_author`` / ``has_license`` / ``has_embargo`` edges
+            # directly from the SL_PD. We honour both to stay
+            # compatible with graphs produced by either path.
+            accepted_classes = (AuthorNode, LicenseNode, EmbargoNode)
+            local_copies: Dict[str, any] = {}
+            image_nodes_list: List = []
+
+            def _register(tgt):
+                if tgt is None or not isinstance(tgt, accepted_classes):
+                    return
+                if tgt.node_id in local_copies:
+                    return
+                klass = tgt.__class__
+                local = klass(
+                    node_id=generate_uuid(),
+                    name=tgt.name,
+                    description=tgt.description,
+                )
+                local.original_emid = tgt.node_id
+                local_copies[tgt.node_id] = local
+                image_nodes_list.append(local)
+
+            for edge in self.graph.edges:
+                # Path A: SL_PD outgoing edges to the paradata image.
+                if edge.edge_source == node.node_id:
+                    accepted = edge_to_class.get(edge.edge_type)
+                    if accepted is not None:
+                        tgt = id_to_node.get(edge.edge_target)
+                        if tgt is not None and isinstance(tgt, accepted):
+                            _register(tgt)
+                    continue
+                # Path B: member → SL_PD via is_in_paradata_nodegroup.
+                if (edge.edge_target == node.node_id
+                        and edge.edge_type == "is_in_paradata_nodegroup"):
+                    tgt = id_to_node.get(edge.edge_source)
+                    _register(tgt)
+
+            # Gather temporal PropertyNodes. Same two paths: direct
+            # ``has_property`` outgoing from SL_PD, or member →
+            # SL_PD via ``is_in_paradata_nodegroup``.
+            prop_nodes_list: List = []
+            seen_props: set = set()
+            for edge in self.graph.edges:
+                candidate = None
+                if (edge.edge_source == node.node_id
+                        and edge.edge_type == "has_property"):
+                    candidate = id_to_node.get(edge.edge_target)
+                elif (edge.edge_target == node.node_id
+                        and edge.edge_type == "is_in_paradata_nodegroup"):
+                    candidate = id_to_node.get(edge.edge_source)
+                if isinstance(candidate, PropertyNode):
+                    if candidate.node_id in seen_props:
+                        continue
+                    seen_props.add(candidate.node_id)
+                    prop_nodes_list.append(candidate)
+
+            groups.append({
+                "sl_pd": node,
+                "us_node": node,  # label fallback; generator reads .name
+                "epoch": target_epoch,
+                "property_nodes": prop_nodes_list,
+                "extractor_nodes": [],
+                "combiner_nodes": [],
+                "document_nodes": [],
+                "chains": [],
+                "paradata_image_nodes": image_nodes_list,
+                "paradata_image_attachments": [],
+            })
+
+        return groups
+
+    def _collect_paradata_image_attachments(self, chains, local_doc_copies,
+                                            us_node=None):
         """
         For a single PD group, walk the three paradata-image edge types
         — ``has_author``, ``has_license``, ``has_embargo`` — from every
@@ -1087,6 +1332,15 @@ class GraphMLExporter:
                 image_attachments.append(
                     (source_local, local_copies[tgt.node_id])
                 )
+
+        # Per-node attribution directly on the host US (pre-compaction
+        # shape: ``US -has_author→ A.NN``). Compact hoists these into
+        # an SL_PD; but if compaction hasn't run, or if some US nodes
+        # carry attribution that survives compaction (multi-epoch
+        # ``survive_in_epoch`` cases), we still want the image node to
+        # appear inside the per-US PD group.
+        if us_node is not None:
+            _collect(us_node, us_node.node_id)
 
         for chain in chains:
             _collect(chain['property'], chain['property'].node_id)

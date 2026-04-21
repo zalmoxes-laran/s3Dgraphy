@@ -458,11 +458,16 @@ class GraphMLPatcher:
             if node_type in INTERNAL_NODE_TYPES:
                 continue
 
-            # Skip DocumentNodes without original_id: they come from auxiliary
-            # data (folder scanning, representation models) and are not part
-            # of the EM formal language in GraphML
+            # Skip DocumentNodes without original_id: they come from
+            # auxiliary data (folder scanning, representation models)
+            # and are not part of the EM formal language in GraphML.
+            # EXCEPTION: an explicitly created Master Document
+            # (marked ``attributes['em_master_document']=True`` by the
+            # Create-Host operator) IS first-class and must be written.
             if isinstance(node, DocumentNode):
-                continue
+                if not (getattr(node, 'attributes', None) or {}).get(
+                        'em_master_document'):
+                    continue
 
             # Safety check: skip nodes whose EMID (node_id) already exists in the XML.
             # This catches nodes that were imported but lost their original_id
@@ -807,9 +812,11 @@ class GraphMLPatcher:
             generic = ET.SubElement(data_gfx, f'{{{NS_Y}}}GenericNode')
             generic.set('configuration', 'com.yworks.bpmn.Artifact.withShadow')
 
+            # Geometry — kept in sync with the Master-Document reference
+            # nodes in templates/em_palette_template.graphml (n37-n39).
             geometry = ET.SubElement(generic, f'{{{NS_Y}}}Geometry')
-            geometry.set('height', '63.79')
-            geometry.set('width', '42.80')
+            geometry.set('height', '55.0')
+            geometry.set('width', '35.0')
             geometry.set('x', str(x))
             geometry.set('y', str(y))
 
@@ -817,16 +824,32 @@ class GraphMLPatcher:
             fill.set('color', '#FFFFFFE6')
             fill.set('transparent', 'false')
 
+            # BorderStyle — honours the Master-Document variant
+            # (EM 1.5.4+). Unclassified documents fall back to the
+            # "default" entry in em_visual_rules.json, equivalent to
+            # the historical black/solid/1.0 styling.
+            try:
+                from ...utils.utils import get_document_variant_style
+                if hasattr(node, "variant_style_key"):
+                    variant = get_document_variant_style(
+                        node.variant_style_key())
+                else:
+                    variant = get_document_variant_style("default")
+            except Exception:
+                variant = {"border_color": "#000000",
+                           "border_style": "solid",
+                           "border_width": 1.0}
             border = ET.SubElement(generic, f'{{{NS_Y}}}BorderStyle')
-            border.set('color', '#000000')
-            border.set('type', 'line')
-            border.set('width', '1.0')
+            border.set('color', variant.get("border_color", "#000000"))
+            _bs = variant.get("border_style", "solid")
+            border.set('type', 'line' if _bs == "solid" else _bs)
+            border.set('width', str(variant.get("border_width", 1.0)))
 
             label = ET.SubElement(generic, f'{{{NS_Y}}}NodeLabel')
             label.set('alignment', 'center')
             label.set('autoSizePolicy', 'content')
             label.set('fontFamily', 'Dialog')
-            label.set('fontSize', '8')
+            label.set('fontSize', '12')
             label.set('fontStyle', 'plain')
             label.set('hasBackgroundColor', 'false')
             label.set('hasLineColor', 'false')
