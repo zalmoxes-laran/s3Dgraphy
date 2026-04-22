@@ -454,13 +454,19 @@ class GraphMLPatcher:
 
         default_target = self._find_insertion_graph(graph_elem)
 
-        # Row-routing map: (y_start, y_end, nested_graph) for each
-        # swimlane-row <node> sitting under the TableNode's graph.
-        # Picking the correct row at insertion time is what actually
-        # places new nodes (and PD groups) INSIDE the right epoch
-        # lane — without this the new <node> is a child of the Table
-        # itself and yEd renders it floating outside the rows.
-        row_map = self._build_row_map(default_target)
+        # NOTE: we used to build a row_map from the direct <node>
+        # children of the Table's <graph> and route new nodes inside
+        # the matching row. That was wrong: in EM graphml swimlane
+        # ROWS are declared in ``<y:Table>/<y:Rows>`` (visual bands
+        # attached to the Table element) — they are NOT <node> children
+        # of the Table's graph. The direct <node> children are real
+        # content containers (ActivityNodeGroups, top-level stratigraphic
+        # nodes) that happen to have nested graphs. Routing by Y range
+        # therefore dumped new US/PD pairs inside an arbitrary Activity
+        # group whose band overlapped the epoch Y. yEd already places
+        # a node in the correct row based on its (x, y) coordinates,
+        # so inserting into the Table's graph with the right Y is
+        # enough. PD group containment is preserved below.
 
         # pd_group_node_id → nested <graph> element where its
         # children should be appended.
@@ -511,12 +517,7 @@ class GraphMLPatcher:
             self._uuid_to_new_id[node.node_id] = new_node_id
             node_xml = self._create_node_xml(node, new_node_id, x, y)
             if node_xml is not None:
-                # Route PD group into the matching swimlane row when
-                # possible — that's what actually anchors the group
-                # (and everything in its nested <graph>) inside the
-                # correct epoch lane visually.
-                target = self._pick_row_graph(row_map, y) or default_target
-                target.append(node_xml)
+                default_target.append(node_xml)
                 nested = node_xml.find(f'{{{NS_GRAPHML}}}graph')
                 if nested is not None:
                     pd_nested_graphs[node.node_id] = nested
@@ -545,75 +546,21 @@ class GraphMLPatcher:
             if node_xml is None:
                 continue
 
-            # Target resolution priority:
-            #   1. PD group containment (child of an is_in_paradata_
-            #      nodegroup edge → the PD's nested <graph>).
-            #   2. Swimlane row matching the calculated Y.
-            #   3. Default top-level insertion graph (last resort).
-            target = None
+            # Target resolution: PD group containment wins, else the
+            # default Table-level insertion graph (the Y coordinate
+            # alone tells yEd which swimlane band to draw the node in).
+            target = default_target
             for edge in self.graph.edges:
                 if (edge.edge_source == node.node_id
                         and edge.edge_type == 'is_in_paradata_nodegroup'
                         and edge.edge_target in pd_nested_graphs):
                     target = pd_nested_graphs[edge.edge_target]
                     break
-            if target is None:
-                target = self._pick_row_graph(row_map, y)
-            if target is None:
-                target = default_target
             target.append(node_xml)
             added += 1
 
         print(f"[GraphMLPatcher] Added {added} new nodes")
         return added
-
-    def _build_row_map(self, table_graph: ET.Element) -> list:
-        """Scan the direct ``<node>`` children of the TableNode's
-        graph and return a list of ``(y_start, y_end, nested_graph)``
-        tuples — one per swimlane row that carries a nested
-        ``<graph>``. Used to route new nodes into the row whose Y
-        range contains their epoch-derived Y.
-
-        Row candidates are the children of ``table_graph`` that have
-        a ``Geometry`` descriptor (any depth under the node) AND a
-        nested ``<graph>``. Floating nodes without a nested graph
-        are ignored.
-        """
-        row_map: list = []
-        for child in table_graph.findall(f'{{{NS_GRAPHML}}}node'):
-            nested = child.find(f'{{{NS_GRAPHML}}}graph')
-            if nested is None:
-                continue
-            # The first Geometry encountered is the row's own (the
-            # outer group/table realizer). Inner children's Geometry
-            # elements are skipped because we use ``find`` (first
-            # match in document order).
-            geom = child.find(f'.//{{{NS_Y}}}Geometry')
-            if geom is None:
-                continue
-            try:
-                y = float(geom.get('y', '0'))
-                h = float(geom.get('height', '0'))
-            except (TypeError, ValueError):
-                continue
-            if h <= 0:
-                continue
-            row_map.append((y, y + h, nested))
-        return row_map
-
-    def _pick_row_graph(self, row_map: list,
-                         y_global: float) -> Optional[ET.Element]:
-        """Return the nested ``<graph>`` of the row whose Y range
-        contains ``y_global``, or ``None`` when no row matches.
-
-        Closed-interval match: ``y_min <= y_global <= y_max``. Ties
-        (a node exactly on a row boundary) resolve to the first row
-        in insertion order, matching yEd's visual attribution rule.
-        """
-        for y_min, y_max, nested in row_map:
-            if y_min <= y_global <= y_max:
-                return nested
-        return None
 
     def _find_xml_node_by_id_under(self, root_graph: ET.Element,
                                      xml_id: str) -> Optional[ET.Element]:
