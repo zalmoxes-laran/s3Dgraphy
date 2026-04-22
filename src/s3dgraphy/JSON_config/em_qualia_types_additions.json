@@ -4,7 +4,9 @@
     "created": "2025-02-14",
     "purpose": "Proposed additions to em_qualia_types.json vocabulary",
     "status": "proposal",
-    "maintainers": ["Emanuel Demetrescu"],
+    "maintainers": [
+      "Emanuel Demetrescu"
+    ],
     "notes": "These additions address gaps identified during AI_EXTRACTION_PROMPT revision. Merge into main vocabulary after review."
   },
   "proposed_additions": {
@@ -20,9 +22,23 @@
               "cidoc_crm": "E54_Dimension"
             },
             "data_type": "float",
-            "units": ["cm2", "m2"],
-            "suffixes": ["_min", "_max", "_approx", "_preserved", "_reconstructed"],
-            "expected_extractors": ["direct_measurement", "3d_model_measurement", "drawing_measurement", "calculated"]
+            "units": [
+              "cm2",
+              "m2"
+            ],
+            "suffixes": [
+              "_min",
+              "_max",
+              "_approx",
+              "_preserved",
+              "_reconstructed"
+            ],
+            "expected_extractors": [
+              "direct_measurement",
+              "3d_model_measurement",
+              "drawing_measurement",
+              "calculated"
+            ]
           },
           {
             "id": "volume",
@@ -33,9 +49,23 @@
               "cidoc_crm": "E54_Dimension"
             },
             "data_type": "float",
-            "units": ["cm3", "m3", "liters"],
-            "suffixes": ["_min", "_max", "_approx", "_preserved", "_reconstructed"],
-            "expected_extractors": ["3d_model_measurement", "calculated", "water_displacement"]
+            "units": [
+              "cm3",
+              "m3",
+              "liters"
+            ],
+            "suffixes": [
+              "_min",
+              "_max",
+              "_approx",
+              "_preserved",
+              "_reconstructed"
+            ],
+            "expected_extractors": [
+              "3d_model_measurement",
+              "calculated",
+              "water_displacement"
+            ]
           },
           {
             "id": "perimeter",
@@ -46,9 +76,41 @@
               "cidoc_crm": "E54_Dimension"
             },
             "data_type": "float",
-            "units": ["cm", "m"],
-            "suffixes": ["_min", "_max", "_approx", "_preserved"],
-            "expected_extractors": ["direct_measurement", "3d_model_measurement", "drawing_measurement"]
+            "units": [
+              "cm",
+              "m"
+            ],
+            "suffixes": [
+              "_min",
+              "_max",
+              "_approx",
+              "_preserved"
+            ],
+            "expected_extractors": [
+              "direct_measurement",
+              "3d_model_measurement",
+              "drawing_measurement"
+            ]
+          },
+          {
+            "id": "proxy_geometry",
+            "name": "Proxy Geometry",
+            "description": "Coarse 3D bounding volume (proxy box) declared from measurement points on the Representation Model — represents the stratigraphic unit's geometric footprint without a triangulated mesh. Typically produced by the Proxy Box Creator tool from 7 measurement points (alignment start/end, thickness, quota min/max, length start/end).",
+            "mappings": {
+              "cidoc_crm": "E53_Place",
+              "getty_aat": null
+            },
+            "data_type": "geometry_reference",
+            "units": [
+              "m",
+              "cm"
+            ],
+            "suffixes": [],
+            "expected_extractors": [
+              "3d_point_pick",
+              "proxy_box_creator"
+            ],
+            "notes": "The Property value stores the proxy mesh object name; the provenance chain (US --has_property--> PN --has_data_provenance--> Combiner --combines--> Extractor --extracted_from--> Document) captures the full paradata."
           }
         ],
         "modification_notes": [
@@ -67,7 +129,10 @@
               "cidoc_crm": "E55_Type"
             },
             "data_type": "string",
-            "expected_extractors": ["visual_inspection", "colorimetry"]
+            "expected_extractors": [
+              "visual_inspection",
+              "colorimetry"
+            ]
           },
           {
             "id": "color_munsell",
@@ -79,7 +144,10 @@
             },
             "data_type": "string",
             "format": "munsell",
-            "expected_extractors": ["munsell_chart_comparison", "colorimetry"]
+            "expected_extractors": [
+              "munsell_chart_comparison",
+              "colorimetry"
+            ]
           },
           {
             "id": "inclusions",
@@ -91,8 +159,23 @@
             },
             "data_type": "controlled_vocabulary_multiple",
             "vocabulary_source": "custom",
-            "values": ["pottery_fragments", "charcoal", "bone", "stone", "shell", "metal", "slag", "organic_material", "brick_fragments", "tile_fragments"],
-            "expected_extractors": ["visual_inspection", "sieving", "microscopic_analysis"]
+            "values": [
+              "pottery_fragments",
+              "charcoal",
+              "bone",
+              "stone",
+              "shell",
+              "metal",
+              "slag",
+              "organic_material",
+              "brick_fragments",
+              "tile_fragments"
+            ],
+            "expected_extractors": [
+              "visual_inspection",
+              "sieving",
+              "microscopic_analysis"
+            ]
           },
           {
             "id": "compaction",
@@ -104,8 +187,17 @@
             },
             "data_type": "controlled_vocabulary",
             "vocabulary_source": "custom",
-            "values": ["loose", "friable", "compact", "very_compact", "cemented"],
-            "expected_extractors": ["visual_inspection", "penetrometer"]
+            "values": [
+              "loose",
+              "friable",
+              "compact",
+              "very_compact",
+              "cemented"
+            ],
+            "expected_extractors": [
+              "visual_inspection",
+              "penetrometer"
+            ]
           }
         ]
       },
@@ -124,8 +216,19 @@
             },
             "data_type": "controlled_vocabulary",
             "vocabulary_source": "custom",
-            "values": ["rectangular", "circular", "oval", "irregular", "linear", "polygonal", "amorphous"],
-            "expected_extractors": ["visual_inspection", "3d_model_analysis"]
+            "values": [
+              "rectangular",
+              "circular",
+              "oval",
+              "irregular",
+              "linear",
+              "polygonal",
+              "amorphous"
+            ],
+            "expected_extractors": [
+              "visual_inspection",
+              "3d_model_analysis"
+            ]
           },
           {
             "id": "plan_shape",
@@ -137,8 +240,21 @@
             },
             "data_type": "controlled_vocabulary",
             "vocabulary_source": "custom",
-            "values": ["rectangular", "square", "circular", "oval", "L-shaped", "T-shaped", "irregular", "linear"],
-            "expected_extractors": ["visual_inspection", "plan_drawing", "3d_model_analysis"]
+            "values": [
+              "rectangular",
+              "square",
+              "circular",
+              "oval",
+              "L-shaped",
+              "T-shaped",
+              "irregular",
+              "linear"
+            ],
+            "expected_extractors": [
+              "visual_inspection",
+              "plan_drawing",
+              "3d_model_analysis"
+            ]
           },
           {
             "id": "section_shape",
@@ -150,8 +266,20 @@
             },
             "data_type": "controlled_vocabulary",
             "vocabulary_source": "custom",
-            "values": ["rectangular", "trapezoidal", "U-shaped", "V-shaped", "stepped", "irregular", "lenticular"],
-            "expected_extractors": ["visual_inspection", "section_drawing", "3d_model_analysis"]
+            "values": [
+              "rectangular",
+              "trapezoidal",
+              "U-shaped",
+              "V-shaped",
+              "stepped",
+              "irregular",
+              "lenticular"
+            ],
+            "expected_extractors": [
+              "visual_inspection",
+              "section_drawing",
+              "3d_model_analysis"
+            ]
           }
         ]
       },
@@ -167,8 +295,21 @@
             },
             "data_type": "controlled_vocabulary",
             "vocabulary_source": "custom",
-            "values": ["lime_mortar", "hydraulic_lime", "pozzolanic", "mud_mortar", "gypsum_mortar", "cement", "opus_signinum", "cocciopesto"],
-            "expected_extractors": ["visual_inspection", "laboratory_analysis", "petrographic_analysis"]
+            "values": [
+              "lime_mortar",
+              "hydraulic_lime",
+              "pozzolanic",
+              "mud_mortar",
+              "gypsum_mortar",
+              "cement",
+              "opus_signinum",
+              "cocciopesto"
+            ],
+            "expected_extractors": [
+              "visual_inspection",
+              "laboratory_analysis",
+              "petrographic_analysis"
+            ]
           },
           {
             "id": "mortar_composition",
@@ -179,7 +320,10 @@
               "cidoc_crm": "E57_Material"
             },
             "data_type": "text",
-            "expected_extractors": ["laboratory_analysis", "petrographic_analysis"]
+            "expected_extractors": [
+              "laboratory_analysis",
+              "petrographic_analysis"
+            ]
           },
           {
             "id": "bond_pattern",
@@ -191,8 +335,25 @@
             },
             "data_type": "controlled_vocabulary",
             "vocabulary_source": "custom",
-            "values": ["opus_incertum", "opus_reticulatum", "opus_testaceum", "opus_mixtum", "opus_vittatum", "opus_quadratum", "opus_spicatum", "english_bond", "flemish_bond", "stretcher_bond", "header_bond", "random_rubble", "coursed_rubble"],
-            "expected_extractors": ["visual_inspection", "architectural_analysis"]
+            "values": [
+              "opus_incertum",
+              "opus_reticulatum",
+              "opus_testaceum",
+              "opus_mixtum",
+              "opus_vittatum",
+              "opus_quadratum",
+              "opus_spicatum",
+              "english_bond",
+              "flemish_bond",
+              "stretcher_bond",
+              "header_bond",
+              "random_rubble",
+              "coursed_rubble"
+            ],
+            "expected_extractors": [
+              "visual_inspection",
+              "architectural_analysis"
+            ]
           },
           {
             "id": "joint_type",
@@ -204,8 +365,17 @@
             },
             "data_type": "controlled_vocabulary",
             "vocabulary_source": "custom",
-            "values": ["flush", "recessed", "weather_struck", "keyed", "ribbon", "bucket_handle"],
-            "expected_extractors": ["visual_inspection"]
+            "values": [
+              "flush",
+              "recessed",
+              "weather_struck",
+              "keyed",
+              "ribbon",
+              "bucket_handle"
+            ],
+            "expected_extractors": [
+              "visual_inspection"
+            ]
           },
           {
             "id": "coursing_type",
@@ -217,8 +387,17 @@
             },
             "data_type": "controlled_vocabulary",
             "vocabulary_source": "custom",
-            "values": ["regular_coursed", "irregular_coursed", "random", "pseudo-isodomic", "isodomic"],
-            "expected_extractors": ["visual_inspection", "architectural_analysis"]
+            "values": [
+              "regular_coursed",
+              "irregular_coursed",
+              "random",
+              "pseudo-isodomic",
+              "isodomic"
+            ],
+            "expected_extractors": [
+              "visual_inspection",
+              "architectural_analysis"
+            ]
           },
           {
             "id": "brick_dimensions",
@@ -229,9 +408,17 @@
               "cidoc_crm": "E54_Dimension"
             },
             "data_type": "dimension_set",
-            "components": ["brick_length", "brick_width", "brick_height"],
-            "units": ["cm"],
-            "expected_extractors": ["direct_measurement"]
+            "components": [
+              "brick_length",
+              "brick_width",
+              "brick_height"
+            ],
+            "units": [
+              "cm"
+            ],
+            "expected_extractors": [
+              "direct_measurement"
+            ]
           },
           {
             "id": "stone_dressing",
@@ -243,8 +430,19 @@
             },
             "data_type": "controlled_vocabulary",
             "vocabulary_source": "custom",
-            "values": ["rough_hewn", "hammered", "pointed", "tooled", "bush_hammered", "polished", "rusticated", "drafted_margin"],
-            "expected_extractors": ["visual_inspection"]
+            "values": [
+              "rough_hewn",
+              "hammered",
+              "pointed",
+              "tooled",
+              "bush_hammered",
+              "polished",
+              "rusticated",
+              "drafted_margin"
+            ],
+            "expected_extractors": [
+              "visual_inspection"
+            ]
           },
           {
             "id": "foundation_type",
@@ -256,8 +454,18 @@
             },
             "data_type": "controlled_vocabulary",
             "vocabulary_source": "custom",
-            "values": ["strip_foundation", "pad_foundation", "raft_foundation", "pile_foundation", "stepped_foundation", "rubble_trench"],
-            "expected_extractors": ["excavation", "architectural_analysis"]
+            "values": [
+              "strip_foundation",
+              "pad_foundation",
+              "raft_foundation",
+              "pile_foundation",
+              "stepped_foundation",
+              "rubble_trench"
+            ],
+            "expected_extractors": [
+              "excavation",
+              "architectural_analysis"
+            ]
           }
         ]
       },
@@ -273,8 +481,26 @@
             },
             "data_type": "controlled_vocabulary_multiple",
             "vocabulary_source": "custom",
-            "values": ["cracks", "spalling", "erosion", "biological_growth", "efflorescence", "discoloration", "deformation", "loss", "abrasion", "fire_damage", "water_damage", "frost_damage", "salt_damage", "mechanical_damage"],
-            "expected_extractors": ["visual_inspection", "condition_assessment"]
+            "values": [
+              "cracks",
+              "spalling",
+              "erosion",
+              "biological_growth",
+              "efflorescence",
+              "discoloration",
+              "deformation",
+              "loss",
+              "abrasion",
+              "fire_damage",
+              "water_damage",
+              "frost_damage",
+              "salt_damage",
+              "mechanical_damage"
+            ],
+            "expected_extractors": [
+              "visual_inspection",
+              "condition_assessment"
+            ]
           },
           {
             "id": "damage_cause",
@@ -286,8 +512,26 @@
             },
             "data_type": "controlled_vocabulary_multiple",
             "vocabulary_source": "custom",
-            "values": ["weathering", "structural_failure", "seismic", "fire", "flooding", "vandalism", "abandonment", "demolition", "reuse", "biological", "chemical", "thermal_cycling", "root_penetration"],
-            "expected_extractors": ["condition_assessment", "structural_analysis", "historical_research"]
+            "values": [
+              "weathering",
+              "structural_failure",
+              "seismic",
+              "fire",
+              "flooding",
+              "vandalism",
+              "abandonment",
+              "demolition",
+              "reuse",
+              "biological",
+              "chemical",
+              "thermal_cycling",
+              "root_penetration"
+            ],
+            "expected_extractors": [
+              "condition_assessment",
+              "structural_analysis",
+              "historical_research"
+            ]
           },
           {
             "id": "damage_extent",
@@ -298,8 +542,14 @@
               "cidoc_crm": "E54_Dimension"
             },
             "data_type": "percentage",
-            "range": [0, 100],
-            "expected_extractors": ["condition_assessment", "3d_model_analysis"]
+            "range": [
+              0,
+              100
+            ],
+            "expected_extractors": [
+              "condition_assessment",
+              "3d_model_analysis"
+            ]
           },
           {
             "id": "restoration_history",
@@ -310,7 +560,11 @@
               "cidoc_crm": "E11_Modification"
             },
             "data_type": "text",
-            "expected_extractors": ["archival_research", "condition_assessment", "visual_inspection"]
+            "expected_extractors": [
+              "archival_research",
+              "condition_assessment",
+              "visual_inspection"
+            ]
           },
           {
             "id": "visible_repairs",
@@ -321,7 +575,10 @@
               "cidoc_crm": "E11_Modification"
             },
             "data_type": "text",
-            "expected_extractors": ["visual_inspection", "condition_assessment"]
+            "expected_extractors": [
+              "visual_inspection",
+              "condition_assessment"
+            ]
           }
         ]
       }
@@ -338,8 +595,18 @@
               "cidoc_crm": "E52_Time-Span"
             },
             "data_type": "date_or_period",
-            "format": ["YYYY-MM-DD", "YYYY", "century_notation"],
-            "expected_extractors": ["coin_dating", "pottery_dating", "stratigraphy", "c14", "dendrochronology"]
+            "format": [
+              "YYYY-MM-DD",
+              "YYYY",
+              "century_notation"
+            ],
+            "expected_extractors": [
+              "coin_dating",
+              "pottery_dating",
+              "stratigraphy",
+              "c14",
+              "dendrochronology"
+            ]
           },
           {
             "id": "terminus_ante_quem",
@@ -350,8 +617,16 @@
               "cidoc_crm": "E52_Time-Span"
             },
             "data_type": "date_or_period",
-            "format": ["YYYY-MM-DD", "YYYY", "century_notation"],
-            "expected_extractors": ["stratigraphy", "historical_sources", "sealing_deposits"]
+            "format": [
+              "YYYY-MM-DD",
+              "YYYY",
+              "century_notation"
+            ],
+            "expected_extractors": [
+              "stratigraphy",
+              "historical_sources",
+              "sealing_deposits"
+            ]
           },
           {
             "id": "dating_evidence_type",
@@ -363,8 +638,24 @@
             },
             "data_type": "controlled_vocabulary",
             "vocabulary_source": "custom",
-            "values": ["coin", "pottery", "inscription", "radiocarbon", "dendrochronology", "archaeomagnetism", "thermoluminescence", "OSL", "historical_document", "stylistic", "epigraphic", "numismatic"],
-            "expected_extractors": ["dating_analysis", "specialist_report"]
+            "values": [
+              "coin",
+              "pottery",
+              "inscription",
+              "radiocarbon",
+              "dendrochronology",
+              "archaeomagnetism",
+              "thermoluminescence",
+              "OSL",
+              "historical_document",
+              "stylistic",
+              "epigraphic",
+              "numismatic"
+            ],
+            "expected_extractors": [
+              "dating_analysis",
+              "specialist_report"
+            ]
           },
           {
             "id": "coin_date",
@@ -375,8 +666,13 @@
               "cidoc_crm": "E52_Time-Span"
             },
             "data_type": "date_range",
-            "components": ["mint_date", "circulation_range"],
-            "expected_extractors": ["numismatic_analysis"]
+            "components": [
+              "mint_date",
+              "circulation_range"
+            ],
+            "expected_extractors": [
+              "numismatic_analysis"
+            ]
           },
           {
             "id": "pottery_date_range",
@@ -387,8 +683,14 @@
               "cidoc_crm": "E52_Time-Span"
             },
             "data_type": "date_range",
-            "components": ["earliest_type", "latest_type"],
-            "expected_extractors": ["ceramic_analysis", "typological_analysis"]
+            "components": [
+              "earliest_type",
+              "latest_type"
+            ],
+            "expected_extractors": [
+              "ceramic_analysis",
+              "typological_analysis"
+            ]
           },
           {
             "id": "relative_chronology",
@@ -398,7 +700,10 @@
               "cidoc_crm": "P120_occurs_before"
             },
             "data_type": "text",
-            "expected_extractors": ["stratigraphy", "matrix_analysis"]
+            "expected_extractors": [
+              "stratigraphy",
+              "matrix_analysis"
+            ]
           },
           {
             "id": "phase",
@@ -408,7 +713,10 @@
               "cidoc_crm": "E4_Period"
             },
             "data_type": "string",
-            "expected_extractors": ["stratigraphy", "phasing_analysis"]
+            "expected_extractors": [
+              "stratigraphy",
+              "phasing_analysis"
+            ]
           },
           {
             "id": "period",
@@ -421,7 +729,10 @@
             "data_type": "controlled_vocabulary",
             "vocabulary_source": "getty_aat",
             "vocabulary_category": "Styles and Periods",
-            "expected_extractors": ["historical_research", "typological_analysis"]
+            "expected_extractors": [
+              "historical_research",
+              "typological_analysis"
+            ]
           }
         ]
       },
@@ -435,7 +746,9 @@
               "cidoc_crm": "E53_Place"
             },
             "data_type": "string",
-            "expected_extractors": ["excavation_records"]
+            "expected_extractors": [
+              "excavation_records"
+            ]
           },
           {
             "id": "grid_reference",
@@ -445,7 +758,10 @@
               "cidoc_crm": "E53_Place"
             },
             "data_type": "string",
-            "expected_extractors": ["excavation_records", "survey"]
+            "expected_extractors": [
+              "excavation_records",
+              "survey"
+            ]
           },
           {
             "id": "slope",
@@ -455,8 +771,14 @@
               "cidoc_crm": "E54_Dimension"
             },
             "data_type": "float",
-            "units": ["degrees", "percent"],
-            "expected_extractors": ["inclinometer", "3d_model_analysis"]
+            "units": [
+              "degrees",
+              "percent"
+            ],
+            "expected_extractors": [
+              "inclinometer",
+              "3d_model_analysis"
+            ]
           }
         ]
       }
@@ -472,7 +794,10 @@
               "cidoc_crm": "E7_Activity"
             },
             "data_type": "text",
-            "expected_extractors": ["visual_inspection", "stratigraphic_analysis"]
+            "expected_extractors": [
+              "visual_inspection",
+              "stratigraphic_analysis"
+            ]
           },
           {
             "id": "abandonment_evidence",
@@ -482,7 +807,10 @@
               "cidoc_crm": "E5_Event"
             },
             "data_type": "text",
-            "expected_extractors": ["stratigraphic_analysis", "archaeological_interpretation"]
+            "expected_extractors": [
+              "stratigraphic_analysis",
+              "archaeological_interpretation"
+            ]
           }
         ]
       }
@@ -501,7 +829,10 @@
               "cidoc_crm": "P46_is_composed_of"
             },
             "data_type": "reference_list",
-            "expected_extractors": ["excavation_records", "finds_catalog"]
+            "expected_extractors": [
+              "excavation_records",
+              "finds_catalog"
+            ]
           },
           {
             "id": "sample_numbers",
@@ -511,7 +842,10 @@
               "cidoc_crm": "P48_has_preferred_identifier"
             },
             "data_type": "string_list",
-            "expected_extractors": ["excavation_records", "laboratory_records"]
+            "expected_extractors": [
+              "excavation_records",
+              "laboratory_records"
+            ]
           },
           {
             "id": "ecofacts",
@@ -521,7 +855,11 @@
               "cidoc_crm": "E20_Biological_Object"
             },
             "data_type": "text",
-            "expected_extractors": ["sieving", "flotation", "specialist_report"]
+            "expected_extractors": [
+              "sieving",
+              "flotation",
+              "specialist_report"
+            ]
           }
         ]
       },
@@ -538,7 +876,9 @@
               "cidoc_crm": "P138_represents"
             },
             "data_type": "string_list",
-            "expected_extractors": ["photo_register"]
+            "expected_extractors": [
+              "photo_register"
+            ]
           },
           {
             "id": "drawing_ids",
@@ -548,7 +888,9 @@
               "cidoc_crm": "P138_represents"
             },
             "data_type": "string_list",
-            "expected_extractors": ["drawing_register"]
+            "expected_extractors": [
+              "drawing_register"
+            ]
           },
           {
             "id": "excavation_date",
@@ -559,7 +901,9 @@
             },
             "data_type": "date_range",
             "format": "YYYY-MM-DD",
-            "expected_extractors": ["excavation_records"]
+            "expected_extractors": [
+              "excavation_records"
+            ]
           },
           {
             "id": "excavator",
@@ -569,7 +913,9 @@
               "cidoc_crm": "E21_Person"
             },
             "data_type": "string",
-            "expected_extractors": ["excavation_records"]
+            "expected_extractors": [
+              "excavation_records"
+            ]
           }
         ]
       }

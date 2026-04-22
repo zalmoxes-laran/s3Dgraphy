@@ -12,6 +12,7 @@ This module includes helper functions for node type conversion based on YED node
 from ..nodes.stratigraphic_node import (
     StratigraphicNode,
     StratigraphicUnit,
+    NegativeStratigraphicUnit,
     SeriesOfStratigraphicUnit,
     SeriesOfNonStructuralVirtualStratigraphicUnit,
     SeriesOfStructuralVirtualStratigraphicUnit,
@@ -22,6 +23,7 @@ from ..nodes.stratigraphic_node import (
     VirtualSpecialFindUnit,
     DocumentaryStratigraphicUnit,
     TransformationStratigraphicUnit,
+    WorkingUnit,
     StratigraphicEventNode,
     ContinuityNode
 )
@@ -135,22 +137,34 @@ def convert_shape2type(yedtype, border_style, border_type="line"):
     return nodetype
 
 
-# Mappa dei tipi stratigrafici alle rispettive classi
+# ──────────────────────────────────────────────────────────────────
+# Stratigraphic type → Python class map.
+#
+# Keep this list aligned with the ``stratigraphic_nodes`` entries in
+# ``JSON_config/s3Dgraphy_node_datamodel.json`` — the JSON is the
+# source of truth for metadata (label, abbreviation, family, …); this
+# dict is only the Python-level runtime factory.
+#
+# The paired test ``test_stratigraphic_classification.py`` verifies
+# the two stay in sync: every class here has a datamodel entry, every
+# entry has a class, and family/is_series obey the expected rules.
+# ──────────────────────────────────────────────────────────────────
 STRATIGRAPHIC_CLASS_MAP = {
-    "US": StratigraphicUnit,
-    "USVs": StructuralVirtualStratigraphicUnit,
-    "serSU": SeriesOfStratigraphicUnit,
+    "US":      StratigraphicUnit,
+    "USN":     NegativeStratigraphicUnit,
+    "USVs":    StructuralVirtualStratigraphicUnit,
+    "USVn":    NonStructuralVirtualStratigraphicUnit,
+    "SF":      SpecialFindUnit,
+    "VSF":     VirtualSpecialFindUnit,
+    "USD":     DocumentaryStratigraphicUnit,
+    "TSU":     TransformationStratigraphicUnit,
+    "UL":      WorkingUnit,
+    "serSU":   SeriesOfStratigraphicUnit,
     "serUSVn": SeriesOfNonStructuralVirtualStratigraphicUnit,
     "serUSVs": SeriesOfStructuralVirtualStratigraphicUnit,
-    "serUSD": SeriesOfDocumentaryStratigraphicUnit,
-    "USVn": NonStructuralVirtualStratigraphicUnit,
-    "SF": SpecialFindUnit,
-    "VSF": VirtualSpecialFindUnit,
-    "USD": DocumentaryStratigraphicUnit,
-    "TSU": TransformationStratigraphicUnit,
-    "SE": StratigraphicEventNode,
-    "BR": ContinuityNode,
-    # Aggiungi ulteriori tipi e classi se necessario
+    "serUSD":  SeriesOfDocumentaryStratigraphicUnit,
+    "SE":      StratigraphicEventNode,
+    "BR":      ContinuityNode,
 }
 
 def get_stratigraphic_node_class(stratigraphic_type):

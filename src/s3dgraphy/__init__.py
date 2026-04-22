@@ -48,14 +48,25 @@ from .indices import GraphIndices
 # Mapping system imports (aggiungi questa riga)
 from .mappings import mapping_registry, add_custom_mapping_directory, get_available_mappings, load_mapping_file
 
+# Stratigraphic classification — JSON-driven source of truth for
+# family (real/virtual) + is_series. Consumers (EM-blender-tools
+# pickers, GraphML importer BR-handling, filter chains) use these
+# helpers instead of hardcoding type lists.
+from .classification import (
+    get_family, is_real, is_virtual, is_series,
+    get_subtype_info, iter_subtypes,
+    REAL_US_TYPES, VIRTUAL_US_TYPES,
+    SERIES_US_TYPES, ALL_US_TYPES,
+)
+
 # Visual layout (optional import of networkx is handled in visual_layout)
 #from .visual_layout import generate_layout
 
 # Defining what is available for import when using 'from s3Dgraphy import *'
 __all__ = [
     "Graph",
-    "Node", 
-    "StratigraphicNode", 
+    "Node",
+    "StratigraphicNode",
     "GroupNode", 
     "ActivityNodeGroup",
     "ParadataNodeGroup",
@@ -86,5 +97,10 @@ __all__ = [
     "manage_id_prefix",
     "get_base_name",
     "add_graph_prefix",
-    "get_ai_prompt"
+    "get_ai_prompt",
+    # Stratigraphic classification (JSON-driven)
+    "get_family", "is_real", "is_virtual", "is_series",
+    "get_subtype_info", "iter_subtypes",
+    "REAL_US_TYPES", "VIRTUAL_US_TYPES",
+    "SERIES_US_TYPES", "ALL_US_TYPES",
 ]

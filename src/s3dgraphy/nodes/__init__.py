@@ -11,10 +11,14 @@ property nodes, and more.
 from .base_node import Node
 from .stratigraphic_node import (
     StratigraphicNode, WorkingUnit,
-    StratigraphicUnit, TransformationStratigraphicUnit,
+    StratigraphicUnit, NegativeStratigraphicUnit,
+    TransformationStratigraphicUnit,
     StructuralVirtualStratigraphicUnit, NonStructuralVirtualStratigraphicUnit,
     SpecialFindUnit, VirtualSpecialFindUnit, DocumentaryStratigraphicUnit,
-    ContinuityNode, StratigraphicEventNode
+    SeriesOfStratigraphicUnit, SeriesOfDocumentaryStratigraphicUnit,
+    SeriesOfStructuralVirtualStratigraphicUnit,
+    SeriesOfNonStructuralVirtualStratigraphicUnit,
+    ContinuityNode, StratigraphicEventNode, UnknownNode,
 )
 from .epoch_node import EpochNode
 from .property_node import PropertyNode
@@ -36,14 +40,20 @@ __all__ = [
     "StratigraphicNode",
     "WorkingUnit",
     "StratigraphicUnit",
+    "NegativeStratigraphicUnit",
     "TransformationStratigraphicUnit",
     "StructuralVirtualStratigraphicUnit",
     "NonStructuralVirtualStratigraphicUnit",
     "SpecialFindUnit",
     "VirtualSpecialFindUnit",
     "DocumentaryStratigraphicUnit",
+    "SeriesOfStratigraphicUnit",
+    "SeriesOfDocumentaryStratigraphicUnit",
+    "SeriesOfStructuralVirtualStratigraphicUnit",
+    "SeriesOfNonStructuralVirtualStratigraphicUnit",
     "ContinuityNode",
     "StratigraphicEventNode",
+    "UnknownNode",
     "EpochNode", 
     "PropertyNode", 
     "DocumentNode",

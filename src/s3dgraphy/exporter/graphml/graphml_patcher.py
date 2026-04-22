@@ -429,14 +429,22 @@ class GraphMLPatcher:
         """
         Add new nodes (created in-memory, not from original GraphML) to the XML.
 
-        For each node in the graph that does NOT have an original_id:
-        - Generates a new GraphML node ID
-        - Creates the XML element with correct yEd graphics for the node type
-        - Appends to the first top-level <graph> element
-        - Does NOT calculate layout positions (user will do that in yEd)
+        Two-pass processing:
 
-        Returns:
-            Number of nodes added
+        1. Every new :class:`ParadataNodeGroup` is inserted first into
+           the default target graph, and a mapping
+           ``{pd_group.node_id: <nested <graph> element>}`` is built
+           (extended with pre-existing PD groups discovered via
+           ``original_id`` → host XML node → nested graph).
+
+        2. Every other new node is inserted into the nested graph of
+           the PD group it belongs to (via ``is_in_paradata_nodegroup``
+           edge), or into the default target graph when no such edge
+           exists.
+
+        This is what makes the yEd rendering put Doc + Extractors +
+        Combiner + PropertyNode physically inside the
+        ``<US>_PD`` container instead of floating beside it.
         """
         added = 0
         graph_elem = self.root.find(f'{{{NS_GRAPHML}}}graph')
@@ -444,56 +452,184 @@ class GraphMLPatcher:
             print("[GraphMLPatcher] WARNING: No <graph> element found in XML")
             return 0
 
-        # Find the deepest graph to insert into (typically inside the swimlane)
-        # For now, find any nested graph or use top-level
-        target_graph = self._find_insertion_graph(graph_elem)
+        default_target = self._find_insertion_graph(graph_elem)
 
+        # Row-routing map: (y_start, y_end, nested_graph) for each
+        # swimlane-row <node> sitting under the TableNode's graph.
+        # Picking the correct row at insertion time is what actually
+        # places new nodes (and PD groups) INSIDE the right epoch
+        # lane — without this the new <node> is a child of the Table
+        # itself and yEd renders it floating outside the rows.
+        row_map = self._build_row_map(default_target)
+
+        # pd_group_node_id → nested <graph> element where its
+        # children should be appended.
+        pd_nested_graphs: Dict[str, ET.Element] = {}
+        # Pre-existing PD groups (already in the XML, indexed by
+        # ``original_id``): look up their host <node> + nested <graph>
+        # so newly-added children can be placed inside them.
         for node in self.graph.nodes:
-            # Skip nodes that already exist in the XML (have original_id from import)
-            if node.attributes.get('original_id'):
+            if not isinstance(node, ParadataNodeGroup):
                 continue
+            orig_id = (node.attributes or {}).get('original_id')
+            if not orig_id:
+                continue
+            host = self._find_xml_node_by_id_under(graph_elem, orig_id)
+            if host is None:
+                continue
+            nested = host.find(f'{{{NS_GRAPHML}}}graph')
+            if nested is not None:
+                pd_nested_graphs[node.node_id] = nested
 
-            # Skip internal node types
+        def _should_skip(node) -> Optional[str]:
+            """Return a reason string to skip the node, or None."""
+            if node.attributes.get('original_id'):
+                return "already in XML (original_id)"
             node_type = getattr(node, 'node_type', '')
             if node_type in INTERNAL_NODE_TYPES:
-                continue
-
-            # Skip DocumentNodes without original_id: they come from
-            # auxiliary data (folder scanning, representation models)
-            # and are not part of the EM formal language in GraphML.
-            # EXCEPTION: an explicitly created Master Document
-            # (marked ``attributes['em_master_document']=True`` by the
-            # Create-Host operator) IS first-class and must be written.
+                return f"internal type {node_type!r}"
             if isinstance(node, DocumentNode):
                 if not (getattr(node, 'attributes', None) or {}).get(
                         'em_master_document'):
-                    continue
-
-            # Safety check: skip nodes whose EMID (node_id) already exists in the XML.
-            # This catches nodes that were imported but lost their original_id
-            # (e.g., deduplicated DocumentNodes, auxiliary imports).
+                    return "DocumentNode without em_master_document"
             if node.node_id in self._existing_xml_emids:
-                print(f"[GraphMLPatcher] Skipping node '{getattr(node, 'name', '?')}' "
-                      f"(type={node_type}): EMID {node.node_id[:12]}... already in XML")
+                return (f"EMID {node.node_id[:12]}... already in XML")
+            return None
+
+        # ── First pass: new ParadataNodeGroups ──────────────────────
+        for node in self.graph.nodes:
+            if not isinstance(node, ParadataNodeGroup):
                 continue
-
-            print(f"[GraphMLPatcher] Adding new node: '{getattr(node, 'name', '?')}' "
-                  f"(type={node_type}, id={node.node_id[:12]}...)")
-
-            # Calculate position within the correct epoch lane
+            reason = _should_skip(node)
+            if reason is not None:
+                continue
+            print(f"[GraphMLPatcher] Adding new PD group: "
+                  f"'{getattr(node, 'name', '?')}' "
+                  f"(id={node.node_id[:12]}...)")
             x, y = self._calculate_node_position(node)
-
-            # Generate XML for this node
             new_node_id = self._generate_new_node_id()
             self._uuid_to_new_id[node.node_id] = new_node_id
-
             node_xml = self._create_node_xml(node, new_node_id, x, y)
             if node_xml is not None:
-                target_graph.append(node_xml)
+                # Route PD group into the matching swimlane row when
+                # possible — that's what actually anchors the group
+                # (and everything in its nested <graph>) inside the
+                # correct epoch lane visually.
+                target = self._pick_row_graph(row_map, y) or default_target
+                target.append(node_xml)
+                nested = node_xml.find(f'{{{NS_GRAPHML}}}graph')
+                if nested is not None:
+                    pd_nested_graphs[node.node_id] = nested
                 added += 1
+
+        # ── Second pass: everything else (containment-aware) ────────
+        for node in self.graph.nodes:
+            if isinstance(node, ParadataNodeGroup):
+                continue  # already handled
+            reason = _should_skip(node)
+            if reason is not None:
+                if reason.startswith("internal") or \
+                        reason.startswith("already in XML"):
+                    continue  # silent
+                print(f"[GraphMLPatcher] Skipping node "
+                      f"'{getattr(node, 'name', '?')}': {reason}")
+                continue
+            print(f"[GraphMLPatcher] Adding new node: "
+                  f"'{getattr(node, 'name', '?')}' "
+                  f"(type={getattr(node, 'node_type', '')}, "
+                  f"id={node.node_id[:12]}...)")
+            x, y = self._calculate_node_position(node)
+            new_node_id = self._generate_new_node_id()
+            self._uuid_to_new_id[node.node_id] = new_node_id
+            node_xml = self._create_node_xml(node, new_node_id, x, y)
+            if node_xml is None:
+                continue
+
+            # Target resolution priority:
+            #   1. PD group containment (child of an is_in_paradata_
+            #      nodegroup edge → the PD's nested <graph>).
+            #   2. Swimlane row matching the calculated Y.
+            #   3. Default top-level insertion graph (last resort).
+            target = None
+            for edge in self.graph.edges:
+                if (edge.edge_source == node.node_id
+                        and edge.edge_type == 'is_in_paradata_nodegroup'
+                        and edge.edge_target in pd_nested_graphs):
+                    target = pd_nested_graphs[edge.edge_target]
+                    break
+            if target is None:
+                target = self._pick_row_graph(row_map, y)
+            if target is None:
+                target = default_target
+            target.append(node_xml)
+            added += 1
 
         print(f"[GraphMLPatcher] Added {added} new nodes")
         return added
+
+    def _build_row_map(self, table_graph: ET.Element) -> list:
+        """Scan the direct ``<node>`` children of the TableNode's
+        graph and return a list of ``(y_start, y_end, nested_graph)``
+        tuples — one per swimlane row that carries a nested
+        ``<graph>``. Used to route new nodes into the row whose Y
+        range contains their epoch-derived Y.
+
+        Row candidates are the children of ``table_graph`` that have
+        a ``Geometry`` descriptor (any depth under the node) AND a
+        nested ``<graph>``. Floating nodes without a nested graph
+        are ignored.
+        """
+        row_map: list = []
+        for child in table_graph.findall(f'{{{NS_GRAPHML}}}node'):
+            nested = child.find(f'{{{NS_GRAPHML}}}graph')
+            if nested is None:
+                continue
+            # The first Geometry encountered is the row's own (the
+            # outer group/table realizer). Inner children's Geometry
+            # elements are skipped because we use ``find`` (first
+            # match in document order).
+            geom = child.find(f'.//{{{NS_Y}}}Geometry')
+            if geom is None:
+                continue
+            try:
+                y = float(geom.get('y', '0'))
+                h = float(geom.get('height', '0'))
+            except (TypeError, ValueError):
+                continue
+            if h <= 0:
+                continue
+            row_map.append((y, y + h, nested))
+        return row_map
+
+    def _pick_row_graph(self, row_map: list,
+                         y_global: float) -> Optional[ET.Element]:
+        """Return the nested ``<graph>`` of the row whose Y range
+        contains ``y_global``, or ``None`` when no row matches.
+
+        Closed-interval match: ``y_min <= y_global <= y_max``. Ties
+        (a node exactly on a row boundary) resolve to the first row
+        in insertion order, matching yEd's visual attribution rule.
+        """
+        for y_min, y_max, nested in row_map:
+            if y_min <= y_global <= y_max:
+                return nested
+        return None
+
+    def _find_xml_node_by_id_under(self, root_graph: ET.Element,
+                                     xml_id: str) -> Optional[ET.Element]:
+        """Return the ``<node id=xml_id>`` element anywhere under
+        ``root_graph`` (recursive), or ``None``. Used to locate the
+        host XML element for a pre-existing ParadataNodeGroup so we
+        can append new children to its nested ``<graph>``.
+
+        Named with a ``_under`` suffix to avoid colliding with the
+        existing :meth:`_find_xml_node_by_id` which takes the id alone
+        and scans the whole tree from ``self.root``.
+        """
+        for n in root_graph.iter(f'{{{NS_GRAPHML}}}node'):
+            if n.get('id') == xml_id:
+                return n
+        return None
 
     def _calculate_node_position(self, node: Node) -> Tuple[float, float]:
         """
@@ -520,6 +656,28 @@ class GraphMLPatcher:
                 if isinstance(source, EpochNode):
                     epoch_node = source
                     break
+
+        if not epoch_node and isinstance(node, ParadataNodeGroup):
+            # ParadataNodeGroups inherit the epoch of the Stratigraphic
+            # Unit that hosts them via ``US --has_paradata_nodegroup--> PD``.
+            # Without this special case a newly-created PD group ends
+            # up at (0, 0) — i.e. the first swimlane — even when its
+            # US belongs to a different epoch.
+            for edge in self.graph.edges:
+                if (edge.edge_target == node.node_id
+                        and edge.edge_type == 'has_paradata_nodegroup'):
+                    host_us = self.graph.find_node_by_id(edge.edge_source)
+                    if host_us is None:
+                        continue
+                    for e2 in self.graph.edges:
+                        if (e2.edge_source == host_us.node_id
+                                and e2.edge_type == 'has_first_epoch'):
+                            target = self.graph.find_node_by_id(e2.edge_target)
+                            if isinstance(target, EpochNode):
+                                epoch_node = target
+                                break
+                    if epoch_node:
+                        break
 
         if not epoch_node:
             # Try finding epoch through a connected stratigraphic node
@@ -925,9 +1083,21 @@ class GraphMLPatcher:
             border.set('type', 'line')
             border.set('width', '1.0')
 
+            # NodeLabel positioned at the NorthWest corner — matches
+            # the convention used by :mod:`node_generator` for
+            # extractors/combiners rendered during full export. Without
+            # ``modelName='corners'`` + ``modelPosition='nw'`` yEd
+            # falls back to ``Internal:Center`` and the id overlaps the
+            # SVG glyph. ``borderDistance='0.0'`` +
+            # ``underlinedText='true'`` keep the visual identical to
+            # the reference TempluMare graphml.
             label = ET.SubElement(svg_node, f'{{{NS_Y}}}NodeLabel')
             label.set('alignment', 'center')
+            label.set('borderDistance', '0.0')
             label.set('fontSize', '10')
+            label.set('modelName', 'corners')
+            label.set('modelPosition', 'nw')
+            label.set('underlinedText', 'true')
             label.set('visible', 'true')
             label.text = node.name or ''
 
@@ -1161,17 +1331,42 @@ class GraphMLPatcher:
         nested_graph.set('edgedefault', 'directed')
         nested_graph.set('id', f'{xml_id}:')
 
+        # Seed the ProxyAutoBoundsNode realizers with the epoch-derived
+        # (x, y). Without this the GroupNode geometry was pinned to
+        # (0, 0) and the PD container fell outside any swimlane row,
+        # dragging every contained paradata child with it. yEd still
+        # auto-bounds the outer size when the group is expanded, but
+        # the anchor point matters for initial placement inside the
+        # correct swimlane.
+        self._seed_group_realizer_positions(node_elem, x, y)
+
         return node_elem
+
+    def _seed_group_realizer_positions(self, node_elem: ET.Element,
+                                         x: float, y: float) -> None:
+        """Write ``x`` / ``y`` into every realizer Geometry under
+        ``node_elem``. Called AFTER realizers are generated — avoids
+        threading x/y through the lower-level helper which is also
+        used from contexts where default (0, 0) is the right answer.
+        """
+        for geom in node_elem.iter(f'{{{NS_Y}}}Geometry'):
+            geom.set('x', str(x))
+            geom.set('y', str(y))
 
     def _add_group_realizer(self, realizers: ET.Element, label_text: str,
                              bg_color: str, closed: bool):
-        """Add a GroupNode realizer (open or closed state)."""
+        """Add a GroupNode realizer (open or closed state).
+
+        Geometry position is left at (0, 0) here; the outer call
+        (:meth:`_create_paradata_group_xml`) rewrites the x/y on the
+        realizer's Geometry so the group anchors inside the correct
+        swimlane row.
+        """
         group_node = ET.SubElement(realizers, f'{{{NS_Y}}}GroupNode')
 
         geometry = ET.SubElement(group_node, f'{{{NS_Y}}}Geometry')
         geometry.set('height', '30.0' if closed else '120.0')
         geometry.set('width', '118.0' if closed else '376.0')
-        # Group geometry is set by yEd auto-bounds; these are defaults
         geometry.set('x', '0.0')
         geometry.set('y', '0.0')
 
