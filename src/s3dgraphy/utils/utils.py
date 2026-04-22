@@ -249,7 +249,7 @@ def get_document_vocabularies():
     """
     _role_order = ("analytical", "comparative")
     _nature_order = ("2d_object", "3d_object")
-    _geometry_order = ("reality_based", "observable", "asserted")
+    _geometry_order = ("reality_based", "observable", "asserted", "em_based")
     rules = _load_visual_rules()
 
     def _keys(section_name):

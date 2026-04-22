@@ -583,6 +583,12 @@
             "border_style": "solid",
             "border_width": 4.0,
             "description": "Compositional positioning asserted by the operator, without claim of restitution (e.g. placing a comparative element in the scene for analytical purposes)."
+        },
+        "em_based": {
+            "border_color": "#4A7FB8",
+            "border_style": "solid",
+            "border_width": 4.0,
+            "description": "3D reconstruction produced via the Extended Matrix methodology — the document itself IS an EM-derived reconstruction. Typical case: a hypothesis model built from another EM graph, used here as a comparative or derivative source."
         }
     },
     "edge_style": {
