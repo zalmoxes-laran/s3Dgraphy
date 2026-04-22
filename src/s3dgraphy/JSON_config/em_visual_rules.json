@@ -299,7 +299,7 @@
                 "border_style": "dashed",
                 "shape": "hexagon"
             },
-            "label_position": "bottom"
+            "label_position": "top_left"
         },
         "EXT": {
             "3d_file": "src/3D/extractor.glb",
@@ -319,7 +319,7 @@
                 "border_style": "solid",
                 "shape": "pentagon"
             },
-            "label_position": "bottom"
+            "label_position": "top_left"
         },
         "DOC": {
             "3d_file": "src/3D/document.glb",
