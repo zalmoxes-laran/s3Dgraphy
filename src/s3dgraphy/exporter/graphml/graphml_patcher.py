@@ -459,33 +459,24 @@ class GraphMLPatcher:
         # the matching row. That was wrong: in EM graphml swimlane
         # ROWS are declared in ``<y:Table>/<y:Rows>`` (visual bands
         # attached to the Table element) — they are NOT <node> children
-        # of the Table's graph. The direct <node> children are real
-        # content containers (ActivityNodeGroups, top-level stratigraphic
-        # nodes) that happen to have nested graphs. Routing by Y range
-        # therefore dumped new US/PD pairs inside an arbitrary Activity
-        # group whose band overlapped the epoch Y. yEd already places
-        # a node in the correct row based on its (x, y) coordinates,
-        # so inserting into the Table's graph with the right Y is
-        # enough. PD group containment is preserved below.
+        # of the Table's graph. yEd places a node in the correct row
+        # band based on its (x, y) coordinates alone, so the Table's
+        # graph + the right Y is enough.
 
-        # pd_group_node_id → nested <graph> element where its
-        # children should be appended.
+        # Containment maps: group_node_id → nested <graph> where its
+        # children should be appended at save time. Covers both PD
+        # nodegroups (``is_in_paradata_nodegroup``) and Activity
+        # groups (``is_in_activity``). Populated lazily:
+        # - Pre-existing groups (imported from GraphML) are indexed
+        #   by their ``attributes['original_id']`` — we look up their
+        #   <node> element under ``graph_elem`` and grab the nested
+        #   <graph>.
+        # - Freshly-created groups get added below, after their own
+        #   XML is generated.
         pd_nested_graphs: Dict[str, ET.Element] = {}
-        # Pre-existing PD groups (already in the XML, indexed by
-        # ``original_id``): look up their host <node> + nested <graph>
-        # so newly-added children can be placed inside them.
-        for node in self.graph.nodes:
-            if not isinstance(node, ParadataNodeGroup):
-                continue
-            orig_id = (node.attributes or {}).get('original_id')
-            if not orig_id:
-                continue
-            host = self._find_xml_node_by_id_under(graph_elem, orig_id)
-            if host is None:
-                continue
-            nested = host.find(f'{{{NS_GRAPHML}}}graph')
-            if nested is not None:
-                pd_nested_graphs[node.node_id] = nested
+        activity_nested_graphs: Dict[str, ET.Element] = {}
+        self._index_pre_existing_group_graphs(
+            graph_elem, pd_nested_graphs, activity_nested_graphs)
 
         def _should_skip(node) -> Optional[str]:
             """Return a reason string to skip the node, or None."""
@@ -546,16 +537,25 @@ class GraphMLPatcher:
             if node_xml is None:
                 continue
 
-            # Target resolution: PD group containment wins, else the
-            # default Table-level insertion graph (the Y coordinate
-            # alone tells yEd which swimlane band to draw the node in).
+            # Target resolution priority:
+            #   1. PD group containment (``is_in_paradata_nodegroup``)
+            #      — deepest container wins when both apply.
+            #   2. Activity group containment (``is_in_activity``).
+            #   3. Default Table-level insertion graph (yEd uses the
+            #      Y coordinate alone to pick the swimlane band).
             target = default_target
             for edge in self.graph.edges:
-                if (edge.edge_source == node.node_id
-                        and edge.edge_type == 'is_in_paradata_nodegroup'
+                if edge.edge_source != node.node_id:
+                    continue
+                if (edge.edge_type == 'is_in_paradata_nodegroup'
                         and edge.edge_target in pd_nested_graphs):
                     target = pd_nested_graphs[edge.edge_target]
                     break
+                if (edge.edge_type == 'is_in_activity'
+                        and edge.edge_target in activity_nested_graphs):
+                    target = activity_nested_graphs[edge.edge_target]
+                    # Don't break — a PD edge with higher priority may
+                    # still follow; let the loop continue.
             target.append(node_xml)
             added += 1
 
@@ -566,8 +566,9 @@ class GraphMLPatcher:
                                      xml_id: str) -> Optional[ET.Element]:
         """Return the ``<node id=xml_id>`` element anywhere under
         ``root_graph`` (recursive), or ``None``. Used to locate the
-        host XML element for a pre-existing ParadataNodeGroup so we
-        can append new children to its nested ``<graph>``.
+        host XML element for a pre-existing group (ParadataNodeGroup
+        or ActivityNodeGroup) so we can append new children to its
+        nested ``<graph>``.
 
         Named with a ``_under`` suffix to avoid colliding with the
         existing :meth:`_find_xml_node_by_id` which takes the id alone
@@ -577,6 +578,39 @@ class GraphMLPatcher:
             if n.get('id') == xml_id:
                 return n
         return None
+
+    def _index_pre_existing_group_graphs(
+            self,
+            graph_elem: ET.Element,
+            pd_map: Dict[str, ET.Element],
+            activity_map: Dict[str, ET.Element]) -> None:
+        """Walk every group node in the graph model and — when the
+        group was imported from the GraphML (carries
+        ``attributes['original_id']``) — locate its host ``<node>``
+        in the XML tree and record its nested ``<graph>`` inside the
+        appropriate map (``pd_map`` for ParadataNodeGroup,
+        ``activity_map`` for ActivityNodeGroup).
+
+        This is what lets new US / PD / paradata children be routed
+        into a pre-existing PD or Activity group without the caller
+        having to recreate the group itself.
+        """
+        for node in self.graph.nodes:
+            if isinstance(node, ParadataNodeGroup):
+                target_map = pd_map
+            elif isinstance(node, ActivityNodeGroup):
+                target_map = activity_map
+            else:
+                continue
+            orig_id = (node.attributes or {}).get('original_id')
+            if not orig_id:
+                continue
+            host = self._find_xml_node_by_id_under(graph_elem, orig_id)
+            if host is None:
+                continue
+            nested = host.find(f'{{{NS_GRAPHML}}}graph')
+            if nested is not None:
+                target_map[node.node_id] = nested
 
     def _calculate_node_position(self, node: Node) -> Tuple[float, float]:
         """
