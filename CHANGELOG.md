@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Stratigraphic classification refactor (2026-04)
+
+- **Datamodel JSON v1.5.2** (patch, additive)
+  (`JSON_config/s3Dgraphy_node_datamodel.json`): every stratigraphic
+  subtype now carries two additional fields — `family`
+  (`"real"` / `"virtual"` / `null`) and `is_series` (bool). Bumped
+  from v1.5.1 as a patch — these are additive metadata fields that
+  existing consumers ignore, no breaking changes to the formalism
+  (the EM formal language stays at 1.5). Lets downstream tools
+  (GraphML importer BR-handling, EM-blender-tools pickers /
+  filters / material maps) consume classification metadata without
+  hardcoding type lists.
+- **`s3dgraphy.classification` module**: JSON-driven API re-exported
+  from the package root:
+  - `get_family(node_type)` / `is_real(nt)` / `is_virtual(nt)` /
+    `is_series(nt)` accessors reading the datamodel JSON.
+  - `get_subtype_info(nt)` / `iter_subtypes()` for metadata walks.
+  - Frozenset constants computed from the JSON:
+    `REAL_US_TYPES`, `VIRTUAL_US_TYPES`, `SERIES_US_TYPES`,
+    `ALL_US_TYPES`.
+- **Negative Stratigraphic Unit**: new
+  `NegativeStratigraphicUnit` class in
+  `nodes/stratigraphic_node.py` with `node_type="USN"`,
+  classified as `family="real"` / non-series. Surfaced in
+  `em_visual_rules.json` with a dashed-rectangle variant so it
+  renders distinct from a positive US in yEd. Replaces the ad-hoc
+  `US_NEG` placeholder that lived only in EM-blender-tools.
+- **Extended `STRATIGRAPHIC_CLASS_MAP`** (`utils/utils.py`): added
+  `UL → WorkingUnit` (was silently missing from the map, causing
+  downstream factories to fall back to the generic
+  `StratigraphicNode`) and `USN → NegativeStratigraphicUnit`.
+- **New qualia `proxy_geometry`** in
+  `JSON_config/em_qualia_types_additions.json` under
+  `physical_material.dimensional` (alongside `area` / `volume`) —
+  canonical property name for the 7-point bounding box that the
+  Proxy Box Creator (EM-blender-tools) writes as a PropertyNode.
+- **Test `test_stratigraphic_classification.py`**: locks seven
+  invariants between the Python map and the JSON datamodel:
+  abbreviations aligned both ways, every subtype declares a valid
+  `family`, `is_series` matches the `ser` prefix convention, the
+  classification accessors agree with the JSON, USN registered
+  correctly, pre-computed sets consistent with per-node
+  accessors, and `iter_subtypes` yields every entry. Brings the
+  suite to 20/20 green.
+
+### Fixed — GraphMLPatcher paradata rendering (2026-04)
+
+- **Extractor / Combiner NodeLabel** positioned at Corner-NorthWest
+  via `modelName="corners"` + `modelPosition="nw"` +
+  `borderDistance="0.0"` + `underlinedText="true"` — matches the
+  reference TempluMare graphml and the full-export
+  `node_generator.py`. Previously the patcher wrote neither
+  attribute, so yEd defaulted to `Internal:Center` and the
+  extractor id overlapped the SVG glyph.
+- **ParadataNodeGroup positioning**: the `_add_group_realizer`
+  Geometry was hardcoded to `(0, 0)`. The new
+  `_seed_group_realizer_positions` rewrites the realizers'
+  `x`/`y` with the epoch-derived position returned by
+  `_calculate_node_position`, so PD groups are anchored in the
+  right swimlane row instead of floating outside the Table.
+- **ParadataNodeGroup / ActivityNodeGroup containment**:
+  `add_new_nodes` now runs as a two-pass routine — first inserts
+  new group containers (indexing their nested `<graph>` elements
+  plus those of pre-existing groups discovered through
+  `original_id`), then routes every other new node into the
+  matching container based on `is_in_paradata_nodegroup` /
+  `is_in_activity` edges. Result: US + PD + Extractors + Combiner
+  + PropertyNode + Document-instance are physically nested under
+  the correct yEd group at save time, not dumped in the top-level
+  graph.
+- **`_calculate_node_position` for ParadataNodeGroup**: special
+  case that inherits the host US's epoch via
+  `has_paradata_nodegroup` (reverse lookup) so the Y coordinate
+  is the US's swimlane band, not `(0, 0)`.
+
 ### Added
 
 - **Hybrid-C auxiliary lifecycle (Phase 1 + 3)**. New module
