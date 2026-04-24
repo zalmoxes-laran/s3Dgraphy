@@ -236,8 +236,8 @@ class Graph:
         }
         
         # Definisci i tipi di unità stratigrafiche riconosciuti
-        stratigraphic_types = ['US', 'USVs', 'SF', 'USVn', 'USD', 'VSF', 'serSU', 
-                            'serUSVn', 'serUSVs', 'TSU', 'SE', 'BR', 'unknown']
+        stratigraphic_types = ['US', 'USVs', 'SF', 'USVn', 'USD', 'VSF', 'serSU',
+                            'serUSVn', 'serUSVs', 'TSU', 'UL', 'SE', 'BR', 'unknown']
         
         # Identifica tutti i nodi ParadataNodeGroup
         paradata_groups = [node for node in self.nodes
@@ -619,7 +619,7 @@ class Graph:
 
         Protocol (hierarchy: specific > local > general):
         1. Assign base times from epoch associations (has_first_epoch, survive_in_epoch)
-        2. Override with specific property values (absolute_start_date, absolute_end_date)
+        2. Override with specific property values (absolute_time_start, absolute_time_end)
         3. Propagate TPQ/TAQ constraints through stratigraphic relations
 
         Args:
@@ -631,6 +631,13 @@ class Graph:
         for t in _STRAT_TYPES:
             strat_nodes.extend(self.get_nodes_by_type(t))
 
+        # Pass 0: stratigraphic cycle detection. AI-extracted graphs can
+        # close loops (A is_after B is_after A); the TPQ/TAQ BFS handles
+        # them via a visited set but the user must be told. Each cycle is
+        # reported with per-node attribution so the right extractor can
+        # be audited.
+        self._warn_on_stratigraphic_cycles()
+
         # Pass 1: calculate base times (epoch + specific properties)
         for node in strat_nodes:
             self._calculate_base_chronology(node)
@@ -638,33 +645,56 @@ class Graph:
         # Pass 2: propagate TPQ/TAQ constraints
         self._propagate_tpq_taq(strat_nodes)
 
+    def _warn_on_stratigraphic_cycles(self):
+        """Detect cycles in the stratigraphic ``is_after`` / ``cuts`` /
+        ``overlies`` / ``fills`` partial order and emit a warning per
+        cycle, including per-node attribution (who claimed which end of
+        each offending relation).
+        """
+        from .diagnostics import detect_stratigraphic_cycles, format_attribution
+
+        cycles = detect_stratigraphic_cycles(self)
+        for cycle in cycles:
+            names = []
+            for nid in cycle:
+                n = self.find_node_by_id(nid)
+                label = getattr(n, "name", None) or nid
+                attr = ""
+                if n is not None:
+                    # Attribute by the start-date claim on this node
+                    # (end-date attribution would be symmetric; one side
+                    # is enough to point the user at the extractor).
+                    attr = format_attribution(self, n, "absolute_time_start")
+                names.append(f"{label}{attr}")
+            if len(cycle) == 1:
+                self.warnings.append(
+                    f"[stratigraphic cycle] self-loop on {names[0]}. "
+                    f"Physically impossible; review the extraction."
+                )
+            else:
+                chain = " → ".join(names) + f" → {names[0]}"
+                self.warnings.append(
+                    f"[stratigraphic cycle] {chain}. "
+                    f"Physically impossible; review the extractors involved."
+                )
+
     def _calculate_base_chronology(self, node):
         """
         Calculate base chronological times for a node from epochs and properties.
-        Specific properties (absolute_start_date/absolute_end_date) override epoch times.
+
+        Delegates to the generic 3-level resolver (DP-32 Layer A) via the
+        ``absolute_time_start`` / ``absolute_time_end`` PropagationRules. The
+        resolution order is identical to the previous hardcoded logic:
+
+            1. Node-level PropertyNode (absolute_time_start / absolute_time_end)
+            2. Swimlane-level EpochNode attributes (min of start_time,
+               max of end_time across has_first_epoch + survive_in_epoch)
+            3. Graph-level (currently no chronology default; rule returns None)
         """
-        # Get epoch-based times
-        epoch_nodes = self.get_connected_epoch_nodes_list_by_edge_type(node, "has_first_epoch")
-        # Also include survive_in_epoch for broader range
-        survived_epochs = self.get_connected_epoch_nodes_list_by_edge_type(node, "survive_in_epoch")
-        all_epochs = epoch_nodes + survived_epochs
+        from .resolvers import resolve, get_rule
 
-        epoch_start = None
-        epoch_end = None
-        if all_epochs:
-            valid_starts = [e.start_time for e in all_epochs if hasattr(e, 'start_time') and e.start_time is not None]
-            valid_ends = [e.end_time for e in all_epochs if hasattr(e, 'end_time') and e.end_time is not None]
-            if valid_starts:
-                epoch_start = min(valid_starts)
-            if valid_ends:
-                epoch_end = max(valid_ends)
-
-        # Look for specific property nodes (override epoch times)
-        start_prop = self._find_temporal_property(node, "absolute_start_date")
-        end_prop = self._find_temporal_property(node, "absolute_end_date")
-
-        start_time = float(start_prop.value) if start_prop and start_prop.value is not None else epoch_start
-        end_time = float(end_prop.value) if end_prop and end_prop.value is not None else epoch_end
+        start_time = resolve(self, node, get_rule("absolute_time_start"))
+        end_time = resolve(self, node, get_rule("absolute_time_end"))
 
         self._set_calculated_times(node, start_time, end_time)
 
@@ -681,7 +711,7 @@ class Graph:
 
         Args:
             node: The stratigraphic node to search from.
-            property_type: The property type to find (e.g. "absolute_start_date").
+            property_type: The property type to find (e.g. "absolute_time_start").
 
         Returns:
             PropertyNode or None (with value guaranteed set if found)
@@ -703,6 +733,30 @@ class Graph:
                     return prop_node
         return None
 
+    def get_property(self, node, rule_id, default=None):
+        """Resolve a propagative property on ``node`` via the registered rule.
+
+        Convenience wrapper around :func:`s3dgraphy.resolvers.resolve`.
+        Walks the 3-level hierarchy (node > swimlane > graph) and returns
+        the first non-null value, or ``default``.
+
+        Example::
+
+            author = graph.get_property(node, "author")
+            start  = graph.get_property(node, "absolute_time_start")
+
+        Args:
+            node: The node to resolve the property for.
+            rule_id: Id of a registered PropagationRule (see
+                :func:`s3dgraphy.resolvers.list_rules`).
+            default: Value to return when no level yields a non-null value.
+
+        Raises:
+            KeyError: If ``rule_id`` is not registered.
+        """
+        from .resolvers import resolve, get_rule
+        return resolve(self, node, get_rule(rule_id), default=default)
+
     def _set_calculated_times(self, node, start_time, end_time):
         """
         Set calculated start and end times as node attributes.
@@ -714,7 +768,8 @@ class Graph:
 
     def _propagate_tpq_taq(self, strat_nodes):
         """
-        Propagate Terminus Post Quem (TPQ) and Terminus Ante Quem (TAQ) constraints.
+        Propagate Terminus Post Quem (TPQ) and Terminus Ante Quem (TAQ) constraints
+        with coherence checking (DP-32 Layer B, Hard paradox policy).
 
         TPQ (propagates upward to more recent nodes):
             If node A has CALCUL_START_T = X, all nodes that are MORE RECENT than A
@@ -724,26 +779,47 @@ class Graph:
             If node A has CALCUL_END_T = Y, all nodes that are MORE ANCIENT than A
             cannot have CALCUL_END_T > Y.
 
-        Only restricts (tightens) existing values, never widens them.
+        Only restricts (tightens) derived values; never widens them.
+
+        Paradox policy (Hard):
+            If a node carries an explicit user-declared seed (a PropertyNode
+            absolute_time_start / absolute_time_end) and the incoming
+            stratigraphic constraint would modify that declared value, the
+            propagation is *blocked* at that node: the declared seed is kept,
+            a warning is appended to ``self.warnings``, and BFS does not
+            traverse further through the conflicting node.
         """
-        # Build adjacency maps for temporal direction
-        # more_recent_neighbors[node_id] = list of node_ids that are MORE RECENT
-        # more_ancient_neighbors[node_id] = list of node_ids that are MORE ANCIENT
+        # --- Collect explicit node-level seeds (before propagation) ---
+        # Only seeds coming from Layer A's node level count as "user-declared".
+        # Values that came from swimlane/graph fallback are derived and freely
+        # overwritable by Layer B tightening.
+        from .resolvers import get_rule
+        start_rule = get_rule("absolute_time_start")
+        end_rule = get_rule("absolute_time_end")
+
+        explicit_start = {}  # node_id -> float declared at node level
+        explicit_end = {}
+        for n in strat_nodes:
+            s = start_rule.node_getter(self, n)
+            if s is not None:
+                explicit_start[n.node_id] = s
+            e = end_rule.node_getter(self, n)
+            if e is not None:
+                explicit_end[n.node_id] = e
+
+        # --- Build adjacency maps for temporal direction ---
         more_recent_of = {}  # node_id -> [nodes that are more recent than this node]
         more_ancient_of = {}  # node_id -> [nodes that are more ancient than this node]
 
         for edge in self.edges:
             if edge.edge_type in self._SOURCE_IS_MORE_RECENT:
-                # source is more recent than target
                 more_recent_of.setdefault(edge.edge_target, []).append(edge.edge_source)
                 more_ancient_of.setdefault(edge.edge_source, []).append(edge.edge_target)
             elif edge.edge_type in self._TARGET_IS_MORE_RECENT:
-                # target is more recent than source
                 more_recent_of.setdefault(edge.edge_source, []).append(edge.edge_target)
                 more_ancient_of.setdefault(edge.edge_target, []).append(edge.edge_source)
 
-        # TPQ propagation: propagate start_time upward (to more recent nodes)
-        # Use BFS from every node that has a CALCUL_START_T
+        # --- TPQ propagation: start_time propagates upward (to more recent nodes) ---
         for node in strat_nodes:
             start_t = node.attributes.get("CALCUL_START_T")
             if start_t is None:
@@ -762,17 +838,32 @@ class Graph:
                 if not neighbor or not hasattr(neighbor, 'node_type'):
                     continue
 
+                # Paradox check: stratigraphy says neighbor.start >= start_t,
+                # but the user declared a strictly-smaller seed on this neighbor.
+                declared = explicit_start.get(neighbor_id)
+                if declared is not None and start_t > declared:
+                    from .diagnostics import format_attribution
+                    attr = format_attribution(self, neighbor, "absolute_time_start")
+                    neighbor_label = getattr(neighbor, "name", None) or neighbor_id
+                    node_label = getattr(node, "name", None) or node.node_id
+                    self.warnings.append(
+                        f"[chronology paradox] node '{neighbor_label}' declares "
+                        f"absolute_time_start={declared}{attr} but is stratigraphically "
+                        f"more recent than '{node_label}' whose start_time={start_t}. "
+                        f"Keeping declared value; TPQ propagation is stopped at this node."
+                    )
+                    # Hard policy: do not overwrite, do not traverse further.
+                    continue
+
                 current_start = neighbor.attributes.get("CALCUL_START_T")
-                # Only tighten: if neighbor's start is before our start, restrict it
                 if current_start is None or current_start < start_t:
                     neighbor.attributes["CALCUL_START_T"] = start_t
 
-                # Continue propagation upward
                 for next_id in more_recent_of.get(neighbor_id, []):
                     if next_id not in visited:
                         queue.append(next_id)
 
-        # TAQ propagation: propagate end_time downward (to more ancient nodes)
+        # --- TAQ propagation: end_time propagates downward (to more ancient nodes) ---
         for node in strat_nodes:
             end_t = node.attributes.get("CALCUL_END_T")
             if end_t is None:
@@ -791,12 +882,27 @@ class Graph:
                 if not neighbor or not hasattr(neighbor, 'node_type'):
                     continue
 
+                # Paradox check: stratigraphy says neighbor.end <= end_t,
+                # but the user declared a strictly-larger seed on this neighbor.
+                declared = explicit_end.get(neighbor_id)
+                if declared is not None and end_t < declared:
+                    from .diagnostics import format_attribution
+                    attr = format_attribution(self, neighbor, "absolute_time_end")
+                    neighbor_label = getattr(neighbor, "name", None) or neighbor_id
+                    node_label = getattr(node, "name", None) or node.node_id
+                    self.warnings.append(
+                        f"[chronology paradox] node '{neighbor_label}' declares "
+                        f"absolute_time_end={declared}{attr} but is stratigraphically "
+                        f"more ancient than '{node_label}' whose end_time={end_t}. "
+                        f"Keeping declared value; TAQ propagation is stopped at this node."
+                    )
+                    # Hard policy: do not overwrite, do not traverse further.
+                    continue
+
                 current_end = neighbor.attributes.get("CALCUL_END_T")
-                # Only tighten: if neighbor's end is after our end, restrict it
                 if current_end is None or current_end > end_t:
                     neighbor.attributes["CALCUL_END_T"] = end_t
 
-                # Continue propagation downward
                 for next_id in more_ancient_of.get(neighbor_id, []):
                     if next_id not in visited:
                         queue.append(next_id)
@@ -1174,7 +1280,7 @@ class Graph:
 
         # Stratigraphic node types
         stratigraphic_types = ['US', 'USVs', 'USVn', 'VSF', 'SF', 'USD', 'serSU',
-                              'serUSVn', 'serUSVs', 'TSU', 'SE', 'BR', 'unknown']
+                              'serUSVn', 'serUSVs', 'TSU', 'UL', 'SE', 'BR', 'unknown']
 
         refined_count = 0
 

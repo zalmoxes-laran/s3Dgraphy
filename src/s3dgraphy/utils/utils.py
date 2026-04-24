@@ -1,6 +1,7 @@
 # s3Dgraphy/utils/utils.py
 import os
 import json
+from importlib.resources import files
 
 """
 Utilities for the s3Dgraphy library.
@@ -11,6 +12,7 @@ This module includes helper functions for node type conversion based on YED node
 from ..nodes.stratigraphic_node import (
     StratigraphicNode,
     StratigraphicUnit,
+    NegativeStratigraphicUnit,
     SeriesOfStratigraphicUnit,
     SeriesOfNonStructuralVirtualStratigraphicUnit,
     SeriesOfStructuralVirtualStratigraphicUnit,
@@ -21,6 +23,7 @@ from ..nodes.stratigraphic_node import (
     VirtualSpecialFindUnit,
     DocumentaryStratigraphicUnit,
     TransformationStratigraphicUnit,
+    WorkingUnit,
     StratigraphicEventNode,
     ContinuityNode
 )
@@ -91,13 +94,14 @@ def debug_graph_structure(graph, node_id=None, max_depth=5, current_depth=0):
             # print(f"  - {etype}: {count} edges")
     # print("=== END DEBUG ===\n")
 
-def convert_shape2type(yedtype, border_style):
+def convert_shape2type(yedtype, border_style, border_type="line"):
     """
     Converts YED node shape and border style to a specific stratigraphic node type.
 
     Args:
         yedtype (str): The shape type of the node in YED.
         border_style (str): The border color of the node.
+        border_type (str): The border line type ('line', 'dashed', etc.).
 
     Returns:
         tuple: A tuple with a short code for the node type and an extended description.
@@ -120,8 +124,12 @@ def convert_shape2type(yedtype, border_style):
         nodetype = ("SF", "Special Find")
     elif yedtype == "octagon" and border_style == "#B19F61":
         nodetype = ("VSF", "Virtual Special Find")
+    elif yedtype == "roundrectangle" and border_type == "dashed":
+        nodetype = ("TSU", "Transformation Stratigraphic Unit")
     elif yedtype == "roundrectangle":
         nodetype = ("USD", "Documentary Stratigraphic Unit")
+    elif yedtype == "diamond":
+        nodetype = ("BR", "Continuity Node")
     else:
         # print(f"Unrecognized node type and style: yedtype='{yedtype}', border_style='{border_style}'")
         nodetype = ("unknown", "Unrecognized node")
@@ -129,22 +137,34 @@ def convert_shape2type(yedtype, border_style):
     return nodetype
 
 
-# Mappa dei tipi stratigrafici alle rispettive classi
+# ──────────────────────────────────────────────────────────────────
+# Stratigraphic type → Python class map.
+#
+# Keep this list aligned with the ``stratigraphic_nodes`` entries in
+# ``JSON_config/s3Dgraphy_node_datamodel.json`` — the JSON is the
+# source of truth for metadata (label, abbreviation, family, …); this
+# dict is only the Python-level runtime factory.
+#
+# The paired test ``test_stratigraphic_classification.py`` verifies
+# the two stay in sync: every class here has a datamodel entry, every
+# entry has a class, and family/is_series obey the expected rules.
+# ──────────────────────────────────────────────────────────────────
 STRATIGRAPHIC_CLASS_MAP = {
-    "US": StratigraphicUnit,
-    "USVs": StructuralVirtualStratigraphicUnit,
-    "serSU": SeriesOfStratigraphicUnit,
+    "US":      StratigraphicUnit,
+    "USN":     NegativeStratigraphicUnit,
+    "USVs":    StructuralVirtualStratigraphicUnit,
+    "USVn":    NonStructuralVirtualStratigraphicUnit,
+    "SF":      SpecialFindUnit,
+    "VSF":     VirtualSpecialFindUnit,
+    "USD":     DocumentaryStratigraphicUnit,
+    "TSU":     TransformationStratigraphicUnit,
+    "UL":      WorkingUnit,
+    "serSU":   SeriesOfStratigraphicUnit,
     "serUSVn": SeriesOfNonStructuralVirtualStratigraphicUnit,
     "serUSVs": SeriesOfStructuralVirtualStratigraphicUnit,
-    "serUSD": SeriesOfDocumentaryStratigraphicUnit,
-    "USVn": NonStructuralVirtualStratigraphicUnit,
-    "SF": SpecialFindUnit,
-    "VSF": VirtualSpecialFindUnit,
-    "USD": DocumentaryStratigraphicUnit,
-    "TSU": TransformationStratigraphicUnit,
-    "SE": StratigraphicEventNode,
-    "BR": ContinuityNode,
-    # Aggiungi ulteriori tipi e classi se necessario
+    "serUSD":  SeriesOfDocumentaryStratigraphicUnit,
+    "SE":      StratigraphicEventNode,
+    "BR":      ContinuityNode,
 }
 
 def get_stratigraphic_node_class(stratigraphic_type):
@@ -173,29 +193,123 @@ def get_material_color(matname, rules_path=None):
         tuple: (R, G, B, A) con valori tra 0 e 1 o None se il nodo non prevede
         un materiale
     """
-    if rules_path is None:
-        rules_path = os.path.join(os.path.dirname(__file__), 
-                                "../JSON_config/em_visual_rules.json")
-    
     try:
-        with open(rules_path, 'r') as f:
-            rules = json.load(f)
-            node_style = rules["node_styles"].get(matname, {})
-            style = node_style.get("style", {})
-            
-            # Se non c'è la sezione material, restituisce None
-            if "material" not in style:
-                return None
-                
-            color = style["material"]["color"]
-            return (color["r"], color["g"], color["b"], color.get("a", 1.0))
-            
-    except (KeyError, FileNotFoundError, json.JSONDecodeError):
+        if rules_path is None:
+            rules_resource = files("s3dgraphy").joinpath(
+                "JSON_config/em_visual_rules.json"
+            )
+            with rules_resource.open('r', encoding='utf-8') as f:
+                rules = json.load(f)
+        else:
+            with open(rules_path, 'r', encoding='utf-8') as f:
+                rules = json.load(f)
+
+        node_style = rules["node_styles"].get(matname, {})
+        style = node_style.get("style", {})
+
+        # Se non c'è la sezione material, restituisce None
+        if "material" not in style:
+            return None
+
+        color = style["material"]["color"]
+        return (color["r"], color["g"], color["b"], color.get("a", 1.0))
+
+    except (KeyError, FileNotFoundError, json.JSONDecodeError, ModuleNotFoundError) as e:
+        print(f"[s3dgraphy] get_material_color('{matname}') fallback: {type(e).__name__}: {e}")
         # Fallback solo per i nodi che dovrebbero avere un materiale
         if matname in ['US', 'USVs', 'USVn', 'VSF', 'SF', 'USD']:
             return (0.5, 0.5, 0.5, 1.0)
         return None
-    
+
+
+# Cache for the loaded visual rules file. Loaded lazily; reloadable
+# for tests via ``_reload_visual_rules``.
+_VISUAL_RULES_CACHE = None
+
+
+def _load_visual_rules():
+    global _VISUAL_RULES_CACHE
+    if _VISUAL_RULES_CACHE is not None:
+        return _VISUAL_RULES_CACHE
+    try:
+        rules_resource = files("s3dgraphy").joinpath(
+            "JSON_config/em_visual_rules.json")
+        with rules_resource.open('r', encoding='utf-8') as f:
+            _VISUAL_RULES_CACHE = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError,
+            ModuleNotFoundError) as e:
+        print(f"[s3dgraphy] _load_visual_rules fallback: "
+              f"{type(e).__name__}: {e}")
+        _VISUAL_RULES_CACHE = {}
+    return _VISUAL_RULES_CACHE
+
+
+def get_document_vocabularies():
+    """Derive the three canonical Master-Document vocabularies from
+    ``em_visual_rules.json``.
+
+    Returns ``(DOCUMENT_ROLES, DOCUMENT_CONTENT_NATURES,
+    DOCUMENT_GEOMETRIES)`` as tuples, reading from:
+
+    - ``document_roles`` → keys (e.g. ``analytical``, ``comparative``)
+    - ``document_content_natures`` → keys (e.g. ``2d_object``)
+    - ``document_variant_styles`` → keys *excluding* ``default`` and
+      any ``_comment`` entry (e.g. ``reality_based``, ``observable``,
+      ``asserted``)
+
+    The JSON is the single source of truth for the Master-Document
+    classification vocabulary; adding a new value there flows through
+    to constructor validation and UI dropdowns automatically.
+    """
+    _role_order = ("analytical", "comparative")
+    _nature_order = ("2d_object", "3d_object")
+    _geometry_order = ("reality_based", "observable", "asserted", "em_based")
+    rules = _load_visual_rules()
+
+    def _keys(section_name):
+        section = rules.get(section_name, {}) or {}
+        return {k for k in section
+                if k and not k.startswith("_") and k != "default"}
+
+    roles = _keys("document_roles")
+    natures = _keys("document_content_natures")
+    geoms = _keys("document_variant_styles")
+
+    def _ordered(values, preferred):
+        return tuple(v for v in preferred if v in values) + tuple(
+            sorted(v for v in values if v not in preferred))
+
+    roles_t = _ordered(roles, _role_order) or _role_order
+    natures_t = _ordered(natures, _nature_order) or _nature_order
+    geoms_t = _ordered(geoms, _geometry_order) or _geometry_order
+    return roles_t, natures_t, geoms_t
+
+
+def get_document_variant_style(variant_key: str) -> dict:
+    """Return the render-style dict for a DocumentNode variant key.
+
+    In EM 1.6 ``variant_key`` is a ``geometry`` value
+    (``"reality_based"``, ``"observable"``, ``"asserted"``) or
+    ``"default"`` when the document has no RM — see
+    :meth:`DocumentNode.variant_style_key`.
+
+    The returned dict includes at least ``border_color``,
+    ``border_style`` and ``border_width``; callers consume whichever
+    they need to emit yEd XML. An unknown key falls back to
+    ``"default"`` so an exporter is never left without a style.
+    """
+    rules = _load_visual_rules()
+    variants = rules.get("document_variant_styles", {}) or {}
+    style = variants.get(variant_key)
+    if style is None:
+        style = variants.get("default", {})
+    return {
+        "border_color": style.get("border_color", "#000000"),
+        "border_style": style.get("border_style", "solid"),
+        "border_width": float(style.get("border_width", 1.0)),
+    }
+
+
 def get_original_node_id(node):
     """
     Recupera l'ID originale di un nodo.
@@ -394,30 +508,57 @@ def _strip_html_comments(text: str) -> str:
 
 def get_ai_prompt(
     language: str = None,
-    include_part_a: bool = True,
-    include_part_b: bool = True,
-    include_part_c: bool = False,
-    include_part_d: bool = False,
+    include_validation: bool = True,
     include_checklist: bool = True,
-    include_validation: bool = False,
+    include_stratigraphy_only: bool = False,
+    documents_folder: str = None,
+    document_list: list = None,
+    dosco_in_place: bool = True,
+    ai_has_filesystem_access: bool = True,
 ) -> str:
     """
-    Build and return the AI extraction prompt for stratigraphic data (v4.1).
+    Build and return the StratiMiner extraction prompt (v5.1 schema).
 
-    Reads ``AI_EXTRACTION_PROMPT_v4.md`` bundled inside the s3dgraphy package,
-    assembles the requested sections, substitutes the language placeholder, and
-    prepends a language instruction line.
+    Reads ``StratiMiner_Extraction_Prompt.md`` bundled inside the s3dgraphy
+    package and produces a ready-to-paste prompt that instructs an AI
+    assistant (Claude, ChatGPT, Gemini, ...) to output a single
+    ``em_data.xlsx`` file with the 5 typed sheets (Units, Epochs, Claims,
+    Authors, Documents).
+
+    The prompt is now fully written in English: meta-instructions are
+    universal, while the AI's textual output (VALUE, EXTRACTOR excerpts,
+    COMBINER_REASONING) is controlled by the ``language`` argument,
+    substituted at the ``[OUTPUT_LANGUAGE]`` placeholder inside the
+    prompt.
 
     Args:
-        language: Working language. If None / empty / "the same as the original
-            document", the AI is instructed to keep the source document's language.
-        include_part_a: Include Part A (Stratigraphy extraction). Default True.
-        include_part_b: Include Part B (Paradata extraction). Default True.
-        include_part_c: Include Part C (ParadataEpochs). Default False.
-        include_part_d: Include Part D (Sources list). Default False.
-        include_checklist: Include Part E (end-of-session checklist). Default True.
-        include_validation: Include the embedded Python validation script and
-            related checklist items (FLAG: VALIDAZIONE_FINALE). Default False.
+        language: Output language for the values the AI writes into the
+            xlsx (VALUE, EXTRACTOR, COMBINER_REASONING, DISPLAY_NAME).
+            ``None`` / empty / "the same as the original document" →
+            the AI is instructed to preserve each document's original
+            language on a per-claim basis.
+        include_validation: Include the embedded Python validation script.
+            Default True.
+        include_checklist: Include the end-of-session checklist. Default True.
+        include_stratigraphy_only: Include the STRATIGRAPHY_ONLY appendix
+            that describes the minimal flow for pre-existing archaeological
+            databases (curator as sole author, no paradata chain). Default
+            False.
+        documents_folder: Optional path to a folder of source PDFs; when
+            provided, appended to the SOURCES PROVIDED section so the AI
+            knows where to look.
+        document_list: Optional pre-catalogued document descriptors (each
+            either a string or a dict with ``id`` / ``title`` / ``path``).
+        dosco_in_place: When True (default) the AI renames files in place
+            inside ``documents_folder`` with the ``D.NN_`` prefix and
+            uses the folder as the DosCo. When False the AI must treat
+            the folder as read-only and produce the document catalog
+            without actually renaming — the user will copy+rename offline.
+        ai_has_filesystem_access: When True (default) the AI is instructed
+            to enumerate and read files from ``documents_folder``. When
+            False, the AI is told it won't have filesystem access and
+            should ask the user to upload the files into the conversation
+            directly, with a data-sovereignty disclaimer.
 
     Returns:
         str: The assembled prompt ready to paste into an AI assistant.
@@ -425,51 +566,188 @@ def get_ai_prompt(
     Raises:
         FileNotFoundError: If the bundled prompt file cannot be located.
     """
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
-    prompt_path = os.path.join(data_dir, 'AI_EXTRACTION_PROMPT_v4.md')
+    prompt_resource = files("s3dgraphy").joinpath(
+        'data/StratiMiner_Extraction_Prompt.md'
+    )
 
-    if not os.path.exists(prompt_path):
+    try:
+        with prompt_resource.open('r', encoding='utf-8') as f:
+            source_md = f.read()
+    except (FileNotFoundError, ModuleNotFoundError) as e:
         raise FileNotFoundError(
-            f"AI extraction prompt not found at: {prompt_path}. "
+            f"StratiMiner extraction prompt not found in s3dgraphy package "
+            f"(data/StratiMiner_Extraction_Prompt.md): {e}. "
             "Ensure s3dgraphy is installed correctly."
         )
 
-    with open(prompt_path, 'r', encoding='utf-8') as f:
-        source_md = f.read()
-
-    # Resolve language
+    # Resolve output language
     _default = "the same as the original document"
     lang = language.strip() if language else ""
     lang_str = lang if (lang and lang.lower() != _default.lower()) else _default
 
-    # 1. Language placeholder
-    result = source_md.replace('[LINGUA]', lang_str)
+    # 1. Output-language placeholder
+    result = source_md.replace('[OUTPUT_LANGUAGE]', lang_str)
 
-    # 2. Flags (nested inside sections — must be processed first)
-    result = _process_flag(result, 'VALIDAZIONE_FINALE', include_validation)
+    # 2. Sources block placeholder (replace regardless, even with empty)
+    sources_text = _build_sources_block(
+        documents_folder=documents_folder,
+        document_list=document_list,
+        dosco_in_place=dosco_in_place,
+        ai_has_filesystem_access=ai_has_filesystem_access,
+    )
+    result = result.replace('[SOURCES_BLOCK]', sources_text)
 
-    # 3. Sections
+    # 3. Optional sections
     for section_id, include in [
-        ('PART_A',    include_part_a),
-        ('PART_B',    include_part_b),
-        ('PART_C',    include_part_c),
-        ('PART_D',    include_part_d),
-        ('CHECKLIST', include_checklist),
+        ('VALIDATION',        include_validation),
+        ('STRATIGRAPHY_ONLY', include_stratigraphy_only),
+        ('CHECKLIST',         include_checklist),
     ]:
         result = _process_section(result, section_id, include)
 
     # 4. Strip any remaining HTML comment markers
     result = _strip_html_comments(result)
 
-    # 5. Prepend language instruction
-    if lang_str == _default:
-        lang_instruction = (
-            "IMPORTANT: Write all descriptions and properties in the same "
-            "language as the original document."
-        )
-    else:
-        lang_instruction = (
-            f"IMPORTANT: Write all descriptions and properties in {lang_str}."
-        )
+    return result.strip()
 
-    return f"{lang_instruction}\n\n{result.strip()}"
+
+def _build_sources_block(documents_folder: str,
+                          document_list: list,
+                          dosco_in_place: bool,
+                          ai_has_filesystem_access: bool) -> str:
+    """Format the SOURCES PROVIDED body inserted at ``[SOURCES_BLOCK]``.
+
+    Covers three degrees of information:
+
+    * ``documents_folder`` alone: instruct the AI to enumerate the
+      folder, respect existing ``D.NN_`` prefixes, fill gaps, and use
+      1000+ for comparative sources.
+    * ``document_list``: pre-catalogued entries take precedence over
+      folder enumeration (the AI re-uses the declared IDs verbatim).
+    * ``ai_has_filesystem_access = False``: replace the enumeration
+      instructions with a request to upload files into the conversation
+      and a data-sovereignty disclaimer.
+
+    Returns a string ready to be dropped into the SOURCES PROVIDED
+    section; it is always non-empty — if nothing is supplied, it
+    contains a single line telling the AI that no documents have been
+    attached yet.
+    """
+    lines = []
+
+    if not documents_folder and not document_list:
+        lines.append(
+            "_No source documents have been attached to this prompt._ "
+            "The user must either paste a documents-folder path into the "
+            "prompt before sending it, or upload the files directly "
+            "into this conversation."
+        )
+        return "\n".join(lines)
+
+    if document_list:
+        lines.append("### Pre-catalogued documents")
+        lines.append("")
+        lines.append(
+            "Use these IDs verbatim; do not re-number. Additional "
+            "documents discovered in the folder extend this list "
+            "using the numbering rules below."
+        )
+        lines.append("")
+        for item in document_list:
+            if isinstance(item, dict):
+                parts = []
+                for key in ("id", "title", "path"):
+                    val = item.get(key)
+                    if val:
+                        parts.append(f"{key}={val}")
+                lines.append("- " + " | ".join(parts))
+            else:
+                lines.append(f"- {item}")
+        lines.append("")
+
+    if documents_folder and ai_has_filesystem_access:
+        lines.append("### Source folder")
+        lines.append("")
+        lines.append("The source documents are in the folder:")
+        lines.append("")
+        lines.append(f"    {documents_folder}")
+        lines.append("")
+        if dosco_in_place:
+            lines.append(
+                "This folder is the **DosCo** (Document Corpus) for the "
+                "project. Treat it in-place:"
+            )
+        else:
+            lines.append(
+                "This folder holds the raw source files. Do **not** "
+                "rename or copy them — the user will perform a separate "
+                "copy/rename pass after your output. Just enumerate."
+            )
+        lines.append("")
+        lines.append("**Document numbering rules:**")
+        lines.append("")
+        lines.append(
+            "1. If a filename already starts with `D.NN_` (e.g. "
+            "`D.02_Diaconescu.pdf`), **re-use that number** as the "
+            "`Documents.ID`. Do not re-number."
+        )
+        lines.append(
+            "2. Otherwise, assign the next available integer in the "
+            "`D.NN` sequence, **filling gaps**: if `D.01`, `D.02`, "
+            "`D.04` exist, assign `D.03` to the next new document "
+            "before going to `D.05`."
+        )
+        lines.append(
+            "3. **Comparative / parallel sources** (documents about "
+            "other sites, theoretical treatises, typological "
+            "references — not about the site itself) use IDs from "
+            "`D.1000` upward to keep them visibly separate from the "
+            "analytical sources of the site."
+        )
+        if dosco_in_place:
+            lines.append(
+                "4. When you report each document in the `Documents` "
+                "sheet, include a note in `TITLE` if you propose a "
+                "rename (e.g. `TITLE = \"Diaconescu 2013 Templu Mare \""
+                "— proposed rename D.03_Diaconescu_2013.pdf`). The "
+                "user will apply the in-place rename after reviewing."
+            )
+        lines.append("")
+    elif documents_folder and not ai_has_filesystem_access:
+        lines.append("### Source documents")
+        lines.append("")
+        lines.append(
+            f"The user has a documents folder at `{documents_folder}` "
+            "but you do **not** have filesystem access in this "
+            "conversation. Ask the user to upload the files directly "
+            "into the chat."
+        )
+        lines.append("")
+        lines.append("**Data-sovereignty notice to return to the user:**")
+        lines.append("")
+        lines.append(
+            "> Before uploading archaeological PDFs into this "
+            "conversation, verify that you have the rights to share "
+            "them and that this AI provider is compliant with your "
+            "organization's data-handling policies. Document content "
+            "is processed by the AI vendor, not by StratiMiner."
+        )
+        lines.append("")
+        lines.append(
+            "Once the files are uploaded, apply the numbering rules "
+            "below (same as for a filesystem folder):"
+        )
+        lines.append("")
+        lines.append(
+            "1. If a filename already starts with `D.NN_`, re-use that "
+            "number."
+        )
+        lines.append(
+            "2. Otherwise, next available integer, filling gaps."
+        )
+        lines.append(
+            "3. Comparative sources from `D.1000` upward."
+        )
+        lines.append("")
+
+    return "\n".join(lines)

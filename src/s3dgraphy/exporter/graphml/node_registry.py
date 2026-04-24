@@ -7,6 +7,7 @@ visual properties from em_palette_template.graphml.
 
 import json
 import os
+from importlib.resources import files, as_file
 from typing import Dict, Tuple, Optional
 from lxml import etree as ET
 from dataclasses import dataclass
@@ -41,30 +42,61 @@ class NodeRegistry:
         self._load_palette_template()
 
     def _load_datamodel(self):
-        """Load node datamodel from JSON."""
-        json_path = os.path.join(
-            os.path.dirname(__file__),
-            '../../JSON_config/s3Dgraphy_node_datamodel.json'
-        )
-        
+        """Load node datamodel from JSON and flatten to a type-code-keyed dict.
+
+        The datamodel JSON is organized by category (stratigraphic_nodes,
+        temporal_nodes, paradata_nodes, etc.), each mapping ClassName ->
+        definition. Definitions may have `subtypes` (keyed by class name but
+        carrying an `abbreviation`), or be leaf classes with an `abbreviation`
+        themselves. `get_node_metadata(node_type)` wants a flat lookup by
+        abbreviation (US, USVs, EP, PROP, ...), so we flatten here.
+        """
         try:
-            with open(json_path, 'r', encoding='utf-8') as f:
+            resource = files("s3dgraphy").joinpath(
+                "JSON_config/s3Dgraphy_node_datamodel.json"
+            )
+            with resource.open('r', encoding='utf-8') as f:
                 data = json.load(f)
-                self.datamodel = data.get('nodes', {})
-        except FileNotFoundError:
-            print(f"Warning: Node datamodel not found at {json_path}")
+        except (FileNotFoundError, ModuleNotFoundError) as e:
+            print(f"[s3dgraphy] Warning: Node datamodel not found: {type(e).__name__}: {e}")
             self.datamodel = {}
+            return
+
+        flat: Dict[str, Dict] = {}
+        # Known non-category top-level keys to skip.
+        meta_keys = {'s3Dgraphy_data_model_version', 'description', 'components'}
+
+        for cat_key, cat_content in data.items():
+            if cat_key in meta_keys or not isinstance(cat_content, dict):
+                continue
+            for class_name, class_def in cat_content.items():
+                if not isinstance(class_def, dict):
+                    continue
+                subtypes = class_def.get('subtypes')
+                if subtypes:
+                    for sub_key, sub_def in subtypes.items():
+                        if not isinstance(sub_def, dict):
+                            continue
+                        code = sub_def.get('abbreviation') or sub_key
+                        flat[code] = sub_def
+                else:
+                    code = class_def.get('abbreviation')
+                    if code:
+                        flat[code] = class_def
+
+        self.datamodel = flat
 
     def _load_palette_template(self):
         """Load visual properties from palette template GraphML."""
-        template_path = os.path.join(
-            os.path.dirname(__file__),
-            '../../templates/em_palette_template.graphml'
-        )
-        
         try:
-            tree = ET.parse(template_path)
-            root = tree.getroot()
+            resource = files("s3dgraphy").joinpath(
+                "templates/em_palette_template.graphml"
+            )
+            # lxml.etree.parse needs a real filesystem path or a file object.
+            # Use as_file() to materialize the resource if it's inside a zip.
+            with as_file(resource) as template_path:
+                tree = ET.parse(str(template_path))
+                root = tree.getroot()
             
             # Parse nodes from palette
             ns = {'graphml': 'http://graphml.graphdrawing.org/xmlns',
@@ -101,11 +133,11 @@ class NodeRegistry:
                     text_color='#FFFFFF'
                 )
             
-        except FileNotFoundError:
-            print(f"Warning: Palette template not found at {template_path}")
+        except (FileNotFoundError, ModuleNotFoundError) as e:
+            print(f"[s3dgraphy] Warning: Palette template not found: {type(e).__name__}: {e}")
             self._load_default_visual_properties()
         except Exception as e:
-            print(f"Warning: Error loading palette template: {e}")
+            print(f"[s3dgraphy] Warning: Error loading palette template: {e}")
             self._load_default_visual_properties()
 
     def _extract_visual_properties(self, node_elem: ET.Element, ns: Dict) -> Optional[NodeVisualProperties]:

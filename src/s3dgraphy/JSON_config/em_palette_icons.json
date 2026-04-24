@@ -1,0 +1,14 @@
+{
+  "s3Dgraphy_palette_prefixes_version": "1.5.6",
+  "description": "Label-prefix registry for paradata image nodes (AuthorNode, AuthorAINode, LicenseNode, EmbargoNode). The primary detection signal in the GraphML importer is the label prefix of a <y:ImageNode> (longest-first to avoid 'AI.' being shadowed by 'A.'). Explicit '_s3d_node_type:<NodeType>' marker in the node description/URL overrides everything and is used by the exporter for round-trip stability. Hash-based detection has been removed because palette icons may be redrawn / reshipped between versions; the label convention is instead stable across the EM ecosystem and matches how ExtractorNode (D.) and CombinerNode (C.) are identified.",
+  "label_prefixes": {
+    "AI.": "AuthorAINode",
+    "A.":  "AuthorNode",
+    "LI.": "LicenseNode",
+    "EB.": "EmbargoNode"
+  },
+  "detection_order": [
+    "description_marker",
+    "label_prefix"
+  ]
+}

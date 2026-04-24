@@ -150,8 +150,24 @@ class NodeGenerator:
         node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
         node_elem.set('id', nested_id)
 
-        # Add description (d5) — property value
-        description = getattr(node, 'description', '')
+        # Add description (d5) — property value.
+        # The yEd convention renders PropertyNode content from d5. Graphs
+        # built by the unified xlsx pipeline store the distilled datum in
+        # ``node.value`` (with optional ``attributes['units']``) and leave
+        # ``description`` empty. Fall back to ``value`` (+ units) so the
+        # node ships its distilled content instead of appearing empty in
+        # yEd.
+        description = getattr(node, 'description', '') or ''
+        if not description:
+            value = getattr(node, 'value', '') or ''
+            units = ''
+            attrs = getattr(node, 'attributes', None) or {}
+            if isinstance(attrs, dict):
+                units = attrs.get('units', '') or ''
+            if value and units:
+                description = f"{value} {units}"
+            elif value:
+                description = str(value)
         if description:
             data_d5 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
             data_d5.set('key', 'd5')
@@ -377,10 +393,11 @@ class NodeGenerator:
         generic_node = ET.SubElement(data_d6, f'{{{self.ns_y}}}GenericNode')
         generic_node.set('configuration', 'com.yworks.bpmn.Artifact.withShadow')
 
-        # Geometry (matching reference: h=63.79, w=42.80)
+        # Geometry — kept in sync with the Master-Document reference
+        # nodes in templates/em_palette_template.graphml (n37-n39).
         geometry = ET.SubElement(generic_node, f'{{{self.ns_y}}}Geometry')
-        geometry.set('height', '63.79')
-        geometry.set('width', '42.80')
+        geometry.set('height', '55.0')
+        geometry.set('width', '35.0')
         geometry.set('x', str(x))
         geometry.set('y', str(y))
 
@@ -389,19 +406,34 @@ class NodeGenerator:
         fill.set('color', '#FFFFFFE6')
         fill.set('transparent', 'false')
 
-        # BorderStyle
+        # BorderStyle — driven by the Master-Document ``geometry`` axis
+        # (EM 1.6). Documents without an RM fall back to the "default"
+        # entry in ``em_visual_rules.json`` (black / solid / 1.0).
+        try:
+            from ...utils.utils import get_document_variant_style
+            if hasattr(node, "variant_style_key"):
+                variant = get_document_variant_style(node.variant_style_key())
+            else:
+                variant = get_document_variant_style("default")
+        except Exception:
+            variant = {"border_color": "#000000",
+                       "border_style": "line",
+                       "border_width": 1.0}
         border = ET.SubElement(generic_node, f'{{{self.ns_y}}}BorderStyle')
-        border.set('color', '#000000')
-        border.set('type', 'line')
-        border.set('width', '1.0')
+        border.set('color', variant.get("border_color", "#000000"))
+        # yEd uses ``type='line'`` for solid by convention; map.
+        _bs = variant.get("border_style", "solid")
+        border.set('type', 'line' if _bs == "solid" else _bs)
+        border.set('width', str(variant.get("border_width", 1.0)))
 
-        # NodeLabel (centered, small font — matching TempluMare reference)
+        # NodeLabel — matches the Master-Document reference in
+        # templates/em_palette_template.graphml (n37-n39).
         doc_name = getattr(node, 'name', 'Document')
         label = ET.SubElement(generic_node, f'{{{self.ns_y}}}NodeLabel')
         label.set('alignment', 'center')
         label.set('autoSizePolicy', 'content')
         label.set('fontFamily', 'Dialog')
-        label.set('fontSize', '8')  # Small font for documents
+        label.set('fontSize', '12')
         label.set('fontStyle', 'plain')
         label.set('hasBackgroundColor', 'false')
         label.set('hasLineColor', 'false')

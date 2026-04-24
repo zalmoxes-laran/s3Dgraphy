@@ -96,6 +96,15 @@ class QualiaImporter:
         self.overwrite = overwrite
         self.warnings = []
 
+        # Structured report of input rows whose US_ID could not be
+        # matched to any stratigraphic node in the host graph. Each
+        # entry is ``{"key_id": str, "payload": dict}``. This is a
+        # neutral data product: any downstream tool (CLI converter,
+        # web viewer, Blender addon) can choose what to do with it
+        # — render a UI list, log, ignore, or (in the EMtools
+        # Hybrid-C adapter) push them into graph.attributes["aux_orphans"].
+        self.orphans = []
+
         # Naming registries
         self.document_registry = {}    # doc_name → serial number (1, 2, ...)
         self.doc_serial_counter = 1
@@ -568,6 +577,20 @@ class QualiaImporter:
                     if us_id not in us_not_found:
                         us_not_found.add(us_id)
                         self.warnings.append(f"US '{us_id}' not found in graph — skipping all its properties")
+                    # Always record the orphan entry (one per row) so
+                    # the caller knows which input rows dropped out.
+                    # This is neutral data — any consumer can inspect
+                    # ``importer.orphans`` (e.g. the EMtools Hybrid-C
+                    # adapter maps them into graph.attributes
+                    # ['aux_orphans'] via push_orphan).
+                    self.orphans.append({
+                        "key_id": us_id,
+                        "payload": {
+                            "property_type": row.get('PROPERTY_TYPE'),
+                            "value": row.get('VALUE'),
+                            "row_index": int(idx) + 1,
+                        },
+                    })
                     skipped += 1
                     continue
 

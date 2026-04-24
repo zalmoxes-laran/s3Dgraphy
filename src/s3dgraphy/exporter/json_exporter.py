@@ -123,6 +123,12 @@ class JSONExporter:
     def _process_nodes(self, graph: Graph) -> Dict[str, Dict[str, Any]]:
         """Process all nodes in the graph, organizing them by type."""
         nodes = {
+            # ``authors`` carries both human (AuthorNode → node_type
+            # "author") and AI-authored agents (AuthorAINode →
+            # node_type "author_ai"). Downstream consumers distinguish
+            # by the ``type`` field inside each entry. AuthorAINode's
+            # extra data fields (``model`` / ``prompt_reference``) flow
+            # through ``node.data.copy()`` automatically.
             "authors": {},
             "stratigraphic": {"US": {}, "USVs": {}, "SF": {}, "VSF": {},"USVn": {}, "USD": {}, "serSU": {}, "serUSVn": {}, "serUSVs": {}, "TSU": {}, "SE": {}, "unknown": {}},
             "epochs": {},
@@ -131,9 +137,14 @@ class JSONExporter:
             "documents": {},
             "extractors": {},
             "combiners": {},
+            # New paradata-image buckets to mirror AuthorNode: they
+            # already get emitted as has_license / has_embargo edges,
+            # so the target nodes need a concrete home in the JSON.
+            "licenses": {},
+            "embargoes": {},
             "links": {},
             "geo": {},
-            "semantic_shapes": {},      
+            "semantic_shapes": {},
             "representation_models": {},
             "representation_model_doc": {},
             "representation_model_sf": {}
@@ -162,10 +173,21 @@ class JSONExporter:
         # Ora elabora tutti i nodi
         for node in graph.nodes:
             # Gestisci ogni tipo di nodo in modo specifico
-            if node.node_type == "author":
+            if node.node_type in ("author", "author_ai"):
+                # AuthorAINode (node_type "author_ai") is a subclass of
+                # AuthorNode; both go into the same bucket. The ``type``
+                # field inside the entry keeps the distinction.
                 node_data = self._prepare_node_data(node)
                 nodes["authors"][node.node_id] = node_data
-                
+
+            elif node.node_type == "license":
+                node_data = self._prepare_node_data(node)
+                nodes["licenses"][node.node_id] = node_data
+
+            elif node.node_type == "embargo":
+                node_data = self._prepare_node_data(node)
+                nodes["embargoes"][node.node_id] = node_data
+
             elif node.node_type in ["US", "USVs", "SF", "USVn", "USD", "VSF", "serSU", "serUSVn", "serUSVs", "TSU", "SE", "unknown"]:
                 node_data = self._prepare_node_data(node)
                 nodes["stratigraphic"][node.node_type][node.node_id] = node_data
@@ -262,54 +284,25 @@ class JSONExporter:
         return node_data
         
     def _process_edges(self, graph: Graph) -> Dict[str, List[Dict[str, Any]]]:
-        """Process all edges in the graph, organizing them by type."""
-        edges = {
-            # Stratigraphic temporal relations
-            "is_before": [],
-            "is_after": [],
-            "has_same_time": [],
-            "changed_from": [],
-            # Physical relations
-            "abuts": [],
-            "cuts": [],
-            "fills": [],
-            "overlies": [],
-            "is_bonded_to": [],
-            "is_physically_equal_to": [],
-            # Data provenance and documentation
-            "has_data_provenance": [],
-            "has_documentation": [],
-            "has_author": [],
-            # Time and epochs
-            "contrasts_with": [],
-            "has_first_epoch": [],
-            "survive_in_epoch": [],
-            # Activities and properties
-            "is_in_activity": [],
-            "has_property": [],
-            # Time branches
-            "has_timebranch": [],
-            "is_in_timebranch": [],
-            # Document relations
-            "extracted_from": [],
-            "combines": [],
-            # Resources and representations
-            "has_linked_resource": [],
-            "has_geoposition": [],
-            "has_semantic_shape": [],
-            "has_representation_model": [],
-            "has_representation_model_doc": [],
-            "has_representation_model_sf": [],
-            # Paradata
-            "is_in_paradata_nodegroup": [],
-            "has_paradata_nodegroup": [],
-            # Licensing
-            "has_license": [],
-            "has_embargo": [],
-            # Fallback
-            "generic_connection": []
+        """Process all edges in the graph, organizing them by type.
+
+        The bucket set is built from the canonical source of truth —
+        ``JSON_config/s3Dgraphy_connections_datamodel.json`` — via the
+        :class:`ConnectionsDatamodel` singleton. Both canonical edge
+        names (e.g. ``bonded_to``, ``equals``, ``has_first_epoch``) and
+        their non-symmetric reverses (e.g. ``is_before`` as the reverse
+        of ``is_after``) are pre-initialised so the serializer never
+        drops an edge silently. A ``generic_connection`` fallback is
+        kept for any edge type that slipped in outside the datamodel.
+        """
+        from ..edges.connections_loader import get_connections_datamodel
+
+        datamodel = get_connections_datamodel()
+        edges: Dict[str, List[Dict[str, Any]]] = {
+            name: [] for name in datamodel.get_all_edge_names(canonical_only=False)
         }
-        
+        edges.setdefault("generic_connection", [])
+
         for edge in graph.edges:
             edge_data = {
                 "id": edge.edge_id,
@@ -324,7 +317,7 @@ class JSONExporter:
                 # Log unknown edge types for debugging
                 print(f"WARNING: Unknown edge type '{edge.edge_type}' for edge {edge.edge_id} ({edge.edge_source} -> {edge.edge_target})")
                 edges["generic_connection"].append(edge_data)
-                
+
         return edges
 
 

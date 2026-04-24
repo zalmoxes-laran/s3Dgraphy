@@ -286,7 +286,7 @@ graph, propagating absolute dates from PropertyNodes through stratigraphic relat
 **How it works:**
 
 1. Collects all stratigraphic nodes (US, USVs, USVn, VSF, SF, USD, serSU, etc.)
-2. For each node, looks for connected ``absolute_start_date`` and ``absolute_end_date``
+2. For each node, looks for connected ``absolute_time_start`` and ``absolute_time_end``
    PropertyNodes via ``has_property`` edges
 3. Seeds those dates as initial ``CALCUL_START_T`` / ``CALCUL_END_T`` attributes
 4. Uses BFS on ``is_after`` / ``is_before`` edges to propagate:
@@ -321,7 +321,7 @@ may store the property semantics in either field. If the numeric value is stored
 .. code-block:: python
 
    # Example: VSF141 has a PropertyNode with:
-   #   name="absolute_start_date", property_type="string",
+   #   name="absolute_time_start", property_type="string",
    #   description="180", value=""
    # _find_temporal_property will match by name and use description=180 as value.
 

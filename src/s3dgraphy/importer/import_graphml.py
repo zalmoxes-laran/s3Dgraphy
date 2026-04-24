@@ -13,11 +13,52 @@ from ..nodes.property_node import PropertyNode
 from ..nodes.epoch_node import EpochNode
 from ..nodes.group_node import GroupNode, ParadataNodeGroup, ActivityNodeGroup, TimeBranchNodeGroup
 from ..nodes.link_node import *
+from ..nodes.author_node import AuthorNode, AuthorAINode
+from ..nodes.license_node import LicenseNode
+from ..nodes.embargo_node import EmbargoNode
 from ..edges.edge import Edge, EDGE_TYPES
 from ..edges import get_connections_datamodel
 from ..utils.utils import convert_shape2type, get_stratigraphic_node_class
 import re
 import uuid
+import os
+import json
+
+# Yworks XML namespace (used when scanning y:ImageNode elements)
+_Y_NS = '{http://www.yworks.com/xml/graphml}'
+
+# --- Paradata image node prefix registry (DP-51) ----------------------------
+# Hash-based detection was dropped: palette PNGs may be redrawn or
+# re-exported between versions. Label prefixes are instead the stable
+# convention across the EM ecosystem (matches how ExtractorNode ``D.`` and
+# CombinerNode ``C.`` are already identified).
+
+def _load_palette_prefix_config():
+    """Return the label_prefix → node_type map from em_palette_icons.json.
+
+    Returns an empty dict if the config is missing or unreadable, in which
+    case paradata image detection falls back to the explicit description
+    marker only.
+    """
+    config_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "JSON_config",
+        "em_palette_icons.json",
+    )
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("label_prefixes", {})
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+_PALETTE_LABEL_PREFIXES = _load_palette_prefix_config()
+
+# Inline description/URL marker used for explicit round-trip identification.
+# Written by the s3Dgraphy GraphML exporter when it emits paradata image
+# nodes; takes precedence over label-prefix detection on the import side.
+_S3D_NODE_TYPE_MARKER = "_s3d_node_type:"
 
 class GraphMLImporter:
     """
@@ -144,13 +185,24 @@ class GraphMLImporter:
                     # Extract ID if present in vocabulary
                     if 'ID' in vocabolario:
                         graph_code = vocabolario['ID']
-                        #print(f"Found graph code from vocabulary: {graph_code}")
-                    
+
                     # If there's a specific ID in the vocabulary, use it
                     if 'graph_id' in vocabolario:
                         graph_id = vocabolario['graph_id']
-                        #print(f"Found specific graph ID: {graph_id}")
-                    
+
+                    # Store graph header metadata for downstream use
+                    header_keys = [
+                        'ORCID', 'author_name', 'author_surname',
+                        'license', 'embargo', 'description'
+                    ]
+                    for key in header_keys:
+                        if key in vocabolario:
+                            self.graph.attributes[key] = vocabolario[key]
+
+                    # Store the clean graph name (without vocabulary)
+                    if stringa_pulita:
+                        self.graph.attributes['graph_label'] = stringa_pulita
+
                     break
                 except Exception as e:
                     pass
@@ -185,6 +237,11 @@ class GraphMLImporter:
         # Costruisci la mappa dinamica delle chiavi GraphML
         self.key_map = self.build_key_mapping(tree)
 
+        # Build the XML-level parent map (original_id → parent original_id)
+        # so the post-import auto-edge inference can find the containing
+        # node of every paradata image node.
+        self._original_parent_of = self._build_original_parent_map(tree)
+
         # Prima estrai il codice del grafo
         graph_id, graph_code = self.extract_graph_id_and_code(tree)
         
@@ -216,8 +273,29 @@ class GraphMLImporter:
             pass
             # print(f"\nCreati {stats['connections_created']} nuovi collegamenti diretti tra unità stratigrafiche e PropertyNode")
 
-
+        # Assign stratigraphic units (and free paradata groups) to epochs
+        # based on their Y position in the swimlane layout. This must run
+        # BEFORE _infer_paradata_image_edges so that a top-level SL_PD
+        # gains the has_first_epoch edge to its swimlane Epoch; the DP-19
+        # auto-edge pass then uses that edge to find the target of the
+        # paradata nodes contained in the group.
         self.connect_nodes_to_epochs()
+
+        # Infer has_author / has_license / has_embargo / has_property edges
+        # from paradata image nodes living inside a free ParadataNodeGroup
+        # (DP-19 pattern). Target is the first non-ParadataNodeGroup XML
+        # ancestor, or (fallback) the node pointed to by has_first_epoch
+        # from the group itself. Canvas-level free groups with no anchor
+        # are skipped because graph.attributes already carries
+        # author/license/embargo via DP-40.
+        self._infer_paradata_image_edges()
+
+        # Warn when an EpochNode carries two disagreeing declarations of
+        # absolute_time_start / absolute_time_end (one from the swimlane
+        # header, one from a PropertyNode inside SL_PD). The resolver
+        # already prefers the PropertyNode; this warning gives the user
+        # a chance to reconcile the yEd source.
+        self._warn_on_epoch_chronology_mismatch()
 
         br_nodes = [n for n in self.graph.nodes if hasattr(n, 'node_type') and n.node_type == "BR"]
         #print(f"\nTotal BR nodes included in the graph: {len(br_nodes)}")
@@ -592,9 +670,9 @@ class GraphMLImporter:
             return
 
         # Salta nodi commento/nota di yEd (sfondo giallo, non sono nodi EM)
-        _, _, _, _, _, fillcolor, _ = self.EM_extract_node_name(node_element)
+        _, _, _, _, _, fillcolor, _, _ = self.EM_extract_node_name(node_element)
         if fillcolor and fillcolor.upper() in ('#FFCC00', '#FFFF00', '#FFFF99'):
-            nodename_check, _, _, _, _, _, _ = self.EM_extract_node_name(node_element)
+            nodename_check, _, _, _, _, _, _, _ = self.EM_extract_node_name(node_element)
             print(f"[GraphML Parser] Skipping comment/note node: '{nodename_check}' (fill={fillcolor})")
             return
 
@@ -626,9 +704,9 @@ class GraphMLImporter:
 
         if self.EM_check_node_us(node_element):
             # Creazione del nodo stratigrafico e aggiunta al grafo
-            nodename, nodedescription, nodeurl, nodeshape, node_y_pos, fillcolor, borderstyle = self.EM_extract_node_name(node_element)
-            
-            stratigraphic_type = convert_shape2type(nodeshape, borderstyle)[0]
+            nodename, nodedescription, nodeurl, nodeshape, node_y_pos, fillcolor, borderstyle, bordertype = self.EM_extract_node_name(node_element)
+
+            stratigraphic_type = convert_shape2type(nodeshape, borderstyle, bordertype)[0]
             node_class = get_stratigraphic_node_class(stratigraphic_type)  # Ottieni la classe usando la funzione
             stratigraphic_node = node_class(
                 node_id=uuid_id,
@@ -814,7 +892,7 @@ class GraphMLImporter:
                 name="continuity_node",
                 description=nodedescription
             )
-            
+
             # Aggiungi attributi di tracciamento
             continuity_node.attributes['original_id'] = original_id
             continuity_node.attributes['graph_id'] = self.graph.graph_id
@@ -826,6 +904,21 @@ class GraphMLImporter:
 
             #print(f"Adding continuity node to graph: {continuity_node.node_id} (Original ID: {original_id})")
             self.graph.add_node(continuity_node)
+
+        elif self.EM_check_node_paradata_image(node_element):
+            # Paradata image nodes (AuthorNode / AuthorAINode / LicenseNode / EmbargoNode).
+            # Detection uses explicit marker → palette icon hash → label prefix.
+            detected_type, label_text, node_description, nodeurl = \
+                self.EM_extract_paradata_image_node(node_element)
+            self._create_paradata_image_node(
+                detected_type=detected_type,
+                uuid_id=uuid_id,
+                label_text=label_text,
+                node_description=node_description,
+                nodeurl=nodeurl,
+                original_id=original_id,
+                node_uri=node_uri,
+            )
 
         else:
             # Creazione di un nodo generico
@@ -1331,8 +1424,8 @@ class GraphMLImporter:
         """
         Dopo il parsing degli edge, copia i valori delle PropertyNode collegate
         ai master document nel loro dict 'data'.
-        Es: D.70 master connesso a PropertyNode 'absolute_start_date' con valore '1870'
-        -> document_node.data['absolute_start_date'] = '1870'
+        Es: D.70 master connesso a PropertyNode 'absolute_time_start' con valore '1870'
+        -> document_node.data['absolute_time_start'] = '1870'
         """
         master_count = 0
         enriched_count = 0
@@ -1348,7 +1441,7 @@ class GraphMLImporter:
                 if edge.edge_source == node.node_id:
                     target = self.graph.find_node_by_id(edge.edge_target)
                     if isinstance(target, PropertyNode):
-                        prop_name = target.name  # es: "absolute_start_date"
+                        prop_name = target.name  # es: "absolute_time_start"
                         prop_value = target.description  # es: "1870"
                         if prop_name and prop_value:
                             node.data[prop_name] = prop_value
@@ -1536,7 +1629,7 @@ class GraphMLImporter:
 
     def EM_check_node_us(self, node_element):
         US_nodes_list = ['rectangle', 'parallelogram', 'ellipse', 'hexagon', 'octagon', 'roundrectangle']
-        nodename, _, _, nodeshape, _, _, _ = self.EM_extract_node_name(node_element)
+        nodename, _, _, nodeshape, _, _, _, _ = self.EM_extract_node_name(node_element)
         return nodeshape in US_nodes_list
 
     def EM_extract_node_name(self, node_element):
@@ -1547,6 +1640,7 @@ class GraphMLImporter:
         nodename = None
         fillcolor = None
         borderstyle = None
+        bordertype = 'line'
 
         # Usa key_map dinamico per trovare le chiavi corrette
         url_key = self.key_map['node'].get('url')
@@ -1576,12 +1670,13 @@ class GraphMLImporter:
                     fillcolor = fill_color.attrib['color']
                 for border_style in subnode.findall('.//{http://www.yworks.com/xml/graphml}BorderStyle'):
                     borderstyle = border_style.attrib['color']
+                    bordertype = border_style.attrib.get('type', 'line')
                 for USshape in subnode.findall('.//{http://www.yworks.com/xml/graphml}Shape'):
                     nodeshape = USshape.attrib['type']
                 for geometry in subnode.findall('.//{http://www.yworks.com/xml/graphml}Geometry'):
                     node_y_pos = geometry.attrib['y']
 
-        return nodename, nodedescription, nodeurl, nodeshape, node_y_pos, fillcolor, borderstyle
+        return nodename, nodedescription, nodeurl, nodeshape, node_y_pos, fillcolor, borderstyle, bordertype
 
     # Mapping from master document border colors to certainty classes.
     # Red = direct knowledge/presence, Orange = documentary reconstruction,
@@ -1793,6 +1888,10 @@ class GraphMLImporter:
     def EM_check_node_continuity(self, node_element):
         """
         Verifica se un nodo è un nodo di continuità (BR).
+        Usa una detection multi-segnale:
+          A) '_continuity' nel campo URL o description
+          B) ShapeNode con shape type 'diamond'
+          C) SVGNode con SVGContent refid='3' (risorsa SVG della palette s3Dgraphy)
 
         Args:
             node_element: Elemento XML del nodo
@@ -1800,32 +1899,36 @@ class GraphMLImporter:
         Returns:
             bool: True se il nodo è di tipo continuity
         """
-        # Use dynamic key mapping for url field (contains _continuity marker)
-        url_key = self.key_map.get('node', {}).get('url', 'd5')
+        url_key = self.key_map.get('node', {}).get('url')
+        description_key = self.key_map.get('node', {}).get('description')
+        nodegraphics_key = self.key_map.get('node', {}).get('nodegraphics')
 
-        # Cerca nei dati del nodo
+        # Signal A: '_continuity' marker nel campo URL o description
         for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-            if subnode.attrib.get('key') == url_key:
-                # Verifica se il testo è "_continuity"
-                if subnode.text and "_continuity" in subnode.text:
-                    # print(f"Found continuity node: {node_element.attrib['id']}")
+            key = subnode.attrib.get('key')
+            if subnode.text and "_continuity" in subnode.text:
+                if key == url_key or key == description_key:
                     return True
 
-        # Verifica se è un SVGNode (alternativa)
-        svg_node = node_element.find('.//{http://graphml.graphdrawing.org/xmlns}data/{http://www.yworks.com/xml/graphml}SVGNode')
-        if svg_node is not None:
-            # Cerca di nuovo nei dati per confermare se è un nodo continuity
-            for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-                if subnode.attrib.get('key') == url_key and subnode.text:
-                    if "_continuity" in subnode.text:
-                        # print(f"Found SVG continuity node: {node_element.attrib['id']}")
-                        return True
+        # Signal B: ShapeNode con shape type 'diamond'
+        _, _, _, nodeshape, _, _, _, _ = self.EM_extract_node_name(node_element)
+        if nodeshape == "diamond":
+            return True
+
+        # Signal C: SVGNode con SVGContent refid='3' (continuity diamond dalla palette)
+        y_ns = '{http://www.yworks.com/xml/graphml}'
+        for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
+            if subnode.attrib.get('key') == nodegraphics_key:
+                svg_content = subnode.find(f'.//{y_ns}SVGNode/{y_ns}SVGModel/{y_ns}SVGContent')
+                if svg_content is not None and svg_content.attrib.get('refid') == '3':
+                    return True
 
         return False
 
     def EM_extract_continuity(self, node_element):
         """
         Estrae informazioni da un nodo continuity.
+        Supporta sia SVGNode che ShapeNode (diamond).
 
         Args:
             node_element: Elemento XML del nodo
@@ -1839,44 +1942,451 @@ class GraphMLImporter:
         node_id = node_element.attrib['id']
 
         # Use dynamic key mapping
-        url_key = self.key_map.get('node', {}).get('url', 'd5')
-        ng_key = self.key_map.get('node', {}).get('nodegraphics', 'd6')
+        url_key = self.key_map.get('node', {}).get('url')
+        description_key = self.key_map.get('node', {}).get('description')
+        ng_key = self.key_map.get('node', {}).get('nodegraphics')
 
-        # Estrai descrizione dal campo url (contains _continuity marker)
+        y_ns = '{http://www.yworks.com/xml/graphml}'
+
         for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
-            if subnode.attrib.get('key') == url_key:
+            key = subnode.attrib.get('key')
+
+            # Estrai descrizione dal campo url o description
+            if key == url_key and subnode.text:
                 is_url_found = True
                 nodedescription = subnode.text
-            
-            # Per SVGNode, estrai la posizione y
-            geometry = subnode.find('.//{http://www.yworks.com/xml/graphml}SVGNode/{http://www.yworks.com/xml/graphml}Geometry')
-            if geometry is not None:
-                y_str = geometry.attrib.get('y', '0.0')
-                try:
-                    node_y_pos = float(y_str)
-                    # print(f"Extracted y position from SVGNode: {node_y_pos}")
-                except (ValueError, TypeError):
-                    # print(f"Error converting y position to float: {y_str}")
-                    node_y_pos = 0.0
-            
-            # Fallback per i nodi non SVG
-            if subnode.attrib.get('key') == 'd6':
-                geometry = subnode.find('.//{http://www.yworks.com/xml/graphml}Geometry')
-                if geometry is not None:
-                    y_str = geometry.attrib.get('y', '0.0')
+            elif key == description_key and subnode.text and not is_url_found:
+                nodedescription = subnode.text
+
+            # Estrai y_pos dal nodegraphics (supporta SVGNode e ShapeNode)
+            if key == ng_key:
+                # SVGNode geometry
+                svg_geom = subnode.find(f'.//{y_ns}SVGNode/{y_ns}Geometry')
+                if svg_geom is not None:
                     try:
-                        node_y_pos = float(y_str)
+                        node_y_pos = float(svg_geom.attrib.get('y', '0.0'))
                     except (ValueError, TypeError):
                         node_y_pos = 0.0
 
-        if not is_url_found:
+                # ShapeNode geometry (fallback per nodi diamond nativi yEd)
+                shape_geom = subnode.find(f'.//{y_ns}ShapeNode/{y_ns}Geometry')
+                if shape_geom is not None:
+                    try:
+                        node_y_pos = float(shape_geom.attrib.get('y', '0.0'))
+                    except (ValueError, TypeError):
+                        node_y_pos = 0.0
+
+                # Fallback generico: qualsiasi Geometry nel data block
+                if node_y_pos == 0.0:
+                    generic_geom = subnode.find(f'.//{y_ns}Geometry')
+                    if generic_geom is not None:
+                        try:
+                            node_y_pos = float(generic_geom.attrib.get('y', '0.0'))
+                        except (ValueError, TypeError):
+                            node_y_pos = 0.0
+
+        if not is_url_found and nodedescription is None:
             nodedescription = ''
 
-        if nodedescription == "_continuity":
-            #print(f"Extracting continuity node: ID={node_id}, y_pos={node_y_pos}")
-            pass
-
         return nodedescription, node_y_pos, node_id
+
+    # ------------------------------------------------------------------
+    # Paradata image nodes (AuthorNode / AuthorAINode / LicenseNode /
+    # EmbargoNode) — multi-signal detection
+    # ------------------------------------------------------------------
+
+    def _detect_paradata_image_type(self, node_element):
+        """Return the paradata node_type for an ImageNode, or ``None``.
+
+        Signals, in order of strength:
+          1. Description / URL carries ``_s3d_node_type:<NodeType>`` marker
+             (explicit round-trip, written by the s3Dgraphy exporter).
+          2. ``<y:ImageNode>`` + label starts with a known prefix from
+             ``em_palette_icons.json`` (``AI.``, ``A.``, ``LI.``, ``EB.``).
+             Longest-first to avoid ``A.`` shadowing ``AI.``.
+        """
+        url_key = self.key_map.get('node', {}).get('url')
+        description_key = self.key_map.get('node', {}).get('description')
+
+        # Signal 1: explicit marker
+        for subnode in node_element.findall(
+                './/{http://graphml.graphdrawing.org/xmlns}data'):
+            if not subnode.text:
+                continue
+            key = subnode.attrib.get('key')
+            if key not in (url_key, description_key):
+                continue
+            idx = subnode.text.find(_S3D_NODE_TYPE_MARKER)
+            if idx >= 0:
+                tail = subnode.text[idx + len(_S3D_NODE_TYPE_MARKER):]
+                explicit = re.match(r"([A-Za-z_][A-Za-z0-9_]*)", tail)
+                if explicit:
+                    return explicit.group(1)
+
+        # Signal 2: ImageNode + label prefix
+        image_nodes = node_element.findall(f'.//{_Y_NS}ImageNode')
+        if not image_nodes:
+            return None
+        image_node = image_nodes[0]
+
+        label_elem = image_node.find(f'.//{_Y_NS}NodeLabel')
+        label_text = (label_elem.text or "").strip() if label_elem is not None else ""
+        # Longest prefix first so "AI." wins over "A."
+        for prefix in sorted(_PALETTE_LABEL_PREFIXES.keys(), key=len, reverse=True):
+            if label_text.startswith(prefix):
+                return _PALETTE_LABEL_PREFIXES[prefix]
+
+        return None
+
+    def EM_check_node_paradata_image(self, node_element):
+        """True if this element is an Author/AuthorAI/License/Embargo node."""
+        return self._detect_paradata_image_type(node_element) is not None
+
+    def EM_extract_paradata_image_node(self, node_element):
+        """Extract (detected_type, label, description, url) for a paradata image node.
+
+        The caller is expected to have already confirmed the type via
+        :meth:`EM_check_node_paradata_image` (or, equivalently, by calling
+        :meth:`_detect_paradata_image_type` directly).
+        """
+        detected_type = self._detect_paradata_image_type(node_element)
+        url_key = self.key_map.get('node', {}).get('url')
+        description_key = self.key_map.get('node', {}).get('description')
+        nodegraphics_key = self.key_map.get('node', {}).get('nodegraphics')
+
+        label_text = ""
+        node_description = ""
+        nodeurl = ""
+
+        for subnode in node_element.findall(
+                './/{http://graphml.graphdrawing.org/xmlns}data'):
+            key = subnode.attrib.get('key')
+            if nodegraphics_key and key == nodegraphics_key:
+                label_elem = subnode.find(f'.//{_Y_NS}NodeLabel')
+                if label_elem is not None and label_elem.text:
+                    label_text = label_elem.text.strip()
+            elif url_key and key == url_key and subnode.text:
+                nodeurl = self._check_if_empty(subnode.text)
+            elif description_key and key == description_key and subnode.text:
+                node_description = self.clean_comments(
+                    self._check_if_empty(subnode.text)
+                )
+
+        return detected_type, label_text, node_description, nodeurl
+
+    def _build_original_parent_map(self, tree):
+        """Return ``{original_id: parent_original_id}`` built from the XML
+        tree. Used by the post-import auto-edge inference to find the
+        containing node of each paradata image node.
+        """
+        parent_of = {}
+        graphml_ns = '{http://graphml.graphdrawing.org/xmlns}'
+        node_tag = f'{graphml_ns}node'
+
+        def walk(elem, current_parent):
+            new_parent = current_parent
+            if elem.tag == node_tag:
+                nid = elem.attrib.get('id')
+                if nid is not None:
+                    if current_parent is not None:
+                        parent_of[nid] = current_parent
+                    new_parent = nid
+            for child in elem:
+                walk(child, new_parent)
+
+        walk(tree.getroot(), None)
+        return parent_of
+
+    def _infer_paradata_image_edges(self):
+        """Emit has_author / has_license / has_embargo / has_property edges
+        for paradata nodes that live inside a **free** ParadataNodeGroup.
+
+        Two kinds of ParadataNodeGroup coexist in an EM graph:
+
+        1. **Claimed** (node-level, DP-43 pattern). The group is attached to
+           a specific stratigraphic unit / document via an explicit
+           ``has_paradata_nodegroup`` edge drawn by the author in yEd.
+           The existing ``Graph.connect_paradatagroup_propertynode_to_stratigraphic``
+           already wires PropertyNodes in these groups to the claimer. We
+           **skip** these groups here to avoid double-wiring.
+
+        2. **Free** (swimlane- or canvas-level, DP-19 pattern). The group
+           has NO incoming ``has_paradata_nodegroup`` edge. By convention
+           its name starts with ``SL_`` (e.g. ``SL_PD``, ``SL_Metadata``).
+           For each paradata image / PropertyNode inside, we emit the
+           corresponding ``has_*`` edge from the target node of the group.
+
+        Two yEd layouts are supported, both interoperable:
+
+        * **XML-nested layout**: paradata items are visually placed inside
+          the SL_PD group in yEd (the group contains them in the XML tree).
+          The target node is the first non-ParadataNodeGroup XML ancestor
+          (typically an EpochNode in a swimlane column).
+        * **Top-level layout**: the SL_PD sits at canvas top level and
+          draws a ``has_first_epoch`` edge towards its target Epoch;
+          children are connected via ``is_in_paradata_nodegroup`` edges.
+          In this case the target is the node pointed to by that
+          ``has_first_epoch`` edge.
+
+        Edge type per paradata-node class:
+          - AuthorNode / AuthorAINode → ``has_author``
+          - LicenseNode              → ``has_license``
+          - EmbargoNode              → ``has_embargo``
+          - PropertyNode             → ``has_property``  (DP-32 Layer A,
+            feeds chronology and other propagation rules.)
+
+        Duplicate edges (same source/target/type) are silently skipped.
+        """
+        nodes_by_uuid = {n.node_id: n for n in self.graph.nodes}
+        original_by_uuid = {v: k for k, v in self.id_mapping.items()}
+
+        edge_type_by_target_cls = {
+            "AuthorNode":   "has_author",
+            "AuthorAINode": "has_author",
+            "LicenseNode":  "has_license",
+            "EmbargoNode":  "has_embargo",
+            "PropertyNode": "has_property",
+        }
+
+        # Pre-compute "claimed" ParadataNodeGroup uuids: any PD group that
+        # is the *target* of an incoming has_paradata_nodegroup edge is
+        # considered node-level and is skipped here.
+        claimed_groups = set()
+        for edge in self.graph.edges:
+            if edge.edge_type == "has_paradata_nodegroup":
+                claimed_groups.add(edge.edge_target)
+
+        def _is_free_pd_group(uuid_id):
+            """True if the node is a ParadataNodeGroup with no incoming
+            has_paradata_nodegroup AND whose name starts with 'SL_'.
+            """
+            node = nodes_by_uuid.get(uuid_id)
+            if node is None or node.__class__.__name__ != "ParadataNodeGroup":
+                return False
+            if uuid_id in claimed_groups:
+                return False
+            name = (getattr(node, "name", "") or "").upper()
+            return name.startswith("SL_")
+
+        # --- Step 1: find the containing PD group for every candidate ---
+        # A candidate node (AuthorNode/AuthorAINode/LicenseNode/EmbargoNode/
+        # PropertyNode) belongs to at most one PD group, via either the XML
+        # nesting chain (immediate parent) or an is_in_paradata_nodegroup
+        # edge (top-level layout). XML nesting wins if both are present.
+        parent_of = self._original_parent_of or {}
+
+        containing_group = {}  # candidate_uuid -> pd_group_uuid
+        for node in self.graph.nodes:
+            if node.__class__.__name__ not in edge_type_by_target_cls:
+                continue
+            candidate_original = original_by_uuid.get(node.node_id)
+            if candidate_original is None:
+                continue
+            parent_original = parent_of.get(candidate_original)
+            if parent_original is None:
+                continue
+            parent_uuid = self.id_mapping.get(parent_original)
+            if parent_uuid is None:
+                continue
+            parent_node = nodes_by_uuid.get(parent_uuid)
+            if parent_node is not None and parent_node.__class__.__name__ == "ParadataNodeGroup":
+                containing_group[node.node_id] = parent_uuid
+
+        for edge in self.graph.edges:
+            if edge.edge_type != "is_in_paradata_nodegroup":
+                continue
+            src_uuid = edge.edge_source
+            if src_uuid in containing_group:
+                continue  # XML nesting already assigned
+            src_node = nodes_by_uuid.get(src_uuid)
+            if src_node is None or src_node.__class__.__name__ not in edge_type_by_target_cls:
+                continue
+            tgt_uuid = edge.edge_target
+            tgt_node = nodes_by_uuid.get(tgt_uuid)
+            if tgt_node is None or tgt_node.__class__.__name__ != "ParadataNodeGroup":
+                continue
+            containing_group[src_uuid] = tgt_uuid
+
+        # --- Step 2: find the target node for every free PD group ---
+        # Target resolution order:
+        #   (a) XML ancestor walk: first non-ParadataNodeGroup ancestor
+        #   (b) has_first_epoch outgoing edge from the group
+        target_by_group = {}
+        free_groups = {g for g in set(containing_group.values()) if _is_free_pd_group(g)}
+        for group_uuid in free_groups:
+            group_original = original_by_uuid.get(group_uuid)
+            target_uuid = None
+
+            # (a) XML ancestor walk
+            ancestor_original = parent_of.get(group_original) if group_original else None
+            while ancestor_original is not None:
+                candidate_uuid = self.id_mapping.get(ancestor_original)
+                if candidate_uuid is not None:
+                    candidate_node = nodes_by_uuid.get(candidate_uuid)
+                    if candidate_node is not None and candidate_node.__class__.__name__ != "ParadataNodeGroup":
+                        target_uuid = candidate_uuid
+                        break
+                ancestor_original = parent_of.get(ancestor_original)
+
+            # (b) has_first_epoch outgoing from the group itself
+            if target_uuid is None:
+                for edge in self.graph.edges:
+                    if edge.edge_source == group_uuid and edge.edge_type == "has_first_epoch":
+                        target_uuid = edge.edge_target
+                        break
+
+            if target_uuid is not None:
+                target_by_group[group_uuid] = target_uuid
+
+        # --- Step 3: emit the auto-edges ---
+        existing = {
+            (e.edge_source, e.edge_target, e.edge_type) for e in self.graph.edges
+        }
+
+        created = 0
+        for node in list(self.graph.nodes):
+            edge_type = edge_type_by_target_cls.get(node.__class__.__name__)
+            if not edge_type:
+                continue
+            group_uuid = containing_group.get(node.node_id)
+            if group_uuid is None or group_uuid not in free_groups:
+                continue
+            source_uuid = target_by_group.get(group_uuid)
+            if source_uuid is None:
+                # Canvas-level free group with no Epoch anchor: DP-40
+                # attributes already cover it.
+                continue
+
+            key = (source_uuid, node.node_id, edge_type)
+            if key in existing:
+                continue
+
+            try:
+                self.graph.add_edge(
+                    edge_id=f"{source_uuid}_{edge_type}_{node.node_id}",
+                    edge_source=source_uuid,
+                    edge_target=node.node_id,
+                    edge_type=edge_type,
+                )
+                existing.add(key)
+                created += 1
+            except Exception as exc:
+                self.graph.add_warning(
+                    f"[paradata auto-edge] Could not create "
+                    f"{edge_type} from {source_uuid[:8]} to {node.node_id[:8]}: {exc}"
+                )
+
+        if created:
+            self.graph.add_warning(
+                f"[paradata auto-edge] Inferred {created} has_author / "
+                f"has_license / has_embargo / has_property edges from "
+                f"free (SL_*) paradata groups."
+            )
+
+    def _warn_on_epoch_chronology_mismatch(self):
+        """Check each EpochNode for a disagreeing pair of declarations.
+
+        Header start/end (``epoch.start_time`` / ``epoch.end_time``) comes
+        from the yEd swimlane title; PropertyNode values come from a
+        PropertyNode connected via ``has_property`` (typically inside an
+        SL_PD, auto-edged by :meth:`_infer_paradata_image_edges`).
+
+        When both are declared AND disagree, the resolver already keeps
+        the PropertyNode as the winner (node-level beats swimlane-level);
+        this method emits a warning so the user can reconcile the source
+        in yEd.
+        """
+        from ..nodes.epoch_node import EpochNode
+        from ..resolvers.builtin_rules import _node_temporal_property
+
+        for n in self.graph.nodes:
+            if not isinstance(n, EpochNode):
+                continue
+
+            header_start = getattr(n, "start_time", None)
+            header_end = getattr(n, "end_time", None)
+            prop_start = _node_temporal_property(
+                self.graph, n, "absolute_time_start")
+            prop_end = _node_temporal_property(
+                self.graph, n, "absolute_time_end")
+
+            def _disagree(a, b):
+                if a is None or b is None:
+                    return False
+                try:
+                    return float(a) != float(b)
+                except (ValueError, TypeError):
+                    return False
+
+            if _disagree(header_start, prop_start):
+                self.graph.add_warning(
+                    f"[chronology mismatch] EpochNode "
+                    f"'{getattr(n, 'name', n.node_id)}' has start_time="
+                    f"{header_start} from the swimlane header but a "
+                    f"PropertyNode 'absolute_time_start'={prop_start} from "
+                    f"SL_PD. Resolver prefers the PropertyNode. Reconcile "
+                    f"in yEd to remove the warning."
+                )
+            if _disagree(header_end, prop_end):
+                self.graph.add_warning(
+                    f"[chronology mismatch] EpochNode "
+                    f"'{getattr(n, 'name', n.node_id)}' has end_time="
+                    f"{header_end} from the swimlane header but a "
+                    f"PropertyNode 'absolute_time_end'={prop_end} from "
+                    f"SL_PD. Resolver prefers the PropertyNode. Reconcile "
+                    f"in yEd to remove the warning."
+                )
+
+    @staticmethod
+    def _strip_s3d_marker(text):
+        """Remove the round-trip ``_s3d_node_type:<Name>`` marker so that
+        the cleaned text is safe to show in UIs as the human description.
+        """
+        if not text:
+            return text
+        cleaned = re.sub(
+            r"\s*" + re.escape(_S3D_NODE_TYPE_MARKER) + r"[A-Za-z_][A-Za-z0-9_]*\s*",
+            " ",
+            text,
+        )
+        return cleaned.strip(" \t\r\n")
+
+    def _create_paradata_image_node(self, detected_type, uuid_id, label_text,
+                                    node_description, nodeurl,
+                                    original_id, node_uri):
+        """Instantiate the correct node class for ``detected_type`` and add
+        it to the graph. Returns the created node (or ``None`` for unknown
+        types).
+        """
+        # The ``name`` is kept verbatim from the yEd label (e.g. the
+        # short code "A.01" defined by the 1.5 dev9 palette convention).
+        # The description is the human-readable content — we strip only
+        # the round-trip ``_s3d_node_type:`` marker so it does not leak
+        # into UIs.
+        clean_name = (label_text or "").strip() or detected_type
+        clean_description = self._strip_s3d_marker(node_description)
+
+        if detected_type == "AuthorNode":
+            node = AuthorNode(node_id=uuid_id, name=clean_name,
+                              description=clean_description)
+        elif detected_type == "AuthorAINode":
+            node = AuthorAINode(node_id=uuid_id, name=clean_name,
+                                description=clean_description)
+        elif detected_type == "LicenseNode":
+            node = LicenseNode(node_id=uuid_id, name=clean_name,
+                               description=clean_description, url=nodeurl)
+        elif detected_type == "EmbargoNode":
+            node = EmbargoNode(node_id=uuid_id, name=clean_name,
+                               description=clean_description)
+        else:
+            return None
+
+        node.attributes['original_id'] = original_id
+        node.attributes['graph_id'] = self.graph.graph_id
+        if node_uri:
+            node.attributes['URI'] = node_uri
+        self.graph.add_node(node)
+        return node
 
     def enhance_edge_type(self, edge_type, source_node, target_node):
         """
@@ -1904,8 +2414,19 @@ class GraphMLImporter:
 
         # Logica per has_data_provenance
         if edge_type == "has_data_provenance":
+            # v1.5 dev10 (DP-51): the yEd palette has no dedicated connector
+            # style for has_author / has_license / has_embargo, so the generic
+            # dashed ``has_data_provenance`` is reclassified here based on the
+            # paradata image target. AuthorAINode is a subclass of AuthorNode
+            # and is covered by the same branch.
+            if isinstance(target_node, AuthorNode):
+                edge_type = "has_author"
+            elif isinstance(target_node, LicenseNode):
+                edge_type = "has_license"
+            elif isinstance(target_node, EmbargoNode):
+                edge_type = "has_embargo"
             # Se il source è un nodo stratigrafico e il target è una property
-            if source_type in stratigraphic_types and target_type == "property":
+            elif source_type in stratigraphic_types and target_type == "property":
                 edge_type = "has_property"
                 # print(f"Enhanced to has_property: {source_type} -> PropertyNode")
 
