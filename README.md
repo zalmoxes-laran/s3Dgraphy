@@ -152,6 +152,12 @@ s3dgraphy is part of a larger ecosystem:
 - **[ATON Framework](https://www.aton3d.org)** - Web-based 3D presentation
 - **[Extended Matrix Documentation](https://github.com/zalmoxes-laran/ExtendedMatrix)** - Formal language specification
 
+## 🤝 Used by
+
+s3dgraphy is consumed by the following third-party tools. To request inclusion, see the [Ecosystem page](https://docs.extendedmatrix.org/en/latest/ecosystem.html) of the Extended Matrix manual.
+
+- **[PyArchInit](https://pyarchinit-api.readthedocs.io/en/latest/)** — QGIS plugin for archaeological recording (stratigraphic, alphanumeric, multimedia and topographical data) · maintained by [Luca Mandolesi](https://github.com/pyarchinit) & [Enzo Cocca](https://github.com/enzococca) (s3dgraphy integration by Enzo Cocca) · vendors s3dgraphy 0.1.41 · [repo](https://github.com/pyarchinit/pyarchinit)
+
 ## 📄 License
 
 This project is licensed under the **GNU General Public License v3.0** - see the [LICENSE](LICENSE) file for details.
