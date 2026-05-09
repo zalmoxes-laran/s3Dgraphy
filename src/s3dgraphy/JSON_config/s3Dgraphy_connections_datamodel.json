@@ -1,6 +1,6 @@
 {
-  "s3Dgraphy_connections_model_version": "1.5.4",
-  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. Version 1.5.3 introduces canonical/reverse directionality with verb-based labels for clear socket identification in node editors. Version 1.5.4 adds 'has_visual_reference' edge type.",
+  "s3Dgraphy_connections_model_version": "1.5.5",
+  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. Version 1.5.3 introduces canonical/reverse directionality with verb-based labels for clear socket identification in node editors. Version 1.5.4 adds 'has_visual_reference' edge type. Version 1.5.5 adds 'is_in_location' edge type with context-sensitive CIDOC mapping (P53 for node→location, P89 for the recursive location→location hierarchy) and an optional 'is_primary' boolean attribute (s3d:isPrimary, proposed).",
   "components": [
     "CIDOC-CRM",
     "CRMarchaeo",
@@ -303,6 +303,51 @@
       "allowed_connections": {
         "source": ["StratigraphicNode", "ParadataNode", "ParadataNodeGroup", "DocumentNode", "ExtractorNode", "CombinerNode", "PropertyNode"],
         "target": ["ActivityNodeGroup"]
+      }
+    },
+    "is_in_location": {
+      "name": "is_in_location",
+      "label": "Is in location",
+      "description": "Indicates that a node belongs to a spatial / locational group (LocationNodeGroup). Membership is m:n (multiple is_in_location edges per source are allowed) and additive (memberships compose; none overrides). The optional 'is_primary' attribute on at most one edge per source disambiguates which membership is rendered as a yEd group folder in em-graph. The same edge type also carries the recursive Location → Location hierarchy (Pompei → Sector 4 → Casa del Fauno → Room 12).",
+      "reverse": {
+        "name": "includes_location",
+        "label": "Includes location"
+      },
+      "mapping": {
+        "cidoc": "P53_has_former_or_current_location",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": null,
+        "extension_name": null,
+        "context_mapping": {
+          "node_to_location": {
+            "applies_when": "source is StratigraphicNode | ParadataNode | ParadataNodeGroup | DocumentNode | ExtractorNode | CombinerNode | PropertyNode and target is LocationNodeGroup",
+            "cidoc": "P53_has_former_or_current_location",
+            "rationale": "CIDOC-core P53 is the canonical predicate connecting an entity to an E53 Place. No s3d: extension predicate is needed."
+          },
+          "location_to_location": {
+            "applies_when": "source is LocationNodeGroup and target is LocationNodeGroup (recursive hierarchy)",
+            "cidoc": "P89_falls_within",
+            "rationale": "CIDOC-core P89 expresses Place-within-Place; reused as-is for the recursive containment of LocationNodeGroups. No s3d: extension predicate is needed."
+          }
+        }
+      },
+      "attributes": {
+        "is_primary": {
+          "type": "boolean",
+          "default": false,
+          "required": false,
+          "description": "If true, this membership is the primary one for the source node and is rendered as a yEd group folder in em-graph. At most one is_primary=true edge per source node. Additional memberships render as labels/badges on the node (yEd cannot draw overlapping group folders).",
+          "mapping": {
+            "cidoc": null,
+            "extension_mapping": "s3d:isPrimary",
+            "extension_status": "proposed",
+            "rationale": "No CIDOC-core or CRMarchaeo equivalent — is_primary is a UX/rendering disambiguation flag for the m:n membership pattern (specifically: which membership becomes the yEd group folder in em-graph). Carrying it in the s3d extension namespace preserves the information through a SPARQL round-trip from a CIDOC triplestore. Candidate primitive for a forthcoming CIDOC-S3D extension."
+          }
+        }
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode", "ParadataNode", "ParadataNodeGroup", "DocumentNode", "ExtractorNode", "CombinerNode", "PropertyNode", "LocationNodeGroup"],
+        "target": ["LocationNodeGroup"]
       }
     },
     "has_property": {

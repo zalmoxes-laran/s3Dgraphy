@@ -1,5 +1,5 @@
 __version__ = "0.1.40"
-__datamodel_version__ = "1.5.4"  # s3Dgraphy connections datamodel version
+__datamodel_version__ = "1.5.5"  # s3Dgraphy connections datamodel version
 
 # s3Dgraphy/__init__.py
 
@@ -67,10 +67,11 @@ __all__ = [
     "Graph",
     "Node",
     "StratigraphicNode",
-    "GroupNode", 
+    "GroupNode",
     "ActivityNodeGroup",
     "ParadataNodeGroup",
-    "TimeBranchNodeGroup", 
+    "TimeBranchNodeGroup",
+    "LocationNodeGroup",
     "ParadataNode", 
     "DocumentNode", 
     "CombinerNode",

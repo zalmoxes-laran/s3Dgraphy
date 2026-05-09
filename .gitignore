@@ -171,3 +171,14 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 *.DS_Store
+
+# Cowork-mode working folder — local session scratch (tests, drafts,
+# release checklists, audits, session notes). Never committed.
+.cowork-work/
+
+# Trans-session design docs — long-form architecture notes that span
+# multiple working sessions (Hybrid-C, StratiMiner paper scoping, …).
+# Local-only by design: they are personal reasoning artifacts, not
+# user-facing manual content. The Sphinx manual lives in the parent
+# docs/ tree alongside this folder.
+docs/dev-projects/

@@ -1,6 +1,10 @@
 {
   "formal_language": "EM",
-  "version": "1.5.0",
+  "version": "1.5.1",
+  "_changelog": {
+    "1.5.1": "Added LocationNodeGroup node style (dashed roundrectangle, kind-based border colour) and is_in_location edge style with primary_modifier override.",
+    "1.5.0": "Initial EM 1.5 visual rules."
+  },
   "node_styles": {
     "US": {
       "file_3d": "src/3D/US.glb",
@@ -558,6 +562,33 @@
         "shape": "rectangle"
       },
       "label_position": "over"
+    },
+    "LocationNodeGroup": {
+      "_comment": "yEd group-folder rendering for spatial / locational membership. Dashed round-rectangle to read clearly as a *group container* and to stay distinct from the solid-rectangle stratigraphic units. Border colour varies by 'kind' (toponym / study / functional). When several is_in_location memberships exist on the same node, only the one with is_primary=true is drawn as a folder; the others are emitted as labels/badges (yEd cannot stack overlapping group folders). See em_data and the Location concept page in the manual.",
+      "style": {
+        "shape": "roundrectangle",
+        "fill_color": "#F5F5F5",
+        "border_color": "#000000",
+        "border_style": "dashed",
+        "border_width": 1.0,
+        "label_background": "#EBEBEB",
+        "label_position": "top"
+      },
+      "kind_modifiers": {
+        "_comment": "Border colour overrides keyed on the LocationNodeGroup.kind enum value.",
+        "toponym": {
+          "border_color": "#888888",
+          "description": "External / administrative identity (Pompei, Lazio, Italia)."
+        },
+        "study": {
+          "border_color": "#3A5A8C",
+          "description": "Operational / procedural identity (saggio, settore, quadrato, sondage)."
+        },
+        "functional": {
+          "border_color": "#000000",
+          "description": "Interpretive / semantic identity (basilica, room A, courtyard)."
+        }
+      }
     }
   },
   "document_roles": {
@@ -674,6 +705,21 @@
         "width": 2
       },
       "label": "Part of Activity"
+    },
+    "is_in_location": {
+      "_comment": "Edge expressing spatial / locational membership of a node into a LocationNodeGroup, or the recursive Location → Location hierarchy. Default style is the non-primary membership rendering. The 'primary_modifier' applies when the edge attribute is_primary=true (in em-graph this membership is also drawn as the yEd group folder).",
+      "style": {
+        "color": "#888888",
+        "line_style": "dotted",
+        "width": 1
+      },
+      "label": "Is in location",
+      "primary_modifier": {
+        "color": "#444444",
+        "line_style": "solid",
+        "width": 2,
+        "description": "Applied when is_primary=true on the edge."
+      }
     },
     "has_property": {
       "style": {

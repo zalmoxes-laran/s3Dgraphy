@@ -7,6 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.41] — 2026-05-09
+
+### Added — `LocationNodeGroup`: spatial / locational membership
+
+A new group-node type closing the structural gap between activity-based and
+location-based grouping in the EM formalism. Originating discussion:
+[issue #5](https://github.com/zalmoxes-laran/s3Dgraphy/issues/5) by
+[@enzococca](https://github.com/enzococca) — the PyArchInit integration
+exposed cases (toponyms, study sectors, functional rooms — and walls between
+two rooms) where activity grouping alone was not enough. Many thanks to Enzo
+for the precise framing.
+
+- **New class `LocationNodeGroup`** in `src/s3dgraphy/nodes/group_node.py`
+  (subclass of `GroupNode`). Re-exported from `s3dgraphy.nodes` and listed
+  in the package `__all__`.
+  - Required field `kind ∈ {toponym, study, functional}` — the *epistemic
+    plane* of the location. The three coexist on the same node and may
+    compose. `ValueError` if the kind is not in the allowed set.
+  - Field `propagation` defaulting to `"additive"` (memberships compose;
+    none overrides) — distinct from `EpochNode`, which is substitutive
+    (finest-grained wins).
+  - Hierarchy: a `LocationNodeGroup` can itself be `is_in_location` of
+    another `LocationNodeGroup` (Pompei → Sector 4 → Casa del Fauno →
+    Room 12).
+- **Datamodel JSON v1.5.3** (`JSON_config/s3Dgraphy_node_datamodel.json`):
+  registers `LocationNodeGroup` under `group_nodes.GroupNode.subtypes`
+  with abbreviation `LNG`, label `"Location Node Group"`, and the full
+  `kind` / `propagation` field schema. CIDOC-core mapping: `E53 Place`,
+  classified by `E55 Type` instances via `P2_has_type`. The `propagation`
+  field is explicitly marked as schema-level metadata, *not* serialised to
+  the triplestore (no per-instance triple).
+- **Connections datamodel JSON v1.5.5**
+  (`JSON_config/s3Dgraphy_connections_datamodel.json`): new `is_in_location`
+  edge with `includes_location` reverse, full `allowed_connections.source`
+  list (`StratigraphicNode`, `ParadataNode`, `ParadataNodeGroup`,
+  `DocumentNode`, `ExtractorNode`, `CombinerNode`, `PropertyNode`,
+  `LocationNodeGroup`) and `target = LocationNodeGroup`. Context-sensitive
+  CIDOC mapping: `P53_has_former_or_current_location` for
+  *node → location* and `P89_falls_within` for the recursive
+  *location → location* hierarchy. Optional edge attribute
+  `is_primary: bool` (default `false`) declared in the new `attributes`
+  block on the edge definition; one `is_primary=true` edge per source is
+  the rendering hint for em-graph yEd group-folder selection.
+- **Visual rules v1.5.1** (`JSON_config/em_visual_rules.json`): new
+  `LocationNodeGroup` entry — dashed round-rectangle, fill `#F5F5F5`,
+  label at top, with per-`kind` border colour modifiers
+  (toponym `#888888`, study `#3A5A8C`, functional `#000000`). New
+  `is_in_location` edge style with a `primary_modifier` override
+  (`width: 2`, `color: #444444`, solid line) applied when
+  `is_primary=true`.
+
+### Triplestore mapping discipline
+
+Every new identifier carries either a CIDOC-core mapping (preferred) or a
+proposed `s3d:` extension URI with an explicit `extension_status: proposed`
+marker and a written `rationale` justifying why CIDOC-core (and the
+existing extensions CRMarchaeo / CRMsci / CRMinf) do not already cover the
+concept:
+
+- `LocationNodeGroup` itself maps to vanilla `E53 Place`
+  (no new s3d class).
+- `kind` is expressed by `P2_has_type` to one of three reserved
+  `E55 Type` instances: `s3d:KindToponym`, `s3d:KindStudy`,
+  `s3d:KindFunctional`. CIDOC-native composition; no new property URI.
+- `is_in_location` reuses CIDOC-core `P53` / `P89`. No s3d predicate.
+- `is_primary` edge attribute is the only genuinely new RDF property —
+  carried as `s3d:isPrimary` with rationale "no CIDOC equivalent —
+  disambiguates UI rendering of m:n membership on yEd group folders".
+- `propagation` is declared schema-level only and is not serialised to
+  triples.
+
+> **Stability disclaimer.** The `s3d:` namespace identifiers introduced in
+> this release (`s3d:KindToponym`, `s3d:KindStudy`, `s3d:KindFunctional`,
+> `s3d:isPrimary`) are *candidate primitives* for a forthcoming CIDOC-S3D
+> extension (in the spirit of CRMarchaeo / CRMsci / CRMinf). Their
+> stability is **proposed**, not final. Consumers should expect potential
+> URI rename when the extension is formalised, and read the
+> `extension_status: "proposed"` field in the JSON datamodel as a
+> machine-readable marker of this commitment level.
+
+### Documentation
+
+The `extendedmatrix-doc` manual gains a new `Location` concept page (the
+first to follow the *concept-first* template: overview → em graph → s3d
+graph → em_data → CIDOC mapping → examples) and a new general `em_data`
+section that the page cross-links to. The AI / StratiMiner section in
+`knowledge_tree.rst` now points to `em_data` for the workbook conventions.
+
+### Naming conventions
+
+Going forward, single-axis sub-discrimination on nodes uses the field name `kind` (Python instance attribute and JSON datamodel field). The existing instance attributes `RepresentationNode.type` and `SemanticShapeNode.type` are preserved for backward compatibility; **new code should prefer `kind`** to avoid collision with the structurally reserved `node_type` (class identity, registered in `Node.node_type_map`) and with `rdf:type` / `P2_has_type` in the CIDOC mapping path.
+
+Multi-axis classification (cf. `DocumentNode.role` / `content_nature` / `geometry`) continues to use semantically named axes — `kind` is reserved for single-axis cases.
+
+A future release may unify `RepresentationNode.type` and `SemanticShapeNode.type` under `kind` with a deprecation cycle; this 0.1.41 makes no breaking changes.
+
 ### Added — Stratigraphic classification refactor (2026-04)
 
 - **Datamodel JSON v1.5.2** (patch, additive)

@@ -1,6 +1,6 @@
 {
-  "s3Dgraphy_data_model_version": "1.5.2",
-  "description": "s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings",
+  "s3Dgraphy_data_model_version": "1.5.3",
+  "description": "s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings. v1.5.3 adds LocationNodeGroup (E53 Place + E55 Type) for spatial / locational membership orthogonal to ActivityNodeGroup (intention) and EpochNode (time). v1.5.2 added family + is_series classification metadata on stratigraphic subtypes.",
   "components": [
     "CIDOC-CRM",
     "CRMarchaeo",
@@ -433,6 +433,69 @@
           "properties": {
             "name": "P1_is_identified_by",
             "description": "P3_has_note"
+          }
+        },
+        "LocationNodeGroup": {
+          "class": "LocationNodeGroup",
+          "parent": "GroupNode",
+          "abbreviation": "LNG",
+          "label": "Location Node Group",
+          "description": "Group node for spatial / locational membership of stratigraphic units and paradata. Orthogonal to ActivityNodeGroup (intention) and EpochNode (time): a Location answers the question 'what (named) place is this in?'. Three required kinds coexist on the same axis: 'toponym' (external/administrative identity, e.g. Pompei), 'study' (operational/procedural identity, e.g. Saggio4/A2) and 'functional' (interpretive/semantic identity, e.g. Casa del Fauno / Room 12). Propagation is additive: multiple memberships compose, none overrides — distinct from EpochNode which is substitutive (finest-grained wins). Membership is m:n via multiple is_in_location edges; the optional 'is_primary: true' attribute on one edge marks the membership rendered as a yEd group folder in em-graph. Locations are hierarchical: a LocationNodeGroup can itself be is_in_location of another LocationNodeGroup. A Location is identitary, not geometric: for coordinates / EPSG / shifts use GeoPositionNode (linked at the CIDOC level via P161).",
+          "s3Dgraphy_file": "group_node.py",
+          "mapping": {
+            "cidoc": "E53 Place",
+            "cidoc_s3d": null,
+            "alternative": "E53 Place + E55 Type (kind classifier via P2_has_type)",
+            "rationale": "No new s3d:Location class is introduced. A LocationNodeGroup is a pure CIDOC E53 Place; its three epistemic planes (toponym/study/functional) are expressed by classification with E55 Type instances (P2_has_type), which is the CIDOC-native pattern. CRMarchaeo does not introduce a Place-level container distinct from E53, so plain E53 is preferred."
+          },
+          "properties": {
+            "name": "P1_is_identified_by",
+            "description": "P3_has_note"
+          },
+          "fields": {
+            "kind": {
+              "type": "enum",
+              "values": ["toponym", "study", "functional"],
+              "required": true,
+              "description": "Epistemic plane of the location. 'toponym' = external/administrative identity (Pompei, Lazio, Italia); 'study' = operational/procedural identity (saggio, settore, quadrato, sondage); 'functional' = interpretive/semantic identity (basilica, room A, courtyard). The three coexist on the same node and may compose.",
+              "mapping": {
+                "cidoc": "P2_has_type → E55 Type",
+                "pattern": "The E53 Place is classified via P2_has_type by exactly one of three reserved E55 Type instances. CIDOC-native composition; no new property URI is introduced.",
+                "value_e55_type_instances": {
+                  "toponym": {
+                    "uri": "s3d:KindToponym",
+                    "rdf_type": "E55_Type",
+                    "extension_status": "proposed",
+                    "rationale": "Names the toponym epistemic plane. CIDOC-core has no reserved E55 Type instance for the administrative/external-identity discrimination of an archaeological place; CRMarchaeo does not introduce equivalent type categorisations either. Candidate primitive for a forthcoming CIDOC-S3D extension."
+                  },
+                  "study": {
+                    "uri": "s3d:KindStudy",
+                    "rdf_type": "E55_Type",
+                    "extension_status": "proposed",
+                    "rationale": "Names the study/operational plane (saggio, settore, quadrato, sondage). No CIDOC-core or CRMarchaeo equivalent — CRMarchaeo carries process semantics on the activity side but not as a Place-classifying type. Candidate primitive for a forthcoming CIDOC-S3D extension."
+                  },
+                  "functional": {
+                    "uri": "s3d:KindFunctional",
+                    "rdf_type": "E55_Type",
+                    "extension_status": "proposed",
+                    "rationale": "Names the functional/interpretive plane (basilica, room A, courtyard). No CIDOC-core or CRMarchaeo equivalent. Candidate primitive for a forthcoming CIDOC-S3D extension."
+                  }
+                }
+              }
+            },
+            "propagation": {
+              "type": "enum",
+              "values": ["additive", "substitutive"],
+              "default": "additive",
+              "required": false,
+              "description": "Declarative rule for how location membership propagates to descendants. Location is additive (memberships compose; none overrides), distinct from EpochNode which is substitutive (finest-grained wins).",
+              "mapping": {
+                "cidoc": null,
+                "level": "schema-level metadata, not instance-data",
+                "serialization": "not serialized to triplestore",
+                "rationale": "Propagation is a meta-schema rule (how a graph traversal should compose memberships), not a fact about a specific Place. It is therefore declared at the schema level and never lifted to RDF triples. Triplestore round-trip uses the schema definition itself, not per-instance triples."
+              }
+            }
           }
         }
       }
