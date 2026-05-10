@@ -7,6 +7,120 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **`RSF` (Reused Special Find)** — new stratigraphic node type for re-used
+  architectural / decorative elements (spolia). Octagon, red border
+  (`#9B3333`), white fill — visually a sibling of `SF` (yellow border) and
+  `VSF` (gold border), distinguished by colour. Originating Development
+  Project: DP-26 (spolia project, last DP before the EM 1.5 cut). Wired
+  through the full pipeline: Python class `ReusedSpecialFind` in
+  `nodes/stratigraphic_node.py`, JSON datamodel entry under
+  `stratigraphic_nodes.StratigraphicNode.subtypes` (family `real`,
+  `is_series=false`), `em_visual_rules.json` style entry, and
+  `STRATIGRAPHIC_CLASS_MAP` registration. Family classification
+  (`real` / non-series) flows through the existing `classification.py`
+  accessors (`is_real("RSF")` returns `True`) without code change.
+- **`serUSD` export dispatch** — palette template `^USD\d+$` shape
+  `ellipse` (border `#D86400`) now correctly dispatches to `serUSD` on
+  export, mirroring the existing import logic in
+  `utils/utils.py::convert_shape2type`. Closes the export-side asymmetry
+  flagged in `PALETTE_AUDIT.md` § 4 — the `serUSD` *class*,
+  *datamodel JSON*, *visual rules*, and *importer rule* all pre-existed,
+  but the exporter was silently routing the ellipse stencil to its
+  default fallback. Round-trip identity now holds for `serUSD` graphs.
+
+### Changed
+- `convert_shape2type` (importer) extended with the `RSF` recognition rule
+  (`octagon` + `#9B3333`). `serSU` continues to use the same border colour
+  but the shape qualifier (ellipse vs octagon) keeps the two unambiguous.
+- `_PALETTE_DISPATCH_RULES` (exporter) extended with `RSF` (`^RSF\d+$` +
+  octagon) and `serUSD` (`^USD\d+$` + ellipse) rules. Order preserves the
+  first-match-wins contract: the new `serUSD` rule sits next to the
+  existing `USD` roundrectangle rule, the new `RSF` rule next to `SF`/`VSF`.
+- `_REQUIRED_PALETTE_TYPES` now includes `RSF` and `serUSD`, so a future
+  palette template that drops either stencil triggers the existing
+  `S3DgraphyPaletteWarning` plus default-visual-properties backfill rather
+  than silently degrading.
+- `NodeRegistry._default_visual_properties_dict()` ships fallback
+  `NodeVisualProperties` for `RSF` and `serUSD` so the registry never
+  returns `None` for these types even when the palette resource is
+  unreachable.
+- `s3Dgraphy_node_datamodel.json` bumped to internal version `1.5.4`
+  (description annotated with the RSF addition). The package-level
+  `__datamodel_version__` (`1.5.5`, connections datamodel) is intentionally
+  unchanged — it is governed by a separate file.
+- `em_visual_rules.json` bumped to internal version `1.5.2` with a
+  changelog entry for the RSF style.
+
+### Changed
+- **GraphML export — semantic dispatch for stratigraphic node types**. The
+  stratigraphic export pipeline (`exporter/graphml/node_registry.py`) now
+  selects palette template elements by `<y:NodeLabel>` pattern matching
+  (e.g. `USM\d+` rectangle → `US`, `USM\d+` ellipse → `serSU`,
+  `USV\d+` parallelogram → `USVs`, `USV\d+` hexagon → `USVn`,
+  `USV\d+` ellipse → `serUSVn`) instead of the GraphML-internal id
+  (`n1..n9`). This aligns the export side with the existing semantic
+  import logic (`utils/utils.py::convert_shape2type`), decouples the
+  palette visual ordering from the writer, and removes the silent
+  degradation that occurred when a node label could not be matched
+  after the palette was reordered in yEd.
+
+### Fixed
+- Unrecognised palette labels in export no longer fall back silently to
+  `US` with a white/red rectangle. The new dispatch emits an explicit
+  `S3DgraphyPaletteWarning` (subclass of `UserWarning`) indicating the
+  label and the chosen fallback, asking the caller to register the
+  pattern in `node_registry._PALETTE_DISPATCH_RULES`.
+- The registry also warns at load time if the palette template ships
+  without one of the canonical stratigraphic stencils (`US`, `serSU`,
+  `USD`, `USVs`, `USVn`, `serUSVn`, `SF`, `VSF`, `TSU`); missing types
+  are backfilled from the hardcoded defaults so callers never get
+  `None` for a known stratigraphic type.
+
+### Migration notes
+- No public API change. `NodeRegistry`, `get_visual_properties()`,
+  `get_shape_for_type()`, `get_colors_for_type()` keep their
+  signatures. Round-trip identity preserved for all existing GraphML
+  fixtures shipped in this repository, including the live
+  `templates/em_palette_template.graphml`.
+- Tools generating palette templates with non-canonical labels (e.g.
+  `MyCustomUS01`) should add their pattern to
+  `_PALETTE_DISPATCH_RULES` in 0.1.42 to avoid the new
+  `S3DgraphyPaletteWarning` and obtain correct visual rendering.
+- The new public symbol `S3DgraphyPaletteWarning` (subclass of
+  `UserWarning`) can be used by downstream code (Blender add-ons,
+  CI gates) to filter or escalate palette mismatches via the standard
+  `warnings` module.
+
+### Tests
+- New `test_palette_dispatch.py` covers: round-trip identity per
+  stratigraphic type (US, USVs, USVn, SF, VSF, **RSF**, USD,
+  **serUSD**, serSU, serUSVn, TSU), live-template backward
+  compatibility, order independence (palette with shuffled `<node id>`
+  still resolves to the right types), `S3DgraphyPaletteWarning`
+  emission on unknown `node_type`, and missing-required-type detection
+  with default backfill.
+- Dedicated tests for the RSF / serUSD additions: class registration
+  (`STRATIGRAPHIC_CLASS_MAP`), dispatch table content, USD-vs-serUSD
+  shape disambiguation, `convert_shape2type` round-trip on the new
+  rules, and `em_visual_rules.json` carrying the RSF and serUSD
+  styles. All 47 palette-dispatch tests + 7 classification tests pass.
+
+### Originating analysis
+- Architectural audit `PALETTE_AUDIT.md` (May 2026, EM-blender-tools
+  repo): identified the export-side positional dispatch as a
+  silent-failure fragility for palette reordering at the 1.5 cut.
+  Variante A applied; the related `serUSVs` synthesis (cloned from
+  `serUSVn` with blue border) is preserved unchanged. The audit also
+  surfaced the `serUSD` export-side asymmetry — closed in this
+  release.
+- DP-26 (spolia project, EM dev tracker): the typological framing of
+  RSF as a re-used physical element with a stratigraphic identity of
+  its own (real / non-series), distinct from `SF` (in-situ
+  repositionable) and `VSF` (virtual reconstruction). Last
+  Development Project before the EM 1.5 cut; formalised here as a
+  first-class stratigraphic subtype.
+
 ## [0.1.41] — 2026-05-09
 
 ### Added — `LocationNodeGroup`: spatial / locational membership

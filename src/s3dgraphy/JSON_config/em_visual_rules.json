@@ -1,7 +1,8 @@
 {
   "formal_language": "EM",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "_changelog": {
+    "1.5.2": "Added RSF (Reused Special Find / spolia) node style — octagon, red border (#9B3333), white fill. Sibling of SF/VSF, distinguished by border colour. Originating DP: DP-26.",
     "1.5.1": "Added LocationNodeGroup node style (dashed roundrectangle, kind-based border colour) and is_in_location edge style with primary_modifier override.",
     "1.5.0": "Initial EM 1.5 visual rules."
   },
@@ -100,6 +101,27 @@
         },
         "border_color": "#AF8208",
         "fill_color": "#CCCCCC",
+        "border_style": "solid",
+        "shape": "octagon"
+      },
+      "label_position": "over"
+    },
+    "RSF": {
+      "3d_file": "src/3D/RSF.glb",
+      "2d_file_rast": "src/2D/RSF.png",
+      "2d_file_vect": "src/2D/RSF.svg",
+      "_comment": "Reused Special Find (RSF / spolia): a physical object observed in situ but originally produced for a different context. Octagon (sibling of SF/VSF) with the EM red border (#9B3333). Originating DP: DP-26.",
+      "style": {
+        "material": {
+          "color": {
+            "r": 0.608,
+            "g": 0.200,
+            "b": 0.200,
+            "a": 1.0
+          }
+        },
+        "border_color": "#9B3333",
+        "fill_color": "#FFFFFF",
         "border_style": "solid",
         "shape": "octagon"
       },

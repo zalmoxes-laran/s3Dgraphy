@@ -1,6 +1,6 @@
 {
-  "s3Dgraphy_data_model_version": "1.5.3",
-  "description": "s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings. v1.5.3 adds LocationNodeGroup (E53 Place + E55 Type) for spatial / locational membership orthogonal to ActivityNodeGroup (intention) and EpochNode (time). v1.5.2 added family + is_series classification metadata on stratigraphic subtypes.",
+  "s3Dgraphy_data_model_version": "1.5.4",
+  "description": "s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings. v1.5.4 adds RSF (Reused Special Find — spolia) as a stratigraphic subtype, octagon with red border, family=real, is_series=false. Originating DP: DP-26 (spolia project, last DP before the EM 1.5 cut). v1.5.3 added LocationNodeGroup (E53 Place + E55 Type) for spatial / locational membership orthogonal to ActivityNodeGroup (intention) and EpochNode (time). v1.5.2 added family + is_series classification metadata on stratigraphic subtypes.",
   "components": [
     "CIDOC-CRM",
     "CRMarchaeo",
@@ -138,6 +138,26 @@
             "description": "P3_has_note"
           },
           "family": "virtual",
+          "is_series": false
+        },
+        "RSF": {
+          "class": "ReusedSpecialFind",
+          "parent": "StratigraphicNode",
+          "abbreviation": "RSF",
+          "label": "Reused Special Find",
+          "symbol": "white octagon red border",
+          "description": "Re-used architectural or decorative element (spolia) in archaeological reconstructions. A physical object observed in situ but originally produced for a different context — e.g. a Roman column re-used in a medieval church wall. Originating Development Project: DP-26 (spolia, last DP before the EM 1.5 cut).",
+          "s3Dgraphy_file": "stratigraphic_node.py",
+          "mapping": {
+            "cidoc": "E19 Physical Object",
+            "cidoc_s3d": "ReusedObject",
+            "alternative": "E19 Physical Object + E11 Modification"
+          },
+          "properties": {
+            "name": "P1_is_identified_by",
+            "description": "P3_has_note"
+          },
+          "family": "real",
           "is_series": false
         },
         "serSU": {

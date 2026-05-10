@@ -98,6 +98,32 @@ class VirtualSpecialFindUnit(StratigraphicNode):
         self.detailed_description = "Hypothetical reconstruction of a fragmented Special Find."
 
 
+class ReusedSpecialFind(StratigraphicNode):
+    """Reused Special Find (RSF) — re-used architectural / decorative
+    element (spolia) in archaeological reconstructions.
+
+    Typological cousin of :class:`SpecialFindUnit` (SF) and
+    :class:`VirtualSpecialFindUnit` (VSF): all three render as octagons.
+    RSF is distinguished by its **red** border (``#9B3333``) and a white
+    fill, marking the element as physically present *and* re-deployed
+    out of its original construction context.
+
+    Originating Development Project: DP-26 (spolia project, last DP
+    before the EM 1.5 cut). Visual stencil shipped in the palette
+    template at ``templates/em_palette_template.graphml``.
+    """
+    node_type = "RSF"
+
+    def __init__(self, node_id, name, description=""):
+        super().__init__(node_id, name, description)
+        self.symbol = "white octagon red border"
+        self.label = "Reused Special Find"
+        self.detailed_description = (
+            "Re-used architectural or decorative element (spolia) in "
+            "archaeological reconstructions. A physical find observed "
+            "in situ but originally produced for a different context.")
+
+
 class DocumentaryStratigraphicUnit(StratigraphicNode):
     node_type = "USD"
     def __init__(self, node_id, name, description=""):

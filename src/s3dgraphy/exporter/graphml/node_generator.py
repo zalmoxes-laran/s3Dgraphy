@@ -5,9 +5,10 @@ Generates XML for all node types: StratigraphicNode, PropertyNode,
 ExtractorNode, DocumentNode.
 """
 
+import warnings
 from lxml import etree as ET
 from typing import Optional
-from .node_registry import NodeRegistry
+from .node_registry import NodeRegistry, S3DgraphyPaletteWarning
 from .utils import IDManager, calculate_node_width, generate_uuid
 
 
@@ -47,6 +48,13 @@ class NodeGenerator:
         node_type = getattr(node, 'node_type', 'US')
         visual_props = self.registry.get_visual_properties(node_type)
         if not visual_props:
+            warnings.warn(
+                f"s3dgraphy: unrecognised palette label '{node_type}' — "
+                "falling back to 'US'. Register a pattern in "
+                "node_registry._PALETTE_DISPATCH_RULES to support this type.",
+                S3DgraphyPaletteWarning,
+                stacklevel=2,
+            )
             visual_props = self.registry.get_visual_properties('US')
         
         # Create node element
