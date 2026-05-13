@@ -109,7 +109,6 @@
     "RSF": {
       "3d_file": "src/3D/RSF.glb",
       "2d_file_rast": "src/2D/RSF.png",
-      "2d_file_vect": "src/2D/RSF.svg",
       "_comment": "Reused Special Find (RSF / spolia): a physical object observed in situ but originally produced for a different context. Octagon (sibling of SF/VSF) with the EM red border (#9B3333). Originating DP: DP-26.",
       "style": {
         "material": {
