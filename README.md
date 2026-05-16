@@ -152,11 +152,33 @@ s3dgraphy is part of a larger ecosystem:
 - **[ATON Framework](https://www.aton3d.org)** - Web-based 3D presentation
 - **[Extended Matrix Documentation](https://github.com/zalmoxes-laran/ExtendedMatrix)** - Formal language specification
 
-## 🤝 Used by
+## 🏛 Production users & integrations
 
-s3dgraphy is consumed by the following third-party tools. To request inclusion, see the [Ecosystem page](https://docs.extendedmatrix.org/en/latest/ecosystem.html) of the Extended Matrix manual.
+**[PyArchInit](https://github.com/pyarchinit/pyarchinit)** — first production
+consumer of s3Dgraphy. PyArchInit is an open-source QGIS plugin for
+archaeological data management with particular strength in **2D GIS
+visualization of stratigraphic data**, maintained by an active community led
+by [Luca Mandolesi](https://github.com/pyarchinit). It is used in production
+by archaeology teams across Europe, and brings existing PyArchInit projects
+into the Extended Matrix workflow as an auxiliary data source through
+s3Dgraphy — referencing records live or baking them into the graph.
 
-- **[PyArchInit](https://pyarchinit-api.readthedocs.io/en/latest/)** — QGIS plugin for archaeological recording (stratigraphic, alphanumeric, multimedia and topographical data) · maintained by [Luca Mandolesi](https://github.com/pyarchinit) & [Enzo Cocca](https://github.com/enzococca) (s3dgraphy integration by Enzo Cocca) · vendors s3dgraphy 0.1.41 · [repo](https://github.com/pyarchinit/pyarchinit)
+The PyArchInit integration drove the design of the LocationNodeGroup in
+s3Dgraphy 0.1.41 (insight from
+[issue #5](https://github.com/zalmoxes-laran/s3Dgraphy/issues/5) by
+[Enzo Cocca](https://github.com/enzococca)).
+
+To request inclusion in this list, see the [Ecosystem page](https://docs.extendedmatrix.org/en/latest/ecosystem.html) of the Extended Matrix manual.
+
+### Open invitation
+
+s3Dgraphy is designed to be consumed by independent tools. **Revit**,
+**Unreal Engine**, **Houdini**, **PostgreSQL/PostGIS**, and other
+domain-specific tools are natural candidates for similar bridges into the
+Extended Matrix ecosystem. If you maintain such a project and want to
+explore an integration, open a discussion at
+[github.com/zalmoxes-laran/s3Dgraphy/discussions](https://github.com/zalmoxes-laran/s3Dgraphy/discussions)
+or look at the PyArchInit integration as a worked example.
 
 ## 📄 License
 
