@@ -5,6 +5,7 @@ Allows applications to register custom mapping directories.
 
 import os
 import json
+from importlib.resources import files
 from typing import Dict, List, Optional, Any
 
 class MappingRegistry:
@@ -19,9 +20,22 @@ class MappingRegistry:
         self._initialize_builtin_paths()
     
     def _initialize_builtin_paths(self):
-        """Initialize built-in mapping paths."""
-        base_path = os.path.dirname(__file__)
-        
+        """Initialize built-in mapping paths.
+
+        Resolves the package mappings directory via importlib.resources so that
+        it works reliably when s3dgraphy is installed from a wheel (including
+        on Windows, where __file__ + "../" construction can fail).
+
+        Blender extensions always extract wheels to the filesystem, so the
+        Traversable returned by files() maps to a real directory and str()
+        yields a usable path for downstream os.path.exists / os.path.join calls.
+        """
+        try:
+            base_path = str(files("s3dgraphy.mappings"))
+        except (ModuleNotFoundError, FileNotFoundError) as e:
+            print(f"[s3dgraphy] Warning: could not resolve mappings package via importlib.resources ({e}); falling back to __file__.")
+            base_path = os.path.dirname(__file__)
+
         # Built-in paths (questi hanno priorità bassa)
         self._mapping_directories['pyarchinit'].append(
             os.path.join(base_path, 'pyarchinit')

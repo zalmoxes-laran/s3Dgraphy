@@ -2,6 +2,7 @@
 
 import json
 import os
+from importlib.resources import files
 
 def load_json_mapping(filename):
     """
@@ -13,15 +14,12 @@ def load_json_mapping(filename):
     Returns:
         dict: Mapping data loaded from the JSON file.
     """
-    # Construct the absolute path
-    mapping_path = os.path.join(os.path.dirname(__file__), '..', 'JSON_config', filename)
-    mapping_path = os.path.abspath(mapping_path)
-
     try:
-        with open(mapping_path, 'r') as file:
+        resource = files("s3dgraphy").joinpath("JSON_config", filename)
+        with resource.open('r', encoding='utf-8') as file:
             return json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        # print(f"Error loading mapping file: {e}")
+    except (FileNotFoundError, json.JSONDecodeError, ModuleNotFoundError) as e:
+        print(f"[s3dgraphy] load_json_mapping('{filename}') failed: {type(e).__name__}: {e}")
         return {}
 
 class Node:

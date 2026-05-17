@@ -9,13 +9,30 @@ property nodes, and more.
 """
 
 from .base_node import Node
-from .stratigraphic_node import StratigraphicNode
+from .stratigraphic_node import (
+    StratigraphicNode, WorkingUnit,
+    StratigraphicUnit, NegativeStratigraphicUnit,
+    TransformationStratigraphicUnit,
+    StructuralVirtualStratigraphicUnit, NonStructuralVirtualStratigraphicUnit,
+    SpecialFindUnit, VirtualSpecialFindUnit, ReusedSpecialFind,
+    DocumentaryStratigraphicUnit,
+    SeriesOfStratigraphicUnit, SeriesOfDocumentaryStratigraphicUnit,
+    SeriesOfStructuralVirtualStratigraphicUnit,
+    SeriesOfNonStructuralVirtualStratigraphicUnit,
+    ContinuityNode, StratigraphicEventNode, UnknownNode,
+)
 from .epoch_node import EpochNode
 from .property_node import PropertyNode
 from .document_node import DocumentNode
 from .combiner_node import CombinerNode
 from .extractor_node import ExtractorNode
-from .group_node import GroupNode, ActivityNodeGroup, ParadataNodeGroup, TimeBranchNodeGroup
+from .group_node import (
+    GroupNode,
+    ActivityNodeGroup,
+    ParadataNodeGroup,
+    TimeBranchNodeGroup,
+    LocationNodeGroup,
+)
 from .paradata_node import ParadataNode
 from .geo_position_node import GeoPositionNode
 from .representation_node import RepresentationModelNode
@@ -27,16 +44,34 @@ from .license_node import LicenseNode
 # Define what is available for import when using 'from nodes import *'
 __all__ = [
     "Node", 
-    "StratigraphicNode", 
+    "StratigraphicNode",
+    "WorkingUnit",
+    "StratigraphicUnit",
+    "NegativeStratigraphicUnit",
+    "TransformationStratigraphicUnit",
+    "StructuralVirtualStratigraphicUnit",
+    "NonStructuralVirtualStratigraphicUnit",
+    "SpecialFindUnit",
+    "VirtualSpecialFindUnit",
+    "ReusedSpecialFind",
+    "DocumentaryStratigraphicUnit",
+    "SeriesOfStratigraphicUnit",
+    "SeriesOfDocumentaryStratigraphicUnit",
+    "SeriesOfStructuralVirtualStratigraphicUnit",
+    "SeriesOfNonStructuralVirtualStratigraphicUnit",
+    "ContinuityNode",
+    "StratigraphicEventNode",
+    "UnknownNode",
     "EpochNode", 
     "PropertyNode", 
     "DocumentNode",
     "CombinerNode", 
     "ExtractorNode", 
-    "GroupNode", 
+    "GroupNode",
     "ActivityNodeGroup",
     "ParadataNodeGroup",
-    "TimeBranchNodeGroup", 
+    "TimeBranchNodeGroup",
+    "LocationNodeGroup",
     "ParadataNode", 
     "GeoPositionNode", 
     "RepresentationModelNode",

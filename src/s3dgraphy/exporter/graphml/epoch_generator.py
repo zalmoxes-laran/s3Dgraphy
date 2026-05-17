@@ -5,10 +5,23 @@ Generates yEd TableNode structures to represent temporal epochs as horizontal sw
 Matches the structure from the TempluMare reference GraphML (YED_TABLE_NODE configuration).
 """
 
+import math
 from typing import List, Dict, Tuple, Optional
 from lxml import etree as ET
 from ...nodes.epoch_node import EpochNode
 from .utils import generate_uuid, qname
+
+
+# Layout constants used by both positioning and swimlane-row sizing.
+# A swimlane wraps its nodes into visual rows of _LAYOUT_COLS columns with
+# _LAYOUT_VSPACING vertical spacing per row. The swimlane's Row element must
+# be tall enough to hold all visual rows without geometric overflow into the
+# next swimlane — otherwise the importer re-assigns overflow nodes to the
+# wrong epoch on reload.
+_LAYOUT_COLS = 8
+_LAYOUT_VSPACING = 50.0
+_LAYOUT_NODE_HEIGHT = 30.0
+_LAYOUT_PADDING = 30.0  # top and bottom breathing room inside the swimlane
 
 
 class EpochSwimlanesGenerator:
@@ -23,6 +36,9 @@ class EpochSwimlanesGenerator:
         """Initialize the epoch swimlanes generator."""
         self.NS_GRAPHML = "http://graphml.graphdrawing.org/xmlns"
         self.NS_YFILES = "http://www.yworks.com/xml/graphml"
+        # Populated by calculate_epoch_positions and consumed by
+        # generate_tablenode_xml so the Row heights match the computed layout.
+        self._row_heights: Dict[str, float] = {}
 
     def generate_tablenode_xml(
         self,
@@ -52,8 +68,16 @@ class EpochSwimlanesGenerator:
         # Sort epochs by start time (most recent first)
         sorted_epochs = self._sort_epochs_by_time(epoch_nodes)
 
-        # Calculate total height needed
-        total_height = len(sorted_epochs) * row_height + 100  # +100 for padding
+        # Per-epoch heights: use the cache populated by calculate_epoch_positions
+        # (which sizes each row to fit its node count). Fall back to the fixed
+        # row_height for epochs not in the cache.
+        row_heights = {
+            ep.node_id: self._row_heights.get(ep.node_id, row_height)
+            for ep in sorted_epochs
+        }
+
+        # Calculate total height needed (sum of row heights + title padding)
+        total_height = sum(row_heights.values()) + 100
         if total_height > canvas_height:
             canvas_height = total_height
 
@@ -203,10 +227,12 @@ class EpochSwimlanesGenerator:
         col_insets.set("right", "0.0")
         col_insets.set("top", "0.0")
 
-        # Rows
+        # Rows — each row sized per the cached per-epoch height so the
+        # swimlane can hold all its nodes without geometric overflow.
         rows_elem = ET.SubElement(y_table, qname(self.NS_YFILES, "Rows"))
         for row_index, epoch in enumerate(sorted_epochs):
-            row_elem = self._generate_epoch_row(epoch, row_height, row_index)
+            h = row_heights[epoch.node_id]
+            row_elem = self._generate_epoch_row(epoch, h, row_index)
             rows_elem.append(row_elem)
 
         # Create nested graph element for nodes inside swimlane
@@ -421,35 +447,75 @@ class EpochSwimlanesGenerator:
         # Assign nodes to epochs using graph edges (has_first_epoch)
         epoch_assignments = self._assign_nodes_to_epochs(nodes, sorted_epochs, graph)
 
+        # Compute per-epoch swimlane heights so a swimlane can hold all its
+        # nodes without geometric overflow. Without this, any epoch with more
+        # than (_LAYOUT_COLS × 3) = 24 nodes pushes its later rows into the
+        # next swimlane's geometric band — and since yEd treats a node's row
+        # assignment as purely geometric, the overflow nodes end up attached
+        # to the wrong epoch on reload.
+        self._row_heights = self._compute_row_heights(
+            sorted_epochs, epoch_assignments, default=row_height)
+
         # Position nodes within each epoch
         current_epoch_y = 50.0  # Start after header
         for epoch in sorted_epochs:
+            epoch_row_h = self._row_heights[epoch.node_id]
             epoch_nodes_list = epoch_assignments.get(epoch.node_id, [])
 
             if not epoch_nodes_list:
-                current_epoch_y += row_height
+                current_epoch_y += epoch_row_h
                 continue
 
             # Sort nodes within epoch by temporal order
             ordered_nodes = self._order_nodes_temporally(epoch_nodes_list, G)
 
-            # Position nodes in grid within epoch row
-            y_center = current_epoch_y + (row_height / 2.0)  # Center in row
+            # Center the block of visual rows inside the (possibly enlarged)
+            # swimlane so there is symmetric breathing room top and bottom.
+            visual_rows = max(1, math.ceil(len(ordered_nodes) / _LAYOUT_COLS))
+            block_span = (visual_rows - 1) * _LAYOUT_VSPACING
+            y_center = current_epoch_y + (epoch_row_h / 2.0)
+            first_row_y = y_center - (block_span / 2.0) - (_LAYOUT_NODE_HEIGHT / 2.0)
+
             x_current = start_x + 30.0  # Left padding
 
             for i, node in enumerate(ordered_nodes):
-                # Grid layout: wrap to new row after 8 nodes
-                col = i % 8
-                row = i // 8
+                col = i % _LAYOUT_COLS
+                row = i // _LAYOUT_COLS
 
                 x = x_current + (col * spacing_x)
-                y = y_center - 15.0 + (row * 50.0)  # -15 to center 30px nodes
+                y = first_row_y + (row * _LAYOUT_VSPACING)
 
                 positions[node.node_id] = (x, y)
 
-            current_epoch_y += row_height
+            current_epoch_y += epoch_row_h
 
         return positions
+
+    def _compute_row_heights(
+        self,
+        sorted_epochs: List[EpochNode],
+        assignments: Dict[str, List],
+        default: float = 150.0,
+    ) -> Dict[str, float]:
+        """
+        Per-epoch swimlane height required to hold all its nodes without
+        overflowing into the next epoch.
+
+        Layout packs nodes in ``_LAYOUT_COLS`` columns with
+        ``_LAYOUT_VSPACING`` vertical spacing between visual rows. The row
+        needs to accommodate all visual rows plus breathing room.
+
+        Never smaller than ``default`` (preserves the visual baseline for
+        sparse epochs and matches the historical 150 px row height).
+        """
+        heights: Dict[str, float] = {}
+        for ep in sorted_epochs:
+            n = len(assignments.get(ep.node_id, []))
+            visual_rows = max(1, math.ceil(n / _LAYOUT_COLS))
+            block = (visual_rows - 1) * _LAYOUT_VSPACING + _LAYOUT_NODE_HEIGHT
+            needed = block + 2 * _LAYOUT_PADDING
+            heights[ep.node_id] = max(default, needed)
+        return heights
 
     def _assign_nodes_to_epochs(
         self,

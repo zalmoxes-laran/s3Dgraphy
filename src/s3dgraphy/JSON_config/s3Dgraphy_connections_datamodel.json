@@ -1,6 +1,6 @@
 {
-  "s3Dgraphy_connections_model_version": "1.5.4",
-  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. Version 1.5.3 introduces canonical/reverse directionality with verb-based labels for clear socket identification in node editors. Version 1.5.4 adds 'has_visual_reference' edge type.",
+  "s3Dgraphy_connections_model_version": "1.5.5",
+  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. Version 1.5.3 introduces canonical/reverse directionality with verb-based labels for clear socket identification in node editors. Version 1.5.4 adds 'has_visual_reference' edge type. Version 1.5.5 adds 'is_in_location' edge type with context-sensitive CIDOC mapping (P53 for node→location, P89 for the recursive location→location hierarchy) and an optional 'is_primary' boolean attribute (s3d:isPrimary, proposed).",
   "components": [
     "CIDOC-CRM",
     "CRMarchaeo",
@@ -146,10 +146,44 @@
         "target": ["StratigraphicNode"]
       }
     },
+    "bonded_to": {
+      "name": "bonded_to",
+      "label": "Bonded to",
+      "description": "Canonical (v5.0 em_data.xlsx) form of the bonding relation: this stratigraphic unit is physically bonded to the target. Symmetric. Allowed between any two StratigraphicNode instances including USVs-USVs when two virtually-reconstructed elements are theoretically bonded (e.g. two missing blocks of the same inferred course).",
+      "reverse": null,
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "bonded to"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
     "is_physically_equal_to": {
       "name": "is_physically_equal_to",
       "label": "Is physically equal to",
       "description": "Two stratigraphic units are considered physically the same entity or continuous fabric. This is a symmetric relation.",
+      "reverse": null,
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "equals"
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode"],
+        "target": ["StratigraphicNode"]
+      }
+    },
+    "equals": {
+      "name": "equals",
+      "label": "Equals",
+      "description": "Canonical (v5.0 em_data.xlsx) form of the 'same physical entity' relation: two distinct unit IDs (from different campaigns or archival sources) refer to the same stratigraphic fact. Symmetric.",
       "reverse": null,
       "mapping": {
         "cidoc": "",
@@ -271,6 +305,51 @@
         "target": ["ActivityNodeGroup"]
       }
     },
+    "is_in_location": {
+      "name": "is_in_location",
+      "label": "Is in location",
+      "description": "Indicates that a node belongs to a spatial / locational group (LocationNodeGroup). Membership is m:n (multiple is_in_location edges per source are allowed) and additive (memberships compose; none overrides). The optional 'is_primary' attribute on at most one edge per source disambiguates which membership is rendered as a yEd group folder in em-graph. The same edge type also carries the recursive Location → Location hierarchy (Pompei → Sector 4 → Casa del Fauno → Room 12).",
+      "reverse": {
+        "name": "includes_location",
+        "label": "Includes location"
+      },
+      "mapping": {
+        "cidoc": "P53_has_former_or_current_location",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": null,
+        "extension_name": null,
+        "context_mapping": {
+          "node_to_location": {
+            "applies_when": "source is StratigraphicNode | ParadataNode | ParadataNodeGroup | DocumentNode | ExtractorNode | CombinerNode | PropertyNode and target is LocationNodeGroup",
+            "cidoc": "P53_has_former_or_current_location",
+            "rationale": "CIDOC-core P53 is the canonical predicate connecting an entity to an E53 Place. No s3d: extension predicate is needed."
+          },
+          "location_to_location": {
+            "applies_when": "source is LocationNodeGroup and target is LocationNodeGroup (recursive hierarchy)",
+            "cidoc": "P89_falls_within",
+            "rationale": "CIDOC-core P89 expresses Place-within-Place; reused as-is for the recursive containment of LocationNodeGroups. No s3d: extension predicate is needed."
+          }
+        }
+      },
+      "attributes": {
+        "is_primary": {
+          "type": "boolean",
+          "default": false,
+          "required": false,
+          "description": "If true, this membership is the primary one for the source node and is rendered as a yEd group folder in em-graph. At most one is_primary=true edge per source node. Additional memberships render as labels/badges on the node (yEd cannot draw overlapping group folders).",
+          "mapping": {
+            "cidoc": null,
+            "extension_mapping": "s3d:isPrimary",
+            "extension_status": "proposed",
+            "rationale": "No CIDOC-core or CRMarchaeo equivalent — is_primary is a UX/rendering disambiguation flag for the m:n membership pattern (specifically: which membership becomes the yEd group folder in em-graph). Carrying it in the s3d extension namespace preserves the information through a SPARQL round-trip from a CIDOC triplestore. Candidate primitive for a forthcoming CIDOC-S3D extension."
+          }
+        }
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode", "ParadataNode", "ParadataNodeGroup", "DocumentNode", "ExtractorNode", "CombinerNode", "PropertyNode", "LocationNodeGroup"],
+        "target": ["LocationNodeGroup"]
+      }
+    },
     "has_property": {
       "name": "has_property",
       "label": "Has property",
@@ -369,7 +448,7 @@
     "has_author": {
       "name": "has_author",
       "label": "Has author",
-      "description": "Represents the connection of a node with its author.",
+      "description": "Represents the connection of a node with its author. Target can be an AuthorNode (human) or AuthorAINode (AI-assisted authoring). Source covers the full range of EM node types so that the resolver can walk from any scope level down to the author.",
       "reverse": {
         "name": "is_author_of",
         "label": "Is author of"
@@ -381,8 +460,8 @@
         "extension_name": "CRMdig"
       },
       "allowed_connections": {
-        "source": ["GraphNode", "StratigraphicNode", "ParadataNode", "GroupNode", "DocumentNode", "ExtractorNode", "CombinerNode", "PropertyNode"],
-        "target": ["AuthorNode"]
+        "source": ["GraphNode", "StratigraphicNode", "ParadataNode", "GroupNode", "DocumentNode", "ExtractorNode", "CombinerNode", "PropertyNode", "EpochNode"],
+        "target": ["AuthorNode", "AuthorAINode"]
       }
     },
     "has_geoposition": {
@@ -438,7 +517,7 @@
         "extension_name": "CIDOC-S3D"
       },
       "allowed_connections": {
-        "source": ["EpochNode", "StratigraphicNode"],
+        "source": ["EpochNode", "StratigraphicNode", "DocumentNode"],
         "target": ["RepresentationModelNode"]
       }
     },
@@ -559,7 +638,7 @@
     "has_embargo": {
       "name": "has_embargo",
       "label": "Has embargo",
-      "description": "Indicates that a license has a temporal embargo associated.",
+      "description": "Indicates that an element is subject to a temporal embargo. Source can be any node (GraphNode for canvas-wide embargo, LicenseNode for license-scoped embargo, or any node for node-scoped embargo), mirroring has_license.",
       "reverse": {
         "name": "is_embargo_of",
         "label": "Is embargo of"
@@ -571,7 +650,7 @@
         "extension_name": null
       },
       "allowed_connections": {
-        "source": ["LicenseNode"],
+        "source": ["Node", "GraphNode", "LicenseNode"],
         "target": ["EmbargoNode"]
       }
     },

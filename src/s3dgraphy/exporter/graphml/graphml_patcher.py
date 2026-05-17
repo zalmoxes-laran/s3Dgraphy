@@ -23,10 +23,15 @@ from ...nodes.property_node import PropertyNode
 from ...nodes.document_node import DocumentNode
 from ...nodes.extractor_node import ExtractorNode
 from ...nodes.combiner_node import CombinerNode
+from ...nodes.author_node import AuthorNode, AuthorAINode
+from ...nodes.license_node import LicenseNode
+from ...nodes.embargo_node import EmbargoNode
 from ...nodes.group_node import GroupNode, ParadataNodeGroup, ActivityNodeGroup, TimeBranchNodeGroup
 from ...nodes.epoch_node import EpochNode
 from ...nodes.base_node import Node
 from ...edges.edge import Edge
+from . import palette_resources
+from .paradata_image_generator import ParadataImageNodeGenerator
 
 
 # Namespace constants
@@ -424,14 +429,22 @@ class GraphMLPatcher:
         """
         Add new nodes (created in-memory, not from original GraphML) to the XML.
 
-        For each node in the graph that does NOT have an original_id:
-        - Generates a new GraphML node ID
-        - Creates the XML element with correct yEd graphics for the node type
-        - Appends to the first top-level <graph> element
-        - Does NOT calculate layout positions (user will do that in yEd)
+        Two-pass processing:
 
-        Returns:
-            Number of nodes added
+        1. Every new :class:`ParadataNodeGroup` is inserted first into
+           the default target graph, and a mapping
+           ``{pd_group.node_id: <nested <graph> element>}`` is built
+           (extended with pre-existing PD groups discovered via
+           ``original_id`` → host XML node → nested graph).
+
+        2. Every other new node is inserted into the nested graph of
+           the PD group it belongs to (via ``is_in_paradata_nodegroup``
+           edge), or into the default target graph when no such edge
+           exists.
+
+        This is what makes the yEd rendering put Doc + Extractors +
+        Combiner + PropertyNode physically inside the
+        ``<US>_PD`` container instead of floating beside it.
         """
         added = 0
         graph_elem = self.root.find(f'{{{NS_GRAPHML}}}graph')
@@ -439,51 +452,165 @@ class GraphMLPatcher:
             print("[GraphMLPatcher] WARNING: No <graph> element found in XML")
             return 0
 
-        # Find the deepest graph to insert into (typically inside the swimlane)
-        # For now, find any nested graph or use top-level
-        target_graph = self._find_insertion_graph(graph_elem)
+        default_target = self._find_insertion_graph(graph_elem)
 
-        for node in self.graph.nodes:
-            # Skip nodes that already exist in the XML (have original_id from import)
+        # NOTE: we used to build a row_map from the direct <node>
+        # children of the Table's <graph> and route new nodes inside
+        # the matching row. That was wrong: in EM graphml swimlane
+        # ROWS are declared in ``<y:Table>/<y:Rows>`` (visual bands
+        # attached to the Table element) — they are NOT <node> children
+        # of the Table's graph. yEd places a node in the correct row
+        # band based on its (x, y) coordinates alone, so the Table's
+        # graph + the right Y is enough.
+
+        # Containment maps: group_node_id → nested <graph> where its
+        # children should be appended at save time. Covers both PD
+        # nodegroups (``is_in_paradata_nodegroup``) and Activity
+        # groups (``is_in_activity``). Populated lazily:
+        # - Pre-existing groups (imported from GraphML) are indexed
+        #   by their ``attributes['original_id']`` — we look up their
+        #   <node> element under ``graph_elem`` and grab the nested
+        #   <graph>.
+        # - Freshly-created groups get added below, after their own
+        #   XML is generated.
+        pd_nested_graphs: Dict[str, ET.Element] = {}
+        activity_nested_graphs: Dict[str, ET.Element] = {}
+        self._index_pre_existing_group_graphs(
+            graph_elem, pd_nested_graphs, activity_nested_graphs)
+
+        def _should_skip(node) -> Optional[str]:
+            """Return a reason string to skip the node, or None."""
             if node.attributes.get('original_id'):
-                continue
-
-            # Skip internal node types
+                return "already in XML (original_id)"
             node_type = getattr(node, 'node_type', '')
             if node_type in INTERNAL_NODE_TYPES:
-                continue
-
-            # Skip DocumentNodes without original_id: they come from auxiliary
-            # data (folder scanning, representation models) and are not part
-            # of the EM formal language in GraphML
+                return f"internal type {node_type!r}"
             if isinstance(node, DocumentNode):
-                continue
-
-            # Safety check: skip nodes whose EMID (node_id) already exists in the XML.
-            # This catches nodes that were imported but lost their original_id
-            # (e.g., deduplicated DocumentNodes, auxiliary imports).
+                if not (getattr(node, 'attributes', None) or {}).get(
+                        'em_master_document'):
+                    return "DocumentNode without em_master_document"
             if node.node_id in self._existing_xml_emids:
-                print(f"[GraphMLPatcher] Skipping node '{getattr(node, 'name', '?')}' "
-                      f"(type={node_type}): EMID {node.node_id[:12]}... already in XML")
+                return (f"EMID {node.node_id[:12]}... already in XML")
+            return None
+
+        # ── First pass: new ParadataNodeGroups ──────────────────────
+        for node in self.graph.nodes:
+            if not isinstance(node, ParadataNodeGroup):
                 continue
-
-            print(f"[GraphMLPatcher] Adding new node: '{getattr(node, 'name', '?')}' "
-                  f"(type={node_type}, id={node.node_id[:12]}...)")
-
-            # Calculate position within the correct epoch lane
+            reason = _should_skip(node)
+            if reason is not None:
+                continue
+            print(f"[GraphMLPatcher] Adding new PD group: "
+                  f"'{getattr(node, 'name', '?')}' "
+                  f"(id={node.node_id[:12]}...)")
             x, y = self._calculate_node_position(node)
-
-            # Generate XML for this node
             new_node_id = self._generate_new_node_id()
             self._uuid_to_new_id[node.node_id] = new_node_id
-
             node_xml = self._create_node_xml(node, new_node_id, x, y)
             if node_xml is not None:
-                target_graph.append(node_xml)
+                default_target.append(node_xml)
+                nested = node_xml.find(f'{{{NS_GRAPHML}}}graph')
+                if nested is not None:
+                    pd_nested_graphs[node.node_id] = nested
                 added += 1
+
+        # ── Second pass: everything else (containment-aware) ────────
+        for node in self.graph.nodes:
+            if isinstance(node, ParadataNodeGroup):
+                continue  # already handled
+            reason = _should_skip(node)
+            if reason is not None:
+                if reason.startswith("internal") or \
+                        reason.startswith("already in XML"):
+                    continue  # silent
+                print(f"[GraphMLPatcher] Skipping node "
+                      f"'{getattr(node, 'name', '?')}': {reason}")
+                continue
+            print(f"[GraphMLPatcher] Adding new node: "
+                  f"'{getattr(node, 'name', '?')}' "
+                  f"(type={getattr(node, 'node_type', '')}, "
+                  f"id={node.node_id[:12]}...)")
+            x, y = self._calculate_node_position(node)
+            new_node_id = self._generate_new_node_id()
+            self._uuid_to_new_id[node.node_id] = new_node_id
+            node_xml = self._create_node_xml(node, new_node_id, x, y)
+            if node_xml is None:
+                continue
+
+            # Target resolution priority:
+            #   1. PD group containment (``is_in_paradata_nodegroup``)
+            #      — deepest container wins when both apply.
+            #   2. Activity group containment (``is_in_activity``).
+            #   3. Default Table-level insertion graph (yEd uses the
+            #      Y coordinate alone to pick the swimlane band).
+            target = default_target
+            for edge in self.graph.edges:
+                if edge.edge_source != node.node_id:
+                    continue
+                if (edge.edge_type == 'is_in_paradata_nodegroup'
+                        and edge.edge_target in pd_nested_graphs):
+                    target = pd_nested_graphs[edge.edge_target]
+                    break
+                if (edge.edge_type == 'is_in_activity'
+                        and edge.edge_target in activity_nested_graphs):
+                    target = activity_nested_graphs[edge.edge_target]
+                    # Don't break — a PD edge with higher priority may
+                    # still follow; let the loop continue.
+            target.append(node_xml)
+            added += 1
 
         print(f"[GraphMLPatcher] Added {added} new nodes")
         return added
+
+    def _find_xml_node_by_id_under(self, root_graph: ET.Element,
+                                     xml_id: str) -> Optional[ET.Element]:
+        """Return the ``<node id=xml_id>`` element anywhere under
+        ``root_graph`` (recursive), or ``None``. Used to locate the
+        host XML element for a pre-existing group (ParadataNodeGroup
+        or ActivityNodeGroup) so we can append new children to its
+        nested ``<graph>``.
+
+        Named with a ``_under`` suffix to avoid colliding with the
+        existing :meth:`_find_xml_node_by_id` which takes the id alone
+        and scans the whole tree from ``self.root``.
+        """
+        for n in root_graph.iter(f'{{{NS_GRAPHML}}}node'):
+            if n.get('id') == xml_id:
+                return n
+        return None
+
+    def _index_pre_existing_group_graphs(
+            self,
+            graph_elem: ET.Element,
+            pd_map: Dict[str, ET.Element],
+            activity_map: Dict[str, ET.Element]) -> None:
+        """Walk every group node in the graph model and — when the
+        group was imported from the GraphML (carries
+        ``attributes['original_id']``) — locate its host ``<node>``
+        in the XML tree and record its nested ``<graph>`` inside the
+        appropriate map (``pd_map`` for ParadataNodeGroup,
+        ``activity_map`` for ActivityNodeGroup).
+
+        This is what lets new US / PD / paradata children be routed
+        into a pre-existing PD or Activity group without the caller
+        having to recreate the group itself.
+        """
+        for node in self.graph.nodes:
+            if isinstance(node, ParadataNodeGroup):
+                target_map = pd_map
+            elif isinstance(node, ActivityNodeGroup):
+                target_map = activity_map
+            else:
+                continue
+            orig_id = (node.attributes or {}).get('original_id')
+            if not orig_id:
+                continue
+            host = self._find_xml_node_by_id_under(graph_elem, orig_id)
+            if host is None:
+                continue
+            nested = host.find(f'{{{NS_GRAPHML}}}graph')
+            if nested is not None:
+                target_map[node.node_id] = nested
 
     def _calculate_node_position(self, node: Node) -> Tuple[float, float]:
         """
@@ -510,6 +637,28 @@ class GraphMLPatcher:
                 if isinstance(source, EpochNode):
                     epoch_node = source
                     break
+
+        if not epoch_node and isinstance(node, ParadataNodeGroup):
+            # ParadataNodeGroups inherit the epoch of the Stratigraphic
+            # Unit that hosts them via ``US --has_paradata_nodegroup--> PD``.
+            # Without this special case a newly-created PD group ends
+            # up at (0, 0) — i.e. the first swimlane — even when its
+            # US belongs to a different epoch.
+            for edge in self.graph.edges:
+                if (edge.edge_target == node.node_id
+                        and edge.edge_type == 'has_paradata_nodegroup'):
+                    host_us = self.graph.find_node_by_id(edge.edge_source)
+                    if host_us is None:
+                        continue
+                    for e2 in self.graph.edges:
+                        if (e2.edge_source == host_us.node_id
+                                and e2.edge_type == 'has_first_epoch'):
+                            target = self.graph.find_node_by_id(e2.edge_target)
+                            if isinstance(target, EpochNode):
+                                epoch_node = target
+                                break
+                    if epoch_node:
+                        break
 
         if not epoch_node:
             # Try finding epoch through a connected stratigraphic node
@@ -603,6 +752,16 @@ class GraphMLPatcher:
             return self._create_extractor_node_xml(node, xml_id, x, y)
         elif isinstance(node, CombinerNode):
             return self._create_combiner_node_xml(node, xml_id, x, y)
+        # Paradata image nodes (DP-51). isinstance(AuthorNode) covers
+        # AuthorAINode via subclass; tested explicitly first for clarity.
+        elif isinstance(node, AuthorAINode):
+            return self._create_paradata_image_node_xml(node, "AuthorAINode", xml_id, x, y)
+        elif isinstance(node, AuthorNode):
+            return self._create_paradata_image_node_xml(node, "AuthorNode", xml_id, x, y)
+        elif isinstance(node, LicenseNode):
+            return self._create_paradata_image_node_xml(node, "LicenseNode", xml_id, x, y)
+        elif isinstance(node, EmbargoNode):
+            return self._create_paradata_image_node_xml(node, "EmbargoNode", xml_id, x, y)
         elif isinstance(node, ParadataNodeGroup):
             return self._create_paradata_group_xml(node, xml_id, x, y)
         elif isinstance(node, EpochNode):
@@ -792,9 +951,11 @@ class GraphMLPatcher:
             generic = ET.SubElement(data_gfx, f'{{{NS_Y}}}GenericNode')
             generic.set('configuration', 'com.yworks.bpmn.Artifact.withShadow')
 
+            # Geometry — kept in sync with the Master-Document reference
+            # nodes in templates/em_palette_template.graphml (n37-n39).
             geometry = ET.SubElement(generic, f'{{{NS_Y}}}Geometry')
-            geometry.set('height', '63.79')
-            geometry.set('width', '42.80')
+            geometry.set('height', '55.0')
+            geometry.set('width', '35.0')
             geometry.set('x', str(x))
             geometry.set('y', str(y))
 
@@ -802,16 +963,32 @@ class GraphMLPatcher:
             fill.set('color', '#FFFFFFE6')
             fill.set('transparent', 'false')
 
+            # BorderStyle — honours the Master-Document variant
+            # (EM 1.5.4+). Unclassified documents fall back to the
+            # "default" entry in em_visual_rules.json, equivalent to
+            # the historical black/solid/1.0 styling.
+            try:
+                from ...utils.utils import get_document_variant_style
+                if hasattr(node, "variant_style_key"):
+                    variant = get_document_variant_style(
+                        node.variant_style_key())
+                else:
+                    variant = get_document_variant_style("default")
+            except Exception:
+                variant = {"border_color": "#000000",
+                           "border_style": "solid",
+                           "border_width": 1.0}
             border = ET.SubElement(generic, f'{{{NS_Y}}}BorderStyle')
-            border.set('color', '#000000')
-            border.set('type', 'line')
-            border.set('width', '1.0')
+            border.set('color', variant.get("border_color", "#000000"))
+            _bs = variant.get("border_style", "solid")
+            border.set('type', 'line' if _bs == "solid" else _bs)
+            border.set('width', str(variant.get("border_width", 1.0)))
 
             label = ET.SubElement(generic, f'{{{NS_Y}}}NodeLabel')
             label.set('alignment', 'center')
             label.set('autoSizePolicy', 'content')
             label.set('fontFamily', 'Dialog')
-            label.set('fontSize', '8')
+            label.set('fontSize', '12')
             label.set('fontStyle', 'plain')
             label.set('hasBackgroundColor', 'false')
             label.set('hasLineColor', 'false')
@@ -887,9 +1064,21 @@ class GraphMLPatcher:
             border.set('type', 'line')
             border.set('width', '1.0')
 
+            # NodeLabel positioned at the NorthWest corner — matches
+            # the convention used by :mod:`node_generator` for
+            # extractors/combiners rendered during full export. Without
+            # ``modelName='corners'`` + ``modelPosition='nw'`` yEd
+            # falls back to ``Internal:Center`` and the id overlaps the
+            # SVG glyph. ``borderDistance='0.0'`` +
+            # ``underlinedText='true'`` keep the visual identical to
+            # the reference TempluMare graphml.
             label = ET.SubElement(svg_node, f'{{{NS_Y}}}NodeLabel')
             label.set('alignment', 'center')
+            label.set('borderDistance', '0.0')
             label.set('fontSize', '10')
+            label.set('modelName', 'corners')
+            label.set('modelPosition', 'nw')
+            label.set('underlinedText', 'true')
             label.set('visible', 'true')
             label.text = node.name or ''
 
@@ -901,6 +1090,192 @@ class GraphMLPatcher:
             svg_content = ET.SubElement(svg_model, f'{{{NS_Y}}}SVGContent')
             svg_content.set('refid', svg_refid)
 
+        return node_elem
+
+    # ------------------------------------------------------------------
+    # Paradata image nodes (AuthorNode / AuthorAINode / LicenseNode /
+    # EmbargoNode) — DP-51
+    # ------------------------------------------------------------------
+
+    def _paradata_refid_for(self, node_type: str) -> str:
+        """Return the ``<y:Image refid="N">`` value to use for ``node_type``
+        in the host file being patched.
+
+        Strategy:
+          1. Scan existing ``<y:ImageNode>`` elements; if one has the
+             palette's label prefix for this type, reuse its refid.
+          2. Otherwise inject the palette template's ``<y:Resource>`` into
+             the host's ``<y:Resources>`` block, under a fresh refid, and
+             return that refid.
+
+        The second path also remembers the mapping so subsequent calls in
+        the same patch session don't re-inject.
+        """
+        cache = getattr(self, "_paradata_refid_cache", None)
+        if cache is None:
+            cache = {}
+            self._paradata_refid_cache = cache
+        if node_type in cache:
+            return cache[node_type]
+
+        entry = palette_resources.get_palette_entry(node_type)
+        if entry is None:
+            raise RuntimeError(
+                f"No palette entry for {node_type}; cannot write its "
+                f"image node without an icon refid."
+            )
+
+        # Try to reuse an existing refid in the host file by matching
+        # the label prefix of already-present ImageNodes.
+        prefix = entry.label_prefix
+        for image_node in self.tree.iter(f"{{{NS_Y}}}ImageNode"):
+            label_elem = image_node.find(f"{{{NS_Y}}}NodeLabel")
+            label_text = (label_elem.text or "").strip() if label_elem is not None else ""
+            if not label_text.startswith(prefix):
+                continue
+            image_ref = image_node.find(f"{{{NS_Y}}}Image")
+            if image_ref is not None and image_ref.attrib.get("refid"):
+                rid = image_ref.attrib["refid"]
+                cache[node_type] = rid
+                return rid
+
+        # Inject the resource from the palette template at a fresh refid.
+        resources_parent = self._ensure_resources_block()
+        used_ids = {
+            r.attrib.get("id")
+            for r in resources_parent.iter(f"{{{NS_Y}}}Resource")
+            if r.attrib.get("id")
+        }
+        # Pick the smallest positive integer not in used_ids
+        i = 1
+        while str(i) in used_ids:
+            i += 1
+        new_refid = str(i)
+
+        # Parse the palette resource XML and clone it with the new refid.
+        # The XML has xmlns:y default via the wrapper parsing trick.
+        wrapped = ET.fromstring(
+            f'<wrap xmlns:y="{NS_Y}">{entry.resource_xml}</wrap>'
+        )
+        for r in wrapped:
+            r.set("id", new_refid)
+            resources_parent.append(r)
+            break
+
+        cache[node_type] = new_refid
+        return new_refid
+
+    def _ensure_resources_block(self) -> ET.Element:
+        """Return the ``<y:Resources>`` element of the host tree,
+        creating the enclosing ``<data key="d9">`` + ``<y:Resources>``
+        structure if it is missing.
+        """
+        root = self.tree.getroot()
+
+        # Find the resources key id (commonly d9). We locate it via the
+        # key declaration with yfiles.type="resources".
+        resources_key = None
+        for k in root.findall(f"{{{NS_GRAPHML}}}key"):
+            if k.attrib.get("yfiles.type") == "resources":
+                resources_key = k.attrib.get("id")
+                break
+        if resources_key is None:
+            resources_key = "d9"  # yEd default; should match importer expectations
+            new_key = ET.SubElement(root, f"{{{NS_GRAPHML}}}key")
+            new_key.set("id", resources_key)
+            new_key.set("for", "graphml")
+            new_key.set("yfiles.type", "resources")
+
+        # Find existing <data key="{resources_key}">
+        for data in root.findall(f"{{{NS_GRAPHML}}}data"):
+            if data.attrib.get("key") == resources_key:
+                existing = data.find(f"{{{NS_Y}}}Resources")
+                if existing is not None:
+                    return existing
+                # Create if the data block has no <y:Resources>
+                return ET.SubElement(data, f"{{{NS_Y}}}Resources")
+
+        # No data block yet — append one at the root level.
+        data = ET.SubElement(root, f"{{{NS_GRAPHML}}}data")
+        data.set("key", resources_key)
+        return ET.SubElement(data, f"{{{NS_Y}}}Resources")
+
+    def _create_paradata_image_node_xml(self, node: Node, node_type: str,
+                                         xml_id: str,
+                                         x: float = 0.0,
+                                         y: float = 0.0) -> ET.Element:
+        """Create ``<node>`` XML for an Author/AuthorAI/License/Embargo node,
+        reusing or injecting the palette resource as needed.
+        """
+        refid = self._paradata_refid_for(node_type)
+
+        # Use the generator (returns lxml Element) then convert to stdlib
+        # ElementTree Element so it fits the patcher's output flow.
+        try:
+            from lxml import etree as LET
+            gen = ParadataImageNodeGenerator()
+            lxml_el = gen.generate_from_node(
+                node, node_id_override=xml_id, x=x, y=y, refid=refid,
+            )
+            if lxml_el is None:
+                return None
+            serialized = LET.tostring(lxml_el).decode("utf-8")
+            node_elem = ET.fromstring(serialized)
+        except ImportError:
+            # lxml unavailable: build directly with stdlib ET using the
+            # same structure the generator produces.
+            node_elem = self._build_paradata_image_node_stdlib(
+                node=node, node_type=node_type, xml_id=xml_id,
+                x=x, y=y, refid=refid,
+            )
+
+        return node_elem
+
+    def _build_paradata_image_node_stdlib(self, node, node_type, xml_id,
+                                          x, y, refid):
+        """Fallback builder for paradata image nodes using stdlib
+        xml.etree (mirrors :class:`ParadataImageNodeGenerator` without
+        lxml). Only executed when lxml is not importable.
+        """
+        entry = palette_resources.get_palette_entry(node_type)
+        prefix = entry.label_prefix if entry else ""
+        display = (getattr(node, "name", None) or node_type).strip()
+        label_text = display if display.startswith(prefix) else f"{prefix} {display}"
+        desc = (getattr(node, "description", "") or "").strip()
+        marker = f"_s3d_node_type:{node_type}"
+        description_with_marker = f"{desc}\n{marker}" if desc else marker
+
+        node_elem = ET.Element(f"{{{NS_GRAPHML}}}node")
+        node_elem.set("id", xml_id)
+
+        description_key = self.key_map['node'].get('description') or "d5"
+        self._set_data_element(node_elem, description_key, description_with_marker)
+
+        gfx_key = self.key_map['node'].get('nodegraphics') or "d6"
+        data_gfx = ET.SubElement(node_elem, f"{{{NS_GRAPHML}}}data")
+        data_gfx.set("key", gfx_key)
+
+        image_node = ET.SubElement(data_gfx, f"{{{NS_Y}}}ImageNode")
+        for tag, attrs in [
+            ("Geometry", {"height": "25.0", "width": "25.0",
+                          "x": str(x), "y": str(y)}),
+            ("Fill", {"color": "#CCCCFF", "transparent": "false"}),
+            ("BorderStyle", {"color": "#000000", "type": "line", "width": "1.0"}),
+        ]:
+            e = ET.SubElement(image_node, f"{{{NS_Y}}}{tag}")
+            for k, v in attrs.items():
+                e.set(k, v)
+
+        label = ET.SubElement(image_node, f"{{{NS_Y}}}NodeLabel")
+        label.set("alignment", "center")
+        label.set("modelName", "corners")
+        label.set("modelPosition", "nw")
+        label.set("fontSize", "12")
+        label.set("visible", "true")
+        label.text = label_text
+
+        image = ET.SubElement(image_node, f"{{{NS_Y}}}Image")
+        image.set("refid", refid)
         return node_elem
 
     def _create_paradata_group_xml(self, node: ParadataNodeGroup,
@@ -937,17 +1312,42 @@ class GraphMLPatcher:
         nested_graph.set('edgedefault', 'directed')
         nested_graph.set('id', f'{xml_id}:')
 
+        # Seed the ProxyAutoBoundsNode realizers with the epoch-derived
+        # (x, y). Without this the GroupNode geometry was pinned to
+        # (0, 0) and the PD container fell outside any swimlane row,
+        # dragging every contained paradata child with it. yEd still
+        # auto-bounds the outer size when the group is expanded, but
+        # the anchor point matters for initial placement inside the
+        # correct swimlane.
+        self._seed_group_realizer_positions(node_elem, x, y)
+
         return node_elem
+
+    def _seed_group_realizer_positions(self, node_elem: ET.Element,
+                                         x: float, y: float) -> None:
+        """Write ``x`` / ``y`` into every realizer Geometry under
+        ``node_elem``. Called AFTER realizers are generated — avoids
+        threading x/y through the lower-level helper which is also
+        used from contexts where default (0, 0) is the right answer.
+        """
+        for geom in node_elem.iter(f'{{{NS_Y}}}Geometry'):
+            geom.set('x', str(x))
+            geom.set('y', str(y))
 
     def _add_group_realizer(self, realizers: ET.Element, label_text: str,
                              bg_color: str, closed: bool):
-        """Add a GroupNode realizer (open or closed state)."""
+        """Add a GroupNode realizer (open or closed state).
+
+        Geometry position is left at (0, 0) here; the outer call
+        (:meth:`_create_paradata_group_xml`) rewrites the x/y on the
+        realizer's Geometry so the group anchors inside the correct
+        swimlane row.
+        """
         group_node = ET.SubElement(realizers, f'{{{NS_Y}}}GroupNode')
 
         geometry = ET.SubElement(group_node, f'{{{NS_Y}}}Geometry')
         geometry.set('height', '30.0' if closed else '120.0')
         geometry.set('width', '118.0' if closed else '376.0')
-        # Group geometry is set by yEd auto-bounds; these are defaults
         geometry.set('x', '0.0')
         geometry.set('y', '0.0')
 
@@ -1025,6 +1425,19 @@ class GraphMLPatcher:
                 if source_node and isinstance(source_node, PropertyNode):
                     property_nodes_in_groups.add(e.edge_source)
 
+        # Build set of EpochNode UUIDs. Edges touching an epoch node are
+        # always importer-derived (has_first_epoch comes from Y-position
+        # matching, and has_author / has_license / has_embargo /
+        # has_property from the SL_PD auto-edge inference). Their
+        # original_id in the source GraphML is ``row_N`` — a yEd Table
+        # row layout identifier, NOT a connectable node id — so writing
+        # them out as <edge source="row_N"…> produces a GraphML that
+        # cannot be reopened in yEd. Drop them here and rely on the
+        # importer to reconstruct them from the swimlane layout + SL_PD
+        # structure on next load.
+        epoch_uuids = {n.node_id for n in self.graph.nodes
+                       if isinstance(n, EpochNode)}
+
         # Find the insertion graph (same as nodes — typically inside swimlane)
         target_graph = self._find_insertion_graph(graph_elem)
 
@@ -1041,6 +1454,12 @@ class GraphMLPatcher:
             # (the relationship is already represented by US → ParadataNodeGroup)
             if (edge.edge_type == 'has_property'
                     and edge.edge_target in property_nodes_in_groups):
+                continue
+
+            # Skip any edge that touches an EpochNode — re-derived at
+            # import time from swimlane Y-positions and SL_PD auto-edge.
+            if (edge.edge_source in epoch_uuids
+                    or edge.edge_target in epoch_uuids):
                 continue
 
             # Resolve source and target IDs
@@ -1251,16 +1670,51 @@ class GraphMLPatcher:
     # Convenience: full patch pipeline
     # -------------------------------------------------------------------------
 
-    def patch(self, output_path: str = None) -> Tuple[int, int, int, List[str]]:
+    def patch(self, output_path: str = None,
+              persist_auxiliary: bool = False
+              ) -> Tuple[int, int, int, List[str]]:
         """
         Run the complete patch pipeline.
 
         Args:
-            output_path: Optional output path (None = overwrite original)
+            output_path: Optional output path (None = overwrite original).
+            persist_auxiliary: Hybrid-C auxiliary-lifecycle policy (see
+                ``docs/dev-projects/HYBRID_C_AUXILIARY_LIFECYCLE.md``).
+                ``False`` (default, **volatile save**): drop nodes/edges
+                tagged ``injected_by`` and revert aux-overridden attributes
+                whose current value still matches the aux value, keeping
+                attributes the user manually re-edited in Blender. ``True``
+                (**bake**): emit everything verbatim and clear
+                ``injected_by`` / ``_aux_overrides`` tags so the enrichment
+                layer becomes graph-native.
 
         Returns:
             Tuple of (nodes_updated, nodes_added, edges_added, emid_problems)
         """
+        # Apply the Hybrid-C policy before patching, so the XML pass
+        # sees the post-policy in-memory graph.
+        from ...transforms.aux_tracking import (
+            apply_override_reversal_policy, strip_injected_content,
+            clear_aux_tags)
+        if persist_auxiliary:
+            report = clear_aux_tags(self.graph)
+            if report["injected_cleared"] or report["overrides_cleared"]:
+                print(f"[GraphMLPatcher] BAKE: cleared "
+                      f"{report['injected_cleared']} injected_by tags, "
+                      f"{report['overrides_cleared']} _aux_overrides entries")
+        else:
+            rev = apply_override_reversal_policy(self.graph)
+            if any(rev.values()):
+                print(f"[GraphMLPatcher] volatile: "
+                      f"{rev['reverted']} attrs reverted, "
+                      f"{rev['kept']} kept (user re-edited), "
+                      f"{rev['unseen']} unseen (kept)")
+            strip = strip_injected_content(self.graph)
+            if strip["nodes"] or strip["edges"]:
+                print(f"[GraphMLPatcher] volatile: stripped "
+                      f"{strip['nodes']} injected nodes, "
+                      f"{strip['edges']} injected edges")
+
         self.load()
         problems = self.validate_emids()
         nodes_updated = self.update_existing_nodes()

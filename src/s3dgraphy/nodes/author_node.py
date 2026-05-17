@@ -2,46 +2,76 @@ from .base_node import Node
 
 class AuthorNode(Node):
     """
-    Classe per rappresentare un nodo autore all'interno del grafo.
+    Human author node.
 
-    Attributi:
-        orcid (str): Identificativo ORCID dell'autore (opzionale).
-        name (str): Nome dell'autore (opzionale).
-        surname (str): Cognome dell'autore (opzionale).
+    Represents a human creator/contributor attached to a graph, a swimlane or
+    a specific node via the ``has_author`` edge type. In the yEd palette it
+    appears as an ImageNode with label prefix ``A.``.
+
+    Attributes:
+        orcid (str): ORCID identifier (optional).
+        name (str): First name (optional).
+        surname (str): Family name (optional).
     """
     node_type = "author"
 
-    def __init__(self, node_id, orcid="noorcid", name="noname", surname="nosurname"):
-        """
-        Inizializza una nuova istanza di AuthorNode.
+    def __init__(self, node_id, name="author", description="",
+                 orcid="noorcid", surname="nosurname",
+                 first_name=None):
+        """Initialize a new AuthorNode.
 
-        Args:
-            node_id (str): Identificativo univoco del nodo.
-            orcid (str, opzionale): Identificativo ORCID. Defaults to "noorcid".
-            name (str, opzionale): Nome dell'autore. Defaults to "noname".
-            surname (str, opzionale): Cognome dell'autore. Defaults to "nosurname".
+        ``name`` here is the node's display name (kept backwards-compatible
+        with existing code that instantiates ``AuthorNode(node_id, name=...)``
+        as a generic Node label). The author's given name can also be passed
+        explicitly via ``first_name``; when omitted, ``name`` is used as the
+        author's given name.
         """
-        super().__init__(node_id=node_id, name="author")
-        
+        super().__init__(node_id=node_id, name=name, description=description)
+
         # Dati dell'autore con valori di fallback
         self.data = {
             "orcid": orcid,
-            "name": name,
-            "surname": surname
+            "name": first_name if first_name is not None else name,
+            "surname": surname,
         }
-    
-    def to_dict(self):
-        """
-        Converte l'istanza di AuthorNode in un dizionario.
 
-        Returns:
-            dict: Rappresentazione del AuthorNode come dizionario.
-        """
+    def to_dict(self):
         return {
             "type": self.node_type,
             "name": self.name,
-            "data": self.data
+            "data": self.data,
         }
+
+
+class AuthorAINode(AuthorNode):
+    """
+    AI-generated author node (subclass of :class:`AuthorNode`).
+
+    Represents an AI-assisted creator (e.g. LLM, image generator) used while
+    authoring parts of the reconstruction. In the yEd palette it appears as
+    an ImageNode with label prefix ``AI.``.
+
+    Adds two fields in ``data``:
+        model (str): identifier of the AI model or service (e.g. ``gpt-5``,
+            ``stable-diffusion-xl``, ``custom-comfyui``).
+        prompt_reference (str): optional reference to the prompt / workflow
+            used; can be a URL, a DocumentNode id or free text.
+
+    The node_type is ``author_ai`` to keep it distinguishable at the graph
+    layer while still resolving as "an author" via
+    ``isinstance(n, AuthorNode)`` checks in consumer code.
+    """
+    node_type = "author_ai"
+
+    def __init__(self, node_id, name="author_ai", description="",
+                 orcid="noorcid", surname="nosurname", first_name=None,
+                 model="", prompt_reference=""):
+        super().__init__(
+            node_id=node_id, name=name, description=description,
+            orcid=orcid, surname=surname, first_name=first_name,
+        )
+        self.data["model"] = model
+        self.data["prompt_reference"] = prompt_reference
 
 '''
 # Esempio di utilizzo per connettere AuthorNode al GraphNode e a nodi specifici

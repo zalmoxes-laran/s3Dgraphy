@@ -4,3 +4,5 @@ recursive-include src/s3dgraphy/JSON_config *.json
 recursive-include src/s3dgraphy/JSON_config *.ttl
 recursive-include src/s3dgraphy/JSON_config/src *
 recursive-include src/s3dgraphy/mappings *.json
+recursive-include src/s3dgraphy/data *
+recursive-include src/s3dgraphy/templates *
