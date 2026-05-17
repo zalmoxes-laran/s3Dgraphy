@@ -63,8 +63,15 @@ class JSONExporter:
         if graph_ids is None:
             graph_ids = get_all_graph_ids()
                 
+        # Schema version 1.6 (lossless): preserves edge.attributes /
+        # edge.edge_type, PropertyNode.value/property_type/units,
+        # ExtractorNode.source, EpochNode.fill_color,
+        # RepresentationModelNode.url, StratigraphicNode class-level
+        # symbol/label/detailed_description, every node.attributes dict,
+        # and the full graph.data payload (previously only 4 keys).
+        # 1.6 is a strict superset of 1.5: all 1.5 fields remain.
         export_data = {
-            "version": "1.5",
+            "version": "1.6",
             "graphs": {}
         }
             
@@ -99,15 +106,28 @@ class JSONExporter:
                             authors.append(edge.edge_source)
                             #print(f"Found author from edge: {edge.edge_source}")
 
+        # Build the ``defaults`` block as a strict superset of the 1.5
+        # schema: the four well-known keys keep their previous shape and
+        # defaults (so a 1.5 reader still finds what it expects), then
+        # every remaining key from ``graph.data`` is folded in so the
+        # export is lossless. Known keys are not overwritten by raw
+        # ``graph.data`` values because they already carry the 1.5
+        # defaults (e.g. license falls back to 'CC-BY-NC-ND').
+        defaults = {
+            "license": graph.data.get('license', 'CC-BY-NC-ND'),
+            "authors": authors,
+            "embargo_until": graph.data.get('embargo_until'),
+            "panorama": graph.data.get('panorama', 'panorama/defsky.jpg')
+        }
+        if isinstance(graph.data, dict):
+            for key, value in graph.data.items():
+                if key not in defaults:
+                    defaults[key] = value
+
         result = {
             "name": graph.name.get('default', ''),
             "description": graph.description.get('default', ''),
-            "defaults": {
-                "license": graph.data.get('license', 'CC-BY-NC-ND'),
-                "authors": authors,
-                "embargo_until": graph.data.get('embargo_until'),
-                "panorama": graph.data.get('panorama', 'panorama/defsky.jpg')
-            },
+            "defaults": defaults,
             "nodes": self._process_nodes(graph),
             "edges": self._process_edges(graph)
         }
@@ -199,6 +219,18 @@ class JSONExporter:
                 nodes["stratigraphic"][node.node_type][node.node_id] = node_data
                 
             elif node.node_type == "EpochNode":
+                # EpochNode keeps its hand-rolled ``data`` block (which is
+                # the 1.5 shape downstream consumers expect) but now also
+                # carries:
+                #   * ``attributes`` — full base attributes dict, so
+                #     ``fill_color`` (set by the GraphML importer) and
+                #     any future importer-side metadata survive.
+                #     (perdite 5 + 8)
+                #   * top-level ``fill_color`` — convenience mirror so
+                #     readers don't have to dig into ``attributes``.
+                epoch_attributes = dict(
+                    getattr(node, "attributes", {}) or {}
+                )
                 node_data = {
                     "type": node.node_type,
                     "name": node.name,
@@ -209,7 +241,9 @@ class JSONExporter:
                         "color": node.color if hasattr(node, 'color') else None,
                         "min_y": node.min_y if hasattr(node, 'min_y') else None,
                         "max_y": node.max_y if hasattr(node, 'max_y') else None
-                    }
+                    },
+                    "attributes": epoch_attributes,
+                    "fill_color": epoch_attributes.get("fill_color"),
                 }
                 nodes["epochs"][node.node_id] = node_data
                 
@@ -260,20 +294,15 @@ class JSONExporter:
                 nodes["semantic_shapes"][node.node_id] = node_data
                 
             elif node.node_type == "representation_model":
-                # Prepara i dati del nodo senza includere l'URL
-                node_data = {
-                    "type": node.node_type,
-                    "name": node.name,
-                    "description": node.description,
-                    "data": {}
-                }
-                
-                # Copia tutti gli attributi tranne URL
-                if hasattr(node, 'data') and isinstance(node.data, dict):
-                    for key, value in node.data.items():
-                        if key != 'url':  # Escludiamo url
-                            node_data['data'][key] = value
-                
+                # Schema 1.6: stop stripping ``url`` from the
+                # RepresentationModelNode export (perdita 6). The
+                # previous behaviour silently dropped the 3D asset
+                # pointer, making the JSON un-rehydratable. We now go
+                # through the standard ``_prepare_node_data`` path so
+                # ``url`` (whether on ``node.data`` or
+                # ``node.attributes``) round-trips, alongside the new
+                # base ``attributes`` catch-all.
+                node_data = self._prepare_node_data(node)
                 nodes["representation_models"][node.node_id] = node_data
 
             elif node.node_type == "representation_model_doc":
@@ -292,14 +321,70 @@ class JSONExporter:
 
         return nodes
 
+    # Stratigraphic subtype node_types whose class-level
+    # ``symbol`` / ``label`` / ``detailed_description`` (declared on the
+    # subclass, not the instance) used to vanish on export. We enumerate
+    # the public node_type strings so the test stays in sync with
+    # ``_process_nodes``' stratigraphic branch.
+    _STRATIGRAPHIC_NODE_TYPES = frozenset({
+        "US", "USVs", "SF", "VSF", "USVn", "USD",
+        "serSU", "serUSVn", "serUSVs",
+        "TSU", "SE", "unknown",
+    })
+
     def _prepare_node_data(self, node):
-        """Helper method to prepare standard node data."""
+        """Helper method to prepare standard node data.
+
+        As of schema 1.6 this helper is the central catch-all for
+        lossless export. On top of the 1.5 fields
+        (``type`` / ``name`` / ``description`` / ``data``) it also emits:
+
+        * ``attributes`` — every ``node.attributes`` dict (perdita 8),
+          which carries importer-side metadata such as ``units`` for
+          PropertyNode or ``fill_color`` for EpochNode.
+        * Type-specific attributes that live directly on the instance
+          (not inside ``data``) and were therefore dropped by the
+          previous ``data.copy()``-only path:
+            - PropertyNode → ``value``, ``property_type``  (perdita 2)
+              plus ``units`` lifted from ``attributes`` (perdita 3)
+            - ExtractorNode → ``source``                    (perdita 4)
+            - StratigraphicNode subclasses → class-level
+              ``symbol`` / ``label`` / ``detailed_description``
+              (perdita 7)
+        """
         node_data = {
             "type": node.node_type,
             "name": node.name,
             "description": node.description,
-            "data": node.data.copy() if hasattr(node, 'data') else {}
+            "data": node.data.copy() if hasattr(node, 'data') else {},
+            # Base catch-all: every importer that stashes metadata on
+            # ``node.attributes`` now round-trips through JSON 1.6.
+            "attributes": dict(getattr(node, "attributes", {}) or {}),
         }
+
+        # PropertyNode — value / property_type are instance attrs, units
+        # is stored under ``attributes`` by the unified xlsx importer.
+        if node.node_type == "property":
+            node_data["value"] = getattr(node, "value", None)
+            node_data["property_type"] = getattr(node, "property_type", None)
+            node_data["units"] = node_data["attributes"].get("units")
+
+        # ExtractorNode — ``source`` is a first-class instance attribute.
+        elif node.node_type == "extractor":
+            node_data["source"] = getattr(node, "source", None)
+
+        # StratigraphicNode subtypes — ``symbol`` / ``label`` /
+        # ``detailed_description`` are declared on the subclass body.
+        # ``getattr`` on an instance returns the class-level default
+        # when no instance override exists, which is exactly what we
+        # want here.
+        if node.node_type in self._STRATIGRAPHIC_NODE_TYPES:
+            node_data["symbol"] = getattr(node, "symbol", None)
+            node_data["label"] = getattr(node, "label", None)
+            node_data["detailed_description"] = getattr(
+                node, "detailed_description", None
+            )
+
         return node_data
         
     def _process_edges(self, graph: Graph) -> Dict[str, List[Dict[str, Any]]]:
@@ -323,10 +408,20 @@ class JSONExporter:
         edges.setdefault("generic_connection", [])
 
         for edge in graph.edges:
+            # Schema 1.6: edges now carry their full payload.
+            #   * ``edge_type`` is added explicitly so a future reader
+            #     can rebuild the typed Edge without inferring the type
+            #     from the bucket key (1.5 omitted the type entirely).
+            #   * ``attributes`` preserves the per-edge metadata dict
+            #     (AUTHOR_n / AUTHOR_KIND_n / DOCUMENT_n etc.) that the
+            #     stratigraphic importers attach. This was perdita 1
+            #     and the single most damaging silent drop in 1.5.
             edge_data = {
                 "id": edge.edge_id,
                 "from": edge.edge_source,
-                "to": edge.edge_target
+                "to": edge.edge_target,
+                "edge_type": edge.edge_type,
+                "attributes": dict(getattr(edge, "attributes", {}) or {}),
             }
 
             # Add edge to appropriate category
