@@ -3,7 +3,6 @@ import pandas as pd
 from ..graph import Graph
 import os
 import json
-import warnings
 from pathlib import Path
 import re
 
@@ -26,14 +25,6 @@ class MappedXLSXImporter(BaseImporter):
                         The caller (EM-tools) is responsible for setting proper graph_id
                         and registering it in MultiGraphManager.
         """
-        warnings.warn(
-            "MappedXLSXImporter is deprecated as of s3Dgraphy 1.6 and will "
-            "be removed in 2.0. Use em_data.xlsx via UnifiedXLSXImporter "
-            "(src/s3dgraphy/importer/unified_xlsx_importer.py) instead. "
-            "See docs/deprecations.md for the migration path.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         super().__init__(
             filepath=filepath,
             mapping_name=mapping_name,

@@ -14,14 +14,16 @@ PYTHONWARNINGS=default::DeprecationWarning python your_script.py
 
 ## Deprecated importers (1.6 → removed in 2.0)
 
-| Symbol                | Deprecated in | Removed in | Replacement                                         |
-| --------------------- | ------------- | ---------- | --------------------------------------------------- |
-| `QualiaImporter`      | 1.6           | 2.0        | `UnifiedXLSXImporter` (single-file `em_data.xlsx`)  |
-| `MappedXLSXImporter`  | 1.6           | 2.0        | `UnifiedXLSXImporter` (single-file `em_data.xlsx`)  |
+| Symbol            | Deprecated in | Removed in | Replacement                                         |
+| ----------------- | ------------- | ---------- | --------------------------------------------------- |
+| `QualiaImporter`  | 1.6           | 2.0        | `UnifiedXLSXImporter` (single-file `em_data.xlsx`)  |
 
-The canonical 1.6 pipeline reads one workbook — `em_data.xlsx` — with
-five typed sheets that together replace the previous two-file
-stratigraphy + paradata flow:
+`QualiaImporter` consumed the long-format `em_paradata.xlsx` workbook
+to enrich an already-imported stratigraphy graph with qualia, epoch
+membership and provenance rows. That two-file pipeline
+(`stratigraphy.xlsx` + `em_paradata.xlsx`) is fully superseded in 1.6
+by `UnifiedXLSXImporter`, which reads a single `em_data.xlsx`
+workbook with five typed sheets:
 
 - `Units` — stratigraphic unit declarations (`ID`, `TYPE`, `NAME`).
 - `Epochs` — temporal swimlanes (`ID`, `NAME`, `START`, `END`, `COLOR`).
@@ -39,15 +41,23 @@ from s3dgraphy.importer.unified_xlsx_importer import UnifiedXLSXImporter
 graph = UnifiedXLSXImporter("em_data.xlsx", graph_id="my_site").parse()
 ```
 
-## Migration recipe
+## Importers that are NOT deprecated
+
+`MappedXLSXImporter`, `XLSXImporter` and `PyArchInitImporter` **remain
+fully supported** in 1.6 and beyond. They are the canonical path for
+ingesting tabular sources **external to `em_data.xlsx`** — for example
+pyArchInit exports, EMdb extracts, or any generic `xlsx` / SQLite file
+mapped via a JSON column-mapping descriptor. This flow is used heavily
+by `em-tools` and is not going anywhere; only the legacy
+`em_paradata.xlsx` long-format ingestion via `QualiaImporter` is
+soppiantato by `em_data.xlsx` + `UnifiedXLSXImporter`.
+
+## Migration recipe (em_paradata.xlsx → em_data.xlsx)
 
 ### Mapping concepts between legacy and 1.6
 
 | Legacy                                              | 1.6 `em_data.xlsx` sheet & column                                |
 | --------------------------------------------------- | ---------------------------------------------------------------- |
-| Stratigraphy sheet (MappedXLSXImporter) `ID`        | `Units.ID`                                                        |
-| Stratigraphy `TYPE` / `STRAT_TYPE`                  | `Units.TYPE`                                                      |
-| Stratigraphy `NAME` / free-text label               | `Units.NAME`                                                      |
 | Paradata sheet (QualiaImporter) `US_ID`             | `Claims.TARGET_ID`                                                |
 | `PROPERTY_TYPE` + `VALUE`                            | `Claims.PROPERTY_TYPE` + `Claims.VALUE`                           |
 | `EXTRACTOR_n` + `DOCUMENT_n` pair                   | `Claims.EXTRACTOR_n` + `Claims.DOCUMENT_n` + `Claims.AUTHOR_n`    |
@@ -59,10 +69,10 @@ graph = UnifiedXLSXImporter("em_data.xlsx", graph_id="my_site").parse()
 
 ### Migration steps
 
-1. Export the existing `stratigraphy.xlsx` and `em_paradata.xlsx`.
-2. Create a new workbook `em_data.xlsx` with the five sheets above.
-3. Move every stratigraphy row into `Units`; the unit `ID` (your old
-   key) stays the same.
+1. Export the existing `em_paradata.xlsx` (paradata long-format).
+2. Create a new workbook `em_data.xlsx` with the five sheets above
+   (Units / Epochs / Claims / Authors / Documents).
+3. Populate `Units` from your stratigraphy source — keys stay the same.
 4. For each paradata / qualia row, append one row to `Claims` keyed by
    `TARGET_ID = <unit id>`. Carry the `EXTRACTOR_n` / `DOCUMENT_n`
    columns over; add `AUTHOR_n` (matching an `Authors.ID`) so the
@@ -79,6 +89,6 @@ graph = UnifiedXLSXImporter("em_data.xlsx", graph_id="my_site").parse()
    graph = UnifiedXLSXImporter("em_data.xlsx").parse()
    ```
 
-Until 2.0 lands the legacy classes still work; they just emit a
-`DeprecationWarning` so that downstream tooling can flag pipelines that
-have not yet migrated.
+Until 2.0 lands `QualiaImporter` still works; it just emits a
+`DeprecationWarning` so that downstream tooling can flag pipelines
+that have not yet migrated.
