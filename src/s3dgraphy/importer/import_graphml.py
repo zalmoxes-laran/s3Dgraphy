@@ -60,6 +60,31 @@ _PALETTE_LABEL_PREFIXES = _load_palette_prefix_config()
 # nodes; takes precedence over label-prefix detection on the import side.
 _S3D_NODE_TYPE_MARKER = "_s3d_node_type:"
 
+# --- Lossless physical-stratigraphic relations side-channel ----------------
+# Companion to the write side in
+# ``exporter/graphml/graphml_exporter.PHYSICAL_STRATIGRAPHIC_TYPES``. The
+# exporter applies a transitive reduction (Harris convention) and emits only
+# the minimal ``is_after`` / ``has_same_time`` edges in the GraphML body; the
+# *original* physical relations (overlies, cuts, fills, abuts, is_before,
+# bonded_to, equals, …) and their author / document attributes are
+# preserved in a graph-level GraphML key called
+# ``_s3d_physical_relations`` (a JSON-encoded list). On import we read that
+# key and use it as the authoritative edge set. Legacy GraphML files
+# without the key fall back to the current behaviour unchanged.
+PHYSICAL_STRATIGRAPHIC_TYPES = (
+    "overlies", "is_overlain_by",
+    "cuts", "is_cut_by",
+    "fills", "is_filled_by",
+    "abuts", "is_abutted_by",
+    "is_before", "is_after",
+    "changed_from", "changed_to",
+    "is_bonded_to", "bonded_to",
+    "is_physically_equal_to", "equals",
+    "has_same_time",
+)
+
+_S3D_PHYSICAL_RELATIONS_ATTR_NAME = "_s3d_physical_relations"
+
 class GraphMLImporter:
     """
     Classe per importare grafi da file GraphML.
@@ -262,6 +287,13 @@ class GraphMLImporter:
         # Prosegui con il parsing normale
         self.parse_nodes(tree)
         self.parse_edges(tree)
+
+        # Restore the full set of physical stratigraphic relations from
+        # the lossless side-channel key written by the s3dgraphy GraphML
+        # exporter. Legacy files without the key are left untouched (the
+        # reduced is_after / has_same_time set from parse_edges remains
+        # in place). See module-level docstring for the rationale.
+        self._restore_physical_relations_from_side_channel(tree)
 
         # Arricchisci i master document con i valori delle PropertyNode collegate
         self._enrich_master_documents()
@@ -649,7 +681,162 @@ class GraphMLImporter:
                     # print(f"Missing target UUID for edge {original_edge_id}: {original_target_id}")
                 
                 # print(f"Warning: Could not create edge {original_edge_id} - Source: {original_source_id} -> Target: {original_target_id}")
-                
+
+    def _restore_physical_relations_from_side_channel(self, tree):
+        """Restore the original physical stratigraphic edges from the
+        ``_s3d_physical_relations`` graph-level GraphML key, if present.
+
+        The exporter writes this key BEFORE applying the Harris-style
+        transitive reduction, so it carries the *full* set of physical
+        relations (overlies, cuts, fills, abuts, is_before, bonded_to,
+        equals, …) with their per-edge attributes (AUTHOR_n,
+        AUTHOR_KIND_n, DOCUMENT_n, URI, …). yEd only sees the reduced
+        ``is_after`` set; this method makes round-tripping the GraphML
+        lossless by switching back to the authoritative edge set.
+
+        Behaviour matrix:
+          - Key present, list non-empty: drop every edge whose type is
+            in :data:`PHYSICAL_STRATIGRAPHIC_TYPES` (those came from the
+            reduction and are stale), then re-emit the original
+            relations from the side channel.
+          - Key present, list empty: nothing to do (the graph genuinely
+            had no physical relations at export time).
+          - Key absent (legacy file): leave the parsed edge set
+            untouched — backward-compatible fallback.
+
+        Source/target IDs in the side channel are the s3dgraphy node
+        UUIDs as written into the EMID slipback fields. Since the
+        importer reuses EMID as the UUID when present (see
+        ``parse_edges`` / ``process_node_element``), the UUIDs round-trip
+        directly. Unknown UUIDs are skipped with a warning so a partial
+        graph still imports cleanly.
+        """
+        root = tree.getroot()
+        ns = 'http://graphml.graphdrawing.org/xmlns'
+
+        # 1) Locate the key id whose attr.name matches our side-channel
+        # name. We do not assume a fixed key id (``d_s3d_phys_rel``)
+        # because some downstream tooling renumbers keys on patch.
+        side_channel_key_id = None
+        for key_elem in root.findall(f'.//{{{ns}}}key'):
+            if (key_elem.attrib.get('attr.name')
+                    == _S3D_PHYSICAL_RELATIONS_ATTR_NAME
+                    and key_elem.attrib.get('for') == 'graph'):
+                side_channel_key_id = key_elem.attrib.get('id')
+                break
+
+        if not side_channel_key_id:
+            # Legacy file: no key declared, nothing to restore.
+            return
+
+        # 2) Find the graph-level <data> element carrying the payload.
+        # We expect it directly under <graph id="G">. Scan all top-level
+        # graphs and pick the first matching data child so we tolerate
+        # files where multiple graphs share the same key declaration.
+        side_channel_data = None
+        for graph_elem in root.findall(f'{{{ns}}}graph'):
+            candidate = graph_elem.find(
+                f'./{{{ns}}}data[@key="{side_channel_key_id}"]')
+            if candidate is not None:
+                side_channel_data = candidate
+                break
+
+        if side_channel_data is None or not (side_channel_data.text or "").strip():
+            # Key declared but no payload — treat as legacy.
+            return
+
+        try:
+            relations = json.loads(side_channel_data.text)
+        except (ValueError, TypeError) as exc:
+            print(f"[GraphML Parser] WARNING: could not parse "
+                  f"{_S3D_PHYSICAL_RELATIONS_ATTR_NAME} payload: {exc}")
+            return
+
+        if not isinstance(relations, list):
+            print(f"[GraphML Parser] WARNING: "
+                  f"{_S3D_PHYSICAL_RELATIONS_ATTR_NAME} payload is not a "
+                  f"list (got {type(relations).__name__}); ignoring")
+            return
+
+        if not relations:
+            # Genuinely empty: drop reduced edges anyway, since the
+            # exporter would not have written them either if the graph
+            # had no physical relations. But to be safe, leave them.
+            return
+
+        # 3) Drop the reduced-physical edges produced by the export-side
+        # transitive reduction. They are stale once we re-add the
+        # originals below.
+        before = len(self.graph.edges)
+        self.graph.edges = [
+            e for e in self.graph.edges
+            if e.edge_type not in PHYSICAL_STRATIGRAPHIC_TYPES
+        ]
+        dropped = before - len(self.graph.edges)
+        # Mark the in-memory indices as dirty (Graph._indices_dirty is the
+        # bookkeeping flag toggled by add_edge / add_node).
+        if hasattr(self.graph, "_indices_dirty"):
+            self.graph._indices_dirty = True
+
+        # 4) Re-emit each physical relation. Use the original edge_id if
+        # present to maximise round-trip fidelity, else generate a fresh
+        # UUID. Skip relations that point to UUIDs not present in the
+        # imported graph (e.g. partial GraphML, deleted nodes).
+        restored = 0
+        skipped_missing = 0
+        skipped_invalid = 0
+        seen_edge_ids = {e.edge_id for e in self.graph.edges}
+        for rel in relations:
+            if not isinstance(rel, dict):
+                skipped_invalid += 1
+                continue
+            source = rel.get("source")
+            target = rel.get("target")
+            edge_type = rel.get("edge_type")
+            if not (source and target and edge_type):
+                skipped_invalid += 1
+                continue
+
+            # Ensure both endpoints exist in the imported graph.
+            if (self.graph.find_node_by_id(source) is None
+                    or self.graph.find_node_by_id(target) is None):
+                skipped_missing += 1
+                continue
+
+            # Resolve edge_id, avoiding collisions with already-present
+            # edges (e.g. a non-physical edge that happens to share the
+            # same edge_id was kept by the filter above).
+            edge_id = rel.get("edge_id") or str(uuid.uuid4())
+            if edge_id in seen_edge_ids:
+                edge_id = str(uuid.uuid4())
+
+            try:
+                edge = self.graph.add_edge(edge_id, source, target,
+                                           edge_type)
+            except ValueError as exc:
+                print(f"[GraphML Parser] WARNING: failed to restore "
+                      f"physical edge {source} -[{edge_type}]-> {target}: "
+                      f"{exc}")
+                skipped_invalid += 1
+                continue
+
+            attrs = rel.get("attributes") or {}
+            if isinstance(attrs, dict) and attrs:
+                if not hasattr(edge, "attributes") or edge.attributes is None:
+                    edge.attributes = {}
+                edge.attributes.update(attrs)
+
+            seen_edge_ids.add(edge_id)
+            restored += 1
+
+        print(f"[GraphML Parser] {_S3D_PHYSICAL_RELATIONS_ATTR_NAME}: "
+              f"dropped {dropped} reduced edges, restored {restored} "
+              f"physical edges"
+              + (f", skipped {skipped_missing} (missing endpoints)"
+                 if skipped_missing else "")
+              + (f", skipped {skipped_invalid} (invalid payload)"
+                 if skipped_invalid else ""))
+
     def process_node_element(self, node_element):
         """
         Processa un elemento nodo dal file GraphML e lo aggiunge al grafo.
