@@ -3,6 +3,7 @@ import pandas as pd
 from ..graph import Graph
 import os
 import json
+import warnings
 from pathlib import Path
 import re
 
@@ -16,17 +17,25 @@ import platform
 _COLUMN_NORMALIZE_PATTERN = re.compile(r'[\s\-/\\()\[\].,;:–—]+')
 
 class MappedXLSXImporter(BaseImporter):
-    def __init__(self, filepath: str, mapping_name: str, overwrite: bool = False, 
+    def __init__(self, filepath: str, mapping_name: str, overwrite: bool = False,
                 existing_graph=None):
         """
         Args:
-            existing_graph: Existing graph instance to use. 
+            existing_graph: Existing graph instance to use.
                         If None, creates new unregistered graph with temporary ID.
-                        The caller (EM-tools) is responsible for setting proper graph_id 
+                        The caller (EM-tools) is responsible for setting proper graph_id
                         and registering it in MultiGraphManager.
         """
+        warnings.warn(
+            "MappedXLSXImporter is deprecated as of s3Dgraphy 1.6 and will "
+            "be removed in 2.0. Use em_data.xlsx via UnifiedXLSXImporter "
+            "(src/s3dgraphy/importer/unified_xlsx_importer.py) instead. "
+            "See docs/deprecations.md for the migration path.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__(
-            filepath=filepath, 
+            filepath=filepath,
             mapping_name=mapping_name,
             overwrite=overwrite
         )
