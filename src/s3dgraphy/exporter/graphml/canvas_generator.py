@@ -55,6 +55,11 @@ class CanvasGenerator:
         # introducing this key has zero impact on the rendered matrix.
         self._add_physical_relations_key(root)
 
+        # Add graph-level lossless key for the PropertyNode structured
+        # metadata side-channel (value / property_type / units /
+        # arbitrary attributes). Same yEd-ignored encoding pattern.
+        self._add_property_metadata_key(root)
+
         # Create main graph element
         graph = ET.SubElement(root, '{http://graphml.graphdrawing.org/xmlns}graph')
         graph.set('id', 'G')
@@ -135,6 +140,15 @@ class CanvasGenerator:
     PHYSICAL_RELATIONS_KEY_ID = "d_s3d_phys_rel"
     PHYSICAL_RELATIONS_ATTR_NAME = "_s3d_physical_relations"
 
+    # Companion graph-level key for lossless storage of PropertyNode
+    # metadata (value / property_type / units / arbitrary attributes).
+    # yEd renders a PropertyNode's content from the description field
+    # (d5), so without this side channel the unified-xlsx structured
+    # qualia (value + units) get flattened into "value units" and
+    # the structured form is lost on import. This key restores it.
+    PROPERTY_METADATA_KEY_ID = "d_s3d_prop_meta"
+    PROPERTY_METADATA_ATTR_NAME = "_s3d_property_metadata"
+
     def _add_physical_relations_key(self, root: ET.Element):
         """Declare the graph-level GraphML key for lossless storage of
         physical stratigraphic relations.
@@ -151,6 +165,26 @@ class CanvasGenerator:
         key.set('attr.type', 'string')
         key.set('for', 'graph')
         key.set('id', self.PHYSICAL_RELATIONS_KEY_ID)
+
+    def _add_property_metadata_key(self, root: ET.Element):
+        """Declare the graph-level GraphML key for lossless storage of
+        PropertyNode structured metadata (value, property_type, units,
+        and the per-node attributes dict).
+
+        yEd encodes a PropertyNode's content via the description field
+        only, which collapses ``value`` + ``attributes['units']`` into
+        a single human-readable string and drops ``property_type``
+        entirely. This side channel preserves the structured form so
+        round-trips are lossless. Companion read side lives in
+        ``importer/import_graphml.py``; legacy GraphML files without
+        the key parse normally (PropertyNodes keep whatever the d5
+        description carries).
+        """
+        key = ET.SubElement(root, '{http://graphml.graphdrawing.org/xmlns}key')
+        key.set('attr.name', self.PROPERTY_METADATA_ATTR_NAME)
+        key.set('attr.type', 'string')
+        key.set('for', 'graph')
+        key.set('id', self.PROPERTY_METADATA_KEY_ID)
 
     def generate_svg_resources(self) -> ET.Element:
         """

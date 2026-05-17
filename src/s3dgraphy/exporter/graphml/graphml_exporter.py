@@ -115,6 +115,13 @@ class GraphMLExporter:
         # read side in ``importer/import_graphml.py``.
         self._write_physical_relations_data(graph_elem, canvas)
 
+        # 1c. Snapshot the structured PropertyNode metadata into a
+        # second graph-level side channel. The yEd encoding collapses
+        # PropertyNode.value + attributes['units'] into a single
+        # description string and drops property_type entirely; the
+        # side channel restores all three on import.
+        self._write_property_metadata_data(graph_elem, canvas)
+
         # Allocate palette refids starting from 4 (1-3 are reserved for
         # SVG extractor/combiner/continuity emitted by CanvasGenerator).
         # Populated as AuthorNode / LicenseNode / EmbargoNode instances
@@ -634,6 +641,64 @@ class GraphMLExporter:
                   f"physical stratigraphic relations in "
                   f"{canvas.PHYSICAL_RELATIONS_ATTR_NAME}")
         return len(physical_relations)
+
+    def _write_property_metadata_data(self, graph_elem: ET.Element,
+                                       canvas: CanvasGenerator) -> int:
+        """Emit the ``_s3d_property_metadata`` graph-level GraphML data
+        element with a JSON-serialised map of every PropertyNode's
+        structured fields keyed by node UUID.
+
+        The yEd PropertyNode encoding renders the description (d5)
+        only, which forces ``_write_property_node`` to collapse
+        ``value`` + ``attributes['units']`` into a single string for
+        display. Without a side channel, ``property_type``,
+        ``value`` and the structured ``units`` field are lost on
+        import. This method writes them out alongside any other
+        non-internal attributes; the importer's
+        :meth:`_restore_property_metadata_from_side_channel`
+        re-applies them in place after node parsing.
+
+        Returns the count of property entries written (for logging).
+        """
+        from ...nodes.property_node import PropertyNode
+
+        property_map: Dict[str, Dict] = {}
+        for node in self.graph.nodes:
+            if not isinstance(node, PropertyNode):
+                continue
+            entry: Dict = {}
+            value = getattr(node, "value", None)
+            if value is not None and value != "":
+                entry["value"] = value
+            property_type = getattr(node, "property_type", None)
+            if property_type:
+                entry["property_type"] = property_type
+            attrs = getattr(node, "attributes", None)
+            if isinstance(attrs, dict) and attrs:
+                # Skip the bookkeeping the GraphML importer rebuilds on
+                # its own (original_id / y_pos / EMID etc.).
+                drop = {"original_id", "y_pos", "x_pos", "EMID", "URI",
+                        "epoch_id", "epoch_name", "is_master_doc",
+                        "graph_id"}
+                semantic_attrs = {k: v for k, v in attrs.items()
+                                   if k not in drop}
+                if semantic_attrs:
+                    entry["attributes"] = semantic_attrs
+            if entry:
+                property_map[node.node_id] = entry
+
+        data = ET.SubElement(
+            graph_elem,
+            '{http://graphml.graphdrawing.org/xmlns}data')
+        data.set('key', canvas.PROPERTY_METADATA_KEY_ID)
+        data.text = json.dumps(property_map,
+                                ensure_ascii=False,
+                                separators=(",", ":"))
+        if property_map:
+            print(f"  [lossless] preserved structured metadata for "
+                  f"{len(property_map)} PropertyNode(s) in "
+                  f"{canvas.PROPERTY_METADATA_ATTR_NAME}")
+        return len(property_map)
 
     def _create_simple_swimlane(self, swimlane_id: str) -> ET.Element:
         """

@@ -85,6 +85,15 @@ PHYSICAL_STRATIGRAPHIC_TYPES = (
 
 _S3D_PHYSICAL_RELATIONS_ATTR_NAME = "_s3d_physical_relations"
 
+# Companion graph-level key carrying structured PropertyNode metadata
+# (value / property_type / units / arbitrary attributes). Written by
+# the GraphML exporter's ``_write_property_metadata_data``; required
+# because the yEd PropertyNode encoding collapses ``value`` +
+# ``attributes['units']`` into the description field and drops
+# ``property_type`` entirely. Without this side channel, structured
+# qualia get re-imported as opaque label strings.
+_S3D_PROPERTY_METADATA_ATTR_NAME = "_s3d_property_metadata"
+
 class GraphMLImporter:
     """
     Classe per importare grafi da file GraphML.
@@ -294,6 +303,14 @@ class GraphMLImporter:
         # reduced is_after / has_same_time set from parse_edges remains
         # in place). See module-level docstring for the rationale.
         self._restore_physical_relations_from_side_channel(tree)
+
+        # Re-apply structured PropertyNode metadata (value /
+        # property_type / units / attributes) from the
+        # ``_s3d_property_metadata`` side channel. The yEd encoding
+        # only carries the rendered description; this restores the
+        # structured form so the (xlsx | GraphML | JSON) triangle is
+        # lossless for qualia-style properties.
+        self._restore_property_metadata_from_side_channel(tree)
 
         # Arricchisci i master document con i valori delle PropertyNode collegate
         self._enrich_master_documents()
@@ -836,6 +853,87 @@ class GraphMLImporter:
                  if skipped_missing else "")
               + (f", skipped {skipped_invalid} (invalid payload)"
                  if skipped_invalid else ""))
+
+    def _restore_property_metadata_from_side_channel(self, tree):
+        """Reapply structured PropertyNode metadata from the
+        ``_s3d_property_metadata`` graph-level GraphML key.
+
+        Companion to :meth:`GraphMLExporter._write_property_metadata_data`.
+        Without this restore the yEd encoding flattens ``value`` +
+        ``attributes['units']`` into the description and loses
+        ``property_type``. With it, the (xlsx | GraphML | JSON)
+        triangle is lossless for qualia PropertyNodes too.
+
+        Behaviour matrix:
+          - Key present, dict non-empty: for each ``node_id`` entry,
+            look up the node in the imported graph (UUIDs round-trip
+            via EMID slipback) and write the structured fields back.
+          - Key present, payload empty / malformed: warn and continue.
+          - Key absent (legacy file): no-op.
+        """
+        root = tree.getroot()
+        ns = 'http://graphml.graphdrawing.org/xmlns'
+
+        # Locate the key id whose attr.name matches our side-channel
+        # name. The id is conventionally ``d_s3d_prop_meta`` but we
+        # do not hard-code it (some tooling renumbers keys on patch).
+        side_channel_key_id = None
+        for key_elem in root.findall(f'.//{{{ns}}}key'):
+            if (key_elem.attrib.get('attr.name')
+                    == _S3D_PROPERTY_METADATA_ATTR_NAME
+                    and key_elem.attrib.get('for') == 'graph'):
+                side_channel_key_id = key_elem.attrib.get('id')
+                break
+
+        if not side_channel_key_id:
+            return  # Legacy file: nothing to restore.
+
+        side_channel_data = None
+        for graph_elem in root.findall(f'{{{ns}}}graph'):
+            candidate = graph_elem.find(
+                f'./{{{ns}}}data[@key="{side_channel_key_id}"]')
+            if candidate is not None:
+                side_channel_data = candidate
+                break
+
+        if side_channel_data is None or not (side_channel_data.text or "").strip():
+            return
+
+        try:
+            property_map = json.loads(side_channel_data.text)
+        except (ValueError, TypeError) as exc:
+            print(f"[GraphML Parser] WARNING: could not parse "
+                  f"{_S3D_PROPERTY_METADATA_ATTR_NAME} payload: {exc}")
+            return
+
+        if not isinstance(property_map, dict) or not property_map:
+            return
+
+        restored = 0
+        skipped_missing = 0
+        for node_id, entry in property_map.items():
+            if not isinstance(entry, dict):
+                continue
+            node = self.graph.find_node_by_id(node_id)
+            if node is None:
+                skipped_missing += 1
+                continue
+            if "value" in entry:
+                node.value = entry["value"]
+            if "property_type" in entry:
+                node.property_type = entry["property_type"]
+            attrs = entry.get("attributes") or {}
+            if isinstance(attrs, dict) and attrs:
+                if not hasattr(node, "attributes") or node.attributes is None:
+                    node.attributes = {}
+                node.attributes.update(attrs)
+            restored += 1
+
+        if restored or skipped_missing:
+            print(f"[GraphML Parser] {_S3D_PROPERTY_METADATA_ATTR_NAME}: "
+                  f"restored {restored} PropertyNode(s)"
+                  + (f", skipped {skipped_missing} (unknown node_id)"
+                     if skipped_missing else ""))
 
     def process_node_element(self, node_element):
         """
