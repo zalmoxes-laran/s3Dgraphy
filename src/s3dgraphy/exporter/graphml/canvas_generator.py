@@ -48,6 +48,13 @@ class CanvasGenerator:
         # Add resources key (for SVG content)
         self._add_resources_key(root)
 
+        # Add graph-level lossless key for the physical stratigraphic
+        # relations side-channel (see graphml_exporter._write_physical_
+        # relations for the rationale). yEd ignores unknown graph-level
+        # keys and the round-trip parser preserves them opaquely, so
+        # introducing this key has zero impact on the rendered matrix.
+        self._add_physical_relations_key(root)
+
         # Create main graph element
         graph = ET.SubElement(root, '{http://graphml.graphdrawing.org/xmlns}graph')
         graph.set('id', 'G')
@@ -121,6 +128,29 @@ class CanvasGenerator:
         key.set('for', 'graphml')
         key.set('id', 'd9')
         key.set('yfiles.type', 'resources')
+
+    # Stable ID used for the graph-level physical-relations key. Chosen
+    # outside the d4..d12 range allocated to node/edge keys so the
+    # existing GraphML id space stays untouched.
+    PHYSICAL_RELATIONS_KEY_ID = "d_s3d_phys_rel"
+    PHYSICAL_RELATIONS_ATTR_NAME = "_s3d_physical_relations"
+
+    def _add_physical_relations_key(self, root: ET.Element):
+        """Declare the graph-level GraphML key for lossless storage of
+        physical stratigraphic relations.
+
+        The key is declared with ``for="graph"`` and a string-typed JSON
+        payload, written next to the main ``<graph>`` element by
+        :class:`GraphMLExporter`. The companion read side lives in
+        ``importer/import_graphml.py``; legacy GraphML files without the
+        key are handled gracefully (fall back to the Harris-minimal
+        ``is_after`` set rendered in yEd).
+        """
+        key = ET.SubElement(root, '{http://graphml.graphdrawing.org/xmlns}key')
+        key.set('attr.name', self.PHYSICAL_RELATIONS_ATTR_NAME)
+        key.set('attr.type', 'string')
+        key.set('for', 'graph')
+        key.set('id', self.PHYSICAL_RELATIONS_KEY_ID)
 
     def generate_svg_resources(self) -> ET.Element:
         """

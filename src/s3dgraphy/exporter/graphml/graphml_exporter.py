@@ -6,6 +6,8 @@ All stratigraphic nodes, ParadataNodeGroups, and edges are nested inside
 a single TableNode swimlane (matching yEd reference structure).
 """
 
+import json
+
 from lxml import etree as ET
 from typing import List, Dict
 from .canvas_generator import CanvasGenerator
@@ -14,6 +16,27 @@ from .node_generator import NodeGenerator
 from .group_node_generator import GroupNodeGenerator
 from .edge_generator import EdgeGenerator
 from .utils import IDManager, generate_uuid
+
+
+# Physical stratigraphic relations preserved as a graph-level GraphML
+# side-channel BEFORE transitive reduction collapses everything into the
+# Harris-minimal ``is_after`` set. Mirrors the canonical / reverse pairs
+# declared in JSON_config/s3Dgraphy_connections_datamodel.json so that
+# both directions round-trip. Symmetric relations (``is_bonded_to``,
+# ``is_physically_equal_to``, ``bonded_to``, ``equals``,
+# ``has_same_time``) are included so the importer can faithfully restore
+# them — yEd only sees the temporal reduction; the data lives here.
+PHYSICAL_STRATIGRAPHIC_TYPES = (
+    "overlies", "is_overlain_by",
+    "cuts", "is_cut_by",
+    "fills", "is_filled_by",
+    "abuts", "is_abutted_by",
+    "is_before", "is_after",
+    "changed_from", "changed_to",
+    "is_bonded_to", "bonded_to",
+    "is_physically_equal_to", "equals",
+    "has_same_time",
+)
 
 
 class GraphMLExporter:
@@ -82,6 +105,15 @@ class GraphMLExporter:
         canvas = CanvasGenerator()
         root = canvas.generate_root()
         graph_elem = root.find('.//{http://graphml.graphdrawing.org/xmlns}graph')
+
+        # 1b. Snapshot the full set of physical stratigraphic relations
+        # BEFORE the transitive reduction below collapses them into the
+        # Harris-minimal ``is_after`` set. The snapshot is serialised as
+        # JSON into a graph-level GraphML data element so the GraphML
+        # round-trip is lossless. yEd ignores unknown graph-level keys,
+        # so this side-channel does not affect rendering. See companion
+        # read side in ``importer/import_graphml.py``.
+        self._write_physical_relations_data(graph_elem, canvas)
 
         # Allocate palette refids starting from 4 (1-3 are reserved for
         # SVG extractor/combiner/continuity emitted by CanvasGenerator).
@@ -538,6 +570,70 @@ class GraphMLExporter:
         print(f"  - Total edges exported: {len(export_edges)}")
         print(f"  - Internal PD edges: {internal_edge_total}")
         print(f"  - ParadataGroups: {len(paradata_groups)}")
+
+    def _write_physical_relations_data(self, graph_elem: ET.Element,
+                                       canvas: CanvasGenerator) -> int:
+        """Emit the ``_s3d_physical_relations`` graph-level GraphML data
+        element with the JSON-serialised list of every physical
+        stratigraphic edge currently in ``self.graph``.
+
+        This runs BEFORE the exporter's transitive reduction so it
+        captures the *original* edge set (including all 10+ physical
+        relation types and their author / document attributes), not the
+        reduced ``is_after`` set sent to yEd. The companion
+        ``graphml_importer`` reads this side-channel and uses it as the
+        canonical edge set on round-trip — legacy GraphML files without
+        the key keep working with the Harris-minimal set.
+
+        Returns the count of relations written (for logging).
+        """
+        physical_relations = []
+        for edge in self.graph.edges:
+            if edge.edge_type not in PHYSICAL_STRATIGRAPHIC_TYPES:
+                continue
+            relation = {
+                "source": edge.edge_source,
+                "target": edge.edge_target,
+                "edge_type": edge.edge_type,
+            }
+            edge_attrs = getattr(edge, "attributes", None)
+            if edge_attrs:
+                # Filter out internal tracking fields the importer
+                # repopulates on its own (``original_edge_id``,
+                # ``original_source_id``, ``original_target_id``) so the
+                # side-channel only carries semantic payload (AUTHOR_n,
+                # AUTHOR_KIND_n, DOCUMENT_n, URI, EMID, etc.).
+                drop = {"original_edge_id", "original_source_id",
+                        "original_target_id"}
+                semantic = {k: v for k, v in edge_attrs.items()
+                            if k not in drop}
+                if semantic:
+                    relation["attributes"] = semantic
+            # ``edge_id`` is preserved so importers can round-trip the
+            # UUID of each physical edge (mirrors EMID handling for the
+            # node/edge level keys).
+            if getattr(edge, "edge_id", None):
+                relation["edge_id"] = edge.edge_id
+            physical_relations.append(relation)
+
+        # Always emit the element — even with an empty list — so the
+        # presence of the key signals "this file was produced by the
+        # lossless exporter, please use it as the canonical edge set"
+        # to the importer. A missing key means "legacy file, use the
+        # reduced is_after set".
+        data = ET.SubElement(
+            graph_elem,
+            '{http://graphml.graphdrawing.org/xmlns}data')
+        data.set('key', canvas.PHYSICAL_RELATIONS_KEY_ID)
+        data.text = json.dumps(physical_relations,
+                               ensure_ascii=False,
+                               separators=(",", ":"))
+
+        if physical_relations:
+            print(f"  [lossless] preserved {len(physical_relations)} "
+                  f"physical stratigraphic relations in "
+                  f"{canvas.PHYSICAL_RELATIONS_ATTR_NAME}")
+        return len(physical_relations)
 
     def _create_simple_swimlane(self, swimlane_id: str) -> ET.Element:
         """
