@@ -133,6 +133,12 @@ class JSONExporter:
             "stratigraphic": {"US": {}, "USVs": {}, "SF": {}, "VSF": {},"USVn": {}, "USD": {}, "serSU": {}, "serUSVn": {}, "serUSVs": {}, "TSU": {}, "SE": {}, "unknown": {}},
             "epochs": {},
             "groups": {},
+            # LocationNodeGroup is a spatial / locational membership
+            # container (toponym / study / functional). It is orthogonal
+            # to ActivityNodeGroup (intention) and EpochNode (time), so it
+            # gets its own bucket instead of being lumped into ``groups``.
+            # See nodes/group_node.py for the CIDOC-CRM mapping.
+            "location_node_groups": {},
             "properties": {},
             "documents": {},
             "extractors": {},
@@ -210,7 +216,20 @@ class JSONExporter:
             elif node.node_type in ["ActivityNodeGroup", "TimeBranchNodeGroup", "ParadataNodeGroup"]:
                 node_data = self._prepare_node_data(node)
                 nodes["groups"][node.node_id] = node_data
-                
+
+            elif node.node_type == "LocationNodeGroup":
+                # LocationNodeGroup nodes were previously silently dropped
+                # from the Heriverse JSON export because the elif chain had
+                # no branch for them. The fix is conservative: prepare the
+                # node like any other group, but write it to its own
+                # ``location_node_groups`` bucket so downstream consumers
+                # (e.g. the WebGL viewer) can treat spatial membership
+                # distinctly from activity / time-branch / paradata groups.
+                # ``kind`` and ``propagation`` flow through via
+                # ``node.data`` / ``node.attributes`` automatically.
+                node_data = self._prepare_node_data(node)
+                nodes["location_node_groups"][node.node_id] = node_data
+
             elif node.node_type == "property":
                 node_data = self._prepare_node_data(node)
                 nodes["properties"][node.node_id] = node_data
