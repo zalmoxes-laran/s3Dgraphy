@@ -292,7 +292,26 @@ class GraphMLImporter:
         
         # Memorizza gli ID originali per la mappatura
         self.id_mapping = {}  # {original_id: uuid_id}
-        
+
+        # Pass 0 — pre-scan dei nodi documento per fissare l'identità
+        # persistente di ogni documento. La regola è:
+        #
+        #     priorità (per ogni ``nodename``):
+        #       1. EMID del Master            (se esiste un nodo Master
+        #                                       con EMID per quel nome)
+        #       2. EMID della prima istanza   (se esiste almeno
+        #                                       un'istanza con EMID)
+        #       3. (nessuna entry)            → fallback al parsing
+        #                                       normale, UUID per-nodo
+        #
+        # Questo passo elimina il bug "Master dopo istanza": senza
+        # pre-scan, la prima istanza in ordine XML genera/usa un UUID
+        # che diventa canonical, e l'EMID del Master (che arriva dopo)
+        # viene scartato dal branch di dedup. Con il pre-scan
+        # l'identità è decisa prima ancora che il parser tocchi i nodi,
+        # ed è indipendente dall'ordine XML.
+        self.canonical_emids_by_name = self._collect_canonical_document_emids(tree)
+
         # Prosegui con il parsing normale
         self.parse_nodes(tree)
         self.parse_edges(tree)
@@ -1030,6 +1049,22 @@ class GraphMLImporter:
 
             is_master = self._is_master_document(border_color, border_width)
 
+            # Pre-scan override: if Pass 0 determined a canonical EMID
+            # for this nodename (Master EMID or first-instance EMID),
+            # use it instead of the per-node uuid_id computed earlier.
+            # This guarantees that the canonical identity for a doc is
+            # always the Master EMID when the Master exists in the
+            # file, regardless of XML order.
+            canonical_emid = (
+                getattr(self, 'canonical_emids_by_name', {}) or {}
+            ).get(nodename)
+            if canonical_emid and canonical_emid != uuid_id:
+                uuid_id = canonical_emid
+                # Keep id_mapping aligned for the current original_id;
+                # the document_nodes_map will also be set to this id
+                # below when the first occurrence is created.
+                self.id_mapping[original_id] = uuid_id
+
             if nodename in self.document_nodes_map:
                 # Documento già presente nel grafo
                 existing_uuid = self.document_nodes_map[nodename]
@@ -1037,7 +1072,25 @@ class GraphMLImporter:
 
                 if is_master and existing_doc and not existing_doc.attributes.get('is_master', False):
                     # Master incontrato dopo un'istanza: aggiorna il nodo esistente
-                    # con i dati del master (descrizione, attributi visivi, posizione)
+                    # con i dati del master (descrizione, attributi visivi, posizione).
+                    # The previous Instance state is preserved in the
+                    # 'instances' list so the exporter can re-emit it.
+                    prev_original_id = existing_doc.attributes.get('original_id')
+                    prev_y_pos = existing_doc.attributes.get('y_pos', 0.0)
+                    # Read the instance's own EMID off the file, if any —
+                    # we want round-trip fidelity, not just position.
+                    try:
+                        prev_emid = (existing_doc.attributes
+                                     .get('original_emid'))
+                    except Exception:
+                        prev_emid = None
+                    self._append_instance_record(
+                        existing_doc,
+                        original_id=prev_original_id,
+                        emid=prev_emid,
+                        y_pos=prev_y_pos,
+                    )
+
                     if nodedescription:
                         existing_doc.description = nodedescription
                     if nodeurl:
@@ -1050,16 +1103,38 @@ class GraphMLImporter:
                         existing_doc.attributes['y_pos'] = float(doc_y_pos)
                     except (ValueError, TypeError):
                         existing_doc.attributes['y_pos'] = 0.0
+                    # The Master takes over as the "primary" XML
+                    # original_id of the merged DocumentNode — that's
+                    # what the exporter will use for the master node.
+                    existing_doc.attributes['original_id'] = original_id
                     # Mappa l'ID originale del master per il remapping degli edge
                     self.id_mapping[original_id] = existing_uuid
-                    existing_original_id = existing_doc.attributes.get('original_id')
+                    existing_original_id = prev_original_id
                     if existing_original_id:
                         self.duplicate_id_map[original_id] = existing_original_id
                     else:
                         self.duplicate_id_map[original_id] = existing_uuid
                     print(f"[GraphML Parser] Master document '{nodename}' upgraded existing instance node ({existing_uuid})")
                 else:
-                    # Deduplicazione standard: istanza dopo master, o istanza duplicata
+                    # Deduplicazione standard: istanza dopo master, o istanza duplicata.
+                    # Record the instance so the exporter can re-emit it
+                    # at round-trip with the original geometry / EMID.
+                    if existing_doc is not None:
+                        custom = self.extract_custom_fields(
+                            node_element, 'node')
+                        instance_emid = (custom.get('EMID')
+                                         if custom else None)
+                        try:
+                            y_val = float(doc_y_pos)
+                        except (ValueError, TypeError):
+                            y_val = 0.0
+                        self._append_instance_record(
+                            existing_doc,
+                            original_id=original_id,
+                            emid=instance_emid,
+                            y_pos=y_val,
+                        )
+
                     if existing_doc and hasattr(existing_doc, 'attributes'):
                         existing_original_id = existing_doc.attributes.get('original_id')
                         if existing_original_id:
@@ -1081,16 +1156,30 @@ class GraphMLImporter:
                 document_node.attributes['original_id'] = original_id
                 document_node.attributes['graph_id'] = self.graph.graph_id
 
+                # Remember the EMID this node carried on the file (may
+                # differ from ``uuid_id`` when the pre-scan promoted a
+                # Master EMID). Used by the exporter to round-trip
+                # instance positions / EMIDs without losing fidelity.
+                try:
+                    _custom = self.extract_custom_fields(node_element, 'node')
+                    _emid_on_file = _custom.get('EMID') if _custom else None
+                    if _emid_on_file:
+                        document_node.attributes['original_emid'] = _emid_on_file.strip()
+                except Exception:
+                    pass
+
                 # Attributi master document
                 document_node.attributes['is_master'] = is_master
+                # Record y_pos for ALL document nodes (not just Masters)
+                # — needed to position instances on export.
+                try:
+                    document_node.attributes['y_pos'] = float(doc_y_pos)
+                except (ValueError, TypeError):
+                    document_node.attributes['y_pos'] = 0.0
                 if is_master:
                     document_node.attributes['border_color'] = border_color
                     document_node.attributes['border_width'] = border_width
                     document_node.attributes['certainty_class'] = self._get_certainty_class(border_color)
-                    try:
-                        document_node.attributes['y_pos'] = float(doc_y_pos)
-                    except (ValueError, TypeError):
-                        document_node.attributes['y_pos'] = 0.0
 
                 # Aggiungi URI se presente
                 if node_uri:
@@ -1973,24 +2062,161 @@ class GraphMLImporter:
     }
 
     def _is_master_document(self, border_color, border_width):
-        """A master document has a colored (non-black) border with width >= 3.0."""
-        if border_color and border_color.upper() != "#000000" and border_width:
-            try:
-                return float(border_width) >= 3.0
-            except (ValueError, TypeError):
-                return False
-        return False
+        """A master document has a thick border (width >= 3.0).
+
+        The previous rule additionally required the border to be
+        non-black (``border_color != "#000000"``). That excluded the
+        case of a Master that is recognised as Master but has no
+        geometry classification yet — the natural neutral colour for
+        which is black. With this widened rule the *thickness*
+        identifies the Master ROLE while the *colour* classifies the
+        Master's geometry-axis category (reality_based / observable /
+        asserted / em_based / unknown). A thin border, regardless of
+        colour, is always an Instance.
+        """
+        if not border_width:
+            return False
+        try:
+            return float(border_width) >= 3.0
+        except (ValueError, TypeError):
+            return False
 
     def _get_certainty_class(self, border_color):
-        """Map border color to a semantic certainty class."""
+        """Map border color to a semantic certainty class.
+
+        Unknown / unrecognised colours (including pure black, used by
+        unclassified Masters) map to ``"unknown"``.
+        """
         if not border_color:
             return "unknown"
         color_upper = border_color.upper()
         for known_color, certainty in self.MASTER_CERTAINTY_CLASSES.items():
             if known_color.upper() == color_upper:
                 return certainty
-        # Colored but unrecognized → still a master, class unknown
         return "unknown"
+
+    @staticmethod
+    def _append_instance_record(doc_node, original_id, emid, y_pos):
+        """Record an Instance occurrence on its DocumentNode.
+
+        ``doc_node.attributes['instances']`` is a list of dicts that
+        the exporter consults to re-emit all yEd nodes the Master was
+        deduplicated with. Each entry holds:
+
+            {'original_id': <yEd xml id>,
+             'emid':        <file EMID or None>,
+             'y_pos':       <float for vertical position>}
+
+        Duplicates by ``original_id`` are skipped so repeated calls
+        don't bloat the list (idempotent in practice).
+        """
+        if doc_node is None:
+            return
+        instances = doc_node.attributes.get('instances')
+        if instances is None:
+            instances = []
+            doc_node.attributes['instances'] = instances
+        if original_id and any(r.get('original_id') == original_id for r in instances):
+            return
+        instances.append({
+            'original_id': original_id,
+            'emid': emid,
+            'y_pos': float(y_pos) if y_pos is not None else 0.0,
+        })
+
+    def _collect_canonical_document_emids(self, tree):
+        """Pre-scan dei nodi documento per fissare l'identità per nome.
+
+        Costruisce e ritorna un ``dict`` ``{nodename: canonical_emid}``.
+        Per ogni nome:
+
+        - se almeno un nodo per quel nome è un Master *con* EMID nel
+          file, vince l'EMID del primo Master incontrato;
+        - altrimenti, se la **prima** occorrenza (in ordine XML) di
+          quel nome ha un EMID sul file, vince quello;
+        - in tutti gli altri casi la chiave non viene inserita (il
+          parsing normale userà l'EMID per-nodo se presente o un fresh
+          UUID, e l'identità si stabilizza al primo save).
+
+        Perché solo la *prima* occorrenza? Perché ``parse_nodes``
+        processa i nodi in ordine XML e la prima occorrenza fornisce
+        ``node.attributes['original_id']``. Lo slipback poi scrive
+        l'EMID canonical su QUELLA XML node. Se il pre-scan promuovesse
+        l'EMID di un'istanza successiva, lo slipback creerebbe due
+        nodi XML con lo stesso EMID (la prima occorrenza eredita
+        l'EMID promosso, l'istanza successiva mantiene il suo): un
+        conflitto. Restringere il fallback alla "prima" elimina il
+        conflitto e mantiene l'invariante "EMID per nodo XML".
+
+        L'ordine di lettura è quello restituito da ``tree.iter('node')``
+        (depth-first, document order), deterministico per struttura.
+        """
+        canonical: dict = {}
+        master_locked: set = set()
+        # Track which names have already had their "first occurrence"
+        # processed for the fallback path. Subsequent non-Master
+        # occurrences cannot overwrite it.
+        first_seen: set = set()
+
+        nodes_xpath = '{http://graphml.graphdrawing.org/xmlns}node'
+        for node_elem in tree.iter(nodes_xpath):
+            # Skip group / swimlane nodes (yEd folders). Their XML
+            # carries a ``yfiles.foldertype`` attribute and their
+            # descendant ``<data>`` elements include children that
+            # are real documents. If we run ``EM_extract_document_node``
+            # on a group node it reaches into the children with a
+            # recursive XPath and incorrectly reports the parent as
+            # a "document" with the deepest child's label and the
+            # parent's own EMID — which would then become the
+            # canonical EMID for that child's name, colliding with
+            # the parent group's UUID at add_node time. The downstream
+            # ``parse_nodes`` already gates groups via ``_check_node_type``
+            # and never calls ``EM_check_node_document`` on them; the
+            # pre-scan must follow the same rule.
+            if self._check_node_type(node_elem) != 'node_simple':
+                continue
+
+            try:
+                (nodename, _node_id, _desc, _url, is_doc,
+                 border_color, border_width, _y) = \
+                    self.EM_extract_document_node(node_element=node_elem)
+            except Exception:
+                continue
+            if not is_doc or not nodename:
+                continue
+
+            is_master = self._is_master_document(border_color, border_width)
+
+            if nodename in master_locked:
+                # Master EMID already fixed; nothing to do.
+                continue
+
+            custom = self.extract_custom_fields(node_elem, 'node')
+            emid_on_file = custom.get('EMID') if custom else None
+            if emid_on_file:
+                emid_on_file = emid_on_file.strip() or None
+
+            if is_master:
+                if emid_on_file:
+                    canonical[nodename] = emid_on_file
+                    master_locked.add(nodename)
+                # Master without EMID on file: don't insert. The
+                # parser's normal flow will handle this — at first
+                # save the Master XML node will receive a stable
+                # EMID via slipback and subsequent loads will hit
+                # the master branch here.
+                continue
+
+            # Non-Master (instance) branch. The fallback only fires
+            # for the FIRST occurrence of the name; subsequent
+            # occurrences cannot donate their EMID. See docstring.
+            if nodename in first_seen:
+                continue
+            first_seen.add(nodename)
+            if emid_on_file:
+                canonical[nodename] = emid_on_file
+
+        return canonical
 
     def EM_check_node_document(self, node_element):
         try:
