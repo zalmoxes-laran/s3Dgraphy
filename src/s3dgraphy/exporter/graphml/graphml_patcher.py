@@ -418,6 +418,39 @@ class GraphMLPatcher:
             if changed:
                 updated += 1
 
+        # Document instances: nodes that were deduplicated at load
+        # (same name as the Master) keep their XML element in the
+        # file but no longer have a corresponding Graph node. To
+        # preserve round-trip identity we re-emit their EMIDs here
+        # using the ``instances`` list recorded on the Master at load
+        # (see ``ImportGraphML._append_instance_record``). Without
+        # this, an instance whose EMID was missing on the original
+        # file would never gain a stable EMID, even after multiple
+        # save passes, defeating slipback for that node.
+        if emid_key:
+            for node in self.graph.nodes:
+                instances = node.attributes.get('instances') if hasattr(node, 'attributes') else None
+                if not instances:
+                    continue
+                for inst in instances:
+                    inst_orig_id = inst.get('original_id')
+                    if not inst_orig_id:
+                        continue
+                    inst_elem = self._find_xml_node_by_id(inst_orig_id)
+                    if inst_elem is None:
+                        continue
+                    # If the instance already had an EMID on file we
+                    # honour it (round-trip fidelity). Otherwise we
+                    # mint one — UUID4 — so the next load can resolve
+                    # this instance by its own stable id.
+                    inst_emid = inst.get('emid')
+                    if not inst_emid:
+                        import uuid as _uuid
+                        inst_emid = str(_uuid.uuid4())
+                        inst['emid'] = inst_emid
+                    self._set_data_element(inst_elem, emid_key, inst_emid)
+                    updated += 1
+
         print(f"[GraphMLPatcher] Updated {updated} existing nodes")
         return updated
 

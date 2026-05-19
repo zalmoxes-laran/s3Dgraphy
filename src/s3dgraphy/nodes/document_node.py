@@ -132,12 +132,39 @@ class DocumentNode(ParadataNode):
         """Return the lookup key for
         :func:`em_visual_rules.json → document_variant_styles`.
 
-        In EM 1.6 the border colour is driven by ``geometry`` alone:
-        the key is the geometry value, or ``"default"`` when the
-        document has no RM. Role and content_nature are metadata and
-        do not affect the border.
+        Border *width* encodes the Master/Instance distinction; border
+        *colour* encodes the geometry-axis sub-classification. The
+        priorities here are:
+
+        - ``geometry`` set (and recognised)  → that geometry key,
+          which yields a *thick* coloured border (Master).
+        - Master flag True but no geometry   → ``"master_unknown"``,
+          a thick *black* border that still reads as Master in yEd
+          and in :func:`_is_master_document` (width-based recognizer).
+        - otherwise                           → ``"default"``, a thin
+          black border (Instance / non-Master document).
+
+        Two attribute keys carry the Master flag depending on the
+        node's provenance and we OR them together:
+
+        - ``is_master``        — set by the GraphML importer when the
+          source node had a thick coloured border in yEd.
+        - ``em_master_document`` — set by EM-blender-tools'
+          ``create_master_document_node`` helper when a Master is
+          authored from inside Blender. Also the flag the GraphML
+          patcher uses to decide whether to write a fresh
+          DocumentNode on save.
+
+        Either key being truthy is enough to make the node a Master
+        for style purposes.
         """
         g = self.effective_geometry()
-        if g is None:
-            return "default"
-        return g
+        if g is not None:
+            return g
+        is_master = bool(
+            self.attributes.get("is_master", False)
+            or self.attributes.get("em_master_document", False)
+        )
+        if is_master:
+            return "master_unknown"
+        return "default"
