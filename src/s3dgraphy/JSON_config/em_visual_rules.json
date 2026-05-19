@@ -631,11 +631,18 @@
     }
   },
   "document_variant_styles": {
-    "_comment": "Axis 3 of the three-axis Master-Document classification (EM 1.6). Declares how the document's Representation Model (RM) is spatialized in the 3D scene. The 'geometry' property drives both the GraphML DocumentNode border colour (in yEd) and the RM contour colour in the 3D viewport (per the v1.6 toggle). Documents without an RM (e.g. PDF articles, bibliographies) omit the geometry property entirely — no node, no colour. Colours follow the EM certainty scale (red / orange / yellow) reinterpreted as geometric-quality grading. Kept in sync with the reference nodes in templates/em_palette_template.graphml (n37 red, n39 orange, n38 yellow).",
+    "_comment": "Axis 3 of the three-axis Master-Document classification (EM 1.6). Declares how the document's Representation Model (RM) is spatialized in the 3D scene. The 'geometry' property drives both the GraphML DocumentNode border colour (in yEd) and the RM contour colour in the 3D viewport (per the v1.6 toggle). Documents without an RM (e.g. PDF articles, bibliographies) omit the geometry property entirely — no node, no colour. Border WIDTH carries the Master/Instance distinction: width >= 3.0 is Master, anything thinner is Instance. The COLOUR classifies the Master's geometry-axis category. A black thick border means 'Master without geometry classification' (master_unknown). Kept in sync with the reference nodes in templates/em_palette_template.graphml.",
     "default": {
       "border_color": "#000000",
       "border_style": "solid",
-      "border_width": 1.0
+      "border_width": 1.0,
+      "_comment": "Instance / non-Master document. Thin black border. Used for DocumentNodes without a Master role (citation references, paradata pointers, etc.)."
+    },
+    "master_unknown": {
+      "border_color": "#000000",
+      "border_style": "solid",
+      "border_width": 4.0,
+      "description": "Master document whose RM spatialisation has not been classified yet on the geometry axis. Thick black border distinguishes it from a non-Master Instance (thin black) while remaining neutral on classification."
     },
     "reality_based": {
       "border_color": "#9B3333",

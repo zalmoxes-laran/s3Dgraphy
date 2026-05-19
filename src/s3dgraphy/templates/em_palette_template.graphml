@@ -737,7 +737,7 @@
     </node>
     <node id="n40">
       <data key="d3" xml:space="preserve"><![CDATA[677b89a4-eb43-465d-a1bb-07195e9cf76b]]></data>
-      <data key="d4"/>
+      <data key="d4" xml:space="preserve"/>
       <data key="d7">
         <y:ShapeNode>
           <y:Geometry height="30.0" width="63.89077774580642" x="788.6451711374251" y="2978.966141089876"/>
@@ -746,6 +746,26 @@
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="18.1328125" horizontalTextPosition="center" iconTextGap="4" modelName="custom" textColor="#000000" verticalTextPosition="bottom" visible="true" width="39.66015625" x="12.115310747903209" xml:space="preserve" y="5.93359375">RSF01<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
           <y:Shape type="octagon"/>
         </y:ShapeNode>
+      </data>
+    </node>
+    <node id="n41">
+      <data key="d3" xml:space="preserve"><![CDATA[2bf151c6-ab77-446c-ab83-84a9986ff31c]]></data>
+      <data key="d4"/>
+      <data key="d6" xml:space="preserve"><![CDATA[Incisione settecentesca]]></data>
+      <data key="d7">
+        <y:GenericNode configuration="com.yworks.bpmn.Artifact.withShadow">
+          <y:Geometry height="55.0" width="35.0" x="0.0" y="3067.6996464531685"/>
+          <y:Fill color="#FFFFFFE6" transparent="false"/>
+          <y:BorderStyle color="#000000" type="line" width="4.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" height="18.1328125" horizontalTextPosition="center" iconTextGap="4" modelName="internal" modelPosition="c" textColor="#000000" verticalTextPosition="bottom" visible="true" width="16.78515625" x="9.107421875" xml:space="preserve" y="18.43359375">D.</y:NodeLabel>
+          <y:StyleProperties>
+            <y:Property class="java.awt.Color" name="com.yworks.bpmn.icon.line.color" value="#000000"/>
+            <y:Property class="java.awt.Color" name="com.yworks.bpmn.icon.fill2" value="#d4d4d4cc"/>
+            <y:Property class="java.awt.Color" name="com.yworks.bpmn.icon.fill" value="#ffffffe6"/>
+            <y:Property class="com.yworks.yfiles.bpmn.view.BPMNTypeEnum" name="com.yworks.bpmn.type" value="ARTIFACT_TYPE_DATA_OBJECT"/>
+            <y:Property class="com.yworks.yfiles.bpmn.view.DataObjectTypeEnum" name="com.yworks.bpmn.dataObjectType" value="DATA_OBJECT_TYPE_PLAIN"/>
+          </y:StyleProperties>
+        </y:GenericNode>
       </data>
     </node>
     <edge id="e0" source="n15" target="n16">
