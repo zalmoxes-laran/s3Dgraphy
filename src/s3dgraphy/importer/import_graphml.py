@@ -116,6 +116,10 @@ class GraphMLImporter:
         self.key_map = {'node': {}, 'edge': {}}  # Mappa attr_name -> key_id
         # Track if we need to update the GraphML file with generated UUIDs
         self.graphml_tree = None  # Will store the parsed XML tree for slipback
+        # Map refid → SVG role (e.g. 'continuity'). yEd assigns refids in
+        # serialization order, so the same logical SVG can be id=1 in one
+        # file and id=3 in another — never hardcode the number.
+        self.svg_resource_map = {}
 
     def build_key_mapping(self, tree):
         """
@@ -160,6 +164,37 @@ class GraphMLImporter:
         print(f"  Edge keys: {key_map['edge']}")
 
         return key_map
+
+    def build_svg_resource_map(self, tree):
+        """
+        Scan ``<y:Resource>`` entries and map each refid to a logical role
+        based on the embedded SVG (``sodipodi:docname="continuity.svg"`` →
+        ``'continuity'``).
+
+        yEd serialises Resource ids in the order they appear in the file,
+        so the same continuity SVG can be id=1, id=3 or anything else
+        depending on which palette items were dragged in (and in what
+        order). Pre-building this map lets EM_check_node_continuity
+        match on what the SVG *is*, not on a brittle hardcoded number.
+
+        Returns:
+            dict: ``{refid: role}`` — only resources whose SVG content
+            matches a known role are listed.
+        """
+        y_ns = '{http://www.yworks.com/xml/graphml}'
+        resource_map = {}
+
+        for resource in tree.findall(f'.//{y_ns}Resource'):
+            refid = resource.attrib.get('id')
+            if not refid:
+                continue
+            content = resource.text or ''
+            if 'continuity.svg' in content:
+                resource_map[refid] = 'continuity'
+
+        if resource_map:
+            print(f"[GraphML Parser] SVG resource roles: {resource_map}")
+        return resource_map
 
     def extract_custom_fields(self, element, entity_type='node'):
         """
@@ -270,6 +305,12 @@ class GraphMLImporter:
 
         # Costruisci la mappa dinamica delle chiavi GraphML
         self.key_map = self.build_key_mapping(tree)
+
+        # Identifica i refid degli SVG di ruolo noto (continuity, …).
+        # Deve precedere parse_nodes() così che EM_check_node_continuity
+        # possa risolvere il refid del nodo guardando il contenuto SVG
+        # invece di affidarsi a un numero fisso.
+        self.svg_resource_map = self.build_svg_resource_map(tree)
 
         # Build the XML-level parent map (original_id → parent original_id)
         # so the post-import auto-edge inference can find the containing
@@ -2402,7 +2443,10 @@ class GraphMLImporter:
         Usa una detection multi-segnale:
           A) '_continuity' nel campo URL o description
           B) ShapeNode con shape type 'diamond'
-          C) SVGNode con SVGContent refid='3' (risorsa SVG della palette s3Dgraphy)
+          C) SVGNode il cui SVGContent refid punta alla risorsa
+             ``continuity.svg`` (refid risolto dinamicamente, vedi
+             build_svg_resource_map — yEd numera le Resource per ordine
+             di serializzazione, non c'è un id fisso)
 
         Args:
             node_element: Elemento XML del nodo
@@ -2426,13 +2470,15 @@ class GraphMLImporter:
         if nodeshape == "diamond":
             return True
 
-        # Signal C: SVGNode con SVGContent refid='3' (continuity diamond dalla palette)
+        # Signal C: SVGNode che referenzia la risorsa continuity.svg
         y_ns = '{http://www.yworks.com/xml/graphml}'
         for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
             if subnode.attrib.get('key') == nodegraphics_key:
                 svg_content = subnode.find(f'.//{y_ns}SVGNode/{y_ns}SVGModel/{y_ns}SVGContent')
-                if svg_content is not None and svg_content.attrib.get('refid') == '3':
-                    return True
+                if svg_content is not None:
+                    refid = svg_content.attrib.get('refid')
+                    if refid and self.svg_resource_map.get(refid) == 'continuity':
+                        return True
 
         return False
 

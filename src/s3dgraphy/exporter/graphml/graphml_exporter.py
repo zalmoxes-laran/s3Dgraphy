@@ -101,6 +101,26 @@ class GraphMLExporter:
                 print(f"  [volatile] stripped {strip_report['nodes']} "
                       f"injected nodes and {strip_report['edges']} edges")
 
+        # Materialize continuity diamonds. The in-memory graph carries
+        # bounded-life information as ``has_first_epoch`` +
+        # ``survive_in_epoch`` edges; GraphML needs an explicit BR
+        # diamond to round-trip that information through a re-import.
+        # The transform is family-aware (real → bounded check;
+        # virtual → any-survival check) and idempotent vs user-authored
+        # diamonds already present in the graph. Cleanup runs after
+        # the file has been written.
+        from ...transforms.materialize_continuity import (
+            materialize_continuity)
+        mat_report = materialize_continuity(self.graph)
+        if mat_report["swept"]:
+            print(f"  [materialize] swept {mat_report['swept']} stale "
+                  f"synthetic items from a prior run")
+        if mat_report["nodes"]:
+            print(f"  [materialize] injected {mat_report['nodes']} BR "
+                  f"diamonds + {mat_report['edges']} edges "
+                  f"(skipped {mat_report['skipped_user_authored']} "
+                  f"nodes with user-authored BR)")
+
         # 1. Generate root XML with correct key definitions
         canvas = CanvasGenerator()
         root = canvas.generate_root()
@@ -567,6 +587,19 @@ class GraphMLExporter:
         print(f"Writing GraphML to {output_path}...")
         tree = ET.ElementTree(root)
         tree.write(output_path, encoding='UTF-8', xml_declaration=True, pretty_print=True)
+
+        # Drop the synthetic BR content injected at the start of
+        # ``export()`` so the in-memory graph returns to its
+        # pre-export state. On a failure path the synthetic content
+        # stays in place; the next ``materialize_continuity`` call
+        # sweeps it before re-injecting.
+        from ...transforms.materialize_continuity import (
+            dematerialize_continuity)
+        dem_report = dematerialize_continuity(self.graph)
+        if dem_report["nodes"] or dem_report["edges"]:
+            print(f"  [dematerialize] cleaned up "
+                  f"{dem_report['nodes']} synthetic BR nodes and "
+                  f"{dem_report['edges']} edges")
 
         print(f"GraphML export completed successfully!")
         print(f"  - Stratigraphic nodes: {len(stratigraphic_nodes)}")
