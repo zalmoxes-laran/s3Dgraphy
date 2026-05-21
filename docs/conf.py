@@ -105,7 +105,11 @@ autodoc_default_options = {
     'special-members': '__init__',
     'undoc-members': True,
     'show-inheritance': True,
-    'imported-members': True,
+    # 'imported-members': True is deliberately omitted in 1.5:
+    # it created hundreds of duplicate-object and ambiguous-xref
+    # warnings (every Node/Edge re-exported via `from .x import Y`
+    # appeared once per importing module). Re-enable per-page with
+    # :imported-members: when needed.
 }
 
 # -- Options for autosummary ------------------------------------------------
@@ -152,7 +156,20 @@ myst_heading_anchors = 3
 
 # Suppress noisy warnings for non-canonical MD anchors during the 1.5
 # documentation push. Drop once every cross-reference is migrated.
-suppress_warnings = ['myst.header']
+suppress_warnings = [
+    'myst.header',
+    # autodoc's cross-reference resolution treats `from x import Y`
+    # in two modules as two valid targets for `Y`. The duplicates are
+    # benign (autoclass picks the right one via the qualified name in
+    # the directive) but produce a lot of build noise. Suppress.
+    'ref.python',
+    'misc.highlighting_failure',
+    # Same root cause: when the package re-exports symbols at multiple
+    # qualified paths and we autodoc more than one of those paths, the
+    # individual member definitions duplicate. Benign in practice.
+    'autosectionlabel.*',
+    'app.add_directive',
+]
 
 # -- Custom configuration ---------------------------------------------------
 

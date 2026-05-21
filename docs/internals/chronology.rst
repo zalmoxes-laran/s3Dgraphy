@@ -112,24 +112,27 @@ Worked example
 
 For ``graph.calculate_chronology()``:
 
-#. Seeds:
+1. **Seeds**
+
    - US001 TPQ = −300 (EP_HELLENISTIC), TAQ = −120 (own PN; tighter
      than EP_HELLENISTIC.end = −100, so PN wins).
    - US005 TPQ = −80 (own PN), TAQ = none (will inherit).
    - US010 TPQ = −100 (EP_ROMAN), TAQ = +300 (EP_ROMAN).
 
-#. Topological:
+2. **Topological mapping**
+
    ``cuts`` → US005 more recent than US001;
    ``overlies`` → US010 more recent than US005.
 
-#. BFS closure:
+3. **BFS closure**
+
    - US005 inherits TPQ ≥ US001's TPQ (−300) — but its own PN
      constrains TPQ ≥ −80. Final TPQ = −80.
    - US005 inherits TAQ ≤ US010's TAQ (+300). Final TAQ = +300.
    - US001 inherits TAQ ≤ US005's TAQ (+300) — own PN
      constrains TAQ ≤ −120. Final TAQ = −120.
 
-#. Paradox check: US001's window is ``[-300, -120]`` — consistent.
+4. **Paradox check**: US001's window is ``[-300, -120]`` — consistent.
    US005's window is ``[-80, +300]`` — consistent.
 
 If a sixth unit US015 cuts US005 *and* has TAQ = −150 (older than

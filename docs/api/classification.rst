@@ -23,15 +23,19 @@ convenience (``from s3dgraphy import REAL_US_TYPES``):
 
 .. autodata:: s3dgraphy.classification.REAL_US_TYPES
    :annotation:
+   :no-index:
 
 .. autodata:: s3dgraphy.classification.VIRTUAL_US_TYPES
    :annotation:
+   :no-index:
 
 .. autodata:: s3dgraphy.classification.SERIES_US_TYPES
    :annotation:
+   :no-index:
 
 .. autodata:: s3dgraphy.classification.ALL_US_TYPES
    :annotation:
+   :no-index:
 
 See :doc:`/internals/classification` for the conceptual overview and a
 worked example of extending the JSON datamodel with a new subtype.

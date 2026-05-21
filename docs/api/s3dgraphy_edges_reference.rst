@@ -141,7 +141,7 @@ Containment Relationships
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **is_part_of**
-^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
 
 :Label: Is Part Of
 :Description: Physical containment -- a node is part of a container stratigraphic unit
@@ -323,7 +323,7 @@ Temporal and Epochal Relationships
    - ContinuityNode → EpochNode
 
 Organizational Relationships
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **is_in_activity**
 ^^^^^^^^^^^^^^^^^^
@@ -834,7 +834,7 @@ Documentation Chains
    graph.add_edge("prov1", "PROP001_material", "EXT001_analysis", "has_data_provenance")
 
 Organizational Structure
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. **Group related elements**: Use node groups for logical organization
 2. **Separate activity phases**: Use activity groups for excavation phases
@@ -914,7 +914,7 @@ The GraphMLImporter automatically enhances edge types based on connected node ty
        return edge_type
 
 Export Considerations
---------------------
+---------------------
 
 GraphML Export
 ~~~~~~~~~~~~~~

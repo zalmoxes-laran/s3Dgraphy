@@ -113,31 +113,31 @@ Dispatch
 The importer dispatches a Claims row by the semantic class of
 ``PROPERTY_TYPE``:
 
-**Scalar qualia** (``definition``, ``material_type``, ``length``,
-``width``, ``height``, ``shape``, ``conservation_state``,
-``comparanda``, ``interpretation``, …)
-    Create a :class:`PropertyNode` attached to ``TARGET_ID`` via
-    ``has_property``. ``VALUE`` is the claim content.
+- **Scalar qualia** (``definition``, ``material_type``, ``length``,
+  ``width``, ``height``, ``shape``, ``conservation_state``,
+  ``comparanda``, ``interpretation``, …) — create a
+  :class:`PropertyNode` attached to ``TARGET_ID`` via ``has_property``.
+  ``VALUE`` is the claim content.
 
-**Temporal qualia** (``absolute_time_start``, ``absolute_time_end``)
-    Same as scalar but the PropertyNode's ``property_type`` is set so
-    the DP-32 resolver and A.1 compaction pick it up. See
-    :doc:`/internals/temporal`.
+- **Temporal qualia** (``absolute_time_start``, ``absolute_time_end``)
+  — same as scalar but the PropertyNode's ``property_type`` is set so
+  the DP-32 resolver and A.1 compaction pick it up. See
+  :doc:`/internals/temporal`.
 
-**Epoch membership** (``has_first_epoch`` / ``belongs_to_epoch``)
-    Create a ``has_first_epoch`` edge from ``TARGET_ID`` (unit) to the
-    Epochs row identified by ``VALUE`` or ``TARGET2_ID``. The
-    deprecated alias ``belongs_to_epoch`` is accepted for backward
-    compat with prompt versions ≤ v5.2.
+- **Epoch membership** (``has_first_epoch`` / ``belongs_to_epoch``) —
+  create a ``has_first_epoch`` edge from ``TARGET_ID`` (unit) to the
+  Epochs row identified by ``VALUE`` or ``TARGET2_ID``. The deprecated
+  alias ``belongs_to_epoch`` is accepted for backward compat with
+  prompt versions ≤ v5.2.
 
-**Stratigraphic relation** (``is_after``, ``overlies``, ``cuts``,
-``fills``, ``abuts``, ``bonded_to``, ``equals``, ``has_same_time``,
-``contrasts_with``, ``changed_from``, plus their reverses)
-    Create a directed edge from ``TARGET_ID`` to ``TARGET2_ID`` with
-    that ``edge_type``. The attribution chain hangs off the edge's
-    ``attributes`` dict (``authored_by_id``, ``authored_by_kind``,
-    ``document_id``) rather than creating PropertyNodes — edges are
-    the natural subject of a relational claim's attribution.
+- **Stratigraphic relation** (``is_after``, ``overlies``, ``cuts``,
+  ``fills``, ``abuts``, ``bonded_to``, ``equals``, ``has_same_time``,
+  ``contrasts_with``, ``changed_from``, plus their reverses) — create
+  a directed edge from ``TARGET_ID`` to ``TARGET2_ID`` with that
+  ``edge_type``. The attribution chain hangs off the edge's
+  ``attributes`` dict (``authored_by_id``, ``authored_by_kind``,
+  ``document_id``) rather than creating PropertyNodes — edges are
+  the natural subject of a relational claim's attribution.
 
 Authors
 ~~~~~~~

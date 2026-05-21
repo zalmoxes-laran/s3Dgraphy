@@ -40,7 +40,7 @@ Other Node Types
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: s3dgraphy.nodes.geoposition_node
+.. automodule:: s3dgraphy.nodes.geo_position_node
    :members:
    :undoc-members:
    :show-inheritance:
