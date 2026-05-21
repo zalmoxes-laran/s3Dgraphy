@@ -182,7 +182,70 @@ Edge Types and Relationships
 s3dgraphy uses **semantic edge types** that correspond to specific archaeological
 relationships and CIDOC-CRM ontology mappings. In the GraphML representation, edge
 types are encoded as visual line styles; during import, they are converted to their
-semantic names:
+semantic names.
+
+.. _canonical-vs-reverse-edges-core:
+
+Canonical, Reverse, and Symmetric Edges (v1.5.3+)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Since connections datamodel **v1.5.3**, every directed edge in s3dgraphy
+is registered under a **single canonical name**. The reverse direction
+has its own *display name* but is **not** a separate edge type — it is
+computed on demand from the JSON datamodel via
+:meth:`Edge.get_reverse_name`. Three categories exist:
+
+**Canonical edges** (the registered name)
+   :meth:`Graph.add_edge` requires the canonical name. Examples:
+   ``is_after`` (canonical for the temporal sequence pair),
+   ``cuts`` (canonical for the cuts/is_cut_by pair),
+   ``has_property`` (canonical for the property attachment pair).
+
+**Reverse edges** (a display name only)
+   Returned by :meth:`Edge.get_reverse_name` for UI labels in node
+   editors. Examples: ``is_before`` (reverse of ``is_after``),
+   ``is_cut_by`` (reverse of ``cuts``), ``is_property_of`` (reverse of
+   ``has_property``).
+
+**Symmetric edges** (``reverse = None``)
+   Direction is meaningless. The exporter emits a single arc with no
+   implicit reverse. Set: ``bonded_to``, ``is_bonded_to``,
+   ``equals``, ``is_physically_equal_to``, ``has_same_time``,
+   ``contrasts_with``, ``generic_connection``.
+
+Why the schema change matters:
+
+- The :class:`~s3dgraphy.exporter.unified_xlsx_exporter.UnifiedXLSXExporter`
+  emits only the *canonical* direction (``overlies``, not
+  ``is_overlain_by``) — the inverse is recovered at re-import, so the
+  workbook stays deduplicated.
+- Node editors (yEd, em-graph) label sockets with the appropriate verb
+  by calling :meth:`Edge.get_reverse_name` — no re-implementation of
+  the lookup table per editor.
+- The ``PHYSICAL_STRATIGRAPHIC_TYPES`` family (``cuts``, ``fills``,
+  ``overlies``, ``abuts``) follows the same convention; the reverses
+  (``is_cut_by``, ``is_filled_by``, ``is_overlain_by``,
+  ``is_abutted_by``) all map back to the canonical via the JSON
+  datamodel.
+
+The canonical set ships **37 canonical edge types** in datamodel v1.5.5
+with **30 distinct reverse names** (67 names total). See
+:ref:`canonical-reverse-edges` in the edges reference for the full
+per-edge listing.
+
+Migration from pre-1.5.3 code
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Pre-1.5.3 code that constructed reverse-direction edges directly
+(``graph.add_edge(_, _, _, "is_before")``) will fail
+:meth:`Graph.add_edge` validation. Migrate to the canonical
+direction (``"is_after"``) and let the consumer call
+:meth:`Edge.get_reverse_name` for UI labels.
+
+Edge style mapping (GraphML)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In the GraphML representation:
 
 .. list-table:: GraphML Line Style to Semantic Edge Type Mapping
    :header-rows: 1
