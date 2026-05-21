@@ -8,30 +8,91 @@ Overview
 
 Edges in s3dgraphy represent relationships between nodes in the archaeological knowledge graph. Each edge type has specific semantic meaning and follows archaeological documentation standards.
 
+.. note::
+
+   **Datamodel version**: connections datamodel **v1.5.5** ships **37
+   canonical edge types** and **30 distinct reverse names** (67 names
+   total). All canonical types are listed below, grouped by domain. The
+   reverse-edge pattern is documented in the next section before the
+   classification.
+
+.. _canonical-reverse-edges:
+
+Canonical / Reverse / Symmetric Pattern
+---------------------------------------
+
+Since datamodel v1.5.3 every edge in s3dgraphy is *one of three kinds*:
+
+**Canonical edges**
+   Have a single semantic direction. The canonical name is the one
+   registered in :data:`s3dgraphy.edges.edge.EDGE_TYPES`; the reverse is
+   computed on demand from the JSON datamodel via
+   :meth:`Edge.get_reverse_name`. Canonical example: ``is_after``,
+   ``cuts``, ``has_property``.
+
+**Reverse edges**
+   The named inverse of a canonical edge. They live in the JSON
+   datamodel under the ``reverse: { name, label }`` block of their
+   canonical sibling, never as a standalone entry. Reverse example:
+   ``is_before`` is the reverse of ``is_after``; ``is_cut_by`` is the
+   reverse of ``cuts``. Edges constructed with the *canonical* name and
+   queried via :meth:`Edge.is_canonical` return ``True``; calling
+   :meth:`Edge.get_reverse_name` returns the reverse string.
+
+**Symmetric edges**
+   Have ``reverse = None`` in the datamodel — direction is meaningless.
+   The current symmetric set is ``bonded_to``, ``equals``,
+   ``is_bonded_to``, ``is_physically_equal_to``, ``has_same_time``. For
+   these edges :meth:`Edge.is_symmetric` returns ``True`` and the
+   exporter emits a single arc with no implicit reverse.
+
+The schema enforces the canonical direction at *write* time
+(:meth:`Graph.add_edge` raises ``ValueError`` on an unknown edge type)
+but accepts either direction at *read* time — :meth:`Edge.get_reverse_name`
+lets node editors (e.g. yEd, em-graph) label sockets with the right verb
+without re-implementing the lookup. See :doc:`/s3dgraphy_core_concepts`
+for the conceptual motivation; the per-edge tables below note the
+reverse name in the ``Reverse`` field.
+
 Edge Types Classification
 --------------------------
 
 Temporal Relationships
 ~~~~~~~~~~~~~~~~~~~~~~
 
-**is_before**
-^^^^^^^^^^^^^
+**is_after**
+^^^^^^^^^^^^
 
-:Label: Chronological Sequence
-:Description: Indicates a temporal sequence where one item occurs before another
+:Label: Is after
+:Description: Indicates a temporal sequence where one item occurs after another. This is the **canonical** direction in Extended Matrix (from more recent to more ancient stratigraphic units).
 :CIDOC-CRM: P120_occurs_before
+:CRMarchaeo: AP28_occurs_before
+:Reverse: ``is_before`` ("Is before")
 :Visual Style: Solid line
 :Usage: Primary stratigraphic relationships
 
 .. code-block:: python
 
-   # Stratigraphic sequence: US003 is earlier than US002
-   graph.add_edge("rel001", "US003", "US002", "is_before")
+   # Canonical: recent -> ancient
+   # US002 (wall) sits on US001 (foundation): the wall is more recent
+   graph.add_edge("rel001", "US002", "US001", "is_after")
 
 **Allowed Connections:**
    - StratigraphicNode → StratigraphicNode
-   - StratigraphicEventNode → StratigraphicEventNode
-   - EpochNode → EpochNode
+
+**is_before** *(reverse of* ``is_after`` *)*
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:Label: Is before
+:Description: Reverse name of ``is_after``. Use the canonical ``is_after``
+   when *writing* an edge; ``is_before`` is what
+   :meth:`Edge.get_reverse_name` returns for the reverse-direction label.
+
+.. note::
+
+   Pre-1.5.3 code that constructed ``is_before`` edges directly will fail
+   :meth:`Graph.add_edge` validation. Migrate to ``is_after`` and let the
+   consumer call :meth:`Edge.get_reverse_name` for UI labels.
 
 **has_same_time**
 ^^^^^^^^^^^^^^^^^
@@ -57,6 +118,7 @@ Temporal Relationships
 :Label: Temporal Transformation
 :Description: Represents an object that changes over time
 :CIDOC-CRM: P123_resulted_from
+:Reverse: ``changed_to`` ("Changed to")
 :Visual Style: Dotted line
 :Usage: Transformation processes, reconstruction phases
 
@@ -79,7 +141,7 @@ Containment Relationships
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **is_part_of**
-^^^^^^^^^^^^^
+^^^^^^^^^^^^^^
 
 :Label: Is Part Of
 :Description: Physical containment -- a node is part of a container stratigraphic unit
@@ -261,7 +323,7 @@ Temporal and Epochal Relationships
    - ContinuityNode → EpochNode
 
 Organizational Relationships
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **is_in_activity**
 ^^^^^^^^^^^^^^^^^^
@@ -402,6 +464,283 @@ Licensing and Legal Relationships
    # License has embargo period
    graph.add_edge("emb001", "LICENSE_CC_BY", "EMBARGO_2025", "has_embargo")
 
+Physical Stratigraphic Relationships
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A family of fine-grained physical relations between stratigraphic units,
+all backed by ``CRMarchaeo:AP11_has_physical_relation`` and tagged by a
+specific ``type_tag`` carried on the edge. Allowed between any two
+:class:`StratigraphicNode` instances. **Canonical edges** in this family
+(``cuts``, ``fills``, ``overlies``, ``abuts``) ship a named reverse;
+**symmetric** edges (``bonded_to``, ``is_bonded_to``,
+``is_physically_equal_to``, ``equals``) have ``reverse = None`` and the
+exporter emits a single arc.
+
+**cuts**
+^^^^^^^^
+
+:Label: Cuts
+:Description: This stratigraphic unit cuts the target stratigraphic unit (e.g., a pit cutting a layer).
+:CRMarchaeo: AP11_has_physical_relation (``type_tag: cuts``)
+:Reverse: ``is_cut_by`` ("Is cut by")
+:Allowed Connections: StratigraphicNode → StratigraphicNode
+
+.. code-block:: python
+
+   # Foundation trench cuts an earlier floor
+   graph.add_edge("rel_cuts", "US010_trench", "US020_floor", "cuts")
+
+**fills**
+^^^^^^^^^
+
+:Label: Fills
+:Description: This stratigraphic unit fills the target stratigraphic unit (e.g., a deposit filling a cut).
+:CRMarchaeo: AP11_has_physical_relation (``type_tag: fills``)
+:Reverse: ``is_filled_by`` ("Is filled by")
+:Allowed Connections: StratigraphicNode → StratigraphicNode
+
+**overlies**
+^^^^^^^^^^^^
+
+:Label: Overlies
+:Description: This stratigraphic unit overlies (covers) the target stratigraphic unit.
+:CRMarchaeo: AP11_has_physical_relation (``type_tag: overlies``)
+:Reverse: ``is_overlain_by`` ("Is overlain by")
+:Allowed Connections: StratigraphicNode → StratigraphicNode
+
+**abuts**
+^^^^^^^^^
+
+:Label: Abuts
+:Description: This stratigraphic unit abuts against the target stratigraphic unit (e.g., a later wall built against an earlier one).
+:CRMarchaeo: AP11_has_physical_relation (``type_tag: abuts``)
+:Reverse: ``is_abutted_by`` ("Is abutted by")
+:Allowed Connections: StratigraphicNode → StratigraphicNode
+
+**bonded_to** *(symmetric, canonical v5.0 em_data.xlsx)*
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:Label: Bonded to
+:Description: Canonical (v5.0 em_data.xlsx) form of the bonding relation:
+   this stratigraphic unit is physically bonded to the target.
+   **Symmetric** (``reverse = None``). Allowed between any two
+   StratigraphicNode instances, including USVs-USVs when two virtually
+   reconstructed elements are theoretically bonded (e.g., two missing
+   blocks of the same inferred course).
+:CRMarchaeo: AP11_has_physical_relation (``type_tag: bonded to``)
+:Reverse: *symmetric — none*
+:Allowed Connections: StratigraphicNode → StratigraphicNode
+
+**is_bonded_to** *(symmetric, legacy alias)*
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:Label: Is bonded to
+:Description: Legacy symmetric bonding relation kept alongside the
+   canonical ``bonded_to`` for backward compatibility with pre-v5.0
+   spreadsheets. New code should prefer ``bonded_to``.
+:CRMarchaeo: AP11_has_physical_relation (``type_tag: is bonded to``)
+:Reverse: *symmetric — none*
+
+**equals** *(symmetric, canonical v5.0 em_data.xlsx)*
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:Label: Equals
+:Description: Canonical (v5.0 em_data.xlsx) form of the *same physical
+   entity* relation: two distinct unit IDs (from different campaigns or
+   archival sources) refer to the same stratigraphic fact. Symmetric.
+:CRMarchaeo: AP11_has_physical_relation (``type_tag: equals``)
+:Reverse: *symmetric — none*
+
+**is_physically_equal_to** *(symmetric, legacy)*
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:Label: Is physically equal to
+:Description: Two stratigraphic units are considered physically the same
+   entity or continuous fabric. Symmetric. Legacy alias of ``equals``.
+:CRMarchaeo: AP11_has_physical_relation (``type_tag: equals``)
+:Reverse: *symmetric — none*
+
+Spatial / Locational
+~~~~~~~~~~~~~~~~~~~~
+
+**is_in_location**
+^^^^^^^^^^^^^^^^^^
+
+:Label: Is in location
+:Description: Indicates that a node belongs to a spatial / locational
+   group (:class:`LocationNodeGroup`). Membership is m:n (multiple
+   ``is_in_location`` edges per source are allowed) and **additive**
+   (memberships compose; none overrides). The optional ``is_primary``
+   attribute on at most one edge per source disambiguates which
+   membership is rendered as a yEd group folder in em-graph. The same
+   edge type also carries the recursive Location → Location hierarchy
+   (Pompei → Sector 4 → Casa del Fauno → Room 12).
+:CIDOC-CRM: P53_has_former_or_current_location (node→location) /
+   P89_falls_within (location→location, recursive)
+:Reverse: ``includes_location`` ("Includes location")
+:Edge attribute: ``is_primary: bool`` (default ``false``) — UI hint
+:Allowed Connections: StratigraphicNode / ParadataNode /
+   ParadataNodeGroup / DocumentNode / ExtractorNode / CombinerNode /
+   PropertyNode / LocationNodeGroup → LocationNodeGroup
+
+.. versionadded:: 0.1.41
+
+Geographic / Linked Resource
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**has_geoposition**
+^^^^^^^^^^^^^^^^^^^
+
+:Label: Has geoposition
+:Description: Represents a connection with the GeoPositionNode of a given node.
+:CIDOC-CRM: P53_has_former_or_current_location
+:CRMgeo: Q4_has_spatial_projection
+:Reverse: ``is_geoposition_of`` ("Is geoposition of")
+:Allowed Connections: StratigraphicNode / ParadataNode /
+   RepresentationModelNode / RepresentationModelDocNode /
+   RepresentationModelSpecialFindNode → GeoPositionNode
+
+Representation Models
+~~~~~~~~~~~~~~~~~~~~~
+
+**has_representation_model_doc**
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:Label: Has document representation model
+:Description: Connects ExtractorNode / DocumentNode / CombinerNode to
+   their representation model in 3D space.
+:CIDOC-CRM: P138i_has_representation
+:CIDOC-S3D: has3DRepresentation
+:Reverse: ``is_doc_representation_model_of``
+:Allowed Connections: ExtractorNode / DocumentNode / CombinerNode →
+   RepresentationModelDocNode / RepresentationModelSpecialFindNode
+
+**has_representation_model_sf**
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:Label: Has special find representation model
+:Description: Connects SpecialFindUnit nodes to their representation
+   model in 3D space.
+:CIDOC-CRM: P138i_has_representation
+:CIDOC-S3D: has3DRepresentation
+:Reverse: ``is_sf_representation_model_of``
+:Allowed Connections: SpecialFindUnit → RepresentationModelSpecialFindNode
+
+Documentation (extended)
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**has_documentation**
+^^^^^^^^^^^^^^^^^^^^^
+
+:Label: Has documentation
+:Description: Indicates that the element has an associated documentation node.
+:CIDOC-CRM: P104_is_subject_to
+:Reverse: ``is_documentation_of`` ("Is documentation of")
+:Allowed Connections: StratigraphicNode / SpecialFindUnit /
+   VirtualStratigraphicUnit → DocumentNode
+
+Paradata Group Reverses
+~~~~~~~~~~~~~~~~~~~~~~~
+
+**is_in_paradata_nodegroup**
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:Label: Is in paradata nodegroup
+:Description: Membership of a node inside a ParadataNodeGroup. Canonical
+   form (source → group) with reverse ``contains_paradata_node``.
+:CIDOC-CRM: P106_is_composed_of
+:CIDOC-S3D: isPartOfParadataGroup
+:Reverse: ``contains_paradata_node`` ("Contains paradata node")
+:Allowed Connections: PropertyNode / DocumentNode / ExtractorNode /
+   CombinerNode / ParadataNode → ParadataNodeGroup
+
+Authorship
+~~~~~~~~~~
+
+**has_author**
+^^^^^^^^^^^^^^
+
+:Label: Has author
+:Description: Represents the connection of a node with its author. Target
+   can be an :class:`AuthorNode` (human) or :class:`AuthorAINode`
+   (AI-assisted authoring). Source covers the full range of EM node types
+   so that the resolver can walk from any scope level down to the author.
+:CIDOC-CRM: P94_has_created
+:CRMdig: L10_had_input
+:Reverse: ``is_author_of`` ("Is author of")
+:Allowed Connections: GraphNode / StratigraphicNode / ParadataNode /
+   GroupNode / DocumentNode / ExtractorNode / CombinerNode / PropertyNode /
+   EpochNode → AuthorNode / AuthorAINode
+
+.. note::
+
+   Author resolution is multi-valued: every ``has_author`` edge from the
+   source is followed and their display names are joined with ``" ; "``.
+   See :doc:`/internals/propagation` for the node-level → swimlane-level
+   fallback order used by ``AUTHOR_RULE``.
+
+Time-branch reverses
+~~~~~~~~~~~~~~~~~~~~
+
+**has_timebranch**
+^^^^^^^^^^^^^^^^^^
+
+:Label: Has timebranch
+:Description: Connects a node to a specific TimeBranchNodeGroup
+   (alternative temporal interpretation).
+:CIDOC-CRM: P67_refers_to
+:CIDOC-S3D: belongsToAlternative
+:Reverse: ``is_timebranch_of`` ("Is timebranch of")
+:Allowed Connections: StratigraphicNode → TimeBranchNodeGroup
+
+Complete Reverse Reference
+--------------------------
+
+The following table lists the **30 distinct reverse names** computed by
+:meth:`Edge.get_reverse_name`. Each row is the reverse of the canonical
+edge in the right column. Use the canonical name when constructing edges
+with :meth:`Graph.add_edge`; the reverse is for UI labels and queries
+only.
+
+==================================  ==========================
+Reverse name                         Canonical
+==================================  ==========================
+``is_before``                        ``is_after``
+``changed_to``                       ``changed_from``
+``is_cut_by``                        ``cuts``
+``is_filled_by``                     ``fills``
+``is_overlain_by``                   ``overlies``
+``is_abutted_by``                    ``abuts``
+``has_part``                         ``is_part_of``
+``is_data_provenance_of``            ``has_data_provenance``
+``is_source_for_extraction``         ``extracted_from``
+``is_combined_by``                   ``combines``
+``is_property_of``                   ``has_property``
+``is_first_epoch_of``                ``has_first_epoch``
+``contains_surviving``               ``survive_in_epoch``
+``includes_in_activity``             ``is_in_activity``
+``includes_location``                ``is_in_location``
+``contains_paradata_node``           ``is_in_paradata_nodegroup``
+``is_paradata_nodegroup_of``         ``has_paradata_nodegroup``
+``contains_in_timebranch``           ``is_in_timebranch``
+``is_timebranch_of``                 ``has_timebranch``
+``is_author_of``                     ``has_author``
+``is_geoposition_of``                ``has_geoposition``
+``is_linked_resource_of``            ``has_linked_resource``
+``is_representation_model_of``       ``has_representation_model``
+``is_doc_representation_model_of``   ``has_representation_model_doc``
+``is_sf_representation_model_of``    ``has_representation_model_sf``
+``is_semantic_shape_of``             ``has_semantic_shape``
+``is_documentation_of``              ``has_documentation``
+``is_visual_reference_of``           ``has_visual_reference``
+``is_license_of``                    ``has_license``
+``is_embargo_of``                    ``has_embargo``
+==================================  ==========================
+
+Symmetric edges (no reverse): ``bonded_to``, ``is_bonded_to``,
+``equals``, ``is_physically_equal_to``, ``has_same_time``,
+``contrasts_with``, ``generic_connection``.
+
 Generic Relationships
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -495,7 +834,7 @@ Documentation Chains
    graph.add_edge("prov1", "PROP001_material", "EXT001_analysis", "has_data_provenance")
 
 Organizational Structure
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. **Group related elements**: Use node groups for logical organization
 2. **Separate activity phases**: Use activity groups for excavation phases
@@ -575,7 +914,7 @@ The GraphMLImporter automatically enhances edge types based on connected node ty
        return edge_type
 
 Export Considerations
---------------------
+---------------------
 
 GraphML Export
 ~~~~~~~~~~~~~~

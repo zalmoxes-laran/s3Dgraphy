@@ -14,8 +14,34 @@ project = 's3dgraphy'
 copyright = f'2024-{datetime.datetime.now().year}, Emanuel Demetrescu'
 author = 'Emanuel Demetrescu'
 
-# Read version from pyproject.toml
-version = '0.1.0'  # Will be updated dynamically
+# Read version from package or pyproject.toml.
+# Best-effort dynamic lookup, falling back to a hardcoded string so the
+# build never fails on a fresh checkout that has not been pip-installed.
+def _read_version():
+    # 1) Try importing the installed package
+    try:
+        import s3dgraphy  # type: ignore
+        v = getattr(s3dgraphy, "__version__", None)
+        if v:
+            return v
+    except Exception:
+        pass
+    # 2) Try parsing pyproject.toml directly
+    try:
+        import re
+        pyproject = os.path.join(os.path.abspath('..'), 'pyproject.toml')
+        with open(pyproject, 'r', encoding='utf-8') as fh:
+            text = fh.read()
+        m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    # 3) Hardcoded fallback (keep in sync with pyproject.toml on each release)
+    # TODO 1.6: drop fallback once Sphinx is always run from an installed env.
+    return '1.6.0.dev3'
+
+version = _read_version()
 release = version
 
 # -- General configuration ---------------------------------------------------
@@ -79,7 +105,11 @@ autodoc_default_options = {
     'special-members': '__init__',
     'undoc-members': True,
     'show-inheritance': True,
-    'imported-members': True,
+    # 'imported-members': True is deliberately omitted in 1.5:
+    # it created hundreds of duplicate-object and ambiguous-xref
+    # warnings (every Node/Edge re-exported via `from .x import Y`
+    # appeared once per importing module). Re-enable per-page with
+    # :imported-members: when needed.
 }
 
 # -- Options for autosummary ------------------------------------------------
@@ -115,6 +145,30 @@ myst_enable_extensions = [
     "deflist",
     "tasklist",
     "colon_fence",
+    "fieldlist",
+    "linkify",
+]
+
+# Generate implicit header anchors for MyST so RST toctrees can cross-link
+# into specific sections of the Markdown design notes
+# (DATA_FORMALIZATIONS.md, GRAPHML_EXPORT.md).
+myst_heading_anchors = 3
+
+# Suppress noisy warnings for non-canonical MD anchors during the 1.5
+# documentation push. Drop once every cross-reference is migrated.
+suppress_warnings = [
+    'myst.header',
+    # autodoc's cross-reference resolution treats `from x import Y`
+    # in two modules as two valid targets for `Y`. The duplicates are
+    # benign (autoclass picks the right one via the qualified name in
+    # the directive) but produce a lot of build noise. Suppress.
+    'ref.python',
+    'misc.highlighting_failure',
+    # Same root cause: when the package re-exports symbols at multiple
+    # qualified paths and we autodoc more than one of those paths, the
+    # individual member definitions duplicate. Benign in practice.
+    'autosectionlabel.*',
+    'app.add_directive',
 ]
 
 # -- Custom configuration ---------------------------------------------------
