@@ -4,10 +4,12 @@ Import and Export
 This document describes the import and export capabilities of s3dgraphy, the core Python library for managing Extended Matrix graphs.
 
 .. note::
-   s3dgraphy version 0.1.31 supports:
+   s3dgraphy version 1.5.1 supports:
 
-   - **Import**: GraphML, XLSX (with JSON mapping), SQLite/pyArchInit (with JSON mapping)
-   - **Export**: JSON, GraphML
+   - **Import**: GraphML, unified ``em_data.xlsx`` (5-sheet canonical),
+     mapped XLSX (JSON mapping), SQLite/pyArchInit (JSON mapping)
+   - **Export**: JSON, GraphML (with round-trip patcher), unified
+     ``em_data.xlsx`` (round-trip with the unified importer)
 
 Import System
 -------------

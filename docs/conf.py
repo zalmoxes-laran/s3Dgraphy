@@ -14,8 +14,34 @@ project = 's3dgraphy'
 copyright = f'2024-{datetime.datetime.now().year}, Emanuel Demetrescu'
 author = 'Emanuel Demetrescu'
 
-# Read version from pyproject.toml
-version = '0.1.0'  # Will be updated dynamically
+# Read version from package or pyproject.toml.
+# Best-effort dynamic lookup, falling back to a hardcoded string so the
+# build never fails on a fresh checkout that has not been pip-installed.
+def _read_version():
+    # 1) Try importing the installed package
+    try:
+        import s3dgraphy  # type: ignore
+        v = getattr(s3dgraphy, "__version__", None)
+        if v:
+            return v
+    except Exception:
+        pass
+    # 2) Try parsing pyproject.toml directly
+    try:
+        import re
+        pyproject = os.path.join(os.path.abspath('..'), 'pyproject.toml')
+        with open(pyproject, 'r', encoding='utf-8') as fh:
+            text = fh.read()
+        m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    # 3) Hardcoded fallback (keep in sync with pyproject.toml on each release)
+    # TODO 1.6: drop fallback once Sphinx is always run from an installed env.
+    return '1.5.1'
+
+version = _read_version()
 release = version
 
 # -- General configuration ---------------------------------------------------
@@ -115,7 +141,18 @@ myst_enable_extensions = [
     "deflist",
     "tasklist",
     "colon_fence",
+    "fieldlist",
+    "linkify",
 ]
+
+# Generate implicit header anchors for MyST so RST toctrees can cross-link
+# into specific sections of the Markdown design notes
+# (DATA_FORMALIZATIONS.md, GRAPHML_EXPORT.md).
+myst_heading_anchors = 3
+
+# Suppress noisy warnings for non-canonical MD anchors during the 1.5
+# documentation push. Drop once every cross-reference is migrated.
+suppress_warnings = ['myst.header']
 
 # -- Custom configuration ---------------------------------------------------
 

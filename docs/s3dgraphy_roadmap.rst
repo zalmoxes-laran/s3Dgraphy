@@ -4,8 +4,8 @@ Development Roadmap
 This document outlines the development roadmap for s3dgraphy, the core Python library
 that implements the Extended Matrix formal language for archaeological documentation.
 
-Current Version: 0.1.35
-------------------------
+Current Version: 1.5.1
+-----------------------
 
 Completed Features
 ~~~~~~~~~~~~~~~~~~
@@ -36,12 +36,42 @@ Completed Features
 - [x] **Chronology calculation** (``calculate_chronology``): BFS-based TPQ/TAQ propagation from absolute dates and epoch membership through stratigraphic relations
 - [x] **Temporal property detection** with fallback matching by name and description
 - [x] [v0.1.27-0.1.30] **AI extraction capabilities** and prompt templates
-- [x] [v0.1.28] **Qualia Importer** for importing from Qualia templates
+- [x] [v0.1.28] **Qualia Importer** (legacy)
+
+  .. deprecated:: 1.5.0
+     The :class:`QualiaImporter` path is the legacy *per-qualia-template* import
+     route preserved for backward compatibility. New projects should use
+     :class:`~s3dgraphy.importer.unified_xlsx_importer.UnifiedXLSXImporter`
+     against the ``em_data.xlsx`` 5-sheet canonical workbook
+     (Units / Epochs / Claims / Authors / Documents). The unified importer
+     subsumes every Qualia-template use case and additionally carries
+     per-claim attribution (``EXTRACTOR_i`` / ``DOCUMENT_i`` /
+     ``AUTHOR_i`` / ``AUTHOR_KIND_i``) which the legacy path cannot express.
 - [x] [v0.1.33] **GraphML Patcher** for round-trip editing (patches existing GraphML files with in-memory graph changes, EMID validation)
 - [x] [v0.1.33] **Graph Merger** with conflict resolution (compares existing graphs with incoming data, produces conflict lists for UI resolution)
 - [x] [v0.1.33] **Master DocumentNode enrichment**
 - [x] [v0.1.34] **Epoch/Relations second-pass processing** for enhanced GraphML handling
 - [x] [v0.1.35] **Import GraphML updates**
+- [x] [v0.1.41] **LocationNodeGroup** — spatial / locational membership
+  (toponym / study / functional) with additive propagation and a recursive
+  ``is_in_location`` hierarchy
+- [x] [v1.5.0] **Unified xlsx pipeline** (``em_data.xlsx``, 5-sheet canonical)
+  with :class:`UnifiedXLSXImporter` + :class:`UnifiedXLSXExporter`
+- [x] [v1.5.0] **JSON-driven stratigraphic classification**
+  (``s3dgraphy.classification``) — single source of truth for
+  family (real/virtual) and ``is_series``
+- [x] [v1.5.0] **Hybrid-C auxiliary lifecycle** —
+  ``s3dgraphy.transforms.aux_tracking`` (mark / freeze / revert / strip)
+  with volatile vs bake save dispatch on
+  :meth:`GraphMLExporter.export` / :meth:`GraphMLPatcher.patch`
+- [x] [v1.5.0] **Compact / materialize_continuity transforms** —
+  ``s3dgraphy.transforms.compact`` + diamond materialization on export
+- [x] [v1.5.0] **Resolvers + Temporal Inference Engine**
+  (``s3dgraphy.resolvers``, ``s3dgraphy.temporal``) with
+  ``attribute_temporal_claim`` per-claim attribution
+- [x] [v1.5.1] **Palette dispatch semantic** —
+  :class:`S3DgraphyPaletteWarning` + label-based dispatch
+  in :mod:`exporter.graphml.node_registry`
 
 Next Priorities
 ~~~~~~~~~~~~~~~

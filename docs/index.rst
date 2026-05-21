@@ -1,7 +1,7 @@
 s3dgraphy Documentation
 ========================
 
-.. image:: https://img.shields.io/badge/version-0.1.32-blue.svg
+.. image:: https://img.shields.io/badge/version-1.5.1-blue.svg
    :target: https://pypi.org/project/s3dgraphy/
    :alt: Version
 
@@ -401,7 +401,7 @@ Community & Support
 Current Status
 --------------
 
-**Version**: 0.1.31
+**Version**: 1.5.1
 
 **Datamodel**: nodes v1.5.1, connections v1.5.4
 
@@ -463,9 +463,30 @@ Table of Contents
    :caption: User Guide
 
    s3dgraphy_import_export
+   importers/unified_xlsx_importer
+   exporters/unified_xlsx_exporter
    s3dgraphy_mapping_system
    s3dgraphy_json_config
    s3dgraphy_integration_emtools
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Design Notes
+
+   DATA_FORMALIZATIONS
+   GRAPHML_EXPORT
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Internals (1.5)
+
+   internals/propagation
+   internals/temporal
+   internals/transforms
+   internals/chronology
+   internals/classification
+   internals/merge_patcher
+   internals/stratiminer_prompt
 
 .. toctree::
    :maxdepth: 2
@@ -475,6 +496,9 @@ Table of Contents
    api/edges
    api/s3dgraphy_classes_reference
    api/s3dgraphy_edges_reference
+   api/classification
+   api/diagnostics
+   api/resolvers
 
 .. toctree::
    :maxdepth: 2
@@ -515,7 +539,7 @@ If you use s3dgraphy in your research, please cite:
      author = {Demetrescu, Emanuel},
      year = {2025},
      url = {https://github.com/zalmoxes-laran/s3dgraphy},
-     version = {0.1.31}
+     version = {1.5.1}
    }
 
 Indices and Tables

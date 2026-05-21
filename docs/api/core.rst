@@ -30,7 +30,7 @@ Edge
 Multi Graph Manager
 -------------------
 
-.. automodule:: s3dgraphy.multi_graph_manager
+.. automodule:: s3dgraphy.multigraph.multigraph
    :members:
    :undoc-members:
    :show-inheritance:
