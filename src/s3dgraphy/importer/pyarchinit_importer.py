@@ -1,22 +1,28 @@
 # s3Dgraphy/importer/pyarchinit_importer.py
 
-from typing import Dict, Any, Optional
+import re
+from typing import Dict, Any, List, Optional, Tuple
 from .base_importer import BaseImporter
 import sqlite3
 import os
-from ..graph import Graph  
+from ..graph import Graph
 from ..nodes.base_node import Node
 from ..nodes.property_node import PropertyNode
 from ..nodes.stratigraphic_node import StratigraphicNode
 from ..utils.utils import get_stratigraphic_node_class
-from ..multigraph.multigraph import multi_graph_manager  
+from ..multigraph.multigraph import multi_graph_manager
+
+# Conservative SQLite identifier whitelist: letters, digits, underscore.
+# Used to guard table names and filter column names interpolated into
+# query strings (values always go through ? parameter binding).
+_SAFE_IDENT_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
 class PyArchInitImporter(BaseImporter):
     def __init__(self, filepath: str, mapping_name: str, overwrite: bool = False,
-                existing_graph=None):
+                existing_graph=None, filters: Optional[Dict[str, Any]] = None):
         """
         Initialize pyArchInit importer with mapping configuration.
-        
+
         Args:
             filepath: Path to the SQLite database
             mapping_name: Name of the JSON mapping file to use
@@ -25,11 +31,16 @@ class PyArchInitImporter(BaseImporter):
                         If None, creates new unregistered graph with temporary ID.
                         The caller (EM-tools) is responsible for setting proper graph_id
                         and registering it in MultiGraphManager.
+            filters: Optional dict of {column_name: value} to restrict the
+                imported rows. Combined with AND. Each column is whitelisted
+                against the mapping's column_mappings, then bound as a
+                parameterized SQL value — safe against injection.
         """
         super().__init__(
-            filepath=filepath, 
+            filepath=filepath,
             mapping_name=mapping_name,
-            overwrite=overwrite
+            overwrite=overwrite,
+            filters=filters,
         )
 
         if existing_graph:
@@ -200,6 +211,83 @@ class PyArchInitImporter(BaseImporter):
                 return col_name
         return None
 
+    @staticmethod
+    def _is_safe_identifier(name: str) -> bool:
+        """Whitelist check for a SQL identifier (table or column name).
+
+        We refuse anything that isn't a plain ``[A-Za-z_][A-Za-z0-9_]*``
+        token. SQLite's ? placeholders only bind *values*, not
+        identifiers, so any identifier we interpolate into a query
+        string must be vetted here first.
+        """
+        return bool(name) and _SAFE_IDENT_RE.match(name) is not None
+
+    def _get_table_name(self) -> str:
+        """Return the SQLite table name from the mapping's table_settings."""
+        table_settings = self.mapping.get('table_settings', {})
+        table_name = table_settings.get('table_name')
+        if not table_name:
+            raise ValueError("Table name not specified in mapping configuration")
+        if not self._is_safe_identifier(table_name):
+            raise ValueError(f"Unsafe table_name in mapping: {table_name!r}")
+        return table_name
+
+    def _build_select_query(self, table_name: str) -> Tuple[str, List[Any]]:
+        """Build the ``SELECT * FROM ...`` query with optional WHERE.
+
+        Filter columns are whitelisted against ``column_mappings`` (so a
+        caller can't slip an arbitrary column name into the SQL) and
+        against the static identifier whitelist; filter *values* go
+        through ? parameter binding.
+
+        Returns:
+            (query_string, params_list) ready for ``cursor.execute``.
+        """
+        if not self.filters:
+            return f"SELECT * FROM {table_name}", []
+
+        where_fragments = []
+        params: List[Any] = []
+        for col, value in self.filters.items():
+            # Defense in depth: validate against mapping + ident regex.
+            self._validate_filter_column(col)
+            if not self._is_safe_identifier(col):
+                raise ValueError(f"Unsafe filter column name: {col!r}")
+            where_fragments.append(f"{col} = ?")
+            params.append(value)
+
+        where_clause = " AND ".join(where_fragments)
+        return f"SELECT * FROM {table_name} WHERE {where_clause}", params
+
+    def get_distinct_values(self, column: str) -> List[Any]:
+        """Return sorted distinct non-null values for ``column``.
+
+        Issues ``SELECT DISTINCT {column} FROM {table} ORDER BY {column}``
+        on the configured table. The column name is whitelisted against
+        the mapping's ``column_mappings`` before being interpolated.
+
+        Args:
+            column: Column to enumerate. Must appear in the mapping.
+
+        Returns:
+            Sorted list of distinct values (NULLs excluded).
+        """
+        self._validate_filter_column(column)
+        if not self._is_safe_identifier(column):
+            raise ValueError(f"Unsafe column name: {column!r}")
+        table_name = self._get_table_name()
+
+        conn = sqlite3.connect(self.filepath)
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT DISTINCT {column} FROM {table_name} "
+                f"WHERE {column} IS NOT NULL ORDER BY {column}"
+            )
+            return [row[0] for row in cursor.fetchall()]
+        finally:
+            conn.close()
+
     def parse(self) -> Graph:
         """Parse pyArchInit database using mapping configuration"""
         try:
@@ -221,9 +309,21 @@ class PyArchInitImporter(BaseImporter):
                 raise ValueError("Table name not specified in mapping configuration")
             
             # print(f"\nReading from table: {table_name}")
-            
-            # Query all rows from table
-            cursor.execute(f"SELECT * FROM {table_name}")
+
+            # Validate table_name against the mapping: it comes from the
+            # JSON, not from the user, but we still refuse anything that
+            # looks like it could break out of an identifier (defense in
+            # depth — the JSON itself could be user-supplied).
+            if not self._is_safe_identifier(table_name):
+                raise ValueError(
+                    f"Unsafe table_name in mapping: {table_name!r}"
+                )
+
+            # Build SELECT with optional WHERE clause for filters. Column
+            # names are whitelisted via the mapping; values go through ?
+            # parameter binding (no string interpolation of user data).
+            query, params = self._build_select_query(table_name)
+            cursor.execute(query, params)
             columns = [description[0] for description in cursor.description]
             # print(f"Columns found: {columns}")
             

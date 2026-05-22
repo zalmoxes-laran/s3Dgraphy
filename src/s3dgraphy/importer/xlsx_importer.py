@@ -11,17 +11,21 @@ class XLSXImporter(BaseImporter):
     Supports both mapped and automatic property creation modes.
     """
     
-    def __init__(self, filepath: str, mapping_name: str = None, id_column: str = None, overwrite: bool = False):
+    def __init__(self, filepath: str, mapping_name: str = None, id_column: str = None,
+                 overwrite: bool = False, filters=None):
         """
         Initialize the XLSX importer.
-        
+
         Args:
             filepath (str): Path to the XLSX file
             mapping_name (str, optional): Name of the mapping configuration to use
             id_column (str, optional): Name of the ID column when not using mapping
             overwrite (bool, optional): If True, overwrites existing values
+            filters (dict, optional): {column_name: value} pairs used to
+                restrict the imported rows. AND semantics. Filter column
+                names must appear in the mapping's ``column_mappings``.
         """
-        super().__init__(filepath, mapping_name, id_column, overwrite)
+        super().__init__(filepath, mapping_name, id_column, overwrite, filters=filters)
         self._validate_settings()
 
     def _validate_settings(self):
@@ -70,10 +74,25 @@ class XLSXImporter(BaseImporter):
             
             if df.empty:
                 raise ValueError("Excel file is empty")
-            
+
             column_maps = self.mapping.get('column_mappings', {})
             if not column_maps:
                 raise ValueError("No column mappings found")
+
+            # Apply row-level filters (AND semantics) BEFORE iteration.
+            # Filter column names are matched against the mapping; the
+            # XLSXImporter uses the JSON column names directly as
+            # DataFrame columns (no normalization layer like
+            # MappedXLSXImporter), so the lookup is straightforward.
+            if self.filters:
+                for filter_col, filter_value in self.filters.items():
+                    self._validate_filter_column(filter_col)
+                    if filter_col not in df.columns:
+                        raise ValueError(
+                            f"Filter column '{filter_col}' is in the mapping "
+                            f"but not present in the Excel file"
+                        )
+                    df = df[df[filter_col] == filter_value].reset_index(drop=True)
             
             # ✅ Statistiche import
             total_rows = 0
@@ -131,7 +150,7 @@ class XLSXImporter(BaseImporter):
     def _get_sheet_names(self) -> list:
         """
         Get list of sheet names from Excel file.
-        
+
         Returns:
             list: List of sheet names
         """
@@ -140,3 +159,34 @@ class XLSXImporter(BaseImporter):
         except Exception as e:
             self.warnings.append(f"Error reading sheet names: {str(e)}")
             return []
+
+    def get_distinct_values(self, column: str) -> list:
+        """Return sorted distinct non-null values for ``column``.
+
+        Validates the column against the mapping, reads the configured
+        sheet, and returns ``df[column].dropna().drop_duplicates()``
+        sorted. Used by consumers to populate a filter dropdown ahead
+        of import.
+        """
+        self._validate_filter_column(column)
+        table_settings = self.mapping.get('table_settings', {})
+        start_row = table_settings.get('start_row', 0)
+        sheet_name = table_settings.get('sheet_name', 0)
+
+        df = pd.read_excel(
+            self.filepath,
+            sheet_name=sheet_name,
+            skiprows=start_row - 1 if start_row > 0 else 0,
+            na_values=['', 'NA', 'N/A'],
+            keep_default_na=True,
+        )
+        if column not in df.columns:
+            raise ValueError(
+                f"Column '{column}' not present in sheet '{sheet_name}'"
+            )
+        series = df[column].dropna().drop_duplicates()
+        try:
+            series = series.sort_values()
+        except TypeError:
+            series = series.astype(str).sort_values()
+        return series.tolist()

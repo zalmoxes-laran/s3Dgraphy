@@ -17,18 +17,25 @@ _COLUMN_NORMALIZE_PATTERN = re.compile(r'[\s\-/\\()\[\].,;:–—]+')
 
 class MappedXLSXImporter(BaseImporter):
     def __init__(self, filepath: str, mapping_name: str, overwrite: bool = False,
-                existing_graph=None):
+                existing_graph=None, filters=None):
         """
         Args:
             existing_graph: Existing graph instance to use.
                         If None, creates new unregistered graph with temporary ID.
                         The caller (EM-tools) is responsible for setting proper graph_id
                         and registering it in MultiGraphManager.
+            filters: Optional dict of {column_name: value}. Rows whose
+                value in the named column does not equal the given value
+                are dropped before processing. Multiple filters are AND-ed.
+                Filter column names are matched against the mapping's
+                column_mappings keys (so JSON-side names work even when
+                the actual Excel header is different, e.g. has spaces).
         """
         super().__init__(
             filepath=filepath,
             mapping_name=mapping_name,
-            overwrite=overwrite
+            overwrite=overwrite,
+            filters=filters,
         )
         
         if existing_graph:
@@ -305,9 +312,24 @@ class MappedXLSXImporter(BaseImporter):
 
             if not id_column_excel:
                 raise ValueError(f"ID column not found in Excel after normalization")
-            
+
             # print(f"\nUsing ID column: '{id_column_json}' (JSON) -> '{id_column_excel}' (Excel)")
-            
+
+            # Apply row-level filters (AND semantics) BEFORE row iteration.
+            # Filter keys are JSON column names from the mapping; we
+            # translate them to the actual Excel column via the matching
+            # dict computed above. Unknown columns raise ValueError.
+            if self.filters:
+                for filter_col, filter_value in self.filters.items():
+                    self._validate_filter_column(filter_col)
+                    excel_col = json_to_excel_mapping.get(filter_col)
+                    if excel_col is None:
+                        raise ValueError(
+                            f"Filter column '{filter_col}' is in the mapping "
+                            f"but no matching column was found in the Excel file"
+                        )
+                    df = df[df[excel_col] == filter_value].reset_index(drop=True)
+
             # Process rows
             total_rows = 0
             successful_rows = 0
@@ -437,4 +459,51 @@ class MappedXLSXImporter(BaseImporter):
         column_maps = self.mapping.get('column_mappings', {})
         if not any(cm.get('is_id', False) for cm in column_maps.values()):
             raise ValueError("No ID column specified in mapping")
-        
+
+    def get_distinct_values(self, column):
+        """Return sorted distinct non-null values for ``column`` in the source.
+
+        Reads the configured sheet via pandas and resolves the JSON
+        column name to the actual Excel header using the same
+        normalization rules as :meth:`parse`. Useful for populating
+        filter dropdowns ahead of import.
+        """
+        self._validate_filter_column(column)
+
+        table_settings = self.mapping.get('table_settings', {})
+        sheet_name = table_settings.get('sheet_name', 0)
+
+        df = pd.read_excel(
+            self.filepath,
+            sheet_name=sheet_name,
+            header=0,
+            na_values=['', 'NA', 'N/A'],
+            keep_default_na=True,
+            engine='openpyxl',
+        )
+
+        # Re-run the same normalization used in parse() so the JSON
+        # column name resolves to the actual Excel header.
+        def _normalize(s):
+            n = str(s).strip().upper()
+            for ch in [' ', '-', '/', '\\', '(', ')', '[', ']', '.', ',', ':', ';', '–', '—']:
+                n = n.replace(ch, '_')
+            while '__' in n:
+                n = n.replace('__', '_')
+            return n.strip('_')
+
+        excel_lookup = {_normalize(c): c for c in df.columns}
+        target = excel_lookup.get(_normalize(column))
+        if target is None:
+            raise ValueError(
+                f"Filter column '{column}' not found in sheet '{sheet_name}'"
+            )
+
+        series = df[target].dropna().drop_duplicates()
+        try:
+            series = series.sort_values()
+        except TypeError:
+            # Mixed types — fall back to lexical sort on string repr.
+            series = series.astype(str).sort_values()
+        return series.tolist()
+
