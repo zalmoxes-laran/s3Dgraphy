@@ -1,6 +1,6 @@
 {
   "_comment": "TEMPLATE — copy to mappings/pyarchinit/ and adapt to your table structure. This file lives in the mappings root and is NOT auto-loaded by the MappingRegistry (the registry only scans the pyarchinit/, emdb/, and generic/ subdirectories). It exists as a reference/starting point.",
-  "_description": "Template for SQLite-based PyArchInit-like tables. Demonstrates: id_column, description column, attribute mapping, filter columns (with the new is_filter / filter_required flags introduced in s3dgraphy 1.6), and stratigraphic relations.",
+  "_description": "Template for SQLite-based PyArchInit-like tables. Demonstrates: id_column, description column, attribute mapping, filter columns (with the new is_filter / filter_required flags introduced in s3dgraphy 1.6), composite node names via node_name_template (1.6+), and stratigraphic relations.",
 
   "name": "Template — pyArchInit-style SQLite table",
   "description": "Replace this description with one specific to your table.",
@@ -10,7 +10,42 @@
     "format_type": "sqlite",
     "table_name": "your_table_here",
     "_comment_format_type": "format_type must be 'sqlite' for the PyArchInitImporter.",
-    "_comment_table_name": "table_name is the SQLite table to read with SELECT * FROM <table_name>. The importer guards this against a [A-Za-z_][A-Za-z0-9_]* whitelist."
+    "_comment_table_name": "table_name is the SQLite table to read with SELECT * FROM <table_name>. The importer guards this against a [A-Za-z_][A-Za-z0-9_]* whitelist.",
+
+    "node_name_template": "{area_id}.{stratigraphic_type}.{unit_number}",
+    "_comment_node_name_template": [
+      "OPTIONAL (1.6+). When set, the importer composes the human-readable",
+      "node name (StratigraphicNode.name) by substituting {column_name}",
+      "placeholders with the row's values, instead of using the bare value",
+      "of the is_id column.",
+      "",
+      "Syntax: Python str.format-style placeholders. Each placeholder is the",
+      "literal name of a column in the source table. Any column may be used",
+      "— it does NOT need to be the is_id column or even appear in",
+      "column_mappings (though listing it there is recommended).",
+      "",
+      "is_id semantics are UNCHANGED. The is_id column still identifies the",
+      "row's stable primary key (and is used by the relations engine to",
+      "resolve cross-row edges by id value). node_name_template is a",
+      "PRESENTATION-LEVEL concern: it only affects the node's .name string.",
+      "",
+      "NULL / empty handling: components whose value is None or an empty",
+      "string are OMITTED from the composite name. Adjacent dots are then",
+      "collapsed and leading/trailing dots are stripped. So if",
+      "unita_tipo='' and the template is '{area}.{unita_tipo}.{us}' with",
+      "area='A' and us='101', the resulting name is 'A.101' (not 'A..101').",
+      "",
+      "If node_name_template is absent (legacy mapping), the importer falls",
+      "back to the pre-1.6 behaviour: node_name = str(row[is_id column]).",
+      "",
+      "ENRICH MODE WARNING: in auxiliary-mode imports the importer looks up",
+      "existing nodes by name (StratigraphicNode.name), so the labels of",
+      "the yEd-curated graph must match the composite naming convention",
+      "encoded here. If your existing graph uses bare US numbers as labels",
+      "(e.g. '101'), re-importing into it with a composite template ('A.US.101')",
+      "will leave every row as an orphan. Either change the template, or",
+      "rename the existing labels."
+    ]
   },
 
   "column_mappings": {
@@ -34,7 +69,7 @@
       "is_id": true,
       "node_type": "US",
       "display_name": "Unit Number",
-      "_comment": "is_id=true marks the row identifier. Every row's value becomes the name of a stratigraphic node in the graph. Exactly ONE column must be marked is_id. node_type selects the StratigraphicNode subclass (US / USV / USD / SF / TSU / ... — see s3dgraphy.utils.utils.get_stratigraphic_node_class)."
+      "_comment": "is_id=true marks the row identifier. The cell value is the row's stable primary key, used by cross-row relations and (when no node_name_template is set in table_settings) as the StratigraphicNode.name. Exactly ONE column must be marked is_id. node_type selects the StratigraphicNode subclass (US / USV / USD / SF / TSU / ... — see s3dgraphy.utils.utils.get_stratigraphic_node_class)."
     },
 
     "description": {
@@ -45,7 +80,7 @@
     "stratigraphic_type": {
       "is_attribute": true,
       "property_name": "usType",
-      "_comment": "is_attribute=true: this column's value is stored as an attribute on the stratigraphic node itself (not as a separate PropertyNode). property_name overrides the default attribute name. Multiple is_attribute columns are allowed."
+      "_comment": "is_attribute=true: this column's value is stored as an attribute on the stratigraphic node itself (not as a separate PropertyNode). property_name overrides the default attribute name. Multiple is_attribute columns are allowed. This column is ALSO referenced by the node_name_template above — that's fine, the template only reads row values, it doesn't care which other role the column plays."
     },
 
     "interpretation": {

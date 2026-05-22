@@ -6,7 +6,8 @@ Mapping JSON Schema Reference
 .. versionadded:: 1.6
    ``is_filter`` / ``filter_required`` flags and the importer
    ``get_filter_columns()`` / ``get_distinct_values()`` / ``filters=``
-   API introduced in this release.
+   API introduced in this release. The ``node_name_template`` field on
+   ``table_settings`` (composite node names) is also new in 1.6.
 
 s3dgraphy imports from tabular sources (SQLite tables, XLSX sheets,
 generic CSVs) by reading a JSON mapping file that describes how each
@@ -339,6 +340,116 @@ Filter discovery API
    ``em_data.xlsx`` workbook has its own 5-sheet semantic schema
    (Units / Epochs / Claims / Authors / Documents) where "filter one
    site out of many" is not a meaningful operation.
+
+Composite node names (1.6+)
+---------------------------
+
+.. versionadded:: 1.6
+
+By default, the **name** of each imported stratigraphic node is the
+bare cell value of the ``is_id`` column — for a pyArchInit ``us_table``
+that is just the US number (``"101"``, ``"1002"``, ...). Plain numeric
+labels collide easily across sites/areas and don't match the dotted
+labelling convention that yEd-curated EMdb graphs commonly use
+(``"A.US.101"``).
+
+The optional ``node_name_template`` field, set on ``table_settings``,
+lets a mapping declare a **composite name** built from several columns
+of the row. The id column's role is unchanged — it still identifies
+the row's primary key for cross-row relations — but the
+:attr:`~s3dgraphy.nodes.base_node.Node.name` written to the graph is
+now the rendered template.
+
+Syntax
+~~~~~~
+
+The template is a Python ``str.format``-style string with
+``{column_name}`` placeholders. Each placeholder is the literal name
+of a column in the source table; it does **not** need to be the
+``is_id`` column or even appear in ``column_mappings`` (but listing it
+there is recommended for documentation and so the registered importer
+can validate it).
+
+.. code-block:: json
+
+   "table_settings": {
+     "format_type": "sqlite",
+     "table_name": "us_table",
+     "node_name_template": "{area}.{unita_tipo}.{us}"
+   }
+
+For a row with ``area="A"``, ``unita_tipo="US"``, ``us="101"``, the
+resulting node name is ``"A.US.101"``.
+
+NULL / empty handling
+~~~~~~~~~~~~~~~~~~~~~
+
+Components whose cell value is ``None`` or an empty string are
+**omitted** from the composite. After substitution the importer
+collapses runs of separator dots to a single dot and strips
+leading/trailing dots, so:
+
+- ``area="A"``, ``unita_tipo=""``, ``us="101"`` → ``"A.101"`` (not
+  ``"A..101"``).
+- ``area=None``, ``unita_tipo=""``, ``us="101"`` → ``"101"``.
+
+If *every* component resolves to an empty string, the importer falls
+back to ``str(row[is_id column])`` — a defensive fallback to avoid
+silently colliding multiple empty-named nodes.
+
+Fallback when the template is absent
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If ``node_name_template`` is not declared, the importer uses the
+pre-1.6 behaviour: ``node_name = str(row[is_id column])``. The feature
+is fully opt-in for custom mappings.
+
+.. warning::
+
+   **Breaking change for the default pyArchInit mapping.**
+
+   Starting in 1.6 the shipped
+   ``mappings/pyarchinit/pyarchinit_us_mapping.json`` declares
+   ``"node_name_template": "{area}.{unita_tipo}.{us}"``. Users
+   re-importing into existing graphs whose nodes were created with the
+   pre-1.6 bare-US-number convention (``"101"``, ``"1002"``, ...) will
+   see every row reported as an orphan in enrich mode, because
+   ``_find_node_by_name`` will look for ``"A.US.101"`` and miss
+   ``"101"``. To migrate, either (a) update the labels in the existing
+   graph to the composite form, or (b) override the mapping with a
+   local copy that removes ``node_name_template``.
+
+Enrich-mode lookups
+~~~~~~~~~~~~~~~~~~~
+
+In auxiliary-mode imports (``existing_graph=...``), the importer
+attaches PyArchInit properties to nodes it finds in the host graph by
+**name**. Composite names mean that the host graph's node labels must
+match the convention encoded in the template, otherwise every row will
+be recorded as an orphan in ``PyArchInitImporter.orphans``. yEd-curated
+graphs that will be enriched via a 1.6+ PyArchInit import should have
+their US node labels written in the composite form.
+
+JSON example (pyArchInit default mapping)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: json
+
+   {
+     "name": "pyArchInit US Table",
+     "version": "1.6.0",
+     "table_settings": {
+       "format_type": "sqlite",
+       "table_name": "us_table",
+       "node_name_template": "{area}.{unita_tipo}.{us}"
+     },
+     "column_mappings": {
+       "sito":       { "is_filter": true, "filter_required": true },
+       "area":       { "is_filter": true, "filter_required": false },
+       "unita_tipo": { "is_filter": true, "filter_required": false },
+       "us":         { "is_id": true, "node_type": "US" }
+     }
+   }
 
 relations
 ---------

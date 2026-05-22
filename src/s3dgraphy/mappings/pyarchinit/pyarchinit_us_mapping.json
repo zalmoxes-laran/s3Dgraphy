@@ -1,10 +1,11 @@
 {
     "name": "pyArchInit US Table",
     "description": "Mapping for pyArchInit Stratigraphic Units table (us_table)",
-    "version": "1.0",
+    "version": "1.6.0",
     "table_settings": {
         "format_type": "sqlite",
-        "table_name": "us_table"
+        "table_name": "us_table",
+        "node_name_template": "{area}.{unita_tipo}.{us}"
     },
     "column_mappings": {
         "sito": {
@@ -19,12 +20,18 @@
             "display_name": "Excavation Area",
             "description": "Excavation area / sector. Optional secondary filter, combined with 'sito' via AND."
         },
+        "unita_tipo": {
+            "is_filter": true,
+            "filter_required": false,
+            "display_name": "Stratigraphic Unit Type",
+            "description": "Type of stratigraphic unit (US, USM, etc.). Optional filter combined with sito/area via AND."
+        },
         "us": {
             "node_type": "US",
             "is_id": true
         },
         "d_stratigrafica": {
-            "node_type": "US", 
+            "node_type": "US",
             "is_description": true,
             "target_id_column": "US"
         },
@@ -38,7 +45,7 @@
         "attivita": {
             "node_type": "PropertyNode",
             "property_name": "Activity",
-            "display_name": "Activity type", 
+            "display_name": "Activity type",
             "description": "Type of archaeological activity",
             "create_empty": true
         },
@@ -57,7 +64,7 @@
             "edge_type": "has_property"
         },
         {
-            "source_column": "us", 
+            "source_column": "us",
             "target_column": "attivita",
             "edge_type": "has_property"
         },

@@ -65,6 +65,50 @@ class PyArchInitImporter(BaseImporter):
 
         self.validate_mapping()
 
+    def _resolve_node_name(self, row_dict: Dict[str, Any], id_column: str) -> str:
+        """Compose the human-readable node name for ``row_dict``.
+
+        When the mapping declares ``table_settings.node_name_template``
+        (1.6+), the template is interpreted as a Python str.format-style
+        string with ``{column_name}`` placeholders. Each placeholder is
+        substituted with the corresponding row value.
+
+        Empty / ``None`` components are **omitted** from the composite
+        name and the resulting double-dots are collapsed to single
+        dots, with leading/trailing dots stripped — so a template
+        ``{area}.{unita_tipo}.{us}`` against a row with
+        ``area='A', unita_tipo='', us='101'`` yields ``'A.101'``,
+        not ``'A..101'``.
+
+        If no template is declared, fall back to the pre-1.6 behaviour:
+        ``str(row_dict[id_column])``.
+        """
+        template = (
+            self.mapping.get('table_settings', {}).get('node_name_template')
+        )
+        if not template:
+            return str(row_dict[id_column])
+
+        def _resolve(match):
+            col = match.group(1)
+            value = row_dict.get(col)
+            if value is None:
+                return ''
+            text = str(value).strip()
+            return text  # may be '' — collapsed below
+
+        composed = re.sub(r"\{(\w+)\}", _resolve, template)
+        # Collapse runs of separator dots created by empty components,
+        # then strip leading/trailing dots.
+        composed = re.sub(r"\.{2,}", ".", composed)
+        composed = composed.strip(".")
+        # If every component was empty, fall back to the bare id value
+        # (defensive — better an ambiguous bare-id node than an empty
+        # name that would silently collide across rows).
+        if not composed:
+            return str(row_dict[id_column])
+        return composed
+
     def process_row(self, row_dict: Dict[str, Any]) -> Optional[Node]:
         """Process a row from pyArchInit database"""
         try:
@@ -72,8 +116,12 @@ class PyArchInitImporter(BaseImporter):
             id_column = self._get_id_column()
             if isinstance(row_dict.get(id_column), (int, float)):
                 row_dict[id_column] = str(row_dict[id_column])
-                
-            node_name = str(row_dict[id_column])  # Es: "1001"
+
+            # Compose node name: honor table_settings.node_name_template
+            # (1.6+) when present, otherwise fall back to the bare id
+            # value. Empty / None components are omitted from the
+            # composite name.
+            node_name = self._resolve_node_name(row_dict, id_column)
             
             # print(f"\n=== Processing pyArchInit row ===")
             # print(f"Node name from DB: {node_name}")
