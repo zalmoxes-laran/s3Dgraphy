@@ -20,7 +20,13 @@ importer for any new project.
 
 .. seealso::
 
-   :doc:`/exporters/unified_xlsx_exporter` for the inverse round-trip.
+   - :doc:`/exporters/unified_xlsx_exporter` for the inverse round-trip.
+   - :doc:`mapping_schema` for the **other** XLSX/SQLite import path:
+     :class:`MappedXLSXImporter` / :class:`PyArchInitImporter` and the
+     JSON mapping schema (``column_mappings``, ``table_settings``,
+     ``relations``, and the 1.6 ``is_filter`` flags). The Unified
+     importer is schema-less; it reads its own fixed 5-sheet layout
+     and is **not** driven by a mapping JSON.
 
 The 5-sheet canonical schema
 ----------------------------

@@ -464,6 +464,9 @@ Table of Contents
 
    s3dgraphy_import_export
    s3dgraphy_mapping_system
+   importers/mapping_schema
+   importers/unified_xlsx_importer
+   exporters/unified_xlsx_exporter
    s3dgraphy_json_config
    s3dgraphy_integration_emtools
 

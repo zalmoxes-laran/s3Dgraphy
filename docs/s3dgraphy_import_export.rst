@@ -764,5 +764,7 @@ See Also
 
 - :doc:`s3dgraphy_json_config` - JSON configuration files documentation
 - :doc:`s3dgraphy_mapping_system` - Detailed mapping system guide
+- :doc:`importers/mapping_schema` - Full mapping JSON schema reference
+  (``column_mappings``, ``table_settings``, ``relations``, 1.6 filter flags)
 - :doc:`s3dgraphy_integration_emtools` - Integration with EM-tools for Blender
 - :doc:`api/s3dgraphy_classes_reference` - Complete API reference

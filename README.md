@@ -126,6 +126,42 @@ accepts a `filters={col: value, ...}` kwarg with AND semantics, and exposes a
 are deliberately library-side and make no assumption about who renders the
 filter UI.
 
+**Full schema reference:**
+[Mapping JSON Schema Reference](https://docs.extendedmatrix.org/projects/s3dgraphy/en/latest/importers/mapping_schema.html)
+documents every key (`table_settings`, `column_mappings`, `relations`) and the
+1.6 filter flags in detail.
+
+### Consumer-side quick start
+
+```python
+from s3dgraphy.importer.pyarchinit_importer import PyArchInitImporter
+
+# 1) Probe the mapping: discover filter columns and their values.
+probe = PyArchInitImporter(
+    filepath="excavation.sqlite",
+    mapping_name="pyarchinit_us_mapping",
+)
+for spec in probe.get_filter_columns():
+    column = spec["column"]
+    label = spec["display_name"]
+    required = spec["filter_required"]
+    values = probe.get_distinct_values(column)
+    print(f"{label} ({'required' if required else 'optional'}): {values}")
+
+# 2) Import only the subset the user picked.
+importer = PyArchInitImporter(
+    filepath="excavation.sqlite",
+    mapping_name="pyarchinit_us_mapping",
+    filters={"sito": "Pompei", "area": "A"},
+)
+graph = importer.parse()
+```
+
+`filters` defaults to `None` (no filtering), so all existing code continues
+to work unchanged. Multiple entries are combined with logical AND; values
+match exactly and case-sensitively. The same flow applies to
+`MappedXLSXImporter` and `XLSXImporter` for XLSX sources.
+
 ## 📖 Documentation
 
 - **[User Guide](https://docs.extendedmatrix.org/projects/s3dgraphy/)** - Complete documentation

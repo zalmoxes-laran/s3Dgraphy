@@ -6,6 +6,13 @@ The s3dgraphy mapping system enables import of tabular data from XLSX and SQLite
 .. note::
    This guide focuses on the practical aspects of creating and using mappings for data import.
 
+.. seealso::
+
+   :doc:`importers/mapping_schema` is the complete schema reference for
+   mapping JSON files: every key in ``table_settings``, ``column_mappings``,
+   and ``relations``, plus the 1.6 ``is_filter`` / ``filter_required``
+   flags and the ``filters=`` import-time API.
+
 Overview
 --------
 
@@ -761,6 +768,7 @@ See Also
 --------
 
 - :doc:`s3dgraphy_import_export` - Complete import/export guide
+- :doc:`importers/mapping_schema` - Full mapping JSON schema reference
 - :doc:`s3dgraphy_json_config` - JSON configuration files
 - :doc:`s3dgraphy_integration_emtools` - EM-tools integration examples
 - :doc:`api/s3dgraphy_classes_reference` - Complete API reference
