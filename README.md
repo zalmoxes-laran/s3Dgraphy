@@ -93,6 +93,39 @@ graph.export_json("stratigraphy.json")
 - **Virtual Archaeology**: Create interactive 3D experiences
 - **Research Integration**: Connect archaeological data with other disciplines
 
+## Mapping JSON files
+
+The `src/s3dgraphy/mappings/` folder contains JSON templates that describe how
+to import data from external tabular sources (SQLite tables from PyArchInit,
+XLSX files from EMdb, generic CSVs, etc.) into an s3dgraphy graph.
+
+Two template files live at the root of the folder for reference:
+
+- `template_pyarchinit_mapping.json` — for SQLite-based tables (PyArchInit-style)
+- `template_emdb_mapping.json` — for XLSX-based tables (EMdb-style)
+
+These templates are NOT loaded automatically by `MappingRegistry`, which only
+scans the `pyarchinit/`, `emdb/`, and `generic/` subdirectories. To use one as
+a starting point, copy it to the appropriate subdirectory and adapt it to your
+table structure.
+
+The templates document the schema inline. In addition to `is_id`,
+`is_description`, `is_attribute`, and `node_type`, 1.6 introduces two new
+optional flags on each `column_mappings` entry:
+
+- `is_filter` — marks the column as a candidate filter. Importers expose these
+  via `get_filter_columns()` so a consumer application can present a dropdown
+  before triggering the import.
+- `filter_required` — when `true`, the consumer is expected to force the user
+  to pick a value (no "All values" option). When `false`, the filter is
+  optional.
+
+Each importer (`PyArchInitImporter`, `MappedXLSXImporter`, `XLSXImporter`) now
+accepts a `filters={col: value, ...}` kwarg with AND semantics, and exposes a
+`get_distinct_values(col)` helper for populating the dropdown. The semantics
+are deliberately library-side and make no assumption about who renders the
+filter UI.
+
 ## 📖 Documentation
 
 - **[User Guide](https://docs.extendedmatrix.org/projects/s3dgraphy/)** - Complete documentation

@@ -1,0 +1,55 @@
+{
+  "_comment": "TEMPLATE — copy to mappings/emdb/ and adapt to your XLSX layout. This file lives in the mappings root and is NOT auto-loaded by the MappingRegistry (the registry only scans the pyarchinit/, emdb/, and generic/ subdirectories). It exists as a reference/starting point.",
+  "_description": "Template for XLSX-based EMdb tables. Same column_mappings schema as the pyarchinit template, but with table_settings.format_type='xlsx' and a sheet name.",
+
+  "name": "Template — EMdb-style XLSX sheet",
+  "description": "Replace this description with one specific to your sheet.",
+  "version": "1.6.0",
+
+  "table_settings": {
+    "format_type": "xlsx",
+    "sheet_name": "Sheet1",
+    "start_row": 1,
+    "_comment_format_type": "format_type='xlsx' selects MappedXLSXImporter / XLSXImporter on the consumer side.",
+    "_comment_sheet_name": "sheet_name is the worksheet to read (string name, or 0-based index).",
+    "_comment_start_row": "start_row is 1-indexed and refers to the first row that contains DATA. Row 1 always holds column headers; if start_row=1, data begins on row 2."
+  },
+
+  "column_mappings": {
+    "Project": {
+      "is_filter": true,
+      "filter_required": true,
+      "display_name": "Project",
+      "description": "Project / dataset identifier.",
+      "_comment": "FILTER COLUMN. The consumer can call importer.get_filter_columns() and importer.get_distinct_values('Project') to render a dropdown so the user picks one project before import. filter_required=true means the consumer should force a selection."
+    },
+
+    "Phase": {
+      "is_filter": true,
+      "filter_required": false,
+      "display_name": "Phase",
+      "_comment": "Optional secondary filter. Combined with 'Project' via AND."
+    },
+
+    "ID": {
+      "is_id": true,
+      "node_type": "US",
+      "display_name": "Unit ID",
+      "_comment": "Row identifier. Becomes the name of the stratigraphic node. Exactly ONE column must be is_id=true."
+    },
+
+    "Description": {
+      "is_description": true,
+      "_comment": "Free-text description, stored on the StratigraphicNode.description field."
+    },
+
+    "Material": {
+      "node_type": "PropertyNode",
+      "property_name": "Material",
+      "display_name": "Material",
+      "_comment": "Regular property column → one PropertyNode per row, linked via 'has_property'."
+    }
+  },
+
+  "relations": []
+}
