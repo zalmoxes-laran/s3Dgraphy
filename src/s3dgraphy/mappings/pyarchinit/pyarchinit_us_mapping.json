@@ -7,6 +7,18 @@
         "table_name": "us_table"
     },
     "column_mappings": {
+        "sito": {
+            "is_filter": true,
+            "filter_required": true,
+            "display_name": "Site",
+            "description": "Archaeological site name. Marked as a required filter so consumer applications can restrict the import to a single site (pyArchInit databases typically store many sites in one us_table)."
+        },
+        "area": {
+            "is_filter": true,
+            "filter_required": false,
+            "display_name": "Excavation Area",
+            "description": "Excavation area / sector. Optional secondary filter, combined with 'sito' via AND."
+        },
         "us": {
             "node_type": "US",
             "is_id": true

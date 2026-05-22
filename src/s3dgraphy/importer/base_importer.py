@@ -20,16 +20,23 @@ class BaseImporter(ABC):
     Abstract base class for all importers.
     Supports both mapped and automatic property creation modes.
     """
-    def __init__(self, filepath: str, mapping_name: str = None, id_column: str = None, 
-                overwrite: bool = False):        
+    def __init__(self, filepath: str, mapping_name: str = None, id_column: str = None,
+                overwrite: bool = False, filters: Optional[Dict[str, Any]] = None):
         """
         Initialize the importer.
-        
+
         Args:
             filepath: Path to the file to import
             mapping_name: Name of the mapping configuration to use
             id_column: Name of the ID column when not using mapping
             overwrite: If True, overwrites existing property values
+            filters: Optional dict of {column_name: value} pairs used to
+                restrict the imported rows. Filters are combined with AND
+                semantics. Only columns marked ``is_filter: true`` in the
+                mapping JSON are expected to appear here, but the base class
+                does not enforce that — subclass implementations decide how
+                to apply each filter (SQL WHERE, pandas mask, etc.).
+                A value of ``None`` or an empty dict disables filtering.
             mode: Either "3DGIS" or "EM_ADVANCED"
         """
         if mapping_name is None and id_column is None:
@@ -54,6 +61,10 @@ class BaseImporter(ABC):
         self.id_column = id_column
         self.mapping = self._load_mapping(mapping_name) if mapping_name else None
         self.overwrite = overwrite
+
+        # Optional row-level filters (column -> value). AND semantics.
+        # Subclasses apply these in their parse() implementation.
+        self.filters = dict(filters) if filters else {}
 
         # ✅ AGGIUNTA: Cache l'ID column una sola volta
         self._cached_id_column = None
@@ -124,6 +135,90 @@ class BaseImporter(ABC):
                     logger.debug(f"Found description column: {col_name}")
                     return col_name
         return None
+
+    # ------------------------------------------------------------------
+    # Filter discovery API (1.6)
+    # ------------------------------------------------------------------
+    def get_filter_columns(self) -> list:
+        """Return column specs flagged as filter candidates in the mapping.
+
+        A column is a filter candidate when its entry in ``column_mappings``
+        contains ``"is_filter": true``. The returned list lets a consumer
+        application (CLI, GUI, web form, etc.) discover at import time which
+        columns should be exposed as user-selectable filters.
+
+        Each entry is a shallow copy of the mapping's column spec with a
+        ``"column"`` key added that holds the original column name. The
+        spec dict is returned verbatim so callers can read whichever fields
+        they care about (``display_name``, ``filter_required``, ``node_type``,
+        ``description``, ...).
+
+        Returns:
+            list of dict, one per filter-candidate column. Empty list when
+            no mapping is loaded or no column is marked as filter.
+        """
+        result = []
+        if not self.mapping:
+            return result
+        for col_name, col_config in self.mapping.get('column_mappings', {}).items():
+            if not col_config.get('is_filter', False):
+                continue
+            entry = dict(col_config)
+            entry['column'] = col_name
+            # Surface defaults explicitly so consumers don't have to .get()
+            entry.setdefault('filter_required', False)
+            entry.setdefault('display_name', col_name)
+            result.append(entry)
+        return result
+
+    def get_distinct_values(self, column: str) -> list:
+        """Return sorted distinct values for a column in the source data.
+
+        Used by consumer applications to populate filter dropdowns
+        ("show me the list of sites available in this database, so the user
+        can pick one before import"). The implementation is format-specific
+        (SQLite ``SELECT DISTINCT``, pandas ``Series.unique``, ...) and must
+        be provided by subclasses.
+
+        Args:
+            column: Name of the column whose distinct values to enumerate.
+
+        Returns:
+            Sorted list of distinct non-null values. Type depends on the
+            backing format (strings for SQLite TEXT columns, native python
+            scalars for pandas, ...).
+
+        Raises:
+            NotImplementedError: Always, in the base class. Subclasses must
+                override.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} must implement get_distinct_values()"
+        )
+
+    def _validate_filter_column(self, column: str) -> None:
+        """Validate that ``column`` is a known mapping column.
+
+        Defends against caller-supplied column names being interpolated into
+        a SQL query string. The check is conservative: the column must
+        appear as a key in ``column_mappings``. Raises ValueError if not.
+
+        Args:
+            column: Column name to validate.
+
+        Raises:
+            ValueError: If the column is not declared in the mapping.
+        """
+        if not self.mapping:
+            raise ValueError(
+                f"Cannot validate column '{column}': no mapping loaded"
+            )
+        col_mappings = self.mapping.get('column_mappings', {})
+        if column not in col_mappings:
+            raise ValueError(
+                f"Column '{column}' is not declared in column_mappings. "
+                f"Known columns: {sorted(col_mappings.keys())}"
+            )
 
     def _get_node_type_from_id_column(self) -> str:
         """Get node type from ID column configuration or use default."""
