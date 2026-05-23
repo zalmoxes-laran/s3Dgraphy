@@ -1,0 +1,177 @@
+@prefix hdto:      <https://w3id.org/hdto/ontology#> .
+@prefix crm:       <http://www.cidoc-crm.org/cidoc-crm/> .
+@prefix crmdig:    <http://www.cidoc-crm.org/extensions/crmdig/> .
+@prefix crmarchaeo: <http://www.cidoc-crm.org/extensions/crmarchaeo/> .
+@prefix em:        <https://w3id.org/em/ontology#> .
+@prefix rdfs:      <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:       <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms:   <http://purl.org/dc/terms/> .
+
+# ============================================================================
+# HDT-O — Heritage Digital Twin Ontology — s3dgraphy alignment layer (v0.2)
+# ============================================================================
+#
+# Reconciled with ECHOES Deliverable D7.1 "The Digital Commons" (May 2024).
+# Authors of D7.1: M. Theodoridou, A. Kritzotaki, M. Doerr (FORTH);
+# B. Markoff, F. Hivert (CNRS); T. Hellmund, M. Zenner (Fraunhofer);
+# E. Demetrescu (CNR); A. Isaac (Europeana).
+#
+# Status:  ALIGNED with D7.1 declarations (was: speculative DRAFT v0.1).
+#          Namespace placeholder (w3id.org/hdto/) — to be replaced when the
+#          official HDT-O resolvable IRI is published by the ECHOES consortium.
+# Author:  Emanuele Demetrescu (s3dgraphy v1.6.0 integration)
+# Date:    2026-05-23
+# License: CC-BY-4.0
+#
+# What this file does:
+#   * Declares the subset of HDT-O classes & properties used by s3dgraphy v1.6.0
+#     to express granularity of heritage digital twins
+#   * Bridges em:EMGraph → HC16 Heritage Proposition Set (an EM graph IS a
+#     named-graph proposition set in HDT-O terms)
+#   * Documents the canonical containment chain:
+#         HC1 ─HP1→ HC2 ─HP3*→ HC2 ─HP33→ HC16 (em:EMGraph)
+#
+# Use case (the Colosseo example):
+#   :Colosseo_phys          a hdto:HC1_Heritage_Entity .
+#   :Colosseo_HDT_overall   a hdto:HC2_Heritage_Digital_Twin ;
+#       hdto:HP1i_is_digital_twin_of :Colosseo_phys .
+#   :Colosseo_HDT_Flavian   hdto:HP3_is_digital_twin_component_of :Colosseo_HDT_overall .
+#   :Colosseo_HDT_medieval  hdto:HP3_is_digital_twin_component_of :Colosseo_HDT_overall .
+#   :Colosseo_HDT_christian hdto:HP3_is_digital_twin_component_of :Colosseo_HDT_overall .
+#   :EM_graph_Colosseo_excavation a em:EMGraph , hdto:HC16_Heritage_Proposition_Set ;
+#       hdto:HP33i_is_proposition_set_of :Colosseo_HDT_Flavian .
+# ============================================================================
+
+<https://w3id.org/em/hdto-extension>
+    a owl:Ontology ;
+    rdfs:label "HDT-O — s3dgraphy alignment layer"@en ;
+    dcterms:title "Heritage Digital Twin Ontology — minimal subset for s3dgraphy v1.6.0"@en ;
+    dcterms:creator "Emanuele Demetrescu (s3dgraphy)" ;
+    dcterms:source <https://www.echoes-eccch.eu/> ;
+    dcterms:license <https://creativecommons.org/licenses/by/4.0/> ;
+    dcterms:issued "2026-05-23"^^xsd:date ;
+    owl:versionInfo "0.2-aligned-with-D7.1" ;
+    rdfs:comment "Subset of HDT-O classes and properties (HC1, HC2, HC14, HC15, HC16; HP1, HP3, HP29, HP33) needed by s3dgraphy v1.6.0 to express granularity of heritage digital twins. Aligned with ECHOES Deliverable D7.1 (May 2024). The namespace (w3id.org/hdto/) is a placeholder pending the official ECHOES publication."@en .
+
+
+# ============================================================================
+# CLASSES (HDT-O HC*) — declared as per D7.1 scope notes
+# ============================================================================
+
+hdto:HC1_Heritage_Entity
+    a owl:Class ;
+    rdfs:label "Heritage Entity"@en ;
+    rdfs:subClassOf crm:E1_CRM_Entity ;
+    rdfs:comment "Any real-world entity socially recognized as having cultural, historical, or scientific value. Heritage status is context-dependent, dynamic, and socially constructed (an attributed ROLE, not an intrinsic property — DOLCE sense). Specialized as HC3 Tangible Heritage Entity or HC4 Intangible Heritage Entity."@en .
+
+hdto:HC2_Heritage_Digital_Twin
+    a owl:Class ;
+    rdfs:label "Heritage Digital Twin (HDT)"@en ;
+    rdfs:subClassOf hdto:HC14_Volatile_Digital_Object ;
+    rdfs:comment "Aggregate of sets of formal propositions related to an instance of HC1 Heritage Entity, documented as single units for a specific purpose. In RDF terms: the CORPUS OF NAMED GRAPHS (instances of E73) that contain statements about the heritage entity. In a defining project context, every HC2 is linked to one HC1 and is valid for a specific timespan. Multiple HC2 instances about the same HC1 may overlap or include each other (e.g. created by different projects or representing different temporal/interpretive phases)."@en .
+
+hdto:HC14_Volatile_Digital_Object
+    a owl:Class ;
+    rdfs:label "Volatile Digital Object"@en ;
+    rdfs:subClassOf crmdig:D1_Digital_Object ;
+    rdfs:comment "A digital object whose content may change over time. Snapshots of its state at specific moments are HC15 Persistent Digital Objects. Parent class of HC2 Heritage Digital Twin."@en .
+
+hdto:HC15_Persistent_Digital_Object
+    a owl:Class ;
+    rdfs:label "Persistent Digital Object"@en ;
+    rdfs:subClassOf crmdig:D1_Digital_Object ;
+    rdfs:comment "A digital object captured at a specific point in time as an immutable snapshot of a corresponding HC14 Volatile Digital Object. Snapshot relationship is documented via the crmpem:PP17 has snapshot equivalent (here modelled as a subproperty of crm:P130 shows features of in line with D7.1 §4.2)."@en .
+
+hdto:HC16_Heritage_Proposition_Set
+    a owl:Class ;
+    rdfs:label "Heritage Proposition Set"@en ;
+    rdfs:subClassOf crm:E73_Information_Object ;
+    rdfs:comment "A named graph carrying a set of formal propositions about (or related to) heritage entities. The atomic content unit that an HC2 Heritage Digital Twin aggregates: an HC2 'contains' (HP33) one or more HC16 instances. Version chains across editing actions are documented via HP30 added content / HP31 deleted content / HP32 replaced. An s3dgraphy em:EMGraph IS a Heritage Proposition Set (formally declared in em.ttl via owl:equivalentClass / subClassOf)."@en .
+
+
+# ============================================================================
+# PROPERTIES (HDT-O HP*) — the canonical D7.1 declarations used by s3dgraphy
+# ============================================================================
+
+hdto:HP1_has_digital_twin
+    a owl:ObjectProperty ;
+    rdfs:label "has digital twin"@en ;
+    rdfs:domain hdto:HC1_Heritage_Entity ;
+    rdfs:range hdto:HC2_Heritage_Digital_Twin ;
+    rdfs:comment "Links a CH entity (the real-world heritage object) with a corresponding HDT that aggregates structured knowledge about it. The fundamental connection between real-world heritage and digital documentation. Quantification: many-to-many (0,n : 0,n) per D7.1."@en .
+
+hdto:HP1i_is_digital_twin_of
+    a owl:ObjectProperty ;
+    rdfs:label "is digital twin of"@en ;
+    owl:inverseOf hdto:HP1_has_digital_twin ;
+    rdfs:domain hdto:HC2_Heritage_Digital_Twin ;
+    rdfs:range hdto:HC1_Heritage_Entity .
+
+hdto:HP3_is_digital_twin_component_of
+    a owl:ObjectProperty , owl:TransitiveProperty ;
+    rdfs:label "is digital twin component of"@en ;
+    rdfs:domain hdto:HC2_Heritage_Digital_Twin ;
+    rdfs:range hdto:HC2_Heritage_Digital_Twin ;
+    rdfs:comment "Enables the HIERARCHICAL ORGANIZATION of digital twins: a smaller HDT is a component of a larger one. Per D7.1 examples: 'HDT of Pafos Gate in Nicosia is digital twin component of HDT of Nicosia City Walls'; 'HDT of Basilica of San Salvatore in Spoleto is digital twin component of HDT of Spoleto, which is component of UNESCO WHS Longobards in Italy'. The 'component' notion is NOT limited to physical/geographical: encompasses any main-associated relationship. Transitive (containment chains). Quantification: many-to-many (0,n : 0,n)."@en .
+
+hdto:HP3i_has_digital_twin_component
+    a owl:ObjectProperty ;
+    rdfs:label "has digital twin component"@en ;
+    owl:inverseOf hdto:HP3_is_digital_twin_component_of ;
+    rdfs:domain hdto:HC2_Heritage_Digital_Twin ;
+    rdfs:range hdto:HC2_Heritage_Digital_Twin .
+
+hdto:HP29_has_digital_object_part
+    a owl:ObjectProperty ;
+    rdfs:label "has digital object part"@en ;
+    rdfs:subPropertyOf crm:P106_is_composed_of ;
+    rdfs:domain hdto:HC14_Volatile_Digital_Object ;
+    rdfs:range crmdig:D1_Digital_Object ;
+    rdfs:comment "Associates an HC14 Volatile Digital Object (such as an HC2 HDT) with a STRUCTURAL PART that is itself a digital object. Per D7.1 example: 'The HDT of the Pisa Leaning Tower (HC2) has digital part a 3D survey project database (crmdig:D1)'. The structural part may be another HC14, an HC15 Persistent Digital Object, or any crmdig:D1. Useful for linking an HDT to auxiliary digital assets (databases, 3D models, point clouds) that are NOT themselves proposition sets but support the documentation."@en .
+
+hdto:HP33_contains
+    a owl:ObjectProperty ;
+    rdfs:label "contains (proposition set)"@en ;
+    rdfs:domain hdto:HC2_Heritage_Digital_Twin ;
+    rdfs:range hdto:HC16_Heritage_Proposition_Set ;
+    rdfs:comment "Associates an HC2 HDT with an HC16 Heritage Proposition Set currently valid within it. The complementary HP34 contained (was proposition set of) tracks superseded versions. For s3dgraphy: the canonical link from an HC2 HDT to an em:EMGraph (which is declared as subclass of HC16 in em.ttl). Quantification per D7.1: many-to-many, with version-chain semantics via HP32 replaced."@en .
+
+hdto:HP33i_is_proposition_set_of
+    a owl:ObjectProperty ;
+    rdfs:label "is proposition set of"@en ;
+    owl:inverseOf hdto:HP33_contains ;
+    rdfs:domain hdto:HC16_Heritage_Proposition_Set ;
+    rdfs:range hdto:HC2_Heritage_Digital_Twin ;
+    rdfs:comment "Inverse of HP33 contains. Used in s3dgraphy to express that an em:EMGraph is a proposition set within a specific HC2 HDT (or several HC2s — many-to-many membership)."@en .
+
+
+# ============================================================================
+# Notes for further reconciliation
+# ============================================================================
+# 1. Namespace: replace https://w3id.org/hdto/ with the official ECHOES IRI
+#    when published. A single sed across this file + em.ttl + node_datamodel
+#    em_extension blocks + connections_datamodel suffices.
+#
+# 2. Other HDT-O classes/properties NOT yet imported but available in D7.1
+#    (to integrate as needed for future use cases):
+#       HC3 Tangible Heritage Entity      (subclass of HC1)
+#       HC4 Intangible Heritage Entity    (subclass of HC1)
+#       HC5 Digital Representation        (3D, image, etc.)
+#       HC10 Heritage Valuation           (declaration of heritage status)
+#       HC11 Digital Twin Maintenance     (HDT lifecycle activity)
+#       HC12 Heritage Declaration Event   (the event of declaring HC1 as heritage)
+#       HC13 Project                      (research project context)
+#       HC17 Observation with Inference   (← of interest for the EM paradata chain)
+#       HC18 Provenance Statement
+#       HC19 Provenance Assessment
+#       HP9 is visual representation of
+#       HP21 is 3D representation output of
+#       HP22 represents
+#       HP30/HP31/HP32 added/deleted/replaced content (HC11 maintenance)
+#       HP34 contained (was proposition set of) (deprecated-replaced chain)
+#
+# 3. HC17 Observation with Inference is the natural HDT-O bridge to the EM
+#    paradata chain (em:Paradata + crminf:I1_Argumentation). To explore in a
+#    follow-up: declare em:Paradata as subclass of HC17, or vice versa.
+# ============================================================================

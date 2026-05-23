@@ -71,9 +71,16 @@
           "description": "Structural Virtual Stratigraphic Unit (USV/s). Represents a virtual reconstruction of structural elements, such as walls, columns, or other architectural components that are no longer physically present but can be reconstructed based on archaeological evidence.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
-            "cidoc": "A2 Stratigraphic Volume Unit",
-            "cidoc_s3d": "VirtualStratigraphicStructuralUnit",
-            "alternative": "E89 Propositional Object + A8 Stratigraphic Unit"
+            "cidoc": "A8 Stratigraphic Unit",
+            "cidoc_s3d": null,
+            "alternative": "crminf:I4_Proposition_Set + A8 Stratigraphic Unit",
+            "rationale": "USVs is a HYPOTHESIZED stratigraphic unit, not physically observed. Multi-typed in OWL as both crminf:I4_Proposition_Set (propositional nature) and crmarchaeo:A8_Stratigraphic_Unit (stratigraphic role). The legacy 'A2 Stratigraphic Volume Unit' mapping was semantically wrong (A2 = physical volume). v1.6.0 corrects this via em_extension."
+          },
+          "em_extension": {
+            "uri": "em:StructuralVirtualSU",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["em:VirtualSU"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -91,9 +98,16 @@
           "description": "Non-structural Virtual Stratigraphic Unit (USV/n). Represents a virtual reconstruction of non-structural elements, such as furniture, decorations, or other non-load bearing components that are no longer physically present but can be reconstructed based on archaeological evidence.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
-            "cidoc": "A2 Stratigraphic Volume Unit",
-            "cidoc_s3d": "VirtualStratigraphicNonStructuralUnit",
-            "alternative": "E89 Propositional Object + A8 Stratigraphic Unit"
+            "cidoc": "A8 Stratigraphic Unit",
+            "cidoc_s3d": null,
+            "alternative": "crminf:I4_Proposition_Set + A8 Stratigraphic Unit",
+            "rationale": "Same correction as USVs: virtual = propositional, not physical A2. See em_extension."
+          },
+          "em_extension": {
+            "uri": "em:NonStructuralVirtualSU",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["em:VirtualSU"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -108,12 +122,19 @@
           "abbreviation": "SF",
           "label": "Special Find",
           "symbol": "white octagon",
-          "description": "Not in situ element that needs repositioning. Represents an object of particular interest found in stratigraphic contexts, such as architectural artifacts, coins, or other significant objects that are not in their original position.",
+          "description": "Movable physical object whose ORIGINAL position is unknown (and sometimes whose pertinence to the site is uncertain). Distinct from in-situ artefacts — known to exist(ed) but displaced. Architectural artefacts, coins, fragments without findspot. Provenance / pertinence uncertainty is captured via paradata edges, not by class.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
             "cidoc": "E19 Physical Object",
-            "cidoc_s3d": "RepositionableObject",
-            "alternative": null
+            "cidoc_s3d": null,
+            "alternative": "E19 Physical Object + crminf:I2_Belief (for uncertain site-pertinence)",
+            "rationale": "E19 captures the movable physical-object nature. The 'displacement' semantic (no original-position info) is intrinsic to the EM concept and is captured by the em:DisplacedSpecialFind class; uncertain pertinence to the site is expressed via paradata edges to a crminf:I2_Belief at instance level."
+          },
+          "em_extension": {
+            "uri": "em:DisplacedSpecialFind",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crm:E19_Physical_Object"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -128,12 +149,19 @@
           "abbreviation": "VSF",
           "label": "Virtual Special Find",
           "symbol": "black octagon",
-          "description": "Hypothetical reconstruction of a fragmented Special Find. Represents a virtual reconstruction of a special find that is fragmented or incomplete, based on archaeological evidence and reasonable inferences.",
+          "description": "Hypothetical reconstruction of a fragmented Special Find. Virtual reassembly of fragments supported by paradata. Linked to the source fragments (DisplacedSpecialFind instances) via em:reconstructsFrom.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
             "cidoc": "E89 Propositional Object",
-            "cidoc_s3d": "VirtualReconstructedObject",
-            "alternative": "E89 Propositional Object + E19 Physical Object"
+            "cidoc_s3d": null,
+            "alternative": "E89 Propositional Object + E19 Physical Object",
+            "rationale": "E89 (propositional) captures the hypothetical nature; multi-typed with E19 (physical object) because the reconstructed result is referred to as if it were the physical artefact."
+          },
+          "em_extension": {
+            "uri": "em:VirtualSpecialFind",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crm:E89_Propositional_Object", "crm:E19_Physical_Object"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -152,8 +180,15 @@
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
             "cidoc": "E19 Physical Object",
-            "cidoc_s3d": "ReusedObject",
-            "alternative": "E19 Physical Object + E11 Modification"
+            "cidoc_s3d": null,
+            "alternative": "E19 Physical Object + A2 Stratigraphic Volume Unit + em:wasReusedFrom (links to original context)",
+            "rationale": "Spolia has DUAL nature: an E19 physical object with its own production history AND now an A2 SU embedded in the current stratigraphy. The legacy 'E19 + E11 Modification' alternative captured only the modification-event side; v1.6.0 model spolia as multi-typed E19 + A2 with em:wasReusedFrom pointing to the original (lost) context."
+          },
+          "em_extension": {
+            "uri": "em:ReusedSpecialFind",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crm:E19_Physical_Object", "crmarchaeo:A2_Stratigraphic_Volume_Unit"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -168,12 +203,19 @@
           "abbreviation": "serSU",
           "label": "US series",
           "symbol": "white ellipse",
-          "description": "Series of Stratigraphic Units (SU). Represents a grouping of multiple related stratigraphic units for organizational or analytical purposes.",
+          "description": "Series of Stratigraphic Units (SU). A pragmatic stratigraphic aggregation: one logical SU representing multiple physical SUs treated as one (e.g. a series of column bases not worth numbering individually). The series IS itself an SU, not just a collection of SUs.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
-            "cidoc": "A6 Group Declaration Event",
+            "cidoc": "A8 Stratigraphic Unit",
             "cidoc_s3d": null,
-            "alternative": "E78 Collection + A8 Stratigraphic Unit"
+            "alternative": "A8 Stratigraphic Unit + P46_is_composed_of (links to component SUs)",
+            "rationale": "A series is itself an SU (A8) that aggregates components via P46_is_composed_of. The legacy mapping 'A6 Group Declaration Event' was wrong — A6 is the EVENT of declaring a group, not the group itself."
+          },
+          "em_extension": {
+            "uri": "em:SeriesOfSU",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crmarchaeo:A8_Stratigraphic_Unit"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -188,12 +230,19 @@
           "abbreviation": "serUSD",
           "label": "USD series",
           "symbol": "white ellipse with orange border",
-          "description": "Series of Documentary Stratigraphic Units (USD). Represents a grouping of multiple related documentary stratigraphic units for organizational or analytical purposes.",
+          "description": "Series of Documentary Stratigraphic Units (USD). Pragmatic aggregation of multiple DocumentaryVirtualSUs (USD) treated as one logical unit. Same series-as-SU pattern as serSU, applied to the documentary family.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
-            "cidoc": "A6 Group Declaration Event",
+            "cidoc": "A8 Stratigraphic Unit",
             "cidoc_s3d": null,
-            "alternative": "E78 Collection + A8 Stratigraphic Unit"
+            "alternative": "em:DocumentaryVirtualSU + P46_is_composed_of",
+            "rationale": "Like serSU, but the aggregated components are DocumentaryVirtualSU. Same correction over the legacy A6 mapping."
+          },
+          "em_extension": {
+            "uri": "em:SeriesOfDocumentarySU",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["em:DocumentaryVirtualSU"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -208,12 +257,19 @@
           "abbreviation": "serUSVn",
           "label": "USVn series",
           "symbol": "black ellipse green border",
-          "description": "Series of non-structural Virtual Stratigraphic Units. Represents a grouping of multiple non-structural virtual stratigraphic units.",
+          "description": "Series of non-structural Virtual Stratigraphic Units. Pragmatic aggregation of multiple NonStructuralVirtualSU (USVn) treated as one logical unit. Same series-as-SU pattern as serSU.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
-            "cidoc": "E78 Collection",
-            "cidoc_s3d": "VirtualStratigraphicSeriesCollection",
-            "alternative": "E78 Collection + A3 Stratigraphic Interface"
+            "cidoc": "A8 Stratigraphic Unit",
+            "cidoc_s3d": null,
+            "alternative": "em:NonStructuralVirtualSU + P46_is_composed_of",
+            "rationale": "The series IS still a virtual SU (subclass of em:NonStructuralVirtualSU), aggregating its components via P46_is_composed_of. Legacy 'E78 Collection' alone treated the series as a pure collection rather than a typed SU; v1.6.0 keeps the SU nature."
+          },
+          "em_extension": {
+            "uri": "em:SeriesOfNonStructuralVirtualSU",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["em:NonStructuralVirtualSU"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -227,12 +283,19 @@
           "parent": "StratigraphicNode",
           "abbreviation": "serUSVs",
           "label": "USVs series",
-          "description": "Series of Structural Virtual Stratigraphic Units. Represents a grouping of multiple structural virtual stratigraphic units.",
+          "description": "Series of Structural Virtual Stratigraphic Units. Pragmatic aggregation of multiple StructuralVirtualSU (USVs) treated as one logical unit.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
-            "cidoc": "E78 Collection",
-            "cidoc_s3d": "VirtualStratigraphicSeriesCollection",
-            "alternative": "E78 Collection + A3 Stratigraphic Interface"
+            "cidoc": "A8 Stratigraphic Unit",
+            "cidoc_s3d": null,
+            "alternative": "em:StructuralVirtualSU + P46_is_composed_of",
+            "rationale": "Same series-as-SU pattern as serUSVn but for the structural virtual family."
+          },
+          "em_extension": {
+            "uri": "em:SeriesOfStructuralVirtualSU",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["em:StructuralVirtualSU"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -249,12 +312,19 @@
           "abbreviation": "USD",
           "label": "USD",
           "symbol": "white round rectangle with orange border",
-          "description": "Documentary Stratigraphic Unit. Represents a conceptual stratigraphic unit based on historical or documentary sources rather than direct physical evidence.",
+          "description": "Documentary Stratigraphic Unit. Represents a conceptual stratigraphic unit inferred from historical or documentary sources rather than direct archaeological observation. A USD is the RESULT of a document (an SU posited because a document attests it), NOT a document itself.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
-            "cidoc": "E31 Document",
-            "cidoc_s3d": "DocumentaryStratigraphicUnit",
-            "alternative": "E31 Document + E73 Information Object"
+            "cidoc": "A8 Stratigraphic Unit",
+            "cidoc_s3d": null,
+            "alternative": "crminf:I4_Proposition_Set + A8 Stratigraphic Unit (linked to E31 Document via em:derivedFromDocument)",
+            "rationale": "A USD is an SU posited on the strength of documentary evidence, not a document. The legacy 'E31 Document' mapping confused the asserted entity with its supporting source. v1.6.0 corrects via em_extension: USD is a Virtual SU (propositional) evidenced by documents."
+          },
+          "em_extension": {
+            "uri": "em:DocumentaryVirtualSU",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["em:VirtualSU"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -269,12 +339,19 @@
           "abbreviation": "TSU",
           "label": "TSU",
           "symbol": "dotted white rectangle with red border",
-          "description": "Transformation Unit. Represents a process of change in a stratigraphic unit.",
+          "description": "Transformation Unit. A family of actions modifying a surface or structure — the 'map of degradation' treated stratigraphically. Aggregates multiple A5 Stratigraphic Modification events via P46_is_composed_of.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
             "cidoc": "A5 Stratigraphic Modification",
             "cidoc_s3d": null,
-            "alternative": "S18 Alteration"
+            "alternative": "A5 Stratigraphic Modification + P46_is_composed_of (multi-action aggregation)",
+            "rationale": "TSU is the canonical 'transformation' / 'degradation' class — A5 in CRMarchaeo. The 'family of actions' aspect is expressed by composition (P46) rather than by a separate class."
+          },
+          "em_extension": {
+            "uri": "em:TransformationSU",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crmarchaeo:A5_Stratigraphic_Modification"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -289,12 +366,19 @@
           "abbreviation": "UL",
           "label": "UL",
           "symbol": "white rectangle with orange border",
-          "description": "Working Unit. Traces of stone working, toolmarks, reworkings on architectural surfaces.",
+          "description": "Working Unit. Traces of stone working on architectural surfaces — chisel marks, gradina, iccozza traces on Etruscan tomb walls, hammer impacts. UL is the FEATURE (the marks themselves); the producing event is a separate E12 Production linked via P108i_was_produced_by.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
-            "cidoc": "E12 Production",
+            "cidoc": "E25 Human-Made Feature",
             "cidoc_s3d": null,
-            "alternative": "S19 Encounter Event"
+            "alternative": "E25 Human-Made Feature + P108i_was_produced_by E12 Production",
+            "rationale": "UL is the trace, not the act that produced it. v1.6.0 corrects the legacy 'E12 Production' (= the production event itself) to 'E25 Human-Made Feature' (= the observable trace). The production event is modelled separately and linked via P108i."
+          },
+          "em_extension": {
+            "uri": "em:WorkingUnit",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crm:E25_Human-Made_Feature"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -309,12 +393,19 @@
           "abbreviation": "BR",
           "label": "continuity node",
           "symbol": "black rhombus",
-          "description": "End of life of a US/USV. Marks the point where a stratigraphic unit ceases to exist.",
+          "description": "End of life of a SU/USV. Marks the point in time when a stratigraphic unit ceases to exist (destruction, dismantling, deep transformation that no longer preserves identity).",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
             "cidoc": "E64 End of Existence",
             "cidoc_s3d": null,
-            "alternative": "A5 Stratigraphic Modification"
+            "alternative": "E64 End of Existence + A5 Stratigraphic Modification (when the end-of-life is itself a stratigraphic modification event)",
+            "rationale": "E64 End_of_Existence is the canonical CIDOC class for the cessation event. A5 is an alternative when the cessation is also itself a stratigraphic modification."
+          },
+          "em_extension": {
+            "uri": "em:ContinuityNode",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crm:E64_End_of_Existence"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -330,12 +421,19 @@
           "abbreviation": "SE",
           "label": "stratigraphic event node",
           "symbol": "to be defined",
-          "description": "A stratigraphic event is the process or event that leads to the formation or alteration of a stratigraphic unit. It is distinct from the unit itself, which represents the result or outcome of the event. The event can be thought of as a precursor and can be paired with its resulting unit to provide a more detailed temporal range. This allows for the documentation of both the initial moment of action (e.g., the start of construction, a collapse, or an incision) and the final state (the resulting unit that persists over time).",
+          "description": "An event that creates, modifies, or destroys a stratigraphic unit (e.g. an earthquake causing a plaster collapse, an act of demolition, the start of construction). Distinct from the resulting unit itself: an SE is the PROCESS, the SU is the result. Can be enriched by a 3D simulation (em:RepresentationModel) of the event. May be paired with its resulting unit to provide a temporal range bracketing the action.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
-            "cidoc": "A4 Stratigraphic Genesis",
+            "cidoc": "E5 Event",
             "cidoc_s3d": null,
-            "alternative": "S17 Physical Genesis"
+            "alternative": "E5 Event + A4 Stratigraphic Genesis (for formation) or A5 Stratigraphic Modification (for modification) or E64 End of Existence (for destruction)",
+            "rationale": "SE spans formation (A4), modification (A5), and destruction (E64). The generic parent is E5 Event; specific CRMarchaeo subclasses A4/A5 are alternatives used when the event nature is precisely typed. Legacy mapping 'A4 Stratigraphic Genesis' was too narrow (formation only)."
+          },
+          "em_extension": {
+            "uri": "em:StratigraphicEvent",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crm:E5_Event"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -354,9 +452,16 @@
           "description": "Negative Stratigraphic Unit — a lacuna, removal, or interface that marks the absence of matter rather than its presence (e.g., a pit cut, an erosion surface, a demolition void). Distinct from a plain StratigraphicUnit (which is positive by default), but equally observable on the ground — hence classified in the `real` family.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
-            "cidoc": "A8 Stratigraphic Unit (Negative)",
+            "cidoc": "A3 Stratigraphic Interface",
             "cidoc_s3d": null,
-            "alternative": "E26 Physical Feature + A8 Stratigraphic Unit"
+            "alternative": "A3 Stratigraphic Interface + A5 Stratigraphic Modification (the producing removal event)",
+            "rationale": "A USN is an INTERFACE (A3) produced by removal of matter, not a positive volumetric SU (A2). The legacy 'A8 Stratigraphic Unit (Negative)' was not a real CRMarchaeo class. The removal action is a separate A5 event linked via P108i_was_produced_by."
+          },
+          "em_extension": {
+            "uri": "em:NegativeSU",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crmarchaeo:A3_Stratigraphic_Interface"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -445,12 +550,19 @@
           "parent": "GroupNode",
           "abbreviation": "TBNG",
           "label": "Time Branch Node Group",
-          "description": "Group node to aggregate all elements belonging to a time branch. Two TB can be connected by a 'contrasts_with' edge.",
+          "description": "An alternative timeline aggregating a set of mutually exclusive beliefs about a temporal interval. Two TimeBranch instances can be connected via em:contrastsWith (symmetric) to express alternative reconstructions of the same period. The Period nature (E4) anchors temporal identity; the alternative-set semantic is captured by contrastsWith.",
           "s3Dgraphy_file": "group_node.py",
           "mapping": {
             "cidoc": "E4 Period",
-            "cidoc_s3d": "AlternativeTemporalBranch",
-            "alternative": "I2 Belief + E4 Period"
+            "cidoc_s3d": null,
+            "alternative": "E4 Period + em:contrastsWith (to peer TimeBranch)",
+            "rationale": "E4 Period anchors the temporal identity. The 'alternative set of beliefs' aspect is NOT modeled as I2 Belief (everything in EM is propositional by design) but as a symmetric contrastsWith relation between TimeBranches. This avoids over-typing every aggregator as a Belief."
+          },
+          "em_extension": {
+            "uri": "em:TimeBranch",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crm:E4_Period"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -527,12 +639,19 @@
     "ParadataNode": {
       "class": "ParadataNode",
       "parent": "Node",
-      "description": "Base class for nodes representing metadata or information on how the data was generated.",
+      "description": "Base class for nodes representing the reasoning chain (paradata) supporting an assertion. Not a document — the documentation lives at the source end of the chain (DocumentNode reached via ExtractorNode → CombinerNode → Paradata).",
       "s3Dgraphy_file": "paradata_node.py",
       "mapping": {
-        "cidoc": "E31 Document",
-        "cidoc_s3d": "ParadataEntity",
-        "alternative": "I1 Argumentation + E31 Document"
+        "cidoc": "crminf:I1_Argumentation",
+        "cidoc_s3d": null,
+        "alternative": "crminf:I1_Argumentation + E31 Document (for the document that records the argument)",
+        "rationale": "ParadataNode is the HEAD of an argumentation chain — semantically a crminf:I1_Argumentation, NOT a document (E31). The legacy E31 mapping conflated the argument with the documentation about it. v1.6.0 promotes CRMinf to primary for the paradata chain (ParadataNode, ExtractorNode, CombinerNode)."
+      },
+      "em_extension": {
+        "uri": "em:Paradata",
+        "rdf_type": "owl:Class",
+        "subclass_of": ["crminf:I1_Argumentation"],
+        "extension_status": "proposed"
       },
       "properties": {
         "name": "P1_is_identified_by",
@@ -545,12 +664,19 @@
           "parent": "ParadataNode",
           "abbreviation": "PROP",
           "label": "Property",
-          "description": "Node that represents a property associated with another node. Attributes: value (any): Value of the property. property_type (str): Type of property (e.g. 'Height', 'Length', etc.). data (dict): Additional metadata, such as 'author', 'time_start', 'time_end'.",
+          "description": "Node representing a property (qualia) of another node. The CIDOC class is CONDITIONAL on the qualia type — looked up at serialization time in em_qualia_types.json: dimensional qualia (height/width/weight) → E54_Dimension, typology qualia (color/style) → E55_Type, material → E57_Material, interpretive qualia (aesthetic_value) → crminf:I4_Proposition_Set. PropertyNode itself is the structural shell (em:Qualia); the semantic class comes from the qualia type catalogue.",
           "s3Dgraphy_file": "property_node.py",
           "mapping": {
-            "cidoc": "E54 Dimension",
-            "cidoc_s3d": "StratigraphicProperty",
-            "alternative": "S9 Property Type + E54 Dimension"
+            "cidoc": "E1 CRM Entity",
+            "cidoc_s3d": null,
+            "alternative": "DEPENDS ON property_type — see em_qualia_types.json: physical_material.dimensional → E54_Dimension; physical_material.material → E57_Material; cultural_interpretive.semantic → crminf:I4_Proposition_Set; functional → E55_Type; etc.",
+            "rationale": "PropertyNode is a generic shell — its specific CRM class depends on the qualia it expresses. The RDF exporter resolves this conditionally (em.ttl declares em:Qualia as E1 placeholder; the qualia-specific class is added at serialization)."
+          },
+          "em_extension": {
+            "uri": "em:Qualia",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crm:E1_CRM_Entity"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -582,12 +708,19 @@
           "parent": "ParadataNode",
           "abbreviation": "EXT",
           "label": "Extractor",
-          "description": "Node that represents the extraction of information from a source. Attributes: source (str): Source from which the information was extracted. data (dict): Additional metadata, such as 'author', 'url_type', 'icon', etc.",
+          "description": "Node that represents the act of extracting information / adopting a belief FROM a single source (DocumentNode). The mediator between a source and an assertion: 'I adopted this belief because the source says so'. Distinct from CombinerNode which combines MULTIPLE extractions.",
           "s3Dgraphy_file": "extractor_node.py",
           "mapping": {
-            "cidoc": "E7 Activity",
-            "cidoc_s3d": "InformationExtraction",
-            "alternative": "I7 Belief Adoption"
+            "cidoc": "crminf:I7_Belief_Adoption",
+            "cidoc_s3d": null,
+            "alternative": "E7 Activity (generic) + I7 Belief Adoption (specific)",
+            "rationale": "I7 Belief Adoption in CRMinf is the exact CRM-side counterpart of an extractor: the act of adopting a belief from a single piece of evidence. The legacy E7 Activity was too generic — it captured the activity but lost the epistemic nuance."
+          },
+          "em_extension": {
+            "uri": "em:Extractor",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crminf:I7_Belief_Adoption"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -601,12 +734,19 @@
           "parent": "ParadataNode",
           "abbreviation": "COMB",
           "label": "Combiner",
-          "description": "Node that represents reasoning that combines information from multiple sources. Attributes: sources (list): List of combined sources. data (dict): Additional metadata, such as 'author'.",
+          "description": "Node that represents the act of combining MULTIPLE extracted beliefs into a single conclusion. The 'X and Y therefore Z' step in the EM paradata chain: combiner takes multiple ExtractorNode inputs and produces a synthesized assertion. Distinct from ExtractorNode (single-source belief adoption).",
           "s3Dgraphy_file": "combiner_node.py",
           "mapping": {
-            "cidoc": "E7 Activity",
-            "cidoc_s3d": "InformationCombination",
-            "alternative": "I5 Inference Making"
+            "cidoc": "crminf:I5_Inference_Making",
+            "cidoc_s3d": null,
+            "alternative": "E7 Activity (generic) + I5 Inference Making (specific)",
+            "rationale": "I5 Inference Making in CRMinf is exactly the act of producing a conclusion from premises — the CRM-side counterpart of EM's combiner. The legacy E7 was too generic."
+          },
+          "em_extension": {
+            "uri": "em:Combiner",
+            "rdf_type": "owl:Class",
+            "subclass_of": ["crminf:I5_Inference_Making"],
+            "extension_status": "proposed"
           },
           "properties": {
             "name": "P1_is_identified_by",
@@ -704,12 +844,19 @@
       "parent": "Node",
       "abbreviation": "RM",
       "label": "Representation Model",
-      "description": "Node that represents a 3D model or a spatialized image.",
+      "description": "3D representation (model or spatialized image) of a stratigraphic node — real or virtual. Always linked to the represented node via crm:P138_represents.",
       "s3Dgraphy_file": "representation_node.py",
       "mapping": {
         "cidoc": "D1 Digital Object",
-        "cidoc_s3d": "VisualRepresentationInstance",
-        "alternative": "D1 Digital Object + SP6 Declarative Place + E52 Time-Span"
+        "cidoc_s3d": null,
+        "alternative": "D1 Digital Object + SP6 Declarative Place + E52 Time-Span",
+        "rationale": "D1 (Digital Object) from CRMdig is the canonical class for any digital asset. Multi-typed with SP6/E52 when the representation carries spatial and temporal anchoring."
+      },
+      "em_extension": {
+        "uri": "em:StratigraphicRepresentation",
+        "rdf_type": "owl:Class",
+        "subclass_of": ["em:RepresentationModel"],
+        "extension_status": "proposed"
       },
       "properties": {
         "name": "P1_is_identified_by",
@@ -728,12 +875,19 @@
       "parent": "Node",
       "abbreviation": "RMDoc",
       "label": "Representation Model Document",
-      "description": "Node that represents a 3D model or a spatialized image. It is used to instanciate documents, extractors or combiner nodes within the scene. An example is an hystorical photo positioned in its original position.",
+      "description": "3D representation of a documentary node — e.g. a historical photo georeferenced and positioned in 3D space at the location it depicts. Linked via crm:P138_represents to a DocumentNode (or ExtractorNode/CombinerNode that uses the document). Specialization of em:RepresentationModel.",
       "s3Dgraphy_file": "representation_node.py",
       "mapping": {
         "cidoc": "D1 Digital Object",
-        "cidoc_s3d": "VisualRepresentationInstance",
-        "alternative": "D1 Digital Object + SP6 Declarative Place + E52 Time-Span"
+        "cidoc_s3d": null,
+        "alternative": "D1 Digital Object + P138 to DocumentNode",
+        "rationale": "Subclass of em:RepresentationModel; the specific kind of target (document) is enforced structurally rather than as a flat property."
+      },
+      "em_extension": {
+        "uri": "em:DocumentaryRepresentation",
+        "rdf_type": "owl:Class",
+        "subclass_of": ["em:RepresentationModel"],
+        "extension_status": "proposed"
       },
       "properties": {
         "name": "P1_is_identified_by",
@@ -752,12 +906,19 @@
       "parent": "Node",
       "abbreviation": "RMSF",
       "label": "Representation Model Special Find",
-      "description": "Node that represents a 3D model or a spatialized image. It is used to instanciate special finds in the scene. An example is a scanned 3D model of a capital repositioned in its original position according to an anastylosis hypothesis.",
+      "description": "3D representation of a Special Find — e.g. a scanned capital repositioned according to an anastylosis hypothesis. Linked via crm:P138_represents to a SpecialFindUnit / VirtualSpecialFind. Specialization of em:RepresentationModel.",
       "s3Dgraphy_file": "representation_node.py",
       "mapping": {
         "cidoc": "D1 Digital Object",
-        "cidoc_s3d": "VisualRepresentationInstance",
-        "alternative": "D1 Digital Object + SP6 Declarative Place + E52 Time-Span"
+        "cidoc_s3d": null,
+        "alternative": "D1 Digital Object + P138 to SpecialFindUnit / VirtualSpecialFind",
+        "rationale": "Subclass of em:RepresentationModel; target type (special find) is enforced structurally."
+      },
+      "em_extension": {
+        "uri": "em:SpecialFindRepresentation",
+        "rdf_type": "owl:Class",
+        "subclass_of": ["em:RepresentationModel"],
+        "extension_status": "proposed"
       },
       "properties": {
         "name": "P1_is_identified_by",
@@ -776,12 +937,19 @@
       "parent": "Node",
       "abbreviation": "SS",
       "label": "Semantic Shape",
-      "description": "Node that represents a semantic shape in 3D space. Can be a proxy of a stratigraphic unit or a generic annotation. Supports the definition of convex shapes (convexshapes) and spheres (spheres) for geometric representation.",
+      "description": "3D proxy geometry (convex shapes or spheres) representing the spatial extent of a node. Used as a semantic proxy distinct from a full RepresentationModel: lighter weight, intended for spatial indexing and rough containment, not for visual rendering. Linked via crm:P138_represents to any Node.",
       "s3Dgraphy_file": "semantic_shape_node.py",
       "mapping": {
-        "cidoc": "E36 Visual Item",
-        "cidoc_s3d": "SymbolicSpatialRepresentation",
-        "alternative": "SP5 Geometric Place Expression + E36 Visual Item"
+        "cidoc": "SP5 Geometric Place Expression",
+        "cidoc_s3d": null,
+        "alternative": "SP5 Geometric Place Expression + E36 Visual Item (legacy)",
+        "rationale": "SP5 (CRMgeo) is the canonical class for geometric expressions of places — exactly what a proxy convex/sphere is. The legacy 'E36 Visual Item' was too generic (E36 is the appearance of any object). v1.6.0 promotes SP5 to primary."
+      },
+      "em_extension": {
+        "uri": "em:SemanticShape",
+        "rdf_type": "owl:Class",
+        "subclass_of": ["crmgeo:SP5_Geometric_Place_Expression"],
+        "extension_status": "proposed"
       },
       "properties": {
         "name": "P1_is_identified_by",
@@ -800,18 +968,153 @@
       "class": "AuthorNode",
       "parent": "Node",
       "abbreviation": "AUTH",
-      "label": "Author",
-      "description": "Class to represent an author node in the graph. Attributes: orcid (str): ORCID identifier of the author (optional). name (str): Name of the author (optional). surname (str): Surname of the author (optional).",
+      "label": "Author (human)",
+      "description": "Human author of one or more nodes. Identified by ORCID where possible. Python: AuthorNode (node_type='author'). The AI-assisted variant is AuthorAINode (subclass of AuthorNode). An isinstance check against AuthorNode matches both at the code level; the node_type discriminator and the em_extension.uri distinguish them semantically.",
       "s3Dgraphy_file": "author_node.py",
       "mapping": {
-        "cidoc": "E39 Actor",
+        "cidoc": "E21 Person",
         "cidoc_s3d": null,
-        "alternative": "E21 Person"
+        "alternative": "E39 Actor + prov:Person",
+        "rationale": "AuthorNode in Python is the canonical human-author class (node_type='author'). The em.ttl ontology declares em:Author as the abstract superclass with em:HumanAuthor / em:AIAuthor as siblings; the Python AuthorAINode inherits from AuthorNode purely for code reuse and isinstance() compatibility, not for OWL subsumption."
+      },
+      "em_extension": {
+        "uri": "em:HumanAuthor",
+        "rdf_type": "owl:Class",
+        "subclass_of": ["crm:E21_Person", "prov:Person", "em:Author"],
+        "extension_status": "proposed"
       },
       "properties": {
         "name": "P131_is_identified_by",
         "orcid": "P48_has_preferred_identifier",
         "surname": "P131_is_identified_by"
+      }
+    },
+    "AuthorAINode": {
+      "class": "AuthorAINode",
+      "parent": "AuthorNode",
+      "abbreviation": "AUTH_AI",
+      "label": "AI Author",
+      "description": "AI agent (model + prompt_reference) responsible for asserting or refining one or more nodes. Python: AuthorAINode (node_type='author_ai'), subclass of AuthorNode. Already referenced as target in connections_datamodel.json has_author edge. The Python class carries 'model' and 'prompt_reference' in node.data for reproducibility.",
+      "s3Dgraphy_file": "author_node.py",
+      "mapping": {
+        "cidoc": "E39 Actor",
+        "cidoc_s3d": null,
+        "alternative": "prov:SoftwareAgent",
+        "rationale": "AI agents are formally PROV-O SoftwareAgents; CIDOC E39 Actor is the parent on the CRM side. Reproducibility metadata (model identifier, prompt_reference) lives in node.data and is EM-specific — no native CRM equivalent."
+      },
+      "em_extension": {
+        "uri": "em:AIAuthor",
+        "rdf_type": "owl:Class",
+        "subclass_of": ["crm:E39_Actor", "prov:SoftwareAgent", "em:Author"],
+        "extension_status": "proposed"
+      },
+      "properties": {
+        "name": "P131_is_identified_by",
+        "model": "P3_has_note",
+        "prompt_reference": "P3_has_note"
+      }
+    },
+    "LicenseNode": {
+      "class": "LicenseNode",
+      "parent": "Node",
+      "abbreviation": "LIC",
+      "label": "License",
+      "description": "Represents the license under which a node (or the whole graph via GraphNode) is published. Identified by license_type (e.g. 'CC-BY-4.0') and url to the license text. Connected via has_license edge to Nodes or GraphNode.",
+      "s3Dgraphy_file": "license_node.py",
+      "mapping": {
+        "cidoc": "E30 Right",
+        "cidoc_s3d": null,
+        "alternative": "E30 Right + dcterms:LicenseDocument",
+        "rationale": "License is naturally an E30 Right in CIDOC-CRM (subject of P104_is_subject_to); dcterms:LicenseDocument provides Dublin Core anchoring for FAIR metadata interoperability. Both parents are kept to satisfy both CRM and Dublin Core consumers."
+      },
+      "em_extension": {
+        "uri": "em:License",
+        "rdf_type": "owl:Class",
+        "subclass_of": ["crm:E30_Right", "dcterms:LicenseDocument"],
+        "extension_status": "proposed"
+      },
+      "properties": {
+        "name": "P1_is_identified_by",
+        "description": "P3_has_note",
+        "license_type": "P2_has_type",
+        "url": "P1_is_identified_by"
+      }
+    },
+    "EmbargoNode": {
+      "class": "EmbargoNode",
+      "parent": "Node",
+      "abbreviation": "EMB",
+      "label": "Embargo",
+      "description": "Represents a temporal embargo on access or distribution of a node, license, or whole graph. Carries embargo_start, embargo_end (optional, indefinite if absent), and reason. Connected via has_embargo edge to a Node, LicenseNode, or GraphNode.",
+      "s3Dgraphy_file": "embargo_node.py",
+      "mapping": {
+        "cidoc": "E30 Right",
+        "cidoc_s3d": null,
+        "alternative": "E30 Right + E52 Time-Span",
+        "rationale": "An embargo is a Right (E30) that restricts access for a bounded time period (linked via P4_has_time-span to E52 Time-Span built from embargo_start and embargo_end). Sibling to LicenseNode but with temporal restriction semantics."
+      },
+      "em_extension": {
+        "uri": "em:Embargo",
+        "rdf_type": "owl:Class",
+        "subclass_of": ["crm:E30_Right"],
+        "extension_status": "proposed"
+      },
+      "properties": {
+        "name": "P1_is_identified_by",
+        "description": "P3_has_note",
+        "embargo_start": "P82a_begin_of_the_begin",
+        "embargo_end": "P82b_end_of_the_end",
+        "reason": "P3_has_note"
+      }
+    }
+  },
+  "container_nodes": {
+    "GraphNode": {
+      "class": "GraphNode",
+      "parent": "Node",
+      "abbreviation": "GRAPH",
+      "label": "Graph",
+      "description": "Represents the EM graph itself as a node, used as anchor for graph-wide metadata (author, license, embargo, default epoch, project-level provenance). Enables graph-level inheritance for metadata propagation: values declared on the GraphNode become defaults for all contained nodes unless overridden. Targeted by has_author, has_license, has_embargo edges to carry global defaults. In HDT-O terms (D7.1) an EM graph IS a Heritage Proposition Set (HC16) — a named graph carrying formal assertions about a heritage entity. Connectable via contains_proposition_set (HP33) to one or more HDTNode (HC2 Heritage Digital Twin) instances.",
+      "s3Dgraphy_file": "graph_node.py",
+      "mapping": {
+        "cidoc": "E73 Information Object",
+        "cidoc_s3d": null,
+        "alternative": "E73 Information Object + prov:Bundle + hdto:HC16_Heritage_Proposition_Set",
+        "rationale": "GraphNode is conceptually three things simultaneously: an information artifact (E73), a bundle of triples (prov:Bundle), and a Heritage Proposition Set (hdto:HC16 from D7.1). Multi-typing captures all three perspectives — a CRM-only reader sees E73, a PROV-O reader sees Bundle, an HDT-O reader sees HC16 attachable to HC2 HDTs."
+      },
+      "em_extension": {
+        "uri": "em:EMGraph",
+        "rdf_type": "owl:Class",
+        "subclass_of": ["crm:E73_Information_Object", "prov:Bundle", "hdto:HC16_Heritage_Proposition_Set"],
+        "extension_status": "proposed"
+      },
+      "properties": {
+        "name": "P1_is_identified_by",
+        "description": "P3_has_note"
+      }
+    },
+    "HDTNode": {
+      "class": "HDTNode",
+      "parent": "Node",
+      "abbreviation": "HDT",
+      "label": "Heritage Digital Twin",
+      "description": "Represents an HC2 Heritage Digital Twin (HDT-O, ECHOES D7.1). An HDT is a named container that aggregates Heritage Proposition Sets (em:EMGraph instances) about a heritage entity (HC1). HDTs can be nested hierarchically via has_digital_twin_component (HP3 inverse) — e.g. Colosseo_HDT_overall has component Colosseo_HDT_Flavian. An EM graph attaches to an HDT via contains_proposition_set (HP33). The HDT is linked to its real-world heritage entity (HC1) via has_digital_twin (HP1).",
+      "s3Dgraphy_file": "hdt_node.py",
+      "mapping": {
+        "cidoc": "hdto:HC2_Heritage_Digital_Twin",
+        "cidoc_s3d": null,
+        "alternative": "hdto:HC2 ⊂ hdto:HC14_Volatile_Digital_Object ⊂ crmdig:D1_Digital_Object",
+        "rationale": "HC2 is the canonical HDT-O class for a Heritage Digital Twin. Per D7.1 §4.1: aggregate of named graphs carrying formal propositions about an HC1 Heritage Entity. Multi-typed via HC14 / D1 so consumers that don't know HDT-O still see a CRMdig Digital Object."
+      },
+      "em_extension": {
+        "uri": "hdto:HC2_Heritage_Digital_Twin",
+        "rdf_type": "owl:Class",
+        "subclass_of": ["hdto:HC14_Volatile_Digital_Object", "crmdig:D1_Digital_Object"],
+        "extension_status": "imported-from-D7.1"
+      },
+      "properties": {
+        "name": "P1_is_identified_by",
+        "description": "P3_has_note"
       }
     }
   },

@@ -1,0 +1,442 @@
+@prefix em:        <https://w3id.org/em/ontology#> .
+@prefix s3d:       <https://w3id.org/em/s3dgraphy#> .
+@prefix crm:       <http://www.cidoc-crm.org/cidoc-crm/> .
+@prefix crminf:    <http://www.cidoc-crm.org/extensions/crminf/> .
+@prefix crmarchaeo: <http://www.cidoc-crm.org/extensions/crmarchaeo/> .
+@prefix crmdig:    <http://www.cidoc-crm.org/extensions/crmdig/> .
+@prefix crmgeo:    <http://www.cidoc-crm.org/extensions/crmgeo/> .
+@prefix hdto:      <https://w3id.org/hdto/ontology#> .
+@prefix prov:      <http://www.w3.org/ns/prov#> .
+@prefix dcterms:   <http://purl.org/dc/terms/> .
+@prefix rdfs:      <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:       <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
+
+# ============================================================================
+# Extended Matrix (EM) Ontology — v1.6.0
+# ============================================================================
+# Formal extension of the CIDOC-CRM family + HDT-O for the Extended Matrix
+# stratigraphic + paradata + virtual-reconstruction modeling. Companion to
+# the s3dgraphy v1.6.0 JSON datamodels (s3Dgraphy_node_datamodel.json,
+# s3Dgraphy_connections_datamodel.json, em_qualia_types.json).
+#
+# Author:  Emanuele Demetrescu
+# Date:    2026-05-23
+# License: CC-BY-4.0
+# Status:  DRAFT — first formal release of em: namespace.
+#
+# Conventions:
+#   * Multiple inheritance is used where Python class semantics differ from
+#     OWL subsumption. The OWL hierarchy reflects the semantic intent;
+#     Python inheritance (e.g. AuthorAINode → AuthorNode) is for code reuse.
+#   * "Maps to: Python ClassName" comments anchor each class to its
+#     s3dgraphy Python counterpart for round-trip verification.
+#   * AP11_has_physical_relation discrimination uses subproperties (em:abuts,
+#     em:cuts, em:fills, em:overlies, em:bondedTo, em:physicallyEquals)
+#     rather than reified relations with E55_Type tags — this is the
+#     SPARQL-friendly pattern.
+# ============================================================================
+
+<https://w3id.org/em/ontology>
+    a owl:Ontology ;
+    rdfs:label "Extended Matrix Ontology"@en ;
+    dcterms:title "Extended Matrix Ontology"@en ;
+    dcterms:creator "Emanuele Demetrescu" ;
+    dcterms:license <https://creativecommons.org/licenses/by/4.0/> ;
+    dcterms:issued "2026-05-23"^^xsd:date ;
+    owl:versionInfo "1.6.0" ;
+    rdfs:comment "Formal ontology for Extended Matrix (EM): a human-readable layout for knowledge graphs of archaeological stratigraphy and virtual reconstruction. Extends CIDOC-CRM, CRMarchaeo, CRMinf, CRMdig, CRMgeo, with PROV-O for agent provenance and HDT-O for digital-twin granularity. This file declares the em: classes and properties introduced in s3dgraphy v1.6.0."@en ;
+    owl:imports <http://www.cidoc-crm.org/cidoc-crm/> ,
+                <http://www.cidoc-crm.org/extensions/crminf/> ,
+                <http://www.cidoc-crm.org/extensions/crmarchaeo/> ,
+                <http://www.cidoc-crm.org/extensions/crmdig/> ,
+                <http://www.cidoc-crm.org/extensions/crmgeo/> ,
+                <http://www.w3.org/ns/prov#> .
+
+
+# ============================================================================
+# 1. AUTHORS (rights_nodes — agent provenance)
+# ============================================================================
+
+em:Author
+    a owl:Class ;
+    rdfs:label "Author (abstract)"@en ;
+    rdfs:subClassOf crm:E39_Actor , prov:Agent ;
+    rdfs:comment "Abstract superclass for any agent (human or AI) that authors or refines nodes in an EM graph. Not directly instantiated; use em:HumanAuthor or em:AIAuthor. The s3dgraphy connection has_author targets both subclasses uniformly."@en .
+
+em:HumanAuthor
+    a owl:Class ;
+    rdfs:label "Human Author"@en ;
+    rdfs:subClassOf em:Author , crm:E21_Person , prov:Person ;
+    rdfs:comment "A human contributor to one or more EM nodes. Identified by ORCID where available. Maps to: Python AuthorNode (node_type='author')."@en .
+
+em:AIAuthor
+    a owl:Class ;
+    rdfs:label "AI Author"@en ;
+    rdfs:subClassOf em:Author , prov:SoftwareAgent ;
+    rdfs:comment "An AI agent (LLM, image generator, etc.) that authored or refined EM nodes. Carries model identifier and prompt reference for reproducibility. Maps to: Python AuthorAINode (node_type='author_ai'). Note: Python AuthorAINode inherits from AuthorNode for isinstance() compatibility, but in OWL em:AIAuthor and em:HumanAuthor are siblings, NOT in subClassOf relation."@en .
+
+em:modelIdentifier
+    a owl:DatatypeProperty ;
+    rdfs:label "model identifier"@en ;
+    rdfs:domain em:AIAuthor ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Identifier of the AI model used (e.g. 'gpt-5', 'claude-opus-4.7', 'stable-diffusion-xl'). Stored in Python as node.data['model']."@en .
+
+em:promptReference
+    a owl:DatatypeProperty ;
+    rdfs:label "prompt reference"@en ;
+    rdfs:domain em:AIAuthor ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Reference to the prompt or workflow used. May be a URL, a DocumentNode id, or free text. Stored in Python as node.data['prompt_reference']."@en .
+
+
+# ============================================================================
+# 2. STRATIGRAPHIC UNITS — VIRTUAL FAMILY
+# ============================================================================
+# Virtual SUs are propositional entities (crminf:I4) AND stratigraphic units
+# (crmarchaeo:A8) — multiple inheritance captures the dual nature: they have
+# the stratigraphic role of an A8 SU but their existence is hypothesized,
+# not directly observed.
+
+em:VirtualSU
+    a owl:Class ;
+    rdfs:label "Virtual Stratigraphic Unit (abstract)"@en ;
+    rdfs:subClassOf crminf:I4_Proposition_Set , crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:comment "Abstract superclass for hypothesized stratigraphic units that are NOT physically observed (reconstructed from evidence). Distinct from crmarchaeo:A2 (physical volume) — a Virtual SU is a propositional entity supported by paradata. Always linked to its argumentation chain via em:hypothesizedBy."@en .
+
+em:StructuralVirtualSU
+    a owl:Class ;
+    rdfs:label "Structural Virtual SU (USVs)"@en ;
+    rdfs:subClassOf em:VirtualSU ;
+    rdfs:comment "Hypothesized structural stratigraphic unit: walls, columns, load-bearing elements. EM yEd symbol: black parallelogram. Maps to: Python StructuralVirtualStratigraphicUnit (node_type='USVs')."@en .
+
+em:NonStructuralVirtualSU
+    a owl:Class ;
+    rdfs:label "Non-Structural Virtual SU (USVn)"@en ;
+    rdfs:subClassOf em:VirtualSU ;
+    rdfs:comment "Hypothesized non-structural stratigraphic unit: furniture, decoration, non-load-bearing elements. EM yEd symbol: black hexagon. Maps to: Python NonStructuralVirtualStratigraphicUnit (node_type='USVn')."@en .
+
+em:DocumentaryVirtualSU
+    a owl:Class ;
+    rdfs:label "Documentary Virtual SU (USD)"@en ;
+    rdfs:subClassOf em:VirtualSU ;
+    rdfs:comment "Stratigraphic unit inferred from documentary sources rather than direct archaeological observation. Logically a Virtual SU (propositional) but evidenced by historical/archival documents rather than archaeological reasoning. Linked to its supporting documents via em:derivedFromDocument. Maps to: Python DocumentaryStratigraphicUnit (node_type='USD')."@en .
+
+em:VirtualSpecialFind
+    a owl:Class ;
+    rdfs:label "Virtual Special Find (VSF)"@en ;
+    rdfs:subClassOf crm:E89_Propositional_Object , crm:E19_Physical_Object ;
+    rdfs:comment "Virtual reconstruction or restoration of a fragmented Special Find. Hypothetical reassembly of fragments supported by paradata. Linked to the source fragments via em:reconstructsFrom. Maps to: Python VirtualSpecialFindUnit (node_type='VSF')."@en .
+
+
+# ============================================================================
+# 3. STRATIGRAPHIC UNITS — REAL FAMILY (extensions of A8)
+# ============================================================================
+
+em:NegativeSU
+    a owl:Class ;
+    rdfs:label "Negative Stratigraphic Unit (USN)"@en ;
+    rdfs:subClassOf crmarchaeo:A3_Stratigraphic_Interface ;
+    rdfs:comment "Stratigraphic interface produced by removal of matter — a cut, an erosion surface, a demolition void, the rasatura of the top of a wall. Distinct from positive A2 units: a USN is an interface (A3), not a volume. Linked to the removal event via crm:P108i_was_produced_by → crmarchaeo:A5_Stratigraphic_Modification. Maps to: Python NegativeStratigraphicUnit (node_type='USN')."@en .
+
+em:DisplacedSpecialFind
+    a owl:Class ;
+    rdfs:label "Displaced Special Find (SF)"@en ;
+    rdfs:subClassOf crm:E19_Physical_Object ;
+    rdfs:comment "Movable physical object whose original position is unknown (and sometimes whose pertinence to the site is uncertain). Distinct from in-situ artefacts: this is the 'special find' concept in EM — known to exist(ed) but displaced. Maps to: Python SpecialFindUnit (node_type='SF')."@en .
+
+em:ReusedSpecialFind
+    a owl:Class ;
+    rdfs:label "Reused Special Find (spolia, RSF)"@en ;
+    rdfs:subClassOf crm:E19_Physical_Object , crmarchaeo:A2_Stratigraphic_Volume_Unit ;
+    rdfs:comment "A physical object observed in situ but originally produced for a different context — e.g. a Roman epigraph reused in a Renaissance wall. Has dual nature: an E19 object with its own production history AND a current A2 SU embedded in stratigraphy. Linked to original context via em:wasReusedFrom. Maps to: Python ReusedSpecialFind (node_type='RSF')."@en .
+
+em:wasReusedFrom
+    a owl:ObjectProperty ;
+    rdfs:label "was reused from"@en ;
+    rdfs:domain em:ReusedSpecialFind ;
+    rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:comment "Links a reused special find (spolia) to the original stratigraphic context from which it was extracted before reuse."@en .
+
+
+# ============================================================================
+# 4. STRATIGRAPHIC UNITS — SERIES (pragmatic aggregations)
+# ============================================================================
+# A series is itself a SU that aggregates multiple component SUs for
+# practical/narrative purposes (e.g., a row of identical column bases).
+# Distinct from a plain E78 Collection: the series IS itself a SU.
+
+em:SeriesOfSU
+    a owl:Class ;
+    rdfs:label "Series of SU"@en ;
+    rdfs:subClassOf crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:comment "Pragmatic stratigraphic aggregation: one logical SU representing multiple physical SUs treated as one (e.g. a series of column bases not worth numbering individually). Linked to its components via crm:P46_is_composed_of. Maps to: Python SeriesOfStratigraphicUnit (node_type='serSU')."@en .
+
+em:SeriesOfDocumentarySU
+    a owl:Class ;
+    rdfs:label "Series of Documentary SU"@en ;
+    rdfs:subClassOf em:DocumentaryVirtualSU ;
+    rdfs:comment "Pragmatic aggregation of multiple DocumentaryVirtualSUs. Maps to: Python SeriesOfDocumentaryStratigraphicUnit (node_type='serUSD')."@en .
+
+em:SeriesOfStructuralVirtualSU
+    a owl:Class ;
+    rdfs:label "Series of Structural Virtual SU"@en ;
+    rdfs:subClassOf em:StructuralVirtualSU ;
+    rdfs:comment "Pragmatic aggregation of multiple StructuralVirtualSUs. Maps to: Python SeriesOfStructuralVirtualStratigraphicUnit (node_type='serUSVs')."@en .
+
+em:SeriesOfNonStructuralVirtualSU
+    a owl:Class ;
+    rdfs:label "Series of Non-Structural Virtual SU"@en ;
+    rdfs:subClassOf em:NonStructuralVirtualSU ;
+    rdfs:comment "Pragmatic aggregation of multiple NonStructuralVirtualSUs. Maps to: Python SeriesOfNonStructuralVirtualStratigraphicUnit (node_type='serUSVn')."@en .
+
+
+# ============================================================================
+# 5. STRATIGRAPHIC EVENTS / TRANSFORMATIONS / WORKING
+# ============================================================================
+
+em:StratigraphicEvent
+    a owl:Class ;
+    rdfs:label "Stratigraphic Event (SE)"@en ;
+    rdfs:subClassOf crm:E5_Event ;
+    rdfs:comment "An event that creates, modifies, or destroys a stratigraphic unit (e.g. an earthquake causing a plaster collapse, an act of demolition). More general than crmarchaeo:A4 (Genesis: formation only) or A5 (Modification only): the EM concept spans formation, modification and destruction. May be enriched by a 3D simulation (em:RepresentationModel) of the event itself. Maps to: Python StratigraphicEventNode (node_type='SE')."@en .
+
+em:TransformationSU
+    a owl:Class ;
+    rdfs:label "Transformation Stratigraphic Unit (TSU)"@en ;
+    rdfs:subClassOf crmarchaeo:A5_Stratigraphic_Modification ;
+    rdfs:comment "A family of actions modifying a surface or structure — the 'map of degradation' treated stratigraphically. Aggregates multiple A5 modification events via crm:P46_is_composed_of. Maps to: Python TransformationStratigraphicUnit (node_type='TSU')."@en .
+
+em:WorkingUnit
+    a owl:Class ;
+    rdfs:label "Working Unit (UL)"@en ;
+    rdfs:subClassOf crm:E25_Human-Made_Feature ;
+    rdfs:comment "Trace of human working/production on a surface — chisel marks, gradina marks, iccozza marks on Etruscan tomb walls, hammer impacts. The UL is the FEATURE (the marks); the production EVENT is a separate crm:E12_Production linked via crm:P108i_was_produced_by. Maps to: Python WorkingUnit (node_type='UL')."@en .
+
+em:ContinuityNode
+    a owl:Class ;
+    rdfs:label "Continuity Node (BR)"@en ;
+    rdfs:subClassOf crm:E64_End_of_Existence ;
+    rdfs:comment "Marks the end-of-life of a SU/USV — the point in time when a stratigraphic unit ceases to exist. Maps to: Python ContinuityNode (node_type='BR')."@en .
+
+
+# ============================================================================
+# 6. TIME BRANCH — alternative timelines
+# ============================================================================
+
+em:TimeBranch
+    a owl:Class ;
+    rdfs:label "Time Branch"@en ;
+    rdfs:subClassOf crm:E4_Period ;
+    rdfs:comment "An alternative timeline aggregating a set of mutually exclusive beliefs about a temporal interval. Two TimeBranch instances may be related by em:contrastsWith to denote alternative reconstructions of the same period. The Period nature (E4) anchors temporal identity; the alternative-set nature is captured by em:contrastsWith. Note: EM does not require TimeBranches to be propositional themselves (everything in EM is propositional by design) — the key distinguishing trait is the aggregation of contrasting beliefs along a shared timeline. Maps to: Python TimeBranchNodeGroup."@en .
+
+em:contrastsWith
+    a owl:ObjectProperty , owl:SymmetricProperty ;
+    rdfs:label "contrasts with"@en ;
+    rdfs:domain em:TimeBranch ;
+    rdfs:range em:TimeBranch ;
+    rdfs:comment "Symmetric relation between two TimeBranches that represent mutually exclusive temporal scenarios. Implies the propositions in each branch are alternatives (only one can be true at a time, or both are entertained as parallel hypotheses)."@en .
+
+
+# ============================================================================
+# 7. 3D REPRESENTATION MODELS (CRMdig family)
+# ============================================================================
+
+em:RepresentationModel
+    a owl:Class ;
+    rdfs:label "Representation Model"@en ;
+    rdfs:subClassOf crmdig:D1_Digital_Object ;
+    rdfs:comment "A 3D model or spatialized image representing some node in the graph. Abstract base. Specialized into em:StratigraphicRepresentation, em:DocumentaryRepresentation, em:SpecialFindRepresentation. Always linked to what it represents via crm:P138_represents."@en .
+
+em:StratigraphicRepresentation
+    a owl:Class ;
+    rdfs:label "Stratigraphic Representation Model"@en ;
+    rdfs:subClassOf em:RepresentationModel ;
+    rdfs:comment "3D representation of a stratigraphic node (real or virtual). Maps to: Python RepresentationModelNode (node_type='representation_model')."@en .
+
+em:DocumentaryRepresentation
+    a owl:Class ;
+    rdfs:label "Documentary Representation Model"@en ;
+    rdfs:subClassOf em:RepresentationModel ;
+    rdfs:comment "3D representation of a documentary node — e.g. a historical photo georeferenced and positioned at the location it depicts. Linked via crm:P138_represents to a DocumentNode. Maps to: Python RepresentationModelDocNode (node_type='representation_model_doc')."@en .
+
+em:SpecialFindRepresentation
+    a owl:Class ;
+    rdfs:label "Special Find Representation Model"@en ;
+    rdfs:subClassOf em:RepresentationModel ;
+    rdfs:comment "3D representation of a special find — e.g. a scanned capital repositioned according to an anastylosis hypothesis. Linked via crm:P138_represents to a SpecialFindUnit. Maps to: Python RepresentationModelSpecialFindNode (node_type='representation_model_sf')."@en .
+
+em:SemanticShape
+    a owl:Class ;
+    rdfs:label "Semantic Shape (proxy geometry)"@en ;
+    rdfs:subClassOf crmgeo:SP5_Geometric_Place_Expression ;
+    rdfs:comment "3D proxy geometry (convex shapes or spheres) representing the spatial extent of a node. Used as a semantic proxy distinct from a full RepresentationModel: lighter weight, intended for spatial indexing and rough containment, not for visual rendering. Linked via crm:P138_represents to any Node. Maps to: Python SemanticShapeNode (node_type='semantic_shape')."@en .
+
+
+# ============================================================================
+# 8. RIGHTS (License, Embargo) and GRAPH CONTAINER
+# ============================================================================
+
+em:License
+    a owl:Class ;
+    rdfs:label "License"@en ;
+    rdfs:subClassOf crm:E30_Right , dcterms:LicenseDocument ;
+    rdfs:comment "The license under which a node (or the whole EM graph) is published. Identified by license_type (e.g. 'CC-BY-4.0') and url. Linked to its subject via the inverse of crm:P104_is_subject_to. Maps to: Python LicenseNode (node_type='license')."@en .
+
+em:Embargo
+    a owl:Class ;
+    rdfs:label "Embargo"@en ;
+    rdfs:subClassOf crm:E30_Right ;
+    rdfs:comment "A temporal embargo restricting access or distribution of a node, license, or whole graph. Linked to its time-span via crm:P4_has_time-span → crm:E52_Time-Span (built from embargo_start / embargo_end). An embargo with no embargo_end is indefinite until lifted. Maps to: Python EmbargoNode (node_type='embargo')."@en .
+
+em:EMGraph
+    a owl:Class ;
+    rdfs:label "EM Graph"@en ;
+    rdfs:subClassOf crm:E73_Information_Object , prov:Bundle , hdto:HC16_Heritage_Proposition_Set ;
+    rdfs:comment "The Extended Matrix project graph as (a) a single information artifact (E73), (b) a bundle of triples (prov:Bundle), and (c) a Heritage Proposition Set in HDT-O terms (hdto:HC16) — i.e. a named graph carrying formal assertions about heritage. Anchor for graph-level metadata: default author, license, embargo, epoch, project provenance. In RDF serialization this is the named-graph IRI carrying graph-wide assertions; values declared on the EMGraph become defaults inherited by all contained nodes unless overridden locally. An em:EMGraph can be attached to one or more hdto:HC2_Heritage_Digital_Twin instances via hdto:HP33_contains (and its inverse HP33i_is_proposition_set_of). Maps to: Python GraphNode (node_type='graph')."@en .
+
+
+# ============================================================================
+# 9. QUALIA (properties of nodes)
+# ============================================================================
+
+em:Qualia
+    a owl:Class ;
+    rdfs:label "Qualia (Property container)"@en ;
+    rdfs:subClassOf crm:E1_CRM_Entity ;
+    rdfs:comment "A property of a node — quale spanning from objective measurement (E54_Dimension) through typology (E55_Type) to interpretive belief (crminf:I4_Proposition_Set). The actual CIDOC class used at RDF serialization time is determined by the qualia type registered in em_qualia_types.json — see the per-qualia cidoc_crm field. em:Qualia is the graph-topology shell; the semantic class comes from the qualia type catalogue. Maps to: Python PropertyNode (node_type='property')."@en .
+
+em:hasQualia
+    a owl:ObjectProperty ;
+    rdfs:label "has qualia"@en ;
+    rdfs:domain crm:E1_CRM_Entity ;
+    rdfs:range em:Qualia ;
+    rdfs:comment "Links an entity to one of its qualia (a typed property with its own paradata chain)."@en .
+
+em:hasQualiaType
+    a owl:DatatypeProperty ;
+    rdfs:label "has qualia type"@en ;
+    rdfs:domain em:Qualia ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The identifier of the qualia type (registered in em_qualia_types.json) — e.g. 'height', 'color', 'aesthetic_value', 'confidence_level'. Used by the RDF mapper to look up the appropriate CIDOC class for serialization."@en .
+
+
+# ============================================================================
+# 10. PARADATA CHAIN (argumentation)
+# ============================================================================
+
+em:Paradata
+    a owl:Class ;
+    rdfs:label "Paradata (Argumentation head)"@en ;
+    rdfs:subClassOf crminf:I1_Argumentation ;
+    rdfs:comment "Head of a paradata chain: the argumentation that supports an assertion about an entity or property. Not a document — the documentation lives at the source end of the chain (DocumentNode reached via ExtractorNode → CombinerNode → Paradata). Maps to: Python ParadataNode (node_type='paradata')."@en .
+
+em:Extractor
+    a owl:Class ;
+    rdfs:label "Extractor (Belief Adoption)"@en ;
+    rdfs:subClassOf crminf:I7_Belief_Adoption ;
+    rdfs:comment "An act of extracting / adopting a belief from a SINGLE source (DocumentNode). The mediator between a primary source and an assertion: 'I adopted this belief because this source says so'. Distinct from em:Combiner which combines multiple Extractors. Maps to: Python ExtractorNode (node_type='extractor')."@en .
+
+em:Combiner
+    a owl:Class ;
+    rdfs:label "Combiner (Inference Making)"@en ;
+    rdfs:subClassOf crminf:I5_Inference_Making ;
+    rdfs:comment "An act of combining MULTIPLE extracted beliefs into a single conclusion — the 'X and Y therefore Z' step in the EM paradata chain. Takes multiple em:Extractor inputs and produces a synthesized assertion. Maps to: Python CombinerNode (node_type='combiner')."@en .
+
+em:hypothesizedBy
+    a owl:ObjectProperty ;
+    rdfs:label "hypothesized by"@en ;
+    rdfs:domain em:VirtualSU ;
+    rdfs:range crminf:I1_Argumentation ;
+    rdfs:comment "Links a virtual stratigraphic unit (or any hypothesized entity) to the argumentation chain that supports its existence."@en .
+
+em:reconstructsAbsent
+    a owl:ObjectProperty ;
+    rdfs:label "reconstructs absent"@en ;
+    rdfs:domain em:VirtualSU ;
+    rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:comment "Links a Virtual SU to the absent (lost, destroyed, or never-observed) stratigraphic unit it reconstructs. Encodes the 'lacuna theory' of EM — what is missing, what is there, and how do we know."@en .
+
+em:derivedFromDocument
+    a owl:ObjectProperty ;
+    rdfs:label "derived from document"@en ;
+    rdfs:domain em:DocumentaryVirtualSU ;
+    rdfs:range crm:E31_Document ;
+    rdfs:comment "Links a DocumentaryVirtualSU to the document(s) from which its existence is inferred."@en .
+
+em:reconstructsFrom
+    a owl:ObjectProperty ;
+    rdfs:label "reconstructs from"@en ;
+    rdfs:domain em:VirtualSpecialFind ;
+    rdfs:range em:DisplacedSpecialFind ;
+    rdfs:comment "Links a Virtual Special Find to the fragmented Special Finds it virtually reassembles."@en .
+
+em:confidenceLevel
+    a owl:DatatypeProperty ;
+    rdfs:label "confidence level"@en ;
+    rdfs:domain crm:E1_CRM_Entity ;
+    rdfs:range xsd:decimal ;
+    rdfs:comment "Numerical confidence (0-100%) in an assertion about an entity. The EM-canonical scalar for paradata-supported claims. See em_qualia_types.json → epistemic.confidence.confidence_level for the full definition."@en .
+
+
+# ============================================================================
+# 11. STRATIGRAPHIC PHYSICAL RELATIONS (AP11 subproperties)
+# ============================================================================
+# CRMarchaeo's AP11_has_physical_relation is the generic relation between
+# two stratigraphic units. We discriminate the specific type with named
+# subproperties — the SPARQL-friendly pattern (queries can be specific
+# OR fall back to the generic AP11 via subproperty inference).
+
+em:abuts
+    a owl:ObjectProperty ;
+    rdfs:label "abuts"@en ;
+    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation ;
+    rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:comment "Source stratigraphic unit abuts against the target. Non-symmetric: A abuts B does NOT imply B abuts A (B is_abutted_by A). Maps to: connections_datamodel edge 'abuts'."@en .
+
+em:cuts
+    a owl:ObjectProperty ;
+    rdfs:label "cuts"@en ;
+    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation ;
+    rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:comment "Source stratigraphic unit cuts (is incised into) the target. Non-symmetric. Maps to: connections_datamodel edge 'cuts'."@en .
+
+em:fills
+    a owl:ObjectProperty ;
+    rdfs:label "fills"@en ;
+    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation ;
+    rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:comment "Source stratigraphic unit fills the target (typically a deposit filling a cut). Non-symmetric. Maps to: connections_datamodel edge 'fills'."@en .
+
+em:overlies
+    a owl:ObjectProperty ;
+    rdfs:label "overlies"@en ;
+    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation ;
+    rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:comment "Source stratigraphic unit overlies (covers) the target. Non-symmetric. Maps to: connections_datamodel edge 'overlies'."@en .
+
+em:bondedTo
+    a owl:ObjectProperty , owl:SymmetricProperty ;
+    rdfs:label "bonded to"@en ;
+    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation ;
+    rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:comment "Two stratigraphic units are physically bonded (e.g. masonry bonding). Symmetric. Maps to: connections_datamodel edges 'bonded_to' / 'is_bonded_to'."@en .
+
+em:physicallyEquals
+    a owl:ObjectProperty , owl:SymmetricProperty ;
+    rdfs:label "physically equals"@en ;
+    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation ;
+    rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:comment "Two distinct stratigraphic-unit ids refer to the same physical entity (e.g. across campaigns or archives). Symmetric. Maps to: connections_datamodel edges 'equals' / 'is_physically_equal_to'."@en .
+
+
+# ============================================================================
+# End of em.ttl v1.6.0
+# ============================================================================

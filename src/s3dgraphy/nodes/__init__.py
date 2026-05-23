@@ -36,14 +36,16 @@ from .group_node import (
 from .paradata_node import ParadataNode
 from .geo_position_node import GeoPositionNode
 from .representation_node import RepresentationModelNode
-from .author_node import AuthorNode
+from .author_node import AuthorNode, AuthorAINode
 from .link_node import LinkNode
 from .embargo_node import EmbargoNode
 from .license_node import LicenseNode
+from .graph_node import GraphNode
+from .hdt_node import HDTNode
 
 # Define what is available for import when using 'from nodes import *'
 __all__ = [
-    "Node", 
+    "Node",
     "StratigraphicNode",
     "WorkingUnit",
     "StratigraphicUnit",
@@ -62,21 +64,24 @@ __all__ = [
     "ContinuityNode",
     "StratigraphicEventNode",
     "UnknownNode",
-    "EpochNode", 
-    "PropertyNode", 
+    "EpochNode",
+    "PropertyNode",
     "DocumentNode",
-    "CombinerNode", 
-    "ExtractorNode", 
+    "CombinerNode",
+    "ExtractorNode",
     "GroupNode",
     "ActivityNodeGroup",
     "ParadataNodeGroup",
     "TimeBranchNodeGroup",
     "LocationNodeGroup",
-    "ParadataNode", 
-    "GeoPositionNode", 
+    "ParadataNode",
+    "GeoPositionNode",
     "RepresentationModelNode",
-    "AuthorNode", 
+    "AuthorNode",
+    "AuthorAINode",
     "LinkNode",
     "EmbargoNode",
-    "LicenseNode"
+    "LicenseNode",
+    "GraphNode",
+    "HDTNode"
 ]

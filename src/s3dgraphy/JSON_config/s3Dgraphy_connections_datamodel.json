@@ -1,13 +1,15 @@
 {
-  "s3Dgraphy_connections_model_version": "1.5.5",
-  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. Version 1.5.3 introduces canonical/reverse directionality with verb-based labels for clear socket identification in node editors. Version 1.5.4 adds 'has_visual_reference' edge type. Version 1.5.5 adds 'is_in_location' edge type with context-sensitive CIDOC mapping (P53 for node→location, P89 for the recursive location→location hierarchy) and an optional 'is_primary' boolean attribute (s3d:isPrimary, proposed).",
+  "s3Dgraphy_connections_model_version": "1.6.0",
+  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. v1.6.0 (paired with node datamodel v1.6.0) introduces: bug fix on is_in_paradata_nodegroup (typo 'ProperrtyNOde' → 'PropertyNode'); semantic fix on has_documentation (P104_is_subject_to → P70i_is_documented_in — P104 means 'subject to a legal right', not 'has documentation'); deprecation of has_timebranch as duplicate of is_in_timebranch (the latter is the canonical one — used by import_graphml.py and graphml_patcher.py; the former exists only in config JSON); component list aligned with node datamodel (HDT-O, PROV-O added). HDT-O containment properties (hdto:contains_HDT, hdto:contains_SU, hdto:isPrimary) and physical-relation discriminator subproperties (em:abuts, em:cuts, em:fills, em:overlies, em:bonded_to, em:equals as rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation) to be added in v1.6.1. v1.5.3 introduced canonical/reverse directionality with verb-based labels for clear socket identification in node editors. v1.5.4 added 'has_visual_reference' edge type. v1.5.5 added 'is_in_location' edge type with context-sensitive CIDOC mapping (P53 for node→location, P89 for the recursive location→location hierarchy) and an optional 'is_primary' boolean attribute (s3d:isPrimary, proposed).",
   "components": [
     "CIDOC-CRM",
     "CRMarchaeo",
-    "CRMsci", 
+    "CRMsci",
     "CRMdig",
     "CRMgeo",
     "CRMinf",
+    "HDT-O",
+    "PROV-O",
     "CRMs3D"
   ],
   "edge_types": {
@@ -429,7 +431,10 @@
     "has_timebranch": {
       "name": "has_timebranch",
       "label": "Has timebranch",
-      "description": "Indicates that a node is connected to a specific time branch.",
+      "deprecated": true,
+      "deprecated_since": "1.6.0",
+      "deprecated_reason": "Duplicate of is_in_timebranch with identical mapping and allowed_connections. Verified usage in /src: is_in_timebranch is the canonical form (used by importer/import_graphml.py:1510 and exporter/graphml/graphml_patcher.py:73); has_timebranch exists only in JSON config files (this one + em_visual_rules.json). Kept temporarily for backward compatibility on read; writers MUST emit is_in_timebranch. Scheduled for removal in 1.7.0.",
+      "description": "[DEPRECATED in 1.6.0 — use is_in_timebranch] Indicates that a node is connected to a specific time branch.",
       "reverse": {
         "name": "is_timebranch_of",
         "label": "Is timebranch of"
@@ -593,7 +598,7 @@
         "extension_name": "CIDOC-S3D"
       },
       "allowed_connections": {
-        "source": ["ProperrtyNOde","DocumentNode", "ExtractorNode", "CombinerNode", "ParadataNode"],
+        "source": ["PropertyNode", "DocumentNode", "ExtractorNode", "CombinerNode", "ParadataNode"],
         "target": ["ParadataNodeGroup"]
       }
     },
@@ -663,10 +668,11 @@
         "label": "Is documentation of"
       },
       "mapping": {
-        "cidoc": "P104_is_subject_to",
+        "cidoc": "P70i_is_documented_in",
         "cidoc_extension": "CIDOC-CRM",
         "extension_mapping": null,
-        "extension_name": null
+        "extension_name": null,
+        "rationale": "P70i_is_documented_in (inverse of P70_documents) is the canonical CRM predicate to link an entity to a document about it. Earlier v1.5.5 used P104_is_subject_to which is semantically wrong (P104 means 'subject to a legal right or rule', not 'has documentation about it')."
       },
       "allowed_connections": {
         "source": ["StratigraphicNode", "SpecialFindUnit", "VirtualStratigraphicUnit"],
@@ -709,6 +715,86 @@
       "allowed_connections": {
         "source": ["SpecialFindUnit", "VirtualSpecialFindUnit"],
         "target": ["StratigraphicUnit", "DocumentaryStratigraphicUnit", "VirtualSpecialFindUnit"]
+      }
+    },
+    "has_digital_twin": {
+      "name": "has_digital_twin",
+      "label": "Has digital twin",
+      "description": "Links a real-world heritage entity (or any node representing one) to its Heritage Digital Twin (HDTNode). HDT-O HP1 per ECHOES D7.1 §4.2.",
+      "reverse": {
+        "name": "is_digital_twin_of",
+        "label": "Is digital twin of"
+      },
+      "mapping": {
+        "cidoc": "hdto:HP1_has_digital_twin",
+        "cidoc_extension": "HDT-O",
+        "extension_mapping": null,
+        "extension_name": "HDT-O",
+        "rationale": "Per D7.1 §4.2 HP1: 'links a CH entity with a corresponding digital twin that aggregates structured knowledge about it'. Quantification many-to-many (0,n : 0,n)."
+      },
+      "allowed_connections": {
+        "source": ["StratigraphicNode", "Node"],
+        "target": ["HDTNode"]
+      }
+    },
+    "has_digital_twin_component": {
+      "name": "has_digital_twin_component",
+      "label": "Has digital twin component",
+      "description": "Hierarchical containment between HDTs. A parent HDT has component child-HDTs. HDT-O HP3 (inverse) per ECHOES D7.1 §4.2. Use case: Colosseo_HDT_overall has_digital_twin_component Colosseo_HDT_Flavian / Colosseo_HDT_medieval_fortress / Colosseo_HDT_christian_site_1800. Transitive: chains of containment are inferred.",
+      "reverse": {
+        "name": "is_digital_twin_component_of",
+        "label": "Is digital twin component of"
+      },
+      "mapping": {
+        "cidoc": "hdto:HP3i_has_digital_twin_component",
+        "cidoc_extension": "HDT-O",
+        "extension_mapping": null,
+        "extension_name": "HDT-O",
+        "rationale": "Per D7.1 §4.2 HP3: 'enables the hierarchical organization of digital twins, allowing the digital twin of a specific asset to be part of a larger digital twin representing a city, archaeological site, or cultural landscape'. Component is not limited to physical/geographical: encompasses any main-associated relationship. Quantification many-to-many (0,n : 0,n)."
+      },
+      "allowed_connections": {
+        "source": ["HDTNode"],
+        "target": ["HDTNode"]
+      }
+    },
+    "contains_proposition_set": {
+      "name": "contains_proposition_set",
+      "label": "Contains proposition set",
+      "description": "Links an HDT (HDTNode) to a Heritage Proposition Set (GraphNode / em:EMGraph) it currently aggregates. HDT-O HP33 per ECHOES D7.1 §4.2. This is the canonical way to attach an EM graph to an HDT. An EM graph can be a proposition set of multiple HDTs (many-to-many).",
+      "reverse": {
+        "name": "is_proposition_set_of",
+        "label": "Is proposition set of"
+      },
+      "mapping": {
+        "cidoc": "hdto:HP33_contains",
+        "cidoc_extension": "HDT-O",
+        "extension_mapping": null,
+        "extension_name": "HDT-O",
+        "rationale": "Per D7.1 §4.2 HP33: 'associates an HC2 HDT with an HC16 Heritage Proposition Set currently valid within it'. Version chains tracked via HP30 added / HP31 deleted / HP32 replaced. Deprecation tracked via HP34 contained (was proposition set of)."
+      },
+      "allowed_connections": {
+        "source": ["HDTNode"],
+        "target": ["GraphNode"]
+      }
+    },
+    "has_digital_object_part": {
+      "name": "has_digital_object_part",
+      "label": "Has digital object part",
+      "description": "Links an HDT (or any HC14 Volatile Digital Object) to an auxiliary digital object that is NOT a proposition set — e.g., a 3D survey database, a point cloud, a generic linked resource. HDT-O HP29 per ECHOES D7.1 §4.2.",
+      "reverse": {
+        "name": "is_digital_object_part_of",
+        "label": "Is digital object part of"
+      },
+      "mapping": {
+        "cidoc": "hdto:HP29_has_digital_object_part",
+        "cidoc_extension": "HDT-O",
+        "extension_mapping": "P106_is_composed_of",
+        "extension_name": "CIDOC-CRM",
+        "rationale": "Per D7.1 §4.2 HP29: 'associates an HC14 Volatile Digital Object with a structural part that is itself a digital object'. Subproperty of crm:P106_is_composed_of. Example: HDT of Pisa Leaning Tower has digital part a 3D survey project database (crmdig:D1)."
+      },
+      "allowed_connections": {
+        "source": ["HDTNode"],
+        "target": ["RepresentationModelNode", "RepresentationModelDocNode", "RepresentationModelSpecialFindNode", "LinkNode"]
       }
     },
     "generic_connection": {

@@ -1,9 +1,10 @@
 {
     "metadata": {
-      "version": "3.0",
-      "last_updated": "2025-01-30",
+      "version": "4.0",
+      "last_updated": "2026-05-23",
       "maintainers": ["Emanuel Demetrescu"],
-      "license": "CC-BY-4.0"
+      "license": "CC-BY-4.0",
+      "changelog": "v4.0: verified all v3.0 CIDOC-CRM mappings (correct). Expanded with: volume, area, circumference in dimensional; color, texture, finish, patina, hardness, porosity in material; damage_type, fragility, completeness in state; tool_marks, joining_technique in technical; bounding_box, footprint_area in spatial; duration, terminus_post_quem, terminus_ante_quem, relative_chronology in temporal; ceremonial_function, ritual_function, defensive_function, domestic_function, symbolic_function in telic; school, workshop, period_attribution in stylistic. NEW subcategories: iconographic + semantic under cultural_interpretive (iconographic_subject, narrative_content, iconographic_program, aesthetic_value, religious_significance, monumental_status, attribution). Added provenance_history, exhibition_history, publication_history under administrative; NEW ownership subcategory (current_custodian, ownership_chain). NEW CATEGORY epistemic — meta-qualia central to EM paradata model (confidence_level, certainty_level, uncertainty_factors, methodology_used, validation_method, source_quality, primary_contributor, review_status, last_modified)."
     },
     "qualia_categories": [
       {
@@ -97,6 +98,39 @@
                 "data_type": "float",
                 "units": ["cm", "m", "ft"],
                 "expected_extractors": ["direct_measurement", "3d_model_measurement", "drawing_measurement"]
+              },
+              {
+                "id": "volume",
+                "name": "Volume",
+                "mappings": {
+                  "getty_aat": "300055921",
+                  "cidoc_crm": "E54_Dimension"
+                },
+                "data_type": "float",
+                "units": ["m3", "cm3", "l"],
+                "expected_extractors": ["3d_model_measurement", "geometric_calculation"]
+              },
+              {
+                "id": "area",
+                "name": "Area",
+                "mappings": {
+                  "getty_aat": "300266585",
+                  "cidoc_crm": "E54_Dimension"
+                },
+                "data_type": "float",
+                "units": ["m2", "cm2"],
+                "expected_extractors": ["3d_model_measurement", "geometric_calculation", "drawing_measurement"]
+              },
+              {
+                "id": "circumference",
+                "name": "Circumference",
+                "mappings": {
+                  "getty_aat": "300379439",
+                  "cidoc_crm": "E54_Dimension"
+                },
+                "data_type": "float",
+                "units": ["cm", "m"],
+                "expected_extractors": ["direct_measurement", "3d_model_measurement"]
               }
             ]
           },
@@ -150,6 +184,83 @@
                 "vocabulary_source": "custom",
                 "values": ["fine", "medium", "coarse"],
                 "expected_extractors": ["visual_inspection", "microscopic_analysis"]
+              },
+              {
+                "id": "color",
+                "name": "Color",
+                "description": "Perceived color of the surface or material; classified by controlled vocabulary (Munsell, Getty AAT) or expressed as RGB/HEX value.",
+                "mappings": {
+                  "getty_aat": "300080438",
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "munsell_or_aat",
+                "vocabulary_category": "Colors",
+                "expected_extractors": ["visual_inspection", "spectrophotometry", "colorimetric_analysis"]
+              },
+              {
+                "id": "texture",
+                "name": "Texture",
+                "description": "Tactile or visual surface quality (smooth, rough, granular, polished, etc.).",
+                "mappings": {
+                  "getty_aat": "300010500",
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["smooth", "rough", "granular", "polished", "weathered", "fibrous", "crystalline"],
+                "expected_extractors": ["visual_inspection", "tactile_examination", "microscopic_analysis"]
+              },
+              {
+                "id": "finish",
+                "name": "Surface Finish",
+                "description": "Final treatment of the surface (matte, glossy, polished, brushed, etc.) distinct from surface_treatment which is the procedure.",
+                "mappings": {
+                  "getty_aat": "300053895",
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["matte", "glossy", "polished", "brushed", "honed", "tumbled", "natural"],
+                "expected_extractors": ["visual_inspection"]
+              },
+              {
+                "id": "patina",
+                "name": "Patina",
+                "description": "Surface alteration layer formed naturally over time (oxidation, weathering, biofilm) or artificially. Modeled as both an observable feature (state) and the result of a modification event.",
+                "mappings": {
+                  "getty_aat": "300053062",
+                  "cidoc_crm": "E26_Physical_Feature"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["none", "oxidation", "weathering", "biological", "artificial", "mixed"],
+                "expected_extractors": ["visual_inspection", "chemical_analysis"]
+              },
+              {
+                "id": "hardness",
+                "name": "Hardness",
+                "description": "Mechanical hardness measured on a standard scale (e.g., Mohs for minerals, Vickers for metals).",
+                "mappings": {
+                  "getty_aat": "300417192",
+                  "cidoc_crm": "E54_Dimension"
+                },
+                "data_type": "float",
+                "units": ["Mohs", "HV", "HRC"],
+                "expected_extractors": ["scratch_test", "instrumented_indentation"]
+              },
+              {
+                "id": "porosity",
+                "name": "Porosity",
+                "description": "Fraction of void volume in the material (0-100%), relevant for stone, brick, mortar.",
+                "mappings": {
+                  "getty_aat": "300417194",
+                  "cidoc_crm": "E54_Dimension"
+                },
+                "data_type": "percentage",
+                "range": [0, 100],
+                "units": ["%"],
+                "expected_extractors": ["water_absorption_test", "mercury_porosimetry", "image_analysis"]
               }
             ]
           },
@@ -181,6 +292,45 @@
                 "data_type": "percentage",
                 "range": [0, 100],
                 "expected_extractors": ["visual_inspection", "3d_model_analysis"]
+              },
+              {
+                "id": "damage_type",
+                "name": "Damage Type",
+                "description": "Typology of observed damage (cracks, fragmentation, abrasion, erosion, missing parts, biological colonization).",
+                "mappings": {
+                  "getty_aat": "300265391",
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary_multiple",
+                "vocabulary_source": "custom",
+                "values": ["cracks", "fragmentation", "abrasion", "erosion", "missing_parts", "biological_colonization", "salt_efflorescence", "delamination", "burns", "graffiti"],
+                "expected_extractors": ["visual_inspection", "condition_assessment", "3d_model_analysis"]
+              },
+              {
+                "id": "fragility",
+                "name": "Fragility",
+                "description": "Susceptibility of the object/feature to damage; qualitative assessment by conservator.",
+                "mappings": {
+                  "getty_aat": "300204716",
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["robust", "stable", "vulnerable", "fragile", "critical"],
+                "expected_extractors": ["conservator_assessment", "mechanical_test"]
+              },
+              {
+                "id": "completeness",
+                "name": "Completeness",
+                "description": "Percentage of the original feature/object that survives. Distinct from integrity (which is overall structural soundness): completeness measures missing material.",
+                "mappings": {
+                  "getty_aat": "300379506",
+                  "cidoc_crm": "E54_Dimension"
+                },
+                "data_type": "percentage",
+                "range": [0, 100],
+                "units": ["%"],
+                "expected_extractors": ["visual_inspection", "3d_model_analysis", "comparison_with_reconstruction"]
               }
             ]
           },
@@ -200,6 +350,32 @@
                 "vocabulary_source": "getty_aat",
                 "vocabulary_category": "Construction Techniques",
                 "expected_extractors": ["visual_inspection", "technical_analysis"]
+              },
+              {
+                "id": "tool_marks",
+                "name": "Tool Marks",
+                "description": "Traces left by specific tools on the surface (chisel marks, saw cuts, hammer impacts). Captures both the type of mark and the inferred tool. Closely related to the WorkingUnit (UL) stratigraphic node.",
+                "mappings": {
+                  "getty_aat": "300248858",
+                  "cidoc_crm": "E25_Human-Made_Feature"
+                },
+                "data_type": "controlled_vocabulary_multiple",
+                "vocabulary_source": "custom",
+                "values": ["chisel", "gradina", "punch", "saw", "hammer", "abrasive", "drill", "lathe", "iccozza"],
+                "expected_extractors": ["visual_inspection", "microscopic_analysis", "3d_model_analysis"]
+              },
+              {
+                "id": "joining_technique",
+                "name": "Joining Technique",
+                "description": "Method used to join structural or decorative elements (mortar, clamp, dowel, dovetail, tenon-and-mortise).",
+                "mappings": {
+                  "getty_aat": "300053914",
+                  "cidoc_crm": "E29_Design_or_Procedure"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["mortar", "metal_clamp", "wooden_dowel", "metal_dowel", "dovetail", "tenon_mortise", "interlock", "adhesive", "dry_fit"],
+                "expected_extractors": ["visual_inspection", "endoscopic_analysis", "x_ray_analysis"]
               }
             ]
           }
@@ -273,6 +449,29 @@
                   "concentric"
                 ],
                 "expected_extractors": ["visual_inspection", "spatial_analysis"]
+              },
+              {
+                "id": "bounding_box",
+                "name": "Bounding Box",
+                "description": "Axis-aligned bounding volume of the element expressed as min/max coordinates. Useful for spatial indexing and rough collision/containment checks.",
+                "mappings": {
+                  "cidoc_crm": "E54_Dimension"
+                },
+                "data_type": "object",
+                "schema": {"x_min": "float", "y_min": "float", "z_min": "float", "x_max": "float", "y_max": "float", "z_max": "float"},
+                "units": ["m"],
+                "expected_extractors": ["3d_model_measurement", "geometric_calculation"]
+              },
+              {
+                "id": "footprint_area",
+                "name": "Footprint Area",
+                "description": "Plan-view area of the element projected on the horizontal plane. Critical for architectural archaeology (rooms, structures, sites).",
+                "mappings": {
+                  "cidoc_crm": "E54_Dimension"
+                },
+                "data_type": "float",
+                "units": ["m2"],
+                "expected_extractors": ["3d_model_measurement", "drawing_measurement", "gis_analysis"]
               }
             ]
           },
@@ -319,6 +518,54 @@
                   "stylistic_analysis"
                 ],
                 "expected_extractors": ["dating_analysis", "laboratory_analysis"]
+              },
+              {
+                "id": "duration",
+                "name": "Duration",
+                "description": "Length of the time-span associated with the element (event duration, period span). Distinct from absolute_time_start/end which are anchors: duration is the magnitude.",
+                "mappings": {
+                  "getty_aat": "300055762",
+                  "cidoc_crm": "E54_Dimension"
+                },
+                "data_type": "float",
+                "units": ["years", "days", "hours"],
+                "expected_extractors": ["chronological_analysis", "computation_from_bounds"]
+              },
+              {
+                "id": "terminus_post_quem",
+                "name": "Terminus Post Quem",
+                "description": "Earliest possible date for the element ('not earlier than'). One of the two foundational dating bounds in archaeological chronology.",
+                "mappings": {
+                  "getty_aat": "300404286",
+                  "cidoc_crm": "E52_Time-Span"
+                },
+                "data_type": "date",
+                "format": "YYYY-MM-DD",
+                "expected_extractors": ["stratigraphic_analysis", "associated_finds_analysis", "historical_sources"]
+              },
+              {
+                "id": "terminus_ante_quem",
+                "name": "Terminus Ante Quem",
+                "description": "Latest possible date for the element ('not later than'). The companion bound to terminus_post_quem; together they bracket the dating window.",
+                "mappings": {
+                  "getty_aat": "300404287",
+                  "cidoc_crm": "E52_Time-Span"
+                },
+                "data_type": "date",
+                "format": "YYYY-MM-DD",
+                "expected_extractors": ["stratigraphic_analysis", "associated_finds_analysis", "historical_sources"]
+              },
+              {
+                "id": "relative_chronology",
+                "name": "Relative Chronology",
+                "description": "Position of the element in a relative sequence (before/after specific reference units), independent of absolute dating. Common when absolute dates are unavailable.",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["earliest", "early", "middle", "late", "latest", "transitional"],
+                "expected_extractors": ["stratigraphic_analysis", "typological_seriation"]
               }
             ]
           }
@@ -365,6 +612,66 @@
                   "functional_analysis",
                   "historical_research"
                 ]
+              },
+              {
+                "id": "ceremonial_function",
+                "name": "Ceremonial Function",
+                "description": "Use in non-domestic, non-utilitarian ceremonies (civic processions, banquets, public rituals). Distinct from ritual_function (sacred) and symbolic_function (representational).",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["banquet", "procession", "public_assembly", "investiture", "commemoration", "none"],
+                "expected_extractors": ["functional_analysis", "iconographic_analysis", "historical_research"]
+              },
+              {
+                "id": "ritual_function",
+                "name": "Ritual Function",
+                "description": "Sacred or religious use of the element (cult activity, offering, burial). Distinct from ceremonial (civic) and symbolic (representational).",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["cult", "offering", "sacrifice", "burial", "purification", "votive", "oracle", "none"],
+                "expected_extractors": ["functional_analysis", "iconographic_analysis", "comparative_analysis"]
+              },
+              {
+                "id": "defensive_function",
+                "name": "Defensive Function",
+                "description": "Use in defense or fortification (walls, towers, gates, ditches).",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["fortification_wall", "tower", "gate", "moat_ditch", "watchtower", "battlement", "none"],
+                "expected_extractors": ["functional_analysis", "architectural_analysis"]
+              },
+              {
+                "id": "domestic_function",
+                "name": "Domestic Function",
+                "description": "Use in everyday household life (storage, cooking, sleeping, washing).",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["storage", "cooking", "dining", "sleeping", "washing", "weaving", "craft_production", "none"],
+                "expected_extractors": ["functional_analysis", "use_wear_analysis"]
+              },
+              {
+                "id": "symbolic_function",
+                "name": "Symbolic Function",
+                "description": "Representational/symbolic role beyond practical use (status display, identity, narrative). Closely related to iconographic and aesthetic qualia.",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["status_display", "identity", "narrative", "apotropaic", "commemorative", "boundary_marker", "none"],
+                "expected_extractors": ["iconographic_analysis", "comparative_analysis"]
               }
             ]
           },
@@ -478,6 +785,126 @@
                   "historical_analysis",
                   "stylistic_analysis"
                 ]
+              },
+              {
+                "id": "school",
+                "name": "School / Workshop",
+                "description": "Production school or workshop attribution (e.g., 'School of Phidias', 'Della Robbia workshop').",
+                "mappings": {
+                  "getty_aat": "300055672",
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "getty_aat",
+                "vocabulary_category": "Schools and Workshops",
+                "expected_extractors": ["stylistic_analysis", "comparative_analysis", "archival_research"]
+              },
+              {
+                "id": "period_attribution",
+                "name": "Period Attribution",
+                "description": "Stylistic period to which the element is attributed (e.g., 'Late Republican', 'Early Imperial'). Distinct from absolute dating: this is the stylistic classification.",
+                "mappings": {
+                  "getty_aat": "300081446",
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "getty_aat",
+                "vocabulary_category": "Styles and Epochs",
+                "expected_extractors": ["stylistic_analysis", "comparative_analysis"]
+              }
+            ]
+          },
+          "iconographic": {
+            "name": "Iconographic Qualia",
+            "description": "Subject matter, narrative content, and iconographic program of the element. Specific to artistic or representational objects.",
+            "qualia": [
+              {
+                "id": "iconographic_subject",
+                "name": "Iconographic Subject",
+                "description": "Primary subject or figure depicted (deity, mythological scene, portrait, allegory).",
+                "mappings": {
+                  "getty_aat": "300055935",
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "getty_aat",
+                "vocabulary_category": "Subjects",
+                "expected_extractors": ["iconographic_analysis", "comparative_analysis", "historical_research"]
+              },
+              {
+                "id": "narrative_content",
+                "name": "Narrative Content",
+                "description": "Story or scene depicted (Trojan War, biblical narrative, historical episode). Free-text or linked to a thematic concept node.",
+                "mappings": {
+                  "getty_aat": "300026031",
+                  "cidoc_crm": "E73_Information_Object"
+                },
+                "data_type": "string_or_reference",
+                "expected_extractors": ["iconographic_analysis", "literary_comparison"]
+              },
+              {
+                "id": "iconographic_program",
+                "name": "Iconographic Program",
+                "description": "Coherent set of subjects forming a thematic whole (e.g., 'Programma augusteo del Foro di Augusto'). Higher-level than individual subjects.",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "expected_extractors": ["iconographic_analysis", "comparative_analysis"]
+              }
+            ]
+          },
+          "semantic": {
+            "name": "Semantic Qualia",
+            "description": "High-level interpretive qualia: aesthetic judgment, religious significance, monumental status, attribution. These are inherently propositional (model as crminf:I4_Proposition_Set in RDF, not as direct dimensions).",
+            "qualia": [
+              {
+                "id": "aesthetic_value",
+                "name": "Aesthetic Value",
+                "description": "Aesthetic judgment about the element ('beautiful', 'sublime', 'monumental', 'refined'). Inherently subjective; the canonical qualia for the EM 'bello/brutto' interpretive axis.",
+                "mappings": {
+                  "cidoc_crm": "crminf:I4_Proposition_Set"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["sublime", "beautiful", "refined", "ordinary", "crude", "monumental", "intimate"],
+                "expected_extractors": ["expert_assessment", "comparative_analysis"]
+              },
+              {
+                "id": "religious_significance",
+                "name": "Religious Significance",
+                "description": "Religious or sacred role attributed to the element (cult image, relic, sanctified space).",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["sacred_object", "cult_image", "relic", "sanctified_space", "votive_offering", "none"],
+                "expected_extractors": ["iconographic_analysis", "historical_research", "comparative_analysis"]
+              },
+              {
+                "id": "monumental_status",
+                "name": "Monumental Status",
+                "description": "Recognition of the element as a monument of cultural significance (national heritage, UNESCO, regional protected).",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["unesco_world_heritage", "national_monument", "regional_protected", "locally_listed", "unprotected"],
+                "expected_extractors": ["legal_documentation", "administrative_research"]
+              },
+              {
+                "id": "attribution",
+                "name": "Attribution",
+                "description": "Attribution to a specific maker, patron, or commission (e.g., 'attributed to Phidias', 'commissioned by Augustus'). Modeled as an attribute-assignment event in RDF to carry confidence.",
+                "mappings": {
+                  "cidoc_crm": "E13_Attribute_Assignment"
+                },
+                "data_type": "object",
+                "schema": {"attributed_to": "E39_Actor reference", "attribution_type": "maker | patron | commission | school", "confidence": "float 0-1"},
+                "expected_extractors": ["expert_assessment", "archival_research", "stylistic_analysis"]
               }
             ]
           }
@@ -562,6 +989,196 @@
                   "access_assessment",
                   "management_review"
                 ]
+              },
+              {
+                "id": "provenance_history",
+                "name": "Provenance History",
+                "description": "Chain of provenance events for the element: production → ownership transfers → current location. Modeled in RDF as a chain of crm:E10_Transfer_of_Custody and crm:E8_Acquisition events linked to the entity.",
+                "mappings": {
+                  "getty_aat": "300055863",
+                  "cidoc_crm": "E12_Production"
+                },
+                "data_type": "object_chain",
+                "expected_extractors": ["archival_research", "provenance_research"]
+              },
+              {
+                "id": "exhibition_history",
+                "name": "Exhibition History",
+                "description": "Record of public exhibitions in which the element has appeared. Modeled in RDF as crm:E7_Activity instances with temporal scope.",
+                "mappings": {
+                  "getty_aat": "300054766",
+                  "cidoc_crm": "E7_Activity"
+                },
+                "data_type": "object_chain",
+                "expected_extractors": ["archival_research", "museum_documentation"]
+              },
+              {
+                "id": "publication_history",
+                "name": "Publication History",
+                "description": "Chain of publications referencing the element. Modeled as crm:E31_Document references via P67_refers_to.",
+                "mappings": {
+                  "getty_aat": "300026656",
+                  "cidoc_crm": "E31_Document"
+                },
+                "data_type": "object_chain",
+                "expected_extractors": ["bibliographic_research", "citation_analysis"]
+              }
+            ]
+          },
+          "ownership": {
+            "name": "Ownership Qualia",
+            "description": "Current and historical ownership / custody of the element. Distinct from administrative qualia which cover legal/inventory aspects: ownership is the chain of who has held the thing.",
+            "qualia": [
+              {
+                "id": "current_custodian",
+                "name": "Current Custodian",
+                "description": "Current legal custodian or owner (institution or person) of the element.",
+                "mappings": {
+                  "cidoc_crm": "E40_Legal_Body"
+                },
+                "data_type": "reference",
+                "reference_target": ["AuthorNode", "AuthorAINode"],
+                "expected_extractors": ["administrative_research"]
+              },
+              {
+                "id": "ownership_chain",
+                "name": "Ownership Chain",
+                "description": "Historical sequence of custodians/owners. Modeled in RDF as a chain of crm:E8_Acquisition events ordered by time.",
+                "mappings": {
+                  "cidoc_crm": "E8_Acquisition"
+                },
+                "data_type": "object_chain",
+                "expected_extractors": ["archival_research", "provenance_research"]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "epistemic",
+        "name": "Epistemic Qualia",
+        "description": "Meta-qualia about how knowledge of a node was constructed: confidence in the assertion, methodology followed, and attribution chain (who said what, validated by whom, when). Central to the Extended Matrix paradata model — every claim in EM carries an epistemic dimension. This category is the explicit machine-readable expression of EM's reasoning chain.",
+        "experimental": false,
+        "subcategories": {
+          "confidence": {
+            "name": "Confidence Qualia",
+            "description": "Quantitative and qualitative confidence in assertions about the node",
+            "qualia": [
+              {
+                "id": "confidence_level",
+                "name": "Confidence Level",
+                "description": "Numerical confidence in the assertion (0-100%). The EM-canonical scalar for paradata-supported claims.",
+                "mappings": {
+                  "cidoc_crm": "E54_Dimension"
+                },
+                "data_type": "percentage",
+                "range": [0, 100],
+                "units": ["%"],
+                "expected_extractors": ["expert_assessment", "statistical_analysis", "consensus_evaluation"]
+              },
+              {
+                "id": "certainty_level",
+                "name": "Certainty Level",
+                "description": "Qualitative certainty discrimination, complementary to confidence_level for non-numerical reasoning.",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["certain", "highly_probable", "probable", "possible", "doubtful", "speculative"],
+                "expected_extractors": ["expert_assessment", "consensus_evaluation"]
+              },
+              {
+                "id": "uncertainty_factors",
+                "name": "Uncertainty Factors",
+                "description": "Factors that reduce certainty about the assertion (partial preservation, missing documentation, conflicting sources).",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary_multiple",
+                "vocabulary_source": "custom",
+                "values": ["partial_preservation", "missing_documentation", "conflicting_sources", "indirect_evidence", "long_interpretive_chain", "single_source_dependency", "non_reproducible_method"],
+                "expected_extractors": ["expert_assessment", "paradata_analysis"]
+              }
+            ]
+          },
+          "methodology": {
+            "name": "Methodology Qualia",
+            "description": "Methods and procedures used to construct the assertion",
+            "qualia": [
+              {
+                "id": "methodology_used",
+                "name": "Methodology Used",
+                "description": "Method or procedure followed to derive the assertion (analytical, comparative, experimental, etc.).",
+                "mappings": {
+                  "cidoc_crm": "E29_Design_or_Procedure"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["direct_observation", "comparative_analysis", "experimental_archaeology", "statistical_inference", "stylistic_analysis", "historical_documentation", "scientific_dating", "geophysical_survey", "ai_assisted_inference", "photogrammetry", "structured_light_scanning"],
+                "expected_extractors": ["paradata_analysis", "documentation_review"]
+              },
+              {
+                "id": "validation_method",
+                "name": "Validation Method",
+                "description": "Method used to validate the assertion (peer-review, cross-validation, replication, etc.).",
+                "mappings": {
+                  "cidoc_crm": "E29_Design_or_Procedure"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["peer_review", "cross_validation", "replication", "independent_verification", "expert_consensus", "automated_validation", "field_check", "none"],
+                "expected_extractors": ["paradata_analysis"]
+              },
+              {
+                "id": "source_quality",
+                "name": "Source Quality",
+                "description": "Quality assessment of the sources supporting the assertion.",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["primary_high", "primary_medium", "primary_low", "secondary_high", "secondary_medium", "secondary_low", "tertiary"],
+                "expected_extractors": ["source_evaluation", "paradata_analysis"]
+              }
+            ]
+          },
+          "attribution_chain": {
+            "name": "Attribution Chain Qualia",
+            "description": "Provenance of the assertion: who made it, who validated it, when",
+            "qualia": [
+              {
+                "id": "primary_contributor",
+                "name": "Primary Contributor",
+                "description": "Author/agent (human or AI) who first asserted the claim. Links to AuthorNode (human) or AuthorAINode (AI subclass) via has_author edge.",
+                "mappings": {
+                  "cidoc_crm": "E39_Actor"
+                },
+                "data_type": "reference",
+                "reference_target": ["AuthorNode", "AuthorAINode"]
+              },
+              {
+                "id": "review_status",
+                "name": "Review Status",
+                "description": "Current review status of the assertion in the paradata workflow.",
+                "mappings": {
+                  "cidoc_crm": "E55_Type"
+                },
+                "data_type": "controlled_vocabulary",
+                "vocabulary_source": "custom",
+                "values": ["draft", "under_review", "peer_reviewed", "published", "deprecated"],
+                "expected_extractors": ["workflow_metadata"]
+              },
+              {
+                "id": "last_modified",
+                "name": "Last Modified",
+                "description": "Timestamp of the most recent modification to the assertion.",
+                "mappings": {
+                  "cidoc_crm": "E52_Time-Span"
+                },
+                "data_type": "datetime",
+                "format": "ISO-8601"
               }
             ]
           }
@@ -569,4 +1186,3 @@
       }
     ]
   }
-  

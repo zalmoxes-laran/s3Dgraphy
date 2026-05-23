@@ -426,6 +426,90 @@
       },
       "label_position": "over"
     },
+    "AUTH_AI": {
+      "_comment": "AI-assisted author. Same star shape as AUTH for visual family unity, but cyan/blue tones to distinguish at a glance from human author (red/orange). The graphml palette identifies it via the 'AI.' label prefix (em_palette_icons).",
+      "file_3d": "src/3D/author_ai.glb",
+      "2d_file_rast": "src/2D/author_ai.png",
+      "2d_file_vect": "src/2D/author_ai.svg",
+      "style": {
+        "material": {
+          "rgba_color": {
+            "r": 0.0,
+            "g": 0.5,
+            "b": 0.8,
+            "a": 1.0
+          }
+        },
+        "border_color": "#00AAFF",
+        "fill_color": "#E0F4FF",
+        "border_style": "solid",
+        "shape": "star"
+      },
+      "label_position": "over"
+    },
+    "LIC": {
+      "_comment": "License node. Shield shape carrying a gold border to read clearly as a rights / legal artifact. Connected via has_license to any Node or to the GraphNode for graph-wide licensing. Graphml palette prefix: 'LI.'.",
+      "file_3d": "src/3D/license.glb",
+      "2d_file_rast": "src/2D/license.png",
+      "2d_file_vect": "src/2D/license.svg",
+      "style": {
+        "material": {
+          "rgba_color": {
+            "r": 0.8,
+            "g": 0.6,
+            "b": 0.0,
+            "a": 1.0
+          }
+        },
+        "border_color": "#FFD700",
+        "fill_color": "#FFF8DC",
+        "border_style": "solid",
+        "shape": "shield"
+      },
+      "label_position": "over"
+    },
+    "EMB": {
+      "_comment": "Embargo node. Octagon with red dashed border to read as a temporal restriction (the dashed border encodes 'temporary'). Connected via has_embargo to a Node, LicenseNode or GraphNode. Graphml palette prefix: 'EB.'.",
+      "file_3d": "src/3D/embargo.glb",
+      "2d_file_rast": "src/2D/embargo.png",
+      "2d_file_vect": "src/2D/embargo.svg",
+      "style": {
+        "material": {
+          "rgba_color": {
+            "r": 0.8,
+            "g": 0.0,
+            "b": 0.0,
+            "a": 1.0
+          }
+        },
+        "border_color": "#CC0000",
+        "fill_color": "#FFEEEE",
+        "border_style": "dashed",
+        "shape": "octagon"
+      },
+      "label_position": "over"
+    },
+    "GRAPH": {
+      "_comment": "Top-level container node representing the EM graph itself. Anchor for graph-wide metadata propagation (default author, license, embargo, epoch). Rendered as a dashed rounded rectangle to read as a meta-container, neutral gray to stay visually distinct from stratigraphic and paradata nodes. Graphml palette prefix: 'G.'.",
+      "file_3d": "src/3D/graph.glb",
+      "2d_file_rast": "src/2D/graph.png",
+      "2d_file_vect": "src/2D/graph.svg",
+      "style": {
+        "material": {
+          "rgba_color": {
+            "r": 0.3,
+            "g": 0.3,
+            "b": 0.3,
+            "a": 1.0
+          }
+        },
+        "border_color": "#333333",
+        "fill_color": "#EEEEEE",
+        "border_style": "dashed",
+        "shape": "rounded_rectangle"
+      },
+      "label_position": "over"
+    },
     "LINK": {
       "file_3d": "src/3D/link.glb",
       "2d_file_rast": "src/2D/link.png",
