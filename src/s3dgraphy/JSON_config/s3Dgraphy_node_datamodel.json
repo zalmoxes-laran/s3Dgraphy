@@ -1,6 +1,6 @@
 {
-  "s3Dgraphy_data_model_version": "1.5.4",
-  "description": "s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings. v1.5.4 adds RSF (Reused Special Find — spolia) as a stratigraphic subtype, octagon with red border, family=real, is_series=false. Originating DP: DP-26 (spolia project, last DP before the EM 1.5 cut). v1.5.3 added LocationNodeGroup (E53 Place + E55 Type) for spatial / locational membership orthogonal to ActivityNodeGroup (intention) and EpochNode (time). v1.5.2 added family + is_series classification metadata on stratigraphic subtypes.",
+  "s3Dgraphy_data_model_version": "1.6.0",
+  "description": "s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings. v1.6.0 inaugurates a systematic CIDOC-CRM mapping revision: complete audit of all node types against CIDOC-CRM, CRMarchaeo, CRMinf, CRMdig, CRMsci, CRMgeo; replacement of legacy 'cidoc_s3d' pseudo-class names (invented strings without IRI or superclass declaration) with formal em:/s3d: IRIs declared as proper subclasses of CRM classes; introduction of CRMinf as primary (not alternative) for the paradata chain (ParadataNode, PropertyNode interpretive case, ExtractorNode, CombinerNode); introduction of PROV-O for AuthorNode to cover both human and AI agents; alignment with the Heritage Digital Twin Ontology (HDT-O) for containment / granularity properties; LocationNodeGroup (v1.5.3) adopted as the reference pattern (CIDOC-native composition via P2_has_type → E55 Type instances, with explicit extension_status and rationale). Companion deliverables: em.ttl (formal EM extension ontology, dereferenceable via w3id.org/em/) and hdto_extension.ttl (HDT-O granularity properties: contains_HDT, contains_SU, isPrimary). v1.5.4 added RSF (Reused Special Find — spolia) as a stratigraphic subtype, octagon with red border, family=real, is_series=false. Originating DP: DP-26 (spolia project, last DP before the EM 1.5 cut). v1.5.3 added LocationNodeGroup (E53 Place + E55 Type) for spatial / locational membership orthogonal to ActivityNodeGroup (intention) and EpochNode (time). v1.5.2 added family + is_series classification metadata on stratigraphic subtypes.",
   "components": [
     "CIDOC-CRM",
     "CRMarchaeo",
@@ -8,6 +8,8 @@
     "CRMdig",
     "CRMgeo",
     "CRMinf",
+    "HDT-O",
+    "PROV-O",
     "CRMs3D"
   ],
   "node_types": {
