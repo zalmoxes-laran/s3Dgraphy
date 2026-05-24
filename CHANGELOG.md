@@ -5,9 +5,152 @@ All notable changes to **s3dgraphy** are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [Unreleased] — v1.6.0 (in development)
 
-### Added
+### Architectural game-changer
+
+This release adopts the **RDF triplestore as the persistent source of truth**
+for EM data. The in-memory property graph (Blender, s3dgraphy Python) is now
+treated as an editing cache; the triplestore is where the data lives. This
+unblocks: (a) SPARQL queries as a daily-workflow capability, (b) multi-tool
+read/write to the same dataset (Blender + web viewers + analytics + AI
+pipelines), (c) formal HDT-O integration (every EM graph is an HC16 Heritage
+Proposition Set attached to one or more HC2 HDTs).
+
+The TTL export shipping in v1.6.0 is the **first** of three pieces (export,
+endpoint read, endpoint write) — see `docs/s3dgraphy_roadmap.rst` for the
+v1.6.0 → v1.7.0 plan.
+
+### Added — Ontology layer
+
+- **`em.ttl`** (`JSON_config/em.ttl`) — first formal Extended Matrix
+  ontology. 30+ classes, 13 object properties, 245 triples. Declares the
+  `em:` namespace (https://w3id.org/em/ontology#) — placeholder until a
+  resolvable IRI is published. Covers: authors (HumanAuthor, AIAuthor +
+  abstract Author), virtual SUs (VirtualSU + structural/non-structural/
+  documentary/special-find variants), real SUs (NegativeSU, ReusedSpecialFind,
+  DisplacedSpecialFind), series (4 types), events (StratigraphicEvent,
+  TransformationSU, WorkingUnit, ContinuityNode), TimeBranch, RepresentationModel
+  (+ 3 specializations), SemanticShape, Rights (License, Embargo, EMGraph),
+  Qualia (paradata shell), Paradata head (I1_Argumentation), AP11 subproperties
+  (abuts, cuts, fills, overlies, bondedTo, physicallyEquals).
+- **`hdto_extension.ttl`** — minimal HDT-O subset aligned with ECHOES
+  Deliverable D7.1 ("The Digital Commons"). 67 triples, 5 classes (HC1, HC2,
+  HC14, HC15, HC16), 7 properties (HP1 + HP1i, HP3 + HP3i, HP29, HP33 + HP33i)
+  with scope notes citing D7.1 §4. Namespace placeholder
+  `https://w3id.org/hdto/ontology#`. Companion to em.ttl for HDT-O containment
+  expression.
+- **HDTNode** — new node type representing an HC2 Heritage Digital Twin
+  inside an EM graph. Python class `HDTNode` (node_type='hdt') with
+  heritage_entity_iri + valid_from/until. Hierarchically composable via
+  `has_digital_twin_component` (HP3 inverse, transitive). EMGraph → HDT
+  attachment via `contains_proposition_set` (HP33).
+
+### Added — Node datamodel (v1.6.0)
+
+- **`em_extension` block** on 29 of 41 node classes — declarative single
+  source of truth for class IRIs (uri, rdf_type, subclass_of, extension_status,
+  rationale). Replaces the deprecated `cidoc_s3d` field of invented strings.
+- **AuthorNode split** into `AuthorNode` (human, em:HumanAuthor) and existing
+  `AuthorAINode` (AI, em:AIAuthor). Both exported from `nodes/__init__.py`.
+  Connections datamodel `has_author` already referenced AuthorAINode — the
+  declaration was missing.
+- **GraphNode** properly exported. New `container_nodes` section in node
+  datamodel. Multi-typed as em:EMGraph + crm:E73_Information_Object +
+  prov:Bundle + hdto:HC16_Heritage_Proposition_Set.
+- **HDTNode** added to node datamodel `container_nodes` section.
+- **Virtual SUs** semantic fix — `StructuralVirtualStratigraphicUnit`,
+  `NonStructuralVirtualStratigraphicUnit`, `VirtualSpecialFindUnit` now
+  declared as `crminf:I4_Proposition_Set` (propositional) not `crmarchaeo:A2`
+  (physical, wrong semantics).
+- **NegativeStratigraphicUnit** mapped to `crmarchaeo:A3_Stratigraphic_Interface`
+  (the correct CRM class for a removal interface) — was wrongly mapped to a
+  non-existent "A8 (Negative)".
+- **DocumentaryStratigraphicUnit** declared as `em:DocumentaryVirtualSU`
+  (a virtual SU inferred from documents) — was wrongly mapped to E31 Document
+  (confused the SU with its sources).
+- **ParadataNode** primary mapped to `crminf:I1_Argumentation` (was E31
+  Document — paradata is reasoning, not documentation).
+- **ExtractorNode** mapped to `crminf:I7_Belief_Adoption` (more specific
+  than the previous E7 Activity).
+- **CombinerNode** mapped to `crminf:I5_Inference_Making`.
+- **TimeBranchNodeGroup** mapped to `em:TimeBranch ⊂ crm:E4_Period` with
+  `em:contrastsWith` (symmetric). Was mapped to I2_Belief which over-typed
+  (everything in EM is propositional by design).
+- **RepresentationModel** subclasses (Doc, SF) declared as proper subclasses
+  of `em:RepresentationModel` ⊂ crmdig:D1, with structural P138 target
+  type constraints (was flat).
+- **SemanticShape** mapped to `crmgeo:SP5_Geometric_Place_Expression`
+  (was E36 Visual Item — too generic).
+- **PropertyNode** declared as `em:Qualia` shell — the specific CIDOC class
+  is resolved at serialization time by the qualia type (see em_qualia_types
+  v4.0).
+
+### Added — Connections datamodel (v1.6.0)
+
+- Bug fix: typo `ProperrtyNOde` → `PropertyNode` in
+  `is_in_paradata_nodegroup.allowed_connections.source`.
+- Semantic fix: `has_documentation.mapping.cidoc` changed from
+  `P104_is_subject_to` (wrong — P104 means subject to a legal right) to
+  `P70i_is_documented_in` (canonical "is documented by").
+- `has_timebranch` marked **deprecated** with rationale: duplicate of
+  `is_in_timebranch`. Verified usage: `is_in_timebranch` is canonical
+  (import_graphml.py:1510, graphml_patcher.py:73); `has_timebranch` lives
+  only in JSON config. Scheduled removal in 1.7.0.
+- **+4 HDT-O containment edges**: `has_digital_twin` (HP1),
+  `has_digital_twin_component` (HP3 inverse, transitive),
+  `contains_proposition_set` (HP33), `has_digital_object_part` (HP29).
+- Components list aligned with node datamodel (HDT-O, PROV-O added).
+
+### Added — Qualia types (v4.0)
+
+- Verified all existing v3.0 CIDOC-CRM mappings (all correct).
+- **+50 new qualia** across categories: volume/area/circumference (dimensional);
+  color, texture, finish, patina, hardness, porosity (material); damage_type,
+  fragility, completeness (state); tool_marks, joining_technique (technical);
+  bounding_box, footprint_area (spatial); duration, terminus_post_quem,
+  terminus_ante_quem, relative_chronology (temporal); ceremonial/ritual/
+  defensive/domestic/symbolic functions (telic); school, period_attribution
+  (stylistic); provenance_history, exhibition_history, publication_history
+  (administrative).
+- **NEW SUBCATEGORIES**: iconographic (iconographic_subject, narrative_content,
+  iconographic_program), semantic (aesthetic_value, religious_significance,
+  monumental_status, attribution), ownership (current_custodian, ownership_chain).
+- **NEW CATEGORY epistemic** — meta-qualia central to the EM paradata model:
+  confidence_level (E54 percentage), certainty_level (E55 enum), uncertainty_factors,
+  methodology_used (E29), validation_method, source_quality, primary_contributor
+  (E39 ref), review_status, last_modified (E52).
+
+### Added — Visual rules + palette
+
+- Visual styles for `AUTH_AI` (cyan star), `LIC` (gold shield),
+  `EMB` (red dashed octagon), `GRAPH` (gray dashed rounded rectangle).
+- Palette label prefix `G.` for GraphNode (alongside existing AI./A./LI./EB.).
+
+### Added — RDFExporter (exporter/rdf_exporter.py)
+
+- First serialization pipeline from s3dgraphy Graph to RDF.
+- Five formats: Turtle, N-Triples, N-Quads, TriG, JSON-LD, RDF/XML.
+- Multi-typing emission from `em_extension.subclass_of`.
+- **Conditional PropertyNode mapping** — qualia type drives the CIDOC class
+  (height → E54_Dimension, aesthetic_value → crminf:I4_Proposition_Set, etc.).
+- AP11 physical-relation discrimination: emits both the specific subproperty
+  (em:abuts) AND the generic crmarchaeo:AP11 (so consumers without subproperty
+  inference still see the relation).
+- Deprecated edges skipped on write.
+- Named-graph wrapping per s3dgraphy Graph (one named graph per Graph).
+- Stats: graphs, nodes, edges_emitted, edges_skipped_deprecated, edges_unmapped,
+  nodes_unmapped, parent_hdt_bindings.
+
+### Added — v1.6.1: parent HDT binding
+
+- `RDFExporter(parent_hdt_iri=...)` — every exported EMGraph emits
+  `hdto:HP33i_is_proposition_set_of <parent>` + parent type triple.
+- IRI validation: requires absolute http(s)/urn IRI, ValueError on malformed.
+- EM-blender-tools `EXPORT_OT_rdf` operator wires the scene field through.
+
+### Added — RSF (Reused Special Find)
+
 - **`RSF` (Reused Special Find)** — new stratigraphic node type for re-used
   architectural / decorative elements (spolia). Octagon, red border
   (`#9B3333`), white fill — visually a sibling of `SF` (yellow border) and
