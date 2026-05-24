@@ -389,8 +389,22 @@ class RDFExporter:
     # ── path/format helpers ─────────────────────────────────────────────────
 
     def _adjust_extension(self, path: str) -> str:
+        """Ensure the file path ends with the format-correct extension.
+
+        Defensive against the leading-dot trap: a basename like ".ttl" is
+        treated by pathlib.Path as a hidden-file name (no suffix), so
+        ``with_suffix(".ttl")`` would produce ".ttl.ttl". We detect that case
+        and leave the path untouched if its name IS already the wanted ext.
+        """
         p = Path(path)
-        if p.suffix.lstrip(".").lower() != self.ext:
+
+        # Leading-dot trap: basename equals "." + wanted ext (e.g. ".ttl")
+        # → treat as already correct, don't double-append.
+        if p.name.startswith('.') and p.name.lower().lstrip('.') == self.ext.lower():
+            return str(p)
+
+        current_ext = p.suffix.lstrip(".").lower()
+        if current_ext != self.ext.lower():
             return str(p.with_suffix("." + self.ext))
         return str(p)
 
