@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "s3dgraphy"
-version = "1.6.0.dev3"
+version = "1.6.0.dev4"
 description = "3D Stratigraphic Graph Management Library for archaeological and heritage applications"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -44,11 +44,13 @@ classifiers = [
 ]
 
 dependencies = [
-    "pandas>=2.0.0",
-    "numpy>=1.21.0",
-    "lxml>=4.9.0",
-    "openpyxl>=3.0.0",
-    "networkx>=3.0",
+    # Strict runtime dependencies — directly imported by s3dgraphy core.
+    # Kept minimal: numpy was removed in 1.6.0 (only transitive via pandas;
+    # no direct s3dgraphy code imports numpy).
+    "pandas>=2.0.0",            # used by xlsx_importer, mapping system
+    "lxml>=4.9.0",              # used by graphml importer/exporter
+    "openpyxl>=3.0.0",          # used by xlsx_importer
+    "networkx>=3.0",            # used by temporal/inference_engine.py
 ]
 
 [project.urls]
@@ -60,29 +62,59 @@ Repository = "https://github.com/zalmoxes-laran/s3dgraphy.git"
 "Extended Matrix" = "https://www.extendedmatrix.org"
 Changelog = "https://github.com/zalmoxes-laran/s3dgraphy/blob/main/CHANGELOG.md"
 
+# ─────────────────────────────────────────────────────────────────────────
+# Optional features — pip install s3dgraphy[<extra>]
+#
+# Pattern: each feature that requires extra runtime libraries is opt-in.
+# This keeps the core install small and avoids forcing rdflib/pyoxigraph
+# on consumers that only need GraphML/JSON/xlsx pipelines.
+#
+# Recommended for most users:
+#     pip install s3dgraphy[full]
+# ─────────────────────────────────────────────────────────────────────────
 [project.optional-dependencies]
+rdf = [
+    # RDF export pipeline (RDFExporter → Turtle / N-Triples / JSON-LD / TriG / RDF-XML)
+    # via s3dgraphy.exporter.rdf_exporter. Without this extra, importing
+    # RDFExporter raises ImportError (gracefully handled by exporter/__init__.py).
+    "rdflib>=7.0",
+]
+rdf-embedded = [
+    # RDF export + embedded SPARQL store (no separate server required).
+    # Planned for s3dgraphy v1.6.3+ (SPARQL endpoint read/write workflow).
+    "rdflib>=7.0",
+    "pyoxigraph>=0.4",
+]
+visualization = [
+    # Plotting / network visualization helpers. networkx itself is strict
+    # (used by temporal/inference_engine) so it is NOT listed here to avoid
+    # a duplicate constraint that could confuse pip resolvers.
+    "matplotlib>=3.0",
+    "plotly>=5.0",
+]
 dev = [
     "pytest>=7.0",
-    "pytest-cov", 
+    "pytest-cov",
     "black",
     "flake8",
     "mypy",
     "build",
     "twine",
-    "bump2version"
+    "bump2version",
 ]
 docs = [
     "sphinx>=5.0",
     "sphinx-rtd-theme",
-    "myst-parser"
+    "myst-parser",
 ]
-visualization = [
-    "networkx>=3.0",
-    "matplotlib>=3.0",
-    "plotly>=5.0"
-]
+# Convenience aggregate — installs every runtime feature (RDF + viz)
+# without the dev/docs tooling. The dev/docs/test stacks stay separate
+# so CI-style installs don't pull editor/QA deps.
 full = [
-    "s3dgraphy[dev,docs,visualization]"
+    "s3dgraphy[rdf-embedded,visualization]",
+]
+all = [
+    "s3dgraphy[full,dev,docs]",
 ]
 
 [tool.setuptools.packages.find]
