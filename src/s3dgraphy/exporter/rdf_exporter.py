@@ -299,7 +299,21 @@ class RDFExporter:
                  output_path: str,
                  format: str = "turtle",
                  base_uri: str = DEFAULT_BASE_URI,
+                 parent_hdt_iri: Optional[str] = None,
                  config_dir: Optional[Path] = None):
+        """
+        Args:
+            output_path: target file path (extension auto-fixed by format).
+            format: 'turtle' (default), 'n-triples', 'json-ld', 'trig', 'xml'.
+            base_uri: base URI for minted node IRIs.
+            parent_hdt_iri: if set, every exported EMGraph (HC16) gets a
+                triple `<emgraph> hdto:HP33i_is_proposition_set_of <parent>`
+                binding it as a proposition set of the given HC2 Heritage
+                Digital Twin. The parent HDT IRI is also declared as
+                rdf:type hdto:HC2_Heritage_Digital_Twin so a SPARQL query
+                can discover the parent without a separate type assertion.
+            config_dir: override location of JSON_config/ (default: alongside exporter).
+        """
         fmt = (format or "turtle").lower()
         if fmt not in self.SUPPORTED_FORMATS:
             raise ValueError(
@@ -310,6 +324,7 @@ class RDFExporter:
         self.ext, self.rdflib_format = self.SUPPORTED_FORMATS[fmt]
         self.output_path = self._adjust_extension(output_path)
         self.base_uri = base_uri.rstrip("/") + "/"
+        self.parent_hdt_iri = self._normalize_iri(parent_hdt_iri)
         self.datamodel = _Datamodel(config_dir=config_dir)
 
         # Stats for the caller (verbose logging, eval)
@@ -317,7 +332,28 @@ class RDFExporter:
             "graphs": 0, "nodes": 0, "edges_emitted": 0,
             "edges_skipped_deprecated": 0, "edges_unmapped": 0,
             "nodes_unmapped": 0,
+            "parent_hdt_bindings": 0,
         }
+
+    @staticmethod
+    def _normalize_iri(value: Optional[str]) -> Optional[str]:
+        """Trim and lightly validate an IRI for the parent HDT binding.
+
+        Accepts absolute http(s) URIs and urn: identifiers. Returns None for
+        empty/whitespace inputs (treated as 'no binding requested'). Raises
+        ValueError on clearly malformed input so the caller fails loudly
+        rather than emitting a broken triple.
+        """
+        if value is None:
+            return None
+        v = value.strip()
+        if not v:
+            return None
+        if not (v.startswith("http://") or v.startswith("https://") or v.startswith("urn:")):
+            raise ValueError(
+                f"parent_hdt_iri must be an absolute IRI (http://, https:// or urn:); got: {v!r}"
+            )
+        return v
 
     # ── public entry points ─────────────────────────────────────────────────
 
@@ -392,6 +428,20 @@ class RDFExporter:
         ctx.add((graph_iri, RDF.type, EM.EMGraph))
         ctx.add((graph_iri, RDF.type, CRM.E73_Information_Object))
         ctx.add((graph_iri, RDF.type, PROV.Bundle))
+        # em:EMGraph rdfs:subClassOf hdto:HC16 is declared in em.ttl, but we
+        # also emit the HC16 type explicitly so HDT-O-aware consumers that
+        # don't run an OWL reasoner can find the proposition set directly.
+        ctx.add((graph_iri, RDF.type, HDTO.HC16_Heritage_Proposition_Set))
+
+        # Parent HDT binding (HP33i is_proposition_set_of) — when configured,
+        # every exported EMGraph is declared as a proposition set of the
+        # given HC2 HDT. We also emit a type triple for the parent so its
+        # role is discoverable via SPARQL without external coordination.
+        if self.parent_hdt_iri:
+            parent_iri = URIRef(self.parent_hdt_iri)
+            ctx.add((graph_iri, HDTO.HP33i_is_proposition_set_of, parent_iri))
+            ctx.add((parent_iri, RDF.type, HDTO.HC2_Heritage_Digital_Twin))
+            self.stats["parent_hdt_bindings"] += 1
 
         gname = self._to_text(getattr(g, "name", None))
         if gname:
@@ -606,16 +656,24 @@ class RDFExporter:
 def export_to_rdf(output_path: str,
                   format: str = "turtle",
                   graph_ids: Optional[List[str]] = None,
-                  base_uri: str = DEFAULT_BASE_URI) -> str:
-    """One-call helper: export all (or specified) graphs to RDF."""
-    exporter = RDFExporter(output_path, format=format, base_uri=base_uri)
+                  base_uri: str = DEFAULT_BASE_URI,
+                  parent_hdt_iri: Optional[str] = None) -> str:
+    """One-call helper: export all (or specified) graphs to RDF.
+
+    If parent_hdt_iri is set, every exported EMGraph is bound to it via
+    hdto:HP33i_is_proposition_set_of.
+    """
+    exporter = RDFExporter(output_path, format=format, base_uri=base_uri,
+                           parent_hdt_iri=parent_hdt_iri)
     return exporter.export_graphs(graph_ids)
 
 
 def export_single_graph_to_rdf(graph: S3DGraph,
                                output_path: str,
                                format: str = "turtle",
-                               base_uri: str = DEFAULT_BASE_URI) -> str:
+                               base_uri: str = DEFAULT_BASE_URI,
+                               parent_hdt_iri: Optional[str] = None) -> str:
     """One-call helper for an in-memory graph."""
-    exporter = RDFExporter(output_path, format=format, base_uri=base_uri)
+    exporter = RDFExporter(output_path, format=format, base_uri=base_uri,
+                           parent_hdt_iri=parent_hdt_iri)
     return exporter.export_single_graph(graph)
