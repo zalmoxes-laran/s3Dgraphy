@@ -236,33 +236,42 @@ class NodeRegistry:
                 )
 
             # Sanity-check the canonical stratigraphic types are all present.
+            # Caller paths (NodeGenerator, GraphmlPatcher) already fall back to
+            # the 'US' stencil — or to inline defaults — when a single type is
+            # missing, so we only emit a diagnostic here.
             missing = sorted(_REQUIRED_PALETTE_TYPES - set(self.visual_properties))
             for em_type in missing:
                 warnings.warn(
                     f"s3dgraphy: palette template did not yield a stencil "
-                    f"for stratigraphic type {em_type!r}. Falling back to "
-                    "the hardcoded default visual properties. Verify that "
-                    "the palette template still contains the expected "
-                    "NodeLabel (USM01, USM02, USD10, USDxx ellipse for "
-                    "serUSD, USV100, USV102, USV106, SF01, VSF01, RSF01, "
-                    "TSU) or extend node_registry._PALETTE_DISPATCH_RULES.",
+                    f"for stratigraphic type {em_type!r}. Callers will fall "
+                    "back to the 'US' stencil. Verify that the palette "
+                    "template still contains the expected NodeLabel (USM01, "
+                    "USM02, USD10, USDxx ellipse for serUSD, USV100, USV102, "
+                    "USV106, SF01, VSF01, RSF01, TSU) or extend "
+                    "node_registry._PALETTE_DISPATCH_RULES.",
                     S3DgraphyPaletteWarning,
                     stacklevel=2,
                 )
-            if missing:
-                # Backfill the missing ones from the hardcoded defaults so
-                # callers never get None for a known stratigraphic type.
-                defaults = self._default_visual_properties_dict()
-                for em_type in missing:
-                    if em_type in defaults:
-                        self.visual_properties[em_type] = defaults[em_type]
 
         except (FileNotFoundError, ModuleNotFoundError) as e:
-            print(f"[s3dgraphy] Warning: Palette template not found: {type(e).__name__}: {e}")
-            self._load_default_visual_properties()
+            # The palette template is bundled with the package — its absence
+            # is a packaging/install bug, not a runtime condition we should
+            # paper over with hardcoded constants that can silently drift
+            # from the canonical palette. Fail loud.
+            raise RuntimeError(
+                "s3dgraphy: palette template "
+                "'templates/em_palette_template.graphml' is missing from "
+                f"the installed package ({type(e).__name__}: {e}). "
+                "GraphML export cannot proceed without it — reinstall "
+                "s3dgraphy or check the package data."
+            ) from e
         except Exception as e:
-            print(f"[s3dgraphy] Warning: Error loading palette template: {e}")
-            self._load_default_visual_properties()
+            # Same rationale: a corrupt template is a packaging issue, not
+            # something to silently swallow.
+            raise RuntimeError(
+                "s3dgraphy: failed to parse palette template "
+                f"'templates/em_palette_template.graphml': {e}"
+            ) from e
 
     def _extract_visual_properties(self, node_elem: ET.Element, ns: Dict) -> Optional[NodeVisualProperties]:
         """Extract visual properties from a palette node element."""
@@ -307,28 +316,6 @@ class NodeRegistry:
         except Exception as e:
             print(f"Warning: Error extracting visual properties: {e}")
             return None
-
-    @staticmethod
-    def _default_visual_properties_dict() -> Dict[str, NodeVisualProperties]:
-        """Hardcoded default visual properties (used as fallback)."""
-        return {
-            'US': NodeVisualProperties('rectangle', '#FFFFFF', '#9B3333', 'line', 4.0, '#000000'),
-            'USVs': NodeVisualProperties('parallelogram', '#000000', '#248FE7', 'line', 4.0, '#FFFFFF'),
-            'USVn': NodeVisualProperties('hexagon', '#000000', '#31792D', 'line', 4.0, '#FFFFFF'),
-            'SF': NodeVisualProperties('octagon', '#FFFFFF', '#D8BD30', 'line', 4.0, '#000000'),
-            'VSF': NodeVisualProperties('octagon', '#000000', '#B19F61', 'line', 4.0, '#FFFFFF'),
-            'RSF': NodeVisualProperties('octagon', '#FFFFFF', '#9B3333', 'line', 4.0, '#000000'),
-            'USD': NodeVisualProperties('roundrectangle', '#FFFFFF', '#D86400', 'line', 4.0, '#000000'),
-            'serSU': NodeVisualProperties('ellipse', '#FFFFFF', '#9B3333', 'line', 4.0, '#000000'),
-            'serUSD': NodeVisualProperties('ellipse', '#FFFFFF', '#D86400', 'line', 4.0, '#000000'),
-            'serUSVn': NodeVisualProperties('ellipse', '#000000', '#31792D', 'line', 4.0, '#FFFFFF'),
-            'serUSVs': NodeVisualProperties('ellipse', '#000000', '#248FE7', 'line', 4.0, '#FFFFFF'),
-            'TSU': NodeVisualProperties('roundrectangle', '#FFFFFF', '#9B3333', 'dashed', 4.0, '#000000'),
-        }
-
-    def _load_default_visual_properties(self):
-        """Load hardcoded default visual properties as fallback."""
-        self.visual_properties = self._default_visual_properties_dict()
 
     def get_visual_properties(self, node_type: str) -> Optional[NodeVisualProperties]:
         """
