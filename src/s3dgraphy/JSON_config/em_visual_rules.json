@@ -1,7 +1,8 @@
 {
   "formal_language": "EM",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "_changelog": {
+    "1.5.3": "Fix USD / serUSD material colour: RGB was (0.549, 0.103, 0.0) = #8C1A00 (red), should be #D86400 (orange) to match the canonical USD documentary colour used in the GraphML palette template and node_registry defaults. USD border_color also corrected from #8C1A00 to #D86400 (serUSD border was already correct).",
     "1.5.2": "Added RSF (Reused Special Find / spolia) node style — octagon, red border (#9B3333), white fill. Sibling of SF/VSF, distinguished by border colour. Originating DP: DP-26.",
     "1.5.1": "Added LocationNodeGroup node style (dashed roundrectangle, kind-based border colour) and is_in_location edge style with primary_modifier override.",
     "1.5.0": "Initial EM 1.5 visual rules."
@@ -133,13 +134,13 @@
       "style": {
         "material": {
           "color": {
-            "r": 0.549,
-            "g": 0.103,
+            "r": 0.847,
+            "g": 0.392,
             "b": 0.0,
             "a": 1.0
           }
         },
-        "border_color": "#8C1A00",
+        "border_color": "#D86400",
         "fill_color": "#F5F5F5",
         "border_style": "solid",
         "shape": "rounded_rectangle"
@@ -173,8 +174,8 @@
       "style": {
         "material": {
           "color": {
-            "r": 0.549,
-            "g": 0.103,
+            "r": 0.847,
+            "g": 0.392,
             "b": 0.0,
             "a": 1.0
           }
