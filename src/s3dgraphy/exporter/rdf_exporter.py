@@ -259,10 +259,45 @@ class _Datamodel:
         return _resolve_prefixed(cidoc), None, deprecated
 
     def get_qualia_crm_iri(self, property_type: Optional[str]) -> Optional[URIRef]:
+        """Resolve a property_type string to its CIDOC class IRI.
+
+        Lookup strategy (graceful, three steps):
+          1. Exact match against em_qualia_types.json `id` (e.g.
+             "absolute_time_start", "height", "color").
+          2. Last segment after dot — handles EM yEd convention where
+             properties are labelled with a category prefix
+             (e.g. "Dimension.height" → "height", "Spatial.elevation" →
+             "elevation").
+          3. Lowercase match — handles minor case mismatches between
+             graphml labels and qualia ids (e.g. "Height" → "height").
+
+        Returns None if no strategy matches; the caller (typically
+        ``_compute_primary_iri``) falls back to the generic PropertyNode
+        default mapping.
+        """
         if not property_type:
             return None
+        # 1) Exact match
         crm = self._qualia_class_index.get(property_type)
-        return _resolve_prefixed(crm)
+        if crm:
+            return _resolve_prefixed(crm)
+        # 2) Last segment after dot (yEd category prefix convention)
+        if "." in property_type:
+            tail = property_type.rsplit(".", 1)[-1]
+            crm = self._qualia_class_index.get(tail)
+            if crm:
+                return _resolve_prefixed(crm)
+        # 3) Lowercase fallback
+        crm = self._qualia_class_index.get(property_type.lower())
+        if crm:
+            return _resolve_prefixed(crm)
+        # 4) Combined: lowercase last segment
+        if "." in property_type:
+            tail_lower = property_type.rsplit(".", 1)[-1].lower()
+            crm = self._qualia_class_index.get(tail_lower)
+            if crm:
+                return _resolve_prefixed(crm)
+        return None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -521,23 +556,44 @@ class RDFExporter:
         Resolve the rdf:type primary IRI for a node, applying conditional rules.
 
         Conditional rule for PropertyNode:
-            The qualia-type-specific class (looked up in em_qualia_types.json
-            by `node.property_type`) takes precedence over the generic
-            PropertyNode default class (typically crm:E54_Dimension).
-            Without this, an aesthetic_value property would be typed as BOTH
-            crm:E54_Dimension (PropertyNode default) and crminf:I4_Proposition_Set
-            (qualia-specific), which is semantically misleading: aesthetic
-            value is NOT a dimension.
+            The qualia-type-specific class (looked up in em_qualia_types.json)
+            takes precedence over the generic PropertyNode default class
+            (typically crm:E54_Dimension). Without this, an aesthetic_value
+            property would be typed as BOTH crm:E54_Dimension (PropertyNode
+            default) and crminf:I4_Proposition_Set (qualia-specific), which is
+            semantically misleading: aesthetic value is NOT a dimension.
 
-        Fallback for all other node types and for PropertyNode with unknown
-        property_type: the em_extension.uri or mapping.cidoc declared in the
-        node datamodel.
+        Lookup key resolution (PropertyNode):
+            The s3dgraphy graphml importer preserves raw graphml data
+            (``node.name`` carries the NodeLabel, ``node.property_type`` is
+            the default "string" unless populated by the
+            ``_s3d_property_metadata`` side channel). To enrich at export
+            time without burdening the importer with vocabulary knowledge,
+            we try the lookup key in this order:
+              1. ``node.property_type`` if explicitly set (not "string")
+              2. ``node.name`` if available (the yEd NodeLabel — qualia
+                 identifier in EM convention)
+            Either string is resolved through the multi-step graceful
+            matcher in ``_Datamodel.get_qualia_crm_iri`` (exact / dot-split
+            / lowercase). Falls back to the generic node datamodel mapping
+            when no qualia term matches (e.g. custom labels like
+            "lenght_pipe" stay as em:Qualia + crm:E1_CRM_Entity).
         """
         if node_type == "property":
             ptype = getattr(node, "property_type", None)
-            qualia_iri = self.datamodel.get_qualia_crm_iri(ptype)
-            if qualia_iri is not None:
-                return qualia_iri
+            # Treat the default "string" sentinel as "unset" — the importer
+            # leaves it on the PropertyNode constructor default when no
+            # side-channel metadata is present.
+            if ptype and ptype.lower() != "string":
+                qualia_iri = self.datamodel.get_qualia_crm_iri(ptype)
+                if qualia_iri is not None:
+                    return qualia_iri
+            # Fall back to NodeLabel (em yEd convention: label IS the qualia id)
+            name = getattr(node, "name", None)
+            if name:
+                qualia_iri = self.datamodel.get_qualia_crm_iri(name)
+                if qualia_iri is not None:
+                    return qualia_iri
         return self.datamodel.get_node_primary_iri(cls_name)
 
     def _serialize_type_specific(self, node: Any, node_type: Optional[str],
@@ -547,10 +603,22 @@ class RDFExporter:
         if node_type == "property":
             # rdf:type already emitted by _compute_primary_iri (qualia-specific
             # class takes precedence over PropertyNode default).
+            #
+            # Value resolution: prefer node.value when set & non-empty;
+            # fall back to node.description for legacy graphml where the
+            # description data field encodes the value (yEd has no separate
+            # "value" socket on annotation-style PropertyNodes).
+            raw_value = getattr(node, "value", None)
+            if raw_value is None or (isinstance(raw_value, str) and not raw_value.strip()):
+                raw_value = getattr(node, "description", None)
+            if raw_value is not None and (not isinstance(raw_value, str) or raw_value.strip()):
+                ctx.add((node_iri, CRM.P90_has_value, Literal(raw_value)))
+
+            # Qualia type identifier — same key resolution as _compute_primary_iri:
+            # property_type if non-default, otherwise the NodeLabel (name).
             ptype = getattr(node, "property_type", None)
-            value = getattr(node, "value", None)
-            if value is not None:
-                ctx.add((node_iri, CRM.P90_has_value, Literal(value)))
+            if not ptype or ptype.lower() == "string":
+                ptype = getattr(node, "name", None)
             if ptype:
                 ctx.add((node_iri, EM.hasQualiaType, Literal(ptype)))
 

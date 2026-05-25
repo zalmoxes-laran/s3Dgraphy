@@ -149,6 +149,46 @@ v1.6.0 → v1.7.0 plan.
 - IRI validation: requires absolute http(s)/urn IRI, ValueError on malformed.
 - EM-blender-tools `EXPORT_OT_rdf` operator wires the scene field through.
 
+### Fixed — v1.6.0.dev5: RDF qualia lookup (exporter-only, importer unchanged)
+
+Architectural note: this fix lives entirely in the RDF exporter. The
+graphml importer is left intact — it preserves raw graphml data
+(``name``, ``description``, raw ``value``, ``property_type``). Semantic
+enrichment via the qualia vocabulary happens at serialization time,
+where it belongs (separation of concerns: importer = data, exporter =
+semantics).
+
+- **`exporter/rdf_exporter.py::_Datamodel.get_qualia_crm_iri`** — 4-step
+  graceful lookup so the RDF conditional mapping survives common yEd label
+  conventions:
+  1. exact match (`"height"` → E54_Dimension)
+  2. dot-split last segment (`"Dimension.height"` → "height" → E54_Dimension)
+  3. lowercase fallback (`"Height"` → "height" → E54_Dimension)
+  4. lowercase + dot-split combined (`"Dimension.Height"` → E54)
+- **`exporter/rdf_exporter.py::_compute_primary_iri`** — for PropertyNodes,
+  resolves the lookup key in two steps:
+  1. ``node.property_type`` if explicitly set (non-default — anything
+     other than the constructor sentinel "string")
+  2. ``node.name`` (the yEd NodeLabel — qualia identifier in EM convention)
+  This means files exported with the structured ``_s3d_property_metadata``
+  side channel (which populates ``property_type``) AND legacy / converted
+  graphml (where only ``name`` is populated) both work transparently.
+- **`exporter/rdf_exporter.py::_serialize_type_specific`** for property —
+  value resolution falls back from ``node.value`` to ``node.description``
+  when the former is empty/None. yEd ARTIFACT_TYPE_ANNOTATION nodes have
+  no dedicated "value" socket, so the description field commonly carries
+  the value text (e.g. ``description="2013"`` for an absolute_time_start
+  PropertyNode). The legacy URL-as-value convention is also honoured via
+  ``node.value`` (which the importer still populates from the URL).
+- The same NodeLabel fallback feeds ``em:hasQualiaType`` so SPARQL queries
+  by qualia type work even on legacy graphml without the side channel.
+
+Verified on Templu Mare graphml labels (absolute_time_start →
+E52_Time-Span, Dimension.height → E54_Dimension, aesthetic_value →
+crminf:I4_Proposition_Set). Custom labels like "lenght_pipe" correctly
+fall back to the generic PropertyNode default (em:Qualia +
+crm:E1_CRM_Entity).
+
 ### Added — RSF (Reused Special Find)
 
 - **`RSF` (Reused Special Find)** — new stratigraphic node type for re-used
