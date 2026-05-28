@@ -94,12 +94,12 @@ KNOWN_EDGE_TYPES: frozenset[str] = (
 )
 
 
-_EXT_LIBS_S3DG = (
-    Path(__file__).resolve().parents[3] / "ext_libs" / "s3dgraphy"
-)
-_VISUAL_RULES_PATH = _EXT_LIBS_S3DG / "JSON_config" / "em_visual_rules.json"
+#: JSON_config now lives alongside the package source (s3dgraphy/JSON_config/).
+#: Path(__file__) is src/s3dgraphy/sync/edge_registry.py, so parents[1] = src/s3dgraphy/.
+_S3DG_PKG_ROOT = Path(__file__).resolve().parents[1]
+_VISUAL_RULES_PATH = _S3DG_PKG_ROOT / "JSON_config" / "em_visual_rules.json"
 _CONNECTIONS_PATH = (
-    _EXT_LIBS_S3DG / "JSON_config" / "s3Dgraphy_connections_datamodel.json"
+    _S3DG_PKG_ROOT / "JSON_config" / "s3Dgraphy_connections_datamodel.json"
 )
 
 

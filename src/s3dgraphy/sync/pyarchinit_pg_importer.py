@@ -24,13 +24,13 @@ if TYPE_CHECKING:
 
 
 def _load_mapping(mapping_name: str) -> dict:
-    """Load mapping JSON from ext_libs/s3dgraphy/mappings/pyarchinit/."""
+    """Load mapping JSON from s3dgraphy/mappings/pyarchinit/."""
     here = Path(__file__).resolve()
-    repo_root = here.parents[3]  # plugins/pyarchinit/
+    # here = src/s3dgraphy/sync/pyarchinit_pg_importer.py
+    # → parents[1] = src/s3dgraphy/
+    pkg_root = here.parents[1]
     mapping_path = (
-        repo_root
-        / "ext_libs"
-        / "s3dgraphy"
+        pkg_root
         / "mappings"
         / "pyarchinit"
         / f"{mapping_name}.json"
