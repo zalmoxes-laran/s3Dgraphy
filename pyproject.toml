@@ -92,6 +92,20 @@ visualization = [
     "matplotlib>=3.0",
     "plotly>=5.0",
 ]
+sync = [
+    # Backend-agnostic SQL bridge (s3dgraphy.sync) — bidirectional
+    # ingestion + projection between a Graph and the host application's
+    # SQL tables. SQLite works out of the box; add the [postgres] extra
+    # for the PostgreSQL backend. Moved from pyArchInit in 1.6.0
+    # (zalmoxes-laran/s3Dgraphy#10).
+    "sqlalchemy>=2.0",
+]
+postgres = [
+    # PostgreSQL backend driver. Combine with [sync] for the SQL bridge
+    # (zalmoxes-laran/s3Dgraphy#9 + #10). Standalone, it also enables
+    # the PG path of PyArchInitImporter when that lands.
+    "psycopg2-binary>=2.9",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov",
@@ -111,10 +125,10 @@ docs = [
 # without the dev/docs tooling. The dev/docs/test stacks stay separate
 # so CI-style installs don't pull editor/QA deps.
 full = [
-    "s3dgraphy[rdf-embedded,visualization]",
+    "s3dgraphy[rdf-embedded,visualization,sync]",
 ]
 all = [
-    "s3dgraphy[full,dev,docs]",
+    "s3dgraphy[full,dev,docs,postgres]",
 ]
 
 [tool.setuptools.packages.find]
