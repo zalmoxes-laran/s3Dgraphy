@@ -2,19 +2,20 @@
 
 For SQLite: workspace = parent dir of the .sqlite file (legacy behaviour).
 For PostgreSQL: workspace = <root> / <conn_slug> / <sito>/
-  where <root> is resolved via _resolve_workspace_root() (env var, QSettings,
-  or default ~/pyarchinit/pyarchinit_DB_folder).
+  where <root> is resolved via _resolve_workspace_root() (env var
+  PYARCHINIT_WORKSPACE_DIR or default ~/pyarchinit/pyarchinit_DB_folder).
 
 Created on-demand via mkdir(parents=True, exist_ok=True).
 
 _conn_slug() is the single source of truth for the PG connection slug
 used as a filesystem-safe directory name.
 
-_resolve_workspace_root() (added in Consolidation 5.7.4-alpha) does
-3-tier fallback:
+_resolve_workspace_root() does 2-tier fallback (s3dgraphy #10 — the
+QSettings tier was removed so this module stays free of qgis.* /
+PyQt* imports; host applications mirror their UI setting into the
+env var):
   1. PYARCHINIT_WORKSPACE_DIR env var (highest priority)
-  2. QSettings 'pyarchinit/paradata_workspace' (UI override)
-  3. Default: ~/pyarchinit/pyarchinit_DB_folder
+  2. Default: ~/pyarchinit/pyarchinit_DB_folder
 """
 from __future__ import annotations
 
@@ -77,7 +78,8 @@ def _resolve_workspace_dir(handle: DbHandle, sito: str) -> Path:
 
     PostgreSQL: `<root>/<conn_slug>/<sito>/`, created via
     `mkdir(parents=True, exist_ok=True)`. <root> is resolved via
-    `_resolve_workspace_root()` which honours env var + QSettings overrides.
+    `_resolve_workspace_root()` which honours the
+    PYARCHINIT_WORKSPACE_DIR env var (set by the host application).
 
     Raises:
         ValueError: SQLite handle with no `sqlite_path` (e.g., `:memory:`).

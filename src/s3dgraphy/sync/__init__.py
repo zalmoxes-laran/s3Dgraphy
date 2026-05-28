@@ -34,6 +34,21 @@ Errors:
     SchemaMismatchError, UnknownUnitaTipoError, SiteMismatchError,
     MissingEpochError
 
+Workspace configuration
+-----------------------
+``_workspace._resolve_workspace_root()`` reads exactly one channel:
+the ``PYARCHINIT_WORKSPACE_DIR`` env var (default:
+``~/pyarchinit/pyarchinit_DB_folder``). The QSettings fallback was
+removed during the #10 decoupling so this module stays free of
+``qgis.*`` / ``PyQt*`` imports.
+
+If your host application has a UI for the workspace path (as
+pyArchInit does, via QSettings ``pyarchinit/paradata_workspace``),
+mirror that setting into the env var at plugin start *and* on every
+config-dialog save. See the pyArchInit shim
+(``modules/s3dgraphy/sync/README.md``) for the canonical wiring.
+CLI / headless callers just export the env var before importing.
+
 Dependency note
 ---------------
 This subpackage requires SQLAlchemy 2.x. Install via the [sync]
