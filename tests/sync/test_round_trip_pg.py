@@ -28,11 +28,12 @@ from sqlalchemy import text
 # Import the PG fixture explicitly — conftest_pg.py is not auto-discovered.
 from tests.sync.conftest_pg import PG_CONN_STR, pg_engine  # noqa: F401
 
-# The SQLAlchemy URL form ("postgresql+psycopg2://...") is what
-# create_engine() wants, but psycopg2.connect() — which the PR #9
-# importer dispatches to — can't parse the "+psycopg2" driver suffix.
-# Strip it for the read side; both forms point at the same PG cluster.
-_PG_IMPORTER_URL = PG_CONN_STR.replace("postgresql+psycopg2://", "postgresql://")
+# The same SQLAlchemy URL ("postgresql+psycopg2://...") feeds BOTH
+# sides: create_engine() on the write side and PyArchInitImporter on
+# the read side. The importer's _psycopg2_dsn() (PR #12) strips the
+# "+psycopg2" driver suffix before psycopg2.connect(), so no caller-
+# side workaround is needed — passing the SQLAlchemy form verbatim is
+# itself the cross-PR composition guarantee.
 
 
 _psycopg2_available: bool
@@ -190,7 +191,7 @@ def test_round_trip_read_via_9_write_via_11(seeded_pg, pg_engine):
     # uses _qmark() to swap "?" → "%s" placeholders. This is the only
     # piece touching #9's new code path.
     importer = PyArchInitImporter(
-        connection_url=_PG_IMPORTER_URL,
+        connection_url=PG_CONN_STR,
         mapping_name=mapping_name,
         filters={"sito": "Volterra"},
     )
@@ -316,7 +317,7 @@ def test_idempotent_second_pass_skips_all(seeded_pg, pg_engine):
     from s3dgraphy.sync.graph_ingestor import GraphIngestor
 
     importer = PyArchInitImporter(
-        connection_url=_PG_IMPORTER_URL,
+        connection_url=PG_CONN_STR,
         mapping_name=seeded_pg,
         filters={"sito": "Volterra"},
     )
