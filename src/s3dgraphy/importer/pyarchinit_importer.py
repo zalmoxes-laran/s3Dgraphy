@@ -158,7 +158,33 @@ class PyArchInitImporter(BaseImporter):
                 "Install via: pip install s3dgraphy[postgres]"
             ) from e
         import psycopg2
-        return psycopg2.connect(self._connection_url)
+        return psycopg2.connect(self._psycopg2_dsn())
+
+    def _psycopg2_dsn(self) -> str:
+        """Normalize the connection URL for ``psycopg2.connect()``.
+
+        ``psycopg2`` doesn't understand SQLAlchemy-style driver
+        suffixes (e.g. ``postgresql+psycopg2://``): it parses the
+        scheme literally and rejects the ``+psycopg2`` part with
+        "invalid dsn". The write side of the bridge
+        (``s3dgraphy.sync`` via SQLAlchemy) naturally produces those
+        URLs, so a caller wiring the *same* connection string into
+        both the read side (here) and the write side would otherwise
+        hit a silent failure on the read.
+
+        Stripping the ``+<driver>`` token lets one URL flow into both
+        without every caller having to know the dialect-prefix
+        convention. ``postgresql+psycopg2://`` → ``postgresql://`` and
+        ``postgres+psycopg2://`` → ``postgres://`` — both accepted by
+        psycopg2. Plain ``postgresql://`` / ``postgres://`` pass
+        through untouched.
+        """
+        url = self._connection_url
+        scheme, sep, rest = url.partition("://")
+        if sep and "+" in scheme:
+            scheme = scheme.split("+", 1)[0]
+            return f"{scheme}://{rest}"
+        return url
 
     def _qmark(self) -> str:
         """Parameter placeholder for the active dialect (``?`` / ``%s``)."""

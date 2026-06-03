@@ -248,3 +248,60 @@ def test_unsupported_url_scheme_raises():
         PyArchInitImporter(
             connection_url="mysql://u:p@h/db", mapping_name="ignored",
         )
+
+
+def test_psycopg2_dsn_strips_sqlalchemy_driver_suffix():
+    """_psycopg2_dsn() drops the +driver token psycopg2 can't parse.
+
+    Pure-logic test (no PG, no mapping needed): builds a bare importer
+    via object.__new__ and exercises the normalization directly.
+
+    The write side of the bridge (s3dgraphy.sync via SQLAlchemy) emits
+    URLs like "postgresql+psycopg2://...". psycopg2.connect() rejects
+    the "+psycopg2" part, so a caller reusing one URL string for both
+    read and write would silently fail on the read. The helper strips
+    the suffix; plain URLs pass through untouched.
+    """
+    imp = object.__new__(PyArchInitImporter)
+
+    imp._connection_url = "postgresql+psycopg2://u:p@h:5432/db"
+    assert imp._psycopg2_dsn() == "postgresql://u:p@h:5432/db"
+
+    imp._connection_url = "postgres+psycopg2://u:p@h/db"
+    assert imp._psycopg2_dsn() == "postgres://u:p@h/db"
+
+    # Plain schemes psycopg2 already accepts are returned verbatim.
+    imp._connection_url = "postgresql://u:p@h/db"
+    assert imp._psycopg2_dsn() == "postgresql://u:p@h/db"
+    imp._connection_url = "postgres://u:p@h/db"
+    assert imp._psycopg2_dsn() == "postgres://u:p@h/db"
+
+
+@pg_required
+def test_pg_accepts_sqlalchemy_driver_url(pg_filtered_setup):
+    """A postgresql+psycopg2:// URL connects and imports end-to-end.
+
+    Exercises _psycopg2_dsn() through the real psycopg2.connect() call:
+    if the strip didn't happen, psycopg2 would raise "invalid dsn".
+    This pins the cross-PR composition — the same connection string
+    the SQLAlchemy write side uses flows unchanged into the read side.
+    """
+    dsn, mapping_name = pg_filtered_setup
+    # Force the SQLAlchemy-style driver suffix regardless of the form
+    # PYTEST_PG_DSN happened to use.
+    if dsn.startswith("postgresql+"):
+        sa_dsn = dsn
+    elif dsn.startswith("postgresql://"):
+        sa_dsn = "postgresql+psycopg2://" + dsn[len("postgresql://"):]
+    elif dsn.startswith("postgres://"):
+        sa_dsn = "postgresql+psycopg2://" + dsn[len("postgres://"):]
+    else:  # pragma: no cover - defensive
+        sa_dsn = dsn
+
+    importer = PyArchInitImporter(
+        connection_url=sa_dsn, mapping_name=mapping_name, filters=None,
+    )
+    graph = importer.parse()
+    us_nodes = [n for n in graph.nodes
+                if getattr(n, "node_type", None) == "US"]
+    assert len(us_nodes) == 6
