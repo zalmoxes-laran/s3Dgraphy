@@ -1,0 +1,144 @@
+"""L1 fixture-based: populate_graph(groups=...) kwarg semantics.
+
+Pins D4 (ActivityNodeGroup + group_kind), D7 (default empty),
+AC-4, AC-5.
+"""
+from __future__ import annotations
+import shutil
+import sqlite3
+import sys
+from pathlib import Path
+
+import pytest
+import pandas  # noqa: F401
+from lxml import etree as _e  # noqa: F401
+PLUGIN_ROOT = Path(__file__).resolve().parents[2]
+
+FIXTURE_DB = (PLUGIN_ROOT / "tests" / "sync" / "fixtures"
+              / "mini_volterra.sqlite")
+
+
+@pytest.fixture
+def mini_volterra(tmp_path):
+    dst = tmp_path / "mini_volterra.sqlite"
+    shutil.copy2(FIXTURE_DB, dst)
+    from tests.sync._uuid_backfill import (
+        add_columns, backfill_uuids)
+    add_columns(dst); backfill_uuids(dst)
+    return dst
+
+
+def _read_sito(db):
+    conn = sqlite3.connect(db)
+    s = conn.execute(
+        "SELECT DISTINCT sito FROM us_table LIMIT 1").fetchone()[0]
+    conn.close()
+    return s
+
+
+def _seed(db, sito, col, value, n=2):
+    conn = sqlite3.connect(db)
+    rows = list(conn.execute(
+        "SELECT id_us FROM us_table WHERE sito=? LIMIT ?", (sito, n)))
+    for (id_us,) in rows:
+        conn.execute(
+            f"UPDATE us_table SET {col}=? WHERE id_us=?",
+            (value, id_us))
+    conn.commit()
+    conn.close()
+
+
+def test_default_groups_empty_no_group_nodes(mini_volterra):
+    """D7: default groups=None / [] -> no GroupNode in graph."""
+    from s3dgraphy.sync.graph_projector import GraphProjector
+    sito = _read_sito(mini_volterra)
+    graph = GraphProjector().populate_graph(mini_volterra, sito=sito)
+    types = [type(n).__name__ for n in graph.nodes]
+    assert "ActivityNodeGroup" not in types
+
+
+def test_groups_arg_materializes_locationnodegroup_for_struttura(
+        mini_volterra):
+    """AI07 update: groups=['struttura'] yields LocationNodeGroup
+    instances (was ActivityNodeGroup pre-5.6.0). attributes['group_kind']
+    must still be 'struttura' for AC-2 palette lookup."""
+    from s3dgraphy.sync.graph_projector import GraphProjector
+    sito = _read_sito(mini_volterra)
+    _seed(mini_volterra, sito, "struttura", "basilica", 3)
+
+    graph = GraphProjector().populate_graph(
+        mini_volterra, sito=sito, groups=["struttura"])
+    groups = [n for n in graph.nodes
+              if type(n).__name__ == "LocationNodeGroup"]
+    assert len(groups) >= 1
+    # struttura → kind="functional" per spec mapping table
+    assert all(getattr(g, "kind", None) == "functional" for g in groups)
+    g = groups[0]
+    attrs = getattr(g, "attributes", None) or {}
+    assert attrs.get("group_kind") == "struttura"
+
+
+def test_groups_arg_adds_is_in_location_edges_for_struttura(mini_volterra):
+    """AI07 update: edges from each US member to its struttura group
+    are now is_in_location (was is_in_activity pre-5.6.0)."""
+    from s3dgraphy.sync.graph_projector import GraphProjector
+    sito = _read_sito(mini_volterra)
+    _seed(mini_volterra, sito, "struttura", "basilica", 3)
+
+    graph = GraphProjector().populate_graph(
+        mini_volterra, sito=sito, groups=["struttura"])
+    group_ids = {n.node_id for n in graph.nodes
+                 if type(n).__name__ == "LocationNodeGroup"}
+    rel_edges = [e for e in graph.edges
+                 if getattr(e, "edge_target", None) in group_ids
+                 and getattr(e, "edge_type", "") == "is_in_location"]
+    assert len(rel_edges) >= 3
+
+
+def test_export_with_groups_emits_yed_folder_node(mini_volterra, tmp_path):
+    """Stage 4e: export with groups=['struttura'] produces a yEd
+    folder node in the GraphML output. AI07: works for the new
+    LocationNodeGroup dispatch via writer's class-agnostic snapshot."""
+    from s3dgraphy.sync.graphml_writer import export_graphml
+    sito = _read_sito(mini_volterra)
+    _seed(mini_volterra, sito, "struttura", "basilica", 3)
+
+    out = tmp_path / "out.graphml"
+    export_graphml(
+        db_path=mini_volterra,
+        mapping="pyarchinit_us_mapping",
+        output_path=out,
+        site_filter=sito,
+        groups=["struttura"],
+    )
+
+    from lxml import etree as ET
+    NS = "{http://graphml.graphdrawing.org/xmlns}"
+    tree = ET.parse(str(out))
+    folders = [n for n in tree.iter(f"{NS}node")
+               if n.get("yfiles.foldertype") == "group"
+               and n.get("id", "").startswith("grp_")]
+    assert len(folders) >= 1
+
+
+def test_export_default_no_groups_unchanged_baseline(mini_volterra, tmp_path):
+    """D7-A: default export (no groups kwarg) doesn't add any
+    grp_* node — AC-2 byte-identical guarantee."""
+    from s3dgraphy.sync.graphml_writer import export_graphml
+    sito = _read_sito(mini_volterra)
+
+    out = tmp_path / "out.graphml"
+    export_graphml(
+        db_path=mini_volterra,
+        mapping="pyarchinit_us_mapping",
+        output_path=out,
+        site_filter=sito,
+    )
+
+    from lxml import etree as ET
+    NS = "{http://graphml.graphdrawing.org/xmlns}"
+    tree = ET.parse(str(out))
+    folders = [n for n in tree.iter(f"{NS}node")
+               if n.get("yfiles.foldertype") == "group"
+               and n.get("id", "").startswith("grp_")]
+    assert folders == []
