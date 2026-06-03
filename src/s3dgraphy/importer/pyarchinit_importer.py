@@ -14,30 +14,100 @@ from ..multigraph.multigraph import multi_graph_manager
 
 # Conservative SQLite identifier whitelist: letters, digits, underscore.
 # Used to guard table names and filter column names interpolated into
-# query strings (values always go through ? parameter binding).
+# query strings (values always go through paramstyle binding).
 _SAFE_IDENT_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
+# Recognized connection URL prefixes for dialect detection.
+_PG_URL_PREFIXES = ("postgresql://", "postgresql+psycopg2://",
+                    "postgres://")
+_SQLITE_URL_PREFIX = "sqlite:///"
+
+
 class PyArchInitImporter(BaseImporter):
-    def __init__(self, filepath: str, mapping_name: str, overwrite: bool = False,
-                existing_graph=None, filters: Optional[Dict[str, Any]] = None):
+    def __init__(self, filepath: Optional[str] = None,
+                 mapping_name: str = None, overwrite: bool = False,
+                 existing_graph=None,
+                 filters: Optional[Dict[str, Any]] = None,
+                 *,
+                 connection_url: Optional[str] = None):
         """
         Initialize pyArchInit importer with mapping configuration.
 
         Args:
-            filepath: Path to the SQLite database
-            mapping_name: Name of the JSON mapping file to use
-            overwrite: If True, overwrites existing nodes
+            filepath: Path to a SQLite database (legacy / default path).
+                Mutually exclusive with ``connection_url``. When given,
+                it is internally promoted to ``sqlite:///<abspath>`` so
+                downstream code uses a single URL-based representation.
+            mapping_name: Name of the JSON mapping file to use.
+            overwrite: If True, overwrites existing nodes.
             existing_graph: Existing graph instance to use.
-                        If None, creates new unregistered graph with temporary ID.
-                        The caller (EM-tools) is responsible for setting proper graph_id
-                        and registering it in MultiGraphManager.
-            filters: Optional dict of {column_name: value} to restrict the
-                imported rows. Combined with AND. Each column is whitelisted
-                against the mapping's column_mappings, then bound as a
-                parameterized SQL value — safe against injection.
+                If None, creates new unregistered graph with temporary
+                ID. The caller (EM-tools) is responsible for setting
+                proper graph_id and registering it in
+                MultiGraphManager.
+            filters: Optional dict of {column_name: value} to restrict
+                the imported rows. Combined with AND. Each column is
+                whitelisted against the mapping's column_mappings, then
+                bound as a parameterized SQL value — safe against
+                injection. Placeholder syntax adapts to the dialect
+                (``?`` on SQLite, ``%s`` on PostgreSQL).
+            connection_url: SQLAlchemy-style connection URL. Mutually
+                exclusive with ``filepath``. Supported schemes:
+                ``sqlite:///<abspath>``,
+                ``postgresql://user:pass@host:port/dbname`` (or the
+                ``postgres://`` alias / ``postgresql+psycopg2://`` form).
+                For PostgreSQL, ``psycopg2-binary`` must be installed
+                (``pip install s3dgraphy[postgres]``); a friendly
+                ``ImportError`` fires on first connection attempt if
+                it isn't.
+
+        Raises:
+            ValueError: If both ``filepath`` and ``connection_url`` are
+                given, if neither is given, or if ``connection_url``
+                uses an unsupported scheme.
         """
+        # Mutually exclusive + at-least-one validation.
+        if filepath is not None and connection_url is not None:
+            raise ValueError(
+                "Pass either filepath= or connection_url=, not both."
+            )
+        if filepath is None and connection_url is None:
+            raise ValueError(
+                "Either filepath= or connection_url= is required."
+            )
+
+        # Resolve dialect + canonical URL + the path-or-URL string we
+        # hand to BaseImporter as `filepath` (diagnostic-friendly).
+        if filepath is not None:
+            abs_path = os.path.abspath(filepath)
+            self._dialect = "sqlite"
+            self._connection_url = f"{_SQLITE_URL_PREFIX}{abs_path}"
+            _base_filepath = filepath
+        else:
+            if connection_url.startswith(_PG_URL_PREFIXES):
+                self._dialect = "postgres"
+            elif connection_url.startswith(_SQLITE_URL_PREFIX):
+                self._dialect = "sqlite"
+            else:
+                raise ValueError(
+                    "Unsupported connection_url scheme: "
+                    f"{connection_url!r}. "
+                    "Use sqlite:///<path>, postgresql://..., "
+                    "or postgres://..."
+                )
+            self._connection_url = connection_url
+            # BaseImporter uses filepath for diagnostics + abspath
+            # normalization. SQLite URLs reduce to a real path; PG URLs
+            # are passed through verbatim.
+            if self._dialect == "sqlite":
+                _base_filepath = connection_url[
+                    len(_SQLITE_URL_PREFIX):
+                ]
+            else:
+                _base_filepath = connection_url
+
         super().__init__(
-            filepath=filepath,
+            filepath=_base_filepath,
             mapping_name=mapping_name,
             overwrite=overwrite,
             filters=filters,
@@ -64,6 +134,61 @@ class PyArchInitImporter(BaseImporter):
         self.orphans = []
 
         self.validate_mapping()
+
+    # ------------------------------------------------------------------
+    # Backend abstraction (#9 multi-backend)
+    # ------------------------------------------------------------------
+    def _connect(self):
+        """Open a DB-API 2 connection for the active dialect.
+
+        Returns a connection that the caller must close. For SQLite,
+        uses the stdlib ``sqlite3``. For PostgreSQL, uses
+        ``psycopg2`` and raises a friendly ``ImportError`` if the
+        extras are missing.
+        """
+        if self._dialect == "sqlite":
+            return sqlite3.connect(self.filepath)
+        # PostgreSQL path. Probe psycopg2 lazily so SQLite-only
+        # callers never pay the import cost (and don't need the wheel).
+        try:
+            import psycopg2  # noqa: F401
+        except ImportError as e:  # pragma: no cover
+            raise ImportError(
+                "PostgreSQL backend requires psycopg2-binary. "
+                "Install via: pip install s3dgraphy[postgres]"
+            ) from e
+        import psycopg2
+        return psycopg2.connect(self._psycopg2_dsn())
+
+    def _psycopg2_dsn(self) -> str:
+        """Normalize the connection URL for ``psycopg2.connect()``.
+
+        ``psycopg2`` doesn't understand SQLAlchemy-style driver
+        suffixes (e.g. ``postgresql+psycopg2://``): it parses the
+        scheme literally and rejects the ``+psycopg2`` part with
+        "invalid dsn". The write side of the bridge
+        (``s3dgraphy.sync`` via SQLAlchemy) naturally produces those
+        URLs, so a caller wiring the *same* connection string into
+        both the read side (here) and the write side would otherwise
+        hit a silent failure on the read.
+
+        Stripping the ``+<driver>`` token lets one URL flow into both
+        without every caller having to know the dialect-prefix
+        convention. ``postgresql+psycopg2://`` → ``postgresql://`` and
+        ``postgres+psycopg2://`` → ``postgres://`` — both accepted by
+        psycopg2. Plain ``postgresql://`` / ``postgres://`` pass
+        through untouched.
+        """
+        url = self._connection_url
+        scheme, sep, rest = url.partition("://")
+        if sep and "+" in scheme:
+            scheme = scheme.split("+", 1)[0]
+            return f"{scheme}://{rest}"
+        return url
+
+    def _qmark(self) -> str:
+        """Parameter placeholder for the active dialect (``?`` / ``%s``)."""
+        return "?" if self._dialect == "sqlite" else "%s"
 
     def _resolve_node_name(self, row_dict: Dict[str, Any], id_column: str) -> str:
         """Compose the human-readable node name for ``row_dict``.
@@ -296,12 +421,13 @@ class PyArchInitImporter(BaseImporter):
 
         where_fragments = []
         params: List[Any] = []
+        qmark = self._qmark()
         for col, value in self.filters.items():
             # Defense in depth: validate against mapping + ident regex.
             self._validate_filter_column(col)
             if not self._is_safe_identifier(col):
                 raise ValueError(f"Unsafe filter column name: {col!r}")
-            where_fragments.append(f"{col} = ?")
+            where_fragments.append(f"{col} = {qmark}")
             params.append(value)
 
         where_clause = " AND ".join(where_fragments)
@@ -325,7 +451,7 @@ class PyArchInitImporter(BaseImporter):
             raise ValueError(f"Unsafe column name: {column!r}")
         table_name = self._get_table_name()
 
-        conn = sqlite3.connect(self.filepath)
+        conn = self._connect()
         try:
             cursor = conn.cursor()
             cursor.execute(
@@ -340,7 +466,7 @@ class PyArchInitImporter(BaseImporter):
         """Parse pyArchInit database using mapping configuration"""
         try:
             # print("\n=== Starting PyArchInit Import ===")
-            conn = sqlite3.connect(self.filepath)
+            conn = self._connect()
             cursor = conn.cursor()
             
             # Debug del mapping
