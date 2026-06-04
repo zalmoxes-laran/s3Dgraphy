@@ -196,21 +196,356 @@ CANONICAL_UNIT_TYPES: frozenset[str] = frozenset({"US", "USM"})
 CONTINUITY_UNIT_TYPES: frozenset[str] = frozenset({"CON"})
 
 
+# ---------------------------------------------------------------------------
+# Python class name → pyArchInit unita_tipo column value
+# ---------------------------------------------------------------------------
+#: Recovery lookup for ``unita_tipo`` when a GraphML round-trip strips
+#: the attribute metadata from a node. The only semantic info that
+#: survives such a round-trip is the s3dgraphy Python class name; we
+#: use it to recover the pyArchInit ``unita_tipo`` code so the
+#: verbose-vs-shorthand dispatch in :func:`select_rapporti_label` and
+#: the row-routing in :class:`GraphIngestor` keep working.
+#:
+#: Several entries are aliases of one another (``StructuralVirtualStratigraphicUnit``
+#: vs ``VirtualStratigraphicStructuralUnit``) because historical
+#: s3dgraphy classes have been renamed twice and old GraphML files
+#: still carry the old names. Keep both spellings.
+S3DGRAPHY_TYPE_TO_UNITA_TIPO: dict[str, str] = {
+    "StratigraphicUnit": "US",
+    "StructuralVirtualStratigraphicUnit": "USVs",
+    "VirtualStratigraphicStructuralUnit": "USVs",
+    "VirtualStratigraphicNonStructuralUnit": "USVn",
+    "NonStructuralVirtualStratigraphicUnit": "USVn",
+    "StratigraphicUnitMasonry": "USM",
+    "DocumentaryStratigraphicUnit": "USD",
+    "SpecialFindUnit": "SF",
+    "VirtualSpecialFindUnit": "VSF",
+    "TransformationStratigraphicUnit": "TSU",
+    "WorkingUnit": "UL",
+    "ContinuityNode": "CON",
+    "DocumentNode": "DOC",
+    "ExtractorNode": "Extractor",
+    "CombinerNode": "Combinar",
+    # yE-D (5.8.0-alpha): VirtualActivity used by SYNTHETIC folder
+    # policy in yed_import_pipeline.py for folder-derived synthetic
+    # us_table rows (unita_tipo='VA').
+    "VirtualActivity": "VA",
+    # s3dgraphy-bump (5.8.1-alpha): ReusedSpecialFind ("spolia"),
+    # introduced in s3dgraphy 0.1.42 (DP-26). Family=real, non-series.
+    # Routed to us_table by yE-D pipeline (unita_tipo='RSF').
+    "ReusedSpecialFind": "RSF",
+}
+
+
+# ---------------------------------------------------------------------------
+# Multilingual unita-tipo prefix strip
+# ---------------------------------------------------------------------------
+#
+# Pyarchinit displays US labels with language-aware prefixes (US/SU/SE/UE/...,
+# USM/WSU/MSE/..., USVs/USVn both rendered as "USV<n>", SF/VSF, CON,
+# D./C. for paradata). For round-trip serialisation we strip ANY of
+# these prefixes (longest match first) so the bare US identifier
+# survives (e.g. "6", "102", "103a").
+
+import re as _re
+
+_US_PREFIX_PATTERN = _re.compile(
+    r"^(?P<prefix>"
+    r"USVs|USVn|USVA|USVB|USVC|USV|"
+    r"USM|USD|USN|"
+    r"VSF|SF|"
+    r"CON|"
+    r"WSU|MSE|TSU|SUS|UE|UM|UC|UL|"
+    r"D\.|C\.|"
+    r"US|SU|SE"
+    r")\s*",
+    _re.IGNORECASE,
+)
+
+
+def strip_us_prefix(name: str) -> str:
+    """Strip the unita-tipo prefix from a node name.
+
+    Examples::
+
+        strip_us_prefix("USM6")    == "6"
+        strip_us_prefix("USV102")  == "102"
+        strip_us_prefix("US103a")  == "103a"
+        strip_us_prefix("D.4001")  == "4001"
+        strip_us_prefix("C.900")   == "900"
+        strip_us_prefix("6")       == "6"   # no prefix → unchanged
+    """
+    if not name:
+        return name
+    m = _US_PREFIX_PATTERN.match(str(name))
+    if m:
+        return str(name)[m.end():]
+    return str(name)
+
+
+# ---------------------------------------------------------------------------
+# Unita_tipo resolution helpers
+# ---------------------------------------------------------------------------
+
+def resolve_unita_tipo_for_dispatch(node) -> str | None:
+    """Best-effort lookup of pyarchinit ``unita_tipo`` for *node*.
+
+    Used by :func:`select_rapporti_label` to decide between verbose
+    Italian (when both endpoints are canonical Harris units) and
+    shorthand ``>`` / ``<`` / ``>>`` / ``<<`` (everything else).
+
+    Lookup order:
+
+    1. ``node.attributes['unita_tipo']`` (set by the AI03 enrichment
+       in :mod:`graph_projector`);
+    2. :data:`S3DGRAPHY_TYPE_TO_UNITA_TIPO` keyed by the node's Python
+       class name (the fallback for graphs that survived a GraphML
+       round-trip without preserving attributes).
+
+    Returns ``None`` when neither source has a value — callers treat
+    "unknown" as "fall through to shorthand" in the dispatcher.
+    """
+    if node is None:
+        return None
+    attrs = getattr(node, "attributes", None) or {}
+    ut = attrs.get("unita_tipo")
+    if ut:
+        return str(ut)
+    cls_name = type(node).__name__
+    return S3DGRAPHY_TYPE_TO_UNITA_TIPO.get(cls_name)
+
+
+def select_rapporti_label(edge_type: str,
+                          src_unita_tipo: str | None,
+                          tgt_unita_tipo: str | None) -> str:
+    """Pick the pyarchinit ``rapporti`` token for an edge.
+
+    Dispatch table:
+
+    * both endpoints ∈ :data:`CANONICAL_UNIT_TYPES` (US / USM) →
+      verbose Italian (``Copre`` / ``Coperto da`` / …) from
+      :data:`EDGE_TYPE_TO_RAPPORTI_IT`;
+    * either endpoint ∈ :data:`CONTINUITY_UNIT_TYPES` (CON) →
+      single arrow ``>`` / ``<`` per the temporal-precedence
+      shorthand;
+    * otherwise → double arrow ``>>`` / ``<<`` (paradata-style data
+      flow shorthand).
+
+    Direction (``>`` vs ``<``, ``>>`` vs ``<<``) is read from
+    :data:`EDGE_TYPE_DIRECTION_FORWARD`: ``overlies`` / ``cuts`` /
+    ``is_after`` / etc. emit ``>`` (source covers target); their
+    inverses emit ``<``.
+    """
+    src = src_unita_tipo or ""
+    tgt = tgt_unita_tipo or ""
+    both_canonical = (src in CANONICAL_UNIT_TYPES
+                      and tgt in CANONICAL_UNIT_TYPES)
+    if both_canonical:
+        return EDGE_TYPE_TO_RAPPORTI_IT.get(edge_type, str(edge_type))
+    forward = EDGE_TYPE_DIRECTION_FORWARD.get(edge_type, True)
+    is_continuity = (src in CONTINUITY_UNIT_TYPES
+                     or tgt in CONTINUITY_UNIT_TYPES)
+    if is_continuity:
+        return ">" if forward else "<"
+    return ">>" if forward else "<<"
+
+
+# ---------------------------------------------------------------------------
+# Edge types that are NOT physical/stratigraphic rapporti
+# ---------------------------------------------------------------------------
+#: Edges with these types are intentionally **excluded** from the
+#: pyarchinit ``rapporti`` column on serialise: they encode
+#: epoch / paradata / property relationships that live in different
+#: pyarchinit tables (or are paradata internal to s3dgraphy and have
+#: no pyarchinit counterpart at all).
+#:
+#: Kept here (rather than as a magic constant inside ``serialize``)
+#: so callers can introspect the exclusion list when debugging
+#: missing rapporti.
+NON_RAPPORTI_EDGE_TYPES: frozenset[str] = frozenset({
+    "has_first_epoch",
+    "has_paradata_nodegroup",
+    "has_property",
+    "extracted_from",
+    "combines",
+    "survive_in_epoch",
+    "has_same_time",
+})
+
+
+# ---------------------------------------------------------------------------
+# Public parse / serialize API
+# ---------------------------------------------------------------------------
+
+def parse_rapporti(value):
+    """Parse a pyarchinit ``us_table.rapporti`` value into canonical
+    relations ready to materialise as graph edges.
+
+    *value* can be:
+
+    * a ``str`` carrying the Python-literal serialisation pyarchinit
+      writes to the column (``"[['Copre', '12', '1', 'Pompei'], ...]"``);
+    * a ``list`` already parsed by the caller (``[['Copre', '12', '1',
+      'Pompei'], ...]``);
+    * ``None`` or empty — returns ``[]``.
+
+    Returns a list of 5-tuples ``(edge_type, target_us, area, sito, swap)``:
+
+    * ``edge_type`` — the canonical s3dgraphy edge type (e.g.
+      ``overlies``, ``is_after``, ``generic_connection``);
+    * ``target_us`` — the second element of the pyarchinit tuple (the
+      target US identifier as a bare string, no prefix);
+    * ``area``, ``sito`` — the third and fourth elements; ``None`` when
+      the source row was a short 2-tuple ``["Copre", "12"]``;
+    * ``swap`` — ``True`` when the shorthand token requested a
+      source/target swap (``<`` and ``<<``). The caller materialises
+      the edge as ``source_us is_after target_us`` after the swap.
+
+    Labels not in :data:`RAPPORTI_TO_EDGE_TYPE` nor
+    :data:`RAPPORTI_SHORTHAND` are silently skipped — the caller
+    decides whether to log a warning. Malformed list entries (not a
+    list, or empty) are skipped likewise.
+
+    The function is pure and side-effect-free; it does not mutate the
+    input.
+    """
+    items = _coerce_to_list(value)
+    out = []
+    for entry in items:
+        if not isinstance(entry, (list, tuple)) or not entry:
+            continue
+        raw_label = str(entry[0]) if entry[0] is not None else ""
+        named = raw_label.strip().lower()
+        edge_type = RAPPORTI_TO_EDGE_TYPE.get(named)
+        swap = False
+        if edge_type is None:
+            shorthand = RAPPORTI_SHORTHAND.get(raw_label.strip())
+            if shorthand is None:
+                continue
+            edge_type, swap = shorthand
+        target_us = str(entry[1]).strip() if len(entry) > 1 and entry[1] is not None else ""
+        area = str(entry[2]).strip() if len(entry) > 2 and entry[2] is not None else None
+        sito = str(entry[3]).strip() if len(entry) > 3 and entry[3] is not None else None
+        out.append((edge_type, target_us, area, sito, swap))
+    return out
+
+
+def _coerce_to_list(value):
+    """Internal: turn the various forms of a pyarchinit ``rapporti``
+    value into a flat list of entries.
+
+    Accepted shapes:
+
+    * ``None`` or empty string / list → ``[]``
+    * ``list`` → returned as-is (assumed to be the parsed list-of-lists)
+    * ``str`` → ``ast.literal_eval`` round-trip; non-list results are
+      treated as empty (defensive); ``ValueError`` / ``SyntaxError``
+      bubble up as ``[]`` rather than raising (the caller is usually
+      a row-by-row importer and one malformed row shouldn't break the
+      whole batch).
+    """
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    if not isinstance(value, str):
+        return []
+    if not value.strip():
+        return []
+    import ast
+    try:
+        parsed = ast.literal_eval(value)
+    except (ValueError, SyntaxError):
+        return []
+    if isinstance(parsed, list):
+        return parsed
+    return []
+
+
+def serialize_rapporti_from_edges(graph, default_sito: str):
+    """Walk *graph*'s edges and produce per-US rapporti lists ready
+    for the pyarchinit ``us_table.rapporti`` column.
+
+    Output: a ``dict`` mapping source node id to a list of
+    ``[label, target_us, area, sito]`` entries — the pyarchinit
+    list-of-lists serialisation, with verbose-Italian or shorthand
+    labels picked by :func:`select_rapporti_label`.
+
+    *default_sito* is the site name to stamp into the 4th element of
+    every entry, regardless of what the graph might carry — this
+    matches the "import to a NEW sito" workflow consumers run
+    (``GraphIngestor.populate_list`` passes the user's chosen site).
+
+    Behaviour notes:
+
+    * Edges with types in :data:`NON_RAPPORTI_EDGE_TYPES` are
+      excluded (paradata / property / epoch edges that don't belong
+      in the pyarchinit ``rapporti`` column).
+    * Target US is read from ``tgt_node.attributes['us']`` when
+      present, otherwise derived from ``tgt_node.name`` via
+      :func:`strip_us_prefix`.
+    * Area defaults to ``"1"`` (compatible with most legacy
+      pyarchinit data).
+    * Duplicates within a source are dropped — external graphml may
+      carry redundant edges for the same ``(label, target)`` and we
+      keep the column clean.
+    """
+    by_id = {}
+    for n in graph.nodes:
+        nid = getattr(n, "node_id", None)
+        if nid:
+            by_id[nid] = n
+    out: dict[str, list[list]] = {}
+    for e in getattr(graph, "edges", None) or []:
+        src = getattr(e, "edge_source", None)
+        tgt = getattr(e, "edge_target", None)
+        et = getattr(e, "edge_type", None)
+        if not src or not tgt or not et:
+            continue
+        if et in NON_RAPPORTI_EDGE_TYPES:
+            continue
+        src_node = by_id.get(src)
+        tgt_node = by_id.get(tgt)
+        if tgt_node is None:
+            continue
+        src_unita_tipo = resolve_unita_tipo_for_dispatch(src_node)
+        tgt_unita_tipo = resolve_unita_tipo_for_dispatch(tgt_node)
+        rapporti_label = select_rapporti_label(
+            et, src_unita_tipo, tgt_unita_tipo)
+        tgt_attrs = getattr(tgt_node, "attributes", None) or {}
+        tgt_us = tgt_attrs.get("us")
+        if not tgt_us:
+            tgt_name = getattr(tgt_node, "name", None)
+            if not tgt_name:
+                continue
+            tgt_us = strip_us_prefix(str(tgt_name))
+        tgt_area = str(tgt_attrs.get("area") or "1")
+        tgt_sito = default_sito
+        rapporto = [rapporti_label, str(tgt_us), tgt_area, tgt_sito]
+        bucket = out.setdefault(src, [])
+        if rapporto not in bucket:
+            bucket.append(rapporto)
+    return out
+
+
 __all__ = [
+    # Vocabulary constants (commit 1)
     "RAPPORTI_TO_EDGE_TYPE",
     "EDGE_TYPE_TO_RAPPORTI_IT",
     "RAPPORTI_SHORTHAND",
     "EDGE_TYPE_DIRECTION_FORWARD",
     "CANONICAL_UNIT_TYPES",
     "CONTINUITY_UNIT_TYPES",
+    "NON_RAPPORTI_EDGE_TYPES",
+    # Type / prefix helpers (commit 2)
+    "S3DGRAPHY_TYPE_TO_UNITA_TIPO",
+    "strip_us_prefix",
+    "resolve_unita_tipo_for_dispatch",
+    "select_rapporti_label",
+    # Parser / serialiser (commit 2)
+    "parse_rapporti",
+    "serialize_rapporti_from_edges",
 ]
-
-# NOTE — the Python class-name → pyArchInit `unita_tipo` lookup
-# (currently `_S3DGRAPHY_TYPE_TO_UNITA_TIPO` in graph_ingestor.py)
-# is intentionally NOT moved into this module in this commit. The
-# canonical copy carries more entries (paradata classes, continuity
-# nodes, yEd-import-pipeline synthetic types) than belong in a
-# pyArchInit-rapporti-focused vocabulary file. It moves in a later
-# refactor commit alongside the verbose-vs-shorthand dispatch
-# function `_select_rapporti_label`.
 

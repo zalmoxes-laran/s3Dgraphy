@@ -187,14 +187,24 @@ def test_legacy_aliases_in_graph_ingestor():
 
 
 def test_module_dunder_all_exposed():
-    """`__all__` enumerates the public surface; nothing else should
-    leak as a public name."""
+    """`__all__` enumerates the public surface. Adjust this set when
+    new public names land in subsequent canonical-edges commits."""
     expected = {
+        # Vocabulary constants (commit 1)
         "RAPPORTI_TO_EDGE_TYPE",
         "EDGE_TYPE_TO_RAPPORTI_IT",
         "RAPPORTI_SHORTHAND",
         "EDGE_TYPE_DIRECTION_FORWARD",
         "CANONICAL_UNIT_TYPES",
         "CONTINUITY_UNIT_TYPES",
+        "NON_RAPPORTI_EDGE_TYPES",
+        # Type / prefix helpers (commit 2)
+        "S3DGRAPHY_TYPE_TO_UNITA_TIPO",
+        "strip_us_prefix",
+        "resolve_unita_tipo_for_dispatch",
+        "select_rapporti_label",
+        # Parser / serialiser (commit 2)
+        "parse_rapporti",
+        "serialize_rapporti_from_edges",
     }
     assert set(rapporti.__all__) == expected
