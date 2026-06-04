@@ -15,17 +15,30 @@ from .utils import IDManager, calculate_node_width, generate_uuid
 class NodeGenerator:
     """Generates GraphML XML for various node types."""
 
-    def __init__(self, registry: NodeRegistry, id_manager: IDManager):
+    def __init__(self, registry: NodeRegistry, id_manager: IDManager,
+                 physical_relationships_by_node: Optional[dict] = None):
         """
         Initialize node generator.
-        
+
         Args:
             registry: Node registry with visual properties
             id_manager: ID manager for nested IDs
+            physical_relationships_by_node: Optional pre-computed dict
+                mapping ``node_id`` → list of
+                ``[label, target_us, area, sito]`` entries (the
+                pyArchInit list-of-lists serialisation produced by
+                :func:`s3dgraphy.sync.rapporti.serialize_rapporti_from_edges`).
+                When provided, ``generate_stratigraphic_node`` emits a
+                ``<data key="d13">`` element with the Python-literal
+                ``repr`` of the entry list — the EM 1.6 palette format
+                for per-node physical relationships. Unknown / missing
+                node ids are silently ignored.
         """
         self.registry = registry
         self.id_manager = id_manager
         self.ns_y = 'http://www.yworks.com/xml/graphml'
+        self._physical_relationships_by_node = (
+            physical_relationships_by_node or {})
 
     def generate_stratigraphic_node(self, node, x: float = 100.0, y: float = 100.0,
                                     parent_id: Optional[str] = None) -> ET.Element:
@@ -72,7 +85,24 @@ class NodeGenerator:
         data_d7 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
         data_d7.set('key', 'd7')
         data_d7.text = node_uuid
-        
+
+        # Add physical_relationships (d13) — EM 1.6 per-node packed
+        # string. The exporter pre-computes a dict ``node_id → list``
+        # using :func:`s3dgraphy.sync.rapporti.serialize_rapporti_from_edges`
+        # before the transitive reduction collapses canonical edges, and
+        # passes it in via ``__init__``. The on-disk format is the
+        # Python literal ``repr`` of the list-of-lists, byte-identical
+        # with the pyArchInit ``us_table.rapporti`` column when the
+        # graph between them is unmutated.
+        rapporti_entries = self._physical_relationships_by_node.get(
+            node_uuid)
+        if rapporti_entries:
+            data_d13 = ET.SubElement(
+                node_elem,
+                '{http://graphml.graphdrawing.org/xmlns}data')
+            data_d13.set('key', 'd13')
+            data_d13.text = repr(rapporti_entries)
+
         # Add nodegraphics (d6) - ShapeNode
         data_d6 = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
         data_d6.set('key', 'd6')

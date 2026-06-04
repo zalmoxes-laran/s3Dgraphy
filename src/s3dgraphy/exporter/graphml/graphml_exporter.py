@@ -142,6 +142,40 @@ class GraphMLExporter:
         # side channel restores all three on import.
         self._write_property_metadata_data(graph_elem, canvas)
 
+        # 1d. Snapshot per-US-node physical_relationships (the EM 1.6
+        # palette per-node packed string format, byte-identical with the
+        # pyArchInit ``us_table.rapporti`` column). Computed BEFORE the
+        # transitive reduction below so the canonical edges are still
+        # present; stashed for NodeGenerator to attach as ``<data
+        # key="d13">`` on each stratigraphic node. See
+        # ``s3dgraphy.sync.rapporti.serialize_rapporti_from_edges`` for
+        # the format and ``canvas_generator._add_node_keys`` (d13) for
+        # the key declaration.
+        try:
+            from ...sync.rapporti import serialize_rapporti_from_edges
+            # Pick the site name to stamp into the 4th column of each
+            # rapporto entry. Graph.__init__ stores the caller-supplied
+            # identifier on ``graph_id`` and leaves ``name`` empty by
+            # default, so ``graph_id`` is the most reliable signal in
+            # practice — but we still consult ``name`` / ``sito`` for
+            # consumers that populate them explicitly.
+            default_sito = (
+                getattr(self.graph, "graph_id", None)
+                or getattr(self.graph, "name", None)
+                or getattr(self.graph, "sito", None)
+                or ""
+            )
+            # ``name`` may be a dict in the s3dgraphy Graph schema; only
+            # str values are valid for the pyArchInit column.
+            if not isinstance(default_sito, str):
+                default_sito = ""
+            self._physical_relationships_by_node: Dict[str, list] = (
+                serialize_rapporti_from_edges(self.graph, default_sito))
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"  [physical_relationships] skipped serialization: "
+                  f"{exc}")
+            self._physical_relationships_by_node = {}
+
         # Allocate palette refids starting from 4 (1-3 are reserved for
         # SVG extractor/combiner/continuity emitted by CanvasGenerator).
         # Populated as AuthorNode / LicenseNode / EmbargoNode instances
@@ -150,7 +184,10 @@ class GraphMLExporter:
         self._next_palette_refid: int = 4
 
         # 2. Initialize generators
-        node_gen = NodeGenerator(self.node_registry, self.id_manager)
+        node_gen = NodeGenerator(
+            self.node_registry, self.id_manager,
+            physical_relationships_by_node=self._physical_relationships_by_node,
+        )
         group_gen = GroupNodeGenerator(self.node_registry, self.id_manager)
         edge_gen = EdgeGenerator(self.id_manager)
 

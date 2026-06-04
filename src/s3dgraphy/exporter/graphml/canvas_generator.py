@@ -68,7 +68,7 @@ class CanvasGenerator:
         return root
 
     def _add_node_keys(self, root: ET.Element):
-        """Add key definitions for nodes (d4-d8)."""
+        """Add key definitions for nodes (d4-d8, d13)."""
         # d4: url
         key = ET.SubElement(root, '{http://graphml.graphdrawing.org/xmlns}key')
         key.set('attr.name', 'url')
@@ -103,6 +103,27 @@ class CanvasGenerator:
         key.set('attr.type', 'string')
         key.set('for', 'node')
         key.set('id', 'd8')
+
+        # d13: physical_relationships (EM 1.6 per-node packed string)
+        #
+        # Per-node serialisation of the canonical physical stratigraphic
+        # edges, in the same list-of-lists Python-literal format used by
+        # the pyArchInit ``us_table.rapporti`` column. yEd reserves edges
+        # for the temporal Matrix layer, so the EM 1.6 palette surfaces
+        # these relationships as a per-node attribute instead — visible
+        # to humans editing the file in yEd, and byte-identical with the
+        # pyArchInit column when the graph between them is unmutated.
+        #
+        # The exporter writes this attribute on every stratigraphic node
+        # whose canonical edges include physical-stratigraphic types;
+        # the importer reads it only when the richer graph-level JSON
+        # side channel (``_s3d_physical_relations``) is absent. See
+        # ``s3dgraphy.sync.rapporti`` for the canonical vocabulary.
+        key = ET.SubElement(root, '{http://graphml.graphdrawing.org/xmlns}key')
+        key.set('attr.name', 'physical_relationships')
+        key.set('attr.type', 'string')
+        key.set('for', 'node')
+        key.set('id', 'd13')
 
     def _add_edge_keys(self, root: ET.Element):
         """Add key definitions for edges (d10-d12)."""
