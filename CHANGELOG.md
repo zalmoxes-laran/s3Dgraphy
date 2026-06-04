@@ -86,6 +86,65 @@ v1.6.0 → v1.7.0 plan.
   is resolved at serialization time by the qualia type (see em_qualia_types
   v4.0).
 
+### Added — Canonical-edges series (v1.6.0)
+
+The pyArchInit ↔ canonical-edge translation is now a single,
+testable, public module (`s3dgraphy.sync.rapporti`). Physical
+stratigraphic relationships (`copre`/`overlies`,
+`taglia`/`cuts`, `riempie`/`fills`, `si appoggia a`/`abuts`,
+`si lega a`/`is_bonded_to`, `uguale a`/`is_physically_equal_to`
+and reciprocals) are **first-class canonical edges** in the
+property graph; the pyArchInit `us_table.rapporti` column and
+the new GraphML `physical_relationships` per-node attribute
+are **serialisations only**, never verbatim copies on the
+s3dgraphy node.
+
+The series landed in four commits on `s3dgraphy_v1.6dev`:
+
+- **`a934c7b`** — Extracted the vocabulary constants
+  (`RAPPORTI_TO_EDGE_TYPE`, `EDGE_TYPE_TO_RAPPORTI_IT`,
+  `RAPPORTI_SHORTHAND`, `EDGE_TYPE_DIRECTION_FORWARD`,
+  `CANONICAL_UNIT_TYPES`, `CONTINUITY_UNIT_TYPES`) from
+  `graphml_writer.py` and `graph_ingestor.py` into the new
+  public `s3dgraphy.sync.rapporti` module. Back-compat shims
+  keep the legacy private names importable from their original
+  modules.
+- **`c0303e5`** — Moved the dispatcher (`select_rapporti_label`,
+  `resolve_unita_tipo_for_dispatch`, `strip_us_prefix`) and the
+  parse/serialise APIs (`parse_rapporti`,
+  `serialize_rapporti_from_edges`) into `sync.rapporti`. Defines
+  the canonical 5-tuple `(edge_type, target_us, area, sito,
+  swap)` that consumers iterate over.
+- **`ce308d3`** — Migrated `graph_projector.py` to consume
+  `parse_rapporti()` instead of its inline `ast.literal_eval` +
+  direct lookups against the legacy constants.
+- **`2823095`** — GraphML import + export for the
+  `physical_relationships` per-node packed string (EM 1.6 palette
+  format, byte-identical with the pyArchInit
+  `us_table.rapporti` column). Three serialisations cohabit:
+  - canonical edges in memory (single source of truth)
+  - graph-level `_s3d_physical_relations` JSON side channel
+    (richer, carries per-edge author/document attributes —
+    authoritative on import when present)
+  - per-node `physical_relationships` packed string
+    (interoperability fallback for yEd-hand-authored files or
+    pyArchInit-side bridges)
+
+Test surface: +57 tests across
+`tests/sync/test_rapporti_vocabulary.py` (13),
+`tests/sync/test_rapporti_parse_serialize.py` (38) and
+`tests/sync/test_graphml_physical_relationships_d13.py` (6).
+The series has zero regressions vs. baseline (385 passed / 8
+pre-existing failures / 37 skipped).
+
+Cross-tracker references:
+- `s3dgraphy #16` — canonical edges + reciprocity + paradox
+  detection (covered).
+- `EM-blender-tools #30` — companion yEd palette change
+  (`physical_relationships` on US-type nodes; the s3dgraphy
+  palette mirror at `src/s3dgraphy/templates/em_palette_template.graphml`
+  is updated by commit `1c195f1`).
+
 ### Added — Connections datamodel (v1.6.0)
 
 - Bug fix: typo `ProperrtyNOde` → `PropertyNode` in
