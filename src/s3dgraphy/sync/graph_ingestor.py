@@ -1057,74 +1057,29 @@ def _is_epoch_node_local(node) -> bool:
     return type(node).__name__ == "EpochNode"
 
 
-# Inverse mapping of `_RAPPORTI_TO_EDGE_TYPE` from graphml_writer.py:
-# convert s3dgraphy edge_type back to the Italian rapporti label that
-# pyarchinit stores in us_table.rapporti.
+# The Italian-rapporti / unit-type / direction tables previously
+# defined inline here moved to `s3dgraphy.sync.rapporti` in v1.6
+# (single home for the pyArchInit ↔ canonical-edge translation,
+# consumed by graph_ingestor, graphml_writer, graph_projector and
+# the yEd-import pipeline alike). The names below are kept as
+# private re-export aliases so call sites in this file and in
+# `yed_import_pipeline.py` (which already imports
+# `_select_rapporti_label` from here) keep working unchanged.
 #
-# Used for **canonical Harris units** (US/USM ↔ US/USM): the verbose
-# Italian terms that the user sees in Scheda US.
-_EDGE_TYPE_TO_RAPPORTI_IT: dict[str, str] = {
-    "overlies": "Copre",
-    "is_overlain_by": "Coperto da",
-    "cuts": "Taglia",
-    "is_cut_by": "Tagliato da",
-    "fills": "Riempie",
-    "is_filled_by": "Riempito da",
-    "is_physically_equal_to": "Uguale a",
-    "is_bonded_to": "Si lega a",
-    "abuts": "Si appoggia a",
-    "is_abutted_by": "Gli si appoggia",
-    "is_after": "Copre",       # default fallback for temporal precedence
-    "generic_connection": "Connesso a",
-}
-
-
-# AI07/H.5 follow-up: shorthand `< > << >>` rapporti tokens for
-# non-canonical unit types per pyarchinit author convention
-# (May 2026 — symmetric to graphml_writer._RAPPORTI_SHORTHAND).
-#
-# Convention:
-#   US / USM (in any UI language) → verbose terms ("Copre"/"Coperto da"/
-#                                   "Si lega a"/...). The reader always
-#                                   normalises to Italian for storage.
-#   CON (Continuity)              → single arrow `>` / `<`
-#   All other non-US/USM types
-#   (USVs, USVn, SF, VSF, USD,
-#   DOC, Extractor, Combinar,
-#   property, ...)               → double arrow `>>` / `<<`
-#
-# The decision tree in `_build_rapporti_from_edges` looks at the
+# AI07/H.5 follow-up: the verbose-Italian / single-arrow /
+# double-arrow dispatch is implemented by `_select_rapporti_label`
+# (still defined later in this module — that function moves to
+# `s3dgraphy.sync.rapporti` in a follow-up commit). It looks at the
 # unita_tipo of BOTH source and target nodes:
 #   - both ∈ _CANONICAL_UNIT_TYPES → verbose Italian
 #   - either ∈ _CONTINUITY_UNIT_TYPES → single arrow `>` / `<`
 #   - otherwise (any other non-canonical) → double arrow `>>` / `<<`
-
-_CANONICAL_UNIT_TYPES: frozenset[str] = frozenset({"US", "USM"})
-
-# CON = Continuity. Single-arrow shorthand reserved for this type.
-_CONTINUITY_UNIT_TYPES: frozenset[str] = frozenset({"CON"})
-
-# Edge-type → "covers/follows" direction. True means the rapporti
-# token reads as `>` / `>>` (source covers target), False means
-# `<` / `<<` (source is covered by target).
-_EDGE_TYPE_DIRECTION_FORWARD: dict[str, bool] = {
-    "overlies": True,
-    "is_overlain_by": False,
-    "cuts": True,
-    "is_cut_by": False,
-    "fills": True,
-    "is_filled_by": False,
-    "is_physically_equal_to": True,   # equality conventionally `>`
-    "is_bonded_to": True,
-    "abuts": True,
-    "is_abutted_by": False,
-    "is_after": True,
-    "is_before": False,
-    "generic_connection": True,
-    "extracted_from": True,
-    "combines": True,
-    "has_property": True,
-}
+from .rapporti import (
+    EDGE_TYPE_TO_RAPPORTI_IT as _EDGE_TYPE_TO_RAPPORTI_IT,
+    CANONICAL_UNIT_TYPES as _CANONICAL_UNIT_TYPES,
+    CONTINUITY_UNIT_TYPES as _CONTINUITY_UNIT_TYPES,
+    EDGE_TYPE_DIRECTION_FORWARD as _EDGE_TYPE_DIRECTION_FORWARD,
+)
 
 
 def _hydrate_pyarchinit_data_keys(graph, graphml_path: Path) -> None:
