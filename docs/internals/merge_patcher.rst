@@ -31,10 +31,12 @@ GraphMerger
 
 Pipeline::
 
-    merger = GraphMerger(existing_graph, incoming_graph)
-    conflicts = merger.detect_conflicts()
-    # UI picks resolutions: e.g. resolutions = {"q.US001.material": "accept_incoming"}
-    merger.apply_resolutions(resolutions)
+    merger = GraphMerger()                                   # no constructor args
+    conflicts = merger.compare(existing_graph, incoming_graph)
+    # The UI reviews each Conflict and sets two flags on it:
+    #   conflict.resolved = True        # the user has made a decision
+    #   conflict.accepted = True/False  # True = take incoming, False = keep current
+    merger.apply_resolutions(existing_graph, conflicts, incoming=incoming_graph)
 
 Conflict types (since 1.5)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -45,8 +47,12 @@ and badge them appropriately:
 ============================================  =================================
 ``Conflict.conflict_type``                     Domain
 ============================================  =================================
-``unit_added`` / ``unit_changed``              StratigraphicNode existence /
-                                               description / connecting edges
+``node_added``                                 StratigraphicNode present only
+                                               in the incoming graph
+``value_changed``                              A field (e.g. ``description``)
+                                               differs on a matched unit
+``edge_added`` / ``edge_removed``              A connecting edge is new in /
+                                               missing from the incoming graph
 ``qualia_added``                               PropertyNode claim new to
                                                existing graph
 ``qualia_changed``                             Value drift on
@@ -75,23 +81,35 @@ The ``Conflict`` dataclass exposes:
 ============================  ========================================
 Field                          Meaning
 ============================  ========================================
-``conflict_type``              Typed label (see above)
-``target_id``                  ID of the host node / edge
-``field``                      Attribute / property name in conflict
-``existing_value``             Value on the host graph
+``node_name``                  Name of the host node (e.g. ``"USM01"``)
+``field``                      Conflicting field — may be prefixed
+                               (``edge:overlies``, ``qualia:material``,
+                               ``author:…``, ``document:…``, ``epoch:…``,
+                               ``edge_attr:…``)
+``current_value``              Value on the existing graph
 ``incoming_value``             Value on the incoming graph
+``conflict_type``              Typed label (see table above)
+``resolved: bool``             Set ``True`` by the UI once the user
+                               decides (default ``False``)
+``accepted: bool``             ``True`` = take ``incoming_value``,
+                               ``False`` = keep ``current_value``
 ``extra: Dict[str, Any]``      Per-conflict payload (subfield, target
                                endpoint, attribute key, …)
 ============================  ========================================
 
 The ``extra`` field is *new in 1.5* and backward-compatible (defaults
 to ``{}``). It carries everything a UI needs to render granular diffs
-without re-walking the graphs.
+without re-walking the graphs. The read-only
+:attr:`Conflict.display_field` and :attr:`Conflict.display_summary`
+properties produce human-readable labels for list rendering.
 
 apply_resolutions semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Each conflict type has a *narrow* application rule:
+:meth:`GraphMerger.apply_resolutions` only acts on conflicts the UI
+marked ``resolved=True`` **and** ``accepted=True``; everything else is
+left untouched. Each accepted conflict type then has a *narrow*
+application rule:
 
 - **qualia_added / qualia_changed** — copy the full PropertyNode
   subtree (PN + provenance chain) from the incoming graph. Catalog
@@ -184,11 +202,11 @@ to create a fresh GraphML from scratch         :class:`GraphMLExporter`
 The typical Blender workflow combines all three:
 
 #. ``UnifiedXLSXImporter.parse()`` — load the incoming xlsx in memory.
-#. ``GraphMerger(existing, incoming).detect_conflicts()`` — list
-   what's new vs. drift.
-#. UI loop: user picks resolutions.
-#. ``GraphMerger.apply_resolutions(...)`` — write the chosen changes
-   into ``existing``.
+#. ``GraphMerger().compare(existing, incoming)`` — list what's new vs.
+   drift.
+#. UI loop: user sets ``resolved`` / ``accepted`` on each conflict.
+#. ``GraphMerger().apply_resolutions(existing, conflicts, incoming=incoming)``
+   — write the chosen changes into ``existing``.
 #. ``GraphMLPatcher(existing_path, existing).patch(output_path)`` —
    serialise back to GraphML, preserving visual state.
 
@@ -202,3 +220,16 @@ See also
   *incoming* graph in the merger pipeline.
 - ``CHANGELOG.md`` [v0.1.33] and [Unreleased] for the per-feature
   detailed roadmap.
+
+API Reference
+-------------
+
+.. automodule:: s3dgraphy.merge.graph_merger
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: s3dgraphy.exporter.graphml.graphml_patcher
+   :members:
+   :undoc-members:
+   :show-inheritance:

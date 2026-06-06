@@ -11,12 +11,19 @@ Driver Stack: stdlib (Read) + SQLAlchemy (Write)
 
 s3dgraphy 1.6 ships two intentionally separate database stacks:
 
-==========================  ====================================  ============================
-Path                        Module                                Driver
-==========================  ====================================  ============================
-**Read** (importer)         :mod:`s3dgraphy.importer.pyarchinit_importer`  Stdlib (``sqlite3`` + ``psycopg2``) via a small ``_qmark()`` dialect helper
-**Write** (sync / ingest)   :mod:`s3dgraphy.sync`                          SQLAlchemy 2.x
-==========================  ====================================  ============================
+.. list-table::
+   :header-rows: 1
+   :widths: 24 38 38
+
+   * - Path
+     - Module
+     - Driver
+   * - **Read** (importer)
+     - :mod:`s3dgraphy.importer.pyarchinit_importer`
+     - Stdlib (``sqlite3`` + ``psycopg2``) via a small ``_qmark()`` dialect helper
+   * - **Write** (sync / ingest)
+     - :mod:`s3dgraphy.sync`
+     - SQLAlchemy 2.x
 
 This page documents **why** the split exists so that a future
 contributor reading the code does not mistake it for legacy in

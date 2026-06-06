@@ -33,7 +33,7 @@ For development or to get the latest features:
    pip install -e .[dev]
 
 Optional Dependencies
---------------------
+---------------------
 
 Install additional features:
 

@@ -3,10 +3,11 @@ GraphML Patcher for s3dgraphy.
 
 Patches an existing GraphML file on disk with changes from an in-memory Graph.
 Supports:
-  - Updating existing nodes (description, name, EMID, URI)
-  - Adding new nodes that were created in-memory
-  - Adding new edges
-  - EMID validation and duplicate detection
+
+- Updating existing nodes (description, name, EMID, URI)
+- Adding new nodes that were created in-memory
+- Adding new edges
+- EMID validation and duplicate detection
 
 This is the "twin" of the importer: it uses the same dynamic key mapping
 and the same conventions to write back what the importer can read.
@@ -1429,11 +1430,13 @@ class GraphMLPatcher:
         Add new edges to the GraphML XML.
 
         For each edge in the graph that does NOT have an original_edge_id:
+
         - Generates a new edge ID
         - Creates <edge> XML with correct line style for the edge type
         - Resolves source/target using original_id or generated ID
 
         Skips:
+
         - Edges with original_edge_id (already in the XML)
         - Structural edges (represented by XML nesting, not <edge> elements)
         - Derived has_property edges where the target PropertyNode is inside

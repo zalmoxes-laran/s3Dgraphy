@@ -39,7 +39,7 @@ def _read_version():
         pass
     # 3) Hardcoded fallback (keep in sync with pyproject.toml on each release)
     # TODO 1.6: drop fallback once Sphinx is always run from an installed env.
-    return '1.6.0.dev3'
+    return '1.6.0.dev7'
 
 version = _read_version()
 release = version
@@ -112,6 +112,24 @@ autodoc_default_options = {
     # :imported-members: when needed.
 }
 
+# Optional / heavy third-party libraries that some submodules import at
+# module level. They are NOT part of the `docs` extra, so on Read the Docs
+# (which runs `pip install .[docs]`) they are absent and autodoc would fail
+# to import the dependent modules — leaving the sync/ subsystem and the RDF
+# exporter undocumented. Mocking them lets autodoc introspect signatures and
+# docstrings without the real packages installed.
+#   - sqlalchemy / psycopg2 : s3dgraphy.sync.* (PyArchInit SQLite/PostgreSQL bridge)
+#   - rdflib                : s3dgraphy.exporter.rdf_exporter
+#   - bpy                   : Blender-only code paths guarded at runtime
+# The core hard deps (pandas, lxml, openpyxl, networkx) are installed
+# transitively by `pip install .` and therefore do NOT need mocking.
+autodoc_mock_imports = [
+    'sqlalchemy',
+    'psycopg2',
+    'rdflib',
+    'bpy',
+]
+
 # -- Options for autosummary ------------------------------------------------
 autosummary_generate = True
 autosummary_generate_overwrite = False
@@ -125,7 +143,12 @@ napoleon_include_special_with_doc = True
 napoleon_use_admonition_for_examples = False
 napoleon_use_admonition_for_notes = False
 napoleon_use_admonition_for_references = False
-napoleon_use_ivar = False
+# Render docstring "Attributes:" sections as :ivar: fields rather than as
+# standalone py:attribute objects. This avoids the "duplicate object
+# description" warnings that arise when a class both documents an attribute
+# in its docstring and exposes it as an autodoc member (e.g. dataclass
+# fields, the `node_type` class var).
+napoleon_use_ivar = True
 napoleon_use_param = True
 napoleon_use_rtype = True
 

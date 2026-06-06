@@ -1,7 +1,8 @@
 """Pure-Python wrapper over s3dgraphy.PyArchInitImporter +
 s3dgraphy.exporter.graphml.GraphMLExporter.
 
-Public API:
+Public API::
+
     export_graphml(db_path, mapping, output_path,
                    *, site_filter=None, persist_auxiliary=False) -> ExportResult
 

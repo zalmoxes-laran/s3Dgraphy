@@ -69,7 +69,7 @@ On *export*, we have to re-create the diamond, otherwise the round-trip
 breaks — the importer would assume default life rules and the user's
 life-bound configuration would be lost on the next reload.
 
-:func:`s3dgraphy.transforms.materialize_continuity.materialize_continuity_diamonds`
+:func:`s3dgraphy.transforms.materialize_continuity.materialize_continuity`
     Family-aware rules using the single source of truth from
     :mod:`s3dgraphy.classification`:
 
@@ -156,8 +156,9 @@ Function                              Side effect
 ``clear_aux_tags``                    Removes the two bookkeeping keys
 ==================================  ==============================================
 
-All other helpers (``aux_overridden_attrs``, ``iter_injected``,
-``push_orphan`` / ``iter_orphans`` / ``clear_orphans``) are read-only.
+The orphan-tracking helpers (``aux_overridden_attrs``, ``is_injected``,
+``push_orphan`` / ``iter_orphans`` / ``clear_orphans``) report and manage
+auxiliary rows that could not be attached to a host node.
 
 Exporter dispatch
 -----------------
@@ -190,7 +191,7 @@ The standard 1.5 export pipeline is:
 #. Optional: ``compact_propagative_metadata(graph)`` for a smaller,
    formally cleaner GraphML.
 #. ``GraphMLExporter.export(path)`` — implicitly calls
-   ``materialize_continuity_diamonds`` and the volatile save policy.
+   ``materialize_continuity`` and the volatile save policy.
 
 The compact pass is *not* run by the exporter automatically — it is a
 conscious editorial decision (you might *want* per-unit declarations

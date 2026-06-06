@@ -290,10 +290,12 @@ graph, propagating absolute dates from PropertyNodes through stratigraphic relat
    PropertyNodes via ``has_property`` edges
 3. Seeds those dates as initial ``CALCUL_START_T`` / ``CALCUL_END_T`` attributes
 4. Uses BFS on ``is_after`` / ``is_before`` edges to propagate:
+
    - **TPQ (Terminus Post Quem)**: a node's start date cannot be earlier than the
      latest start date of the nodes it comes after
    - **TAQ (Terminus Ante Quem)**: a node's end date cannot be later than the
      earliest end date of the nodes it comes before
+
 5. Epoch membership (``has_first_epoch`` / ``survive_in_epoch``) provides fallback
    date ranges for nodes without direct property dates
 

@@ -3,11 +3,12 @@
 Reads the top-level <y:TableNode configuration="YED_TABLE_NODE"> of a
 yEd-raw graphml and extracts archaeological period candidates from
 its swimlane rows. Each row produces a PeriodCandidate with:
-  - auto_label from <y:NodeLabel> text
-  - auto_periodo from 1-based row ordinal
-  - auto_fase always 1 (yEd table rows don't encode phases)
-  - member_yed_ids from leaf nodes whose Y-coordinate falls in the
-    row's Y-range
+
+- auto_label from <y:NodeLabel> text
+- auto_periodo from 1-based row ordinal
+- auto_fase always 1 (yEd table rows don't encode phases)
+- member_yed_ids from leaf nodes whose Y-coordinate falls in the
+  row's Y-range
 
 datazione_iniziale / datazione_finale are NOT extracted (yEd doesn't
 encode dates on table rows) — user fills them later in the

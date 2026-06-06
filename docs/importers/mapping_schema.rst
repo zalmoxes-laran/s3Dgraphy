@@ -87,15 +87,20 @@ SQLite (``format_type: "sqlite"``)
 
 Used by :class:`~s3dgraphy.importer.pyarchinit_importer.PyArchInitImporter`.
 
-============  ==========  =====================================================
-Key           Required    Meaning
-============  ==========  =====================================================
-``format_type``  yes      Must be the literal string ``"sqlite"``.
-``table_name``   yes      Name of the table to read with
-                          ``SELECT * FROM <table_name>``. Guarded against a
-                          ``[A-Za-z_][A-Za-z0-9_]*`` whitelist to prevent
-                          SQL injection.
-============  ==========  =====================================================
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 68
+
+   * - Key
+     - Required
+     - Meaning
+   * - ``format_type``
+     - yes
+     - Must be the literal string ``"sqlite"``.
+   * - ``table_name``
+     - yes
+     - Name of the table to read with ``SELECT * FROM <table_name>``. Guarded
+       against a ``[A-Za-z_][A-Za-z0-9_]*`` whitelist to prevent SQL injection.
 
 .. code-block:: json
 
@@ -110,18 +115,29 @@ XLSX (``format_type: "xlsx"``)
 Used by :class:`~s3dgraphy.importer.xlsx_importer.MappedXLSXImporter`
 and :class:`~s3dgraphy.importer.xlsx_importer.XLSXImporter`.
 
-==============  ==========  ===================================================
-Key             Required    Meaning
-==============  ==========  ===================================================
-``format_type`` yes         Must be the literal string ``"xlsx"``.
-``sheet_name``  yes         Worksheet to read. String name or 0-based index.
-``start_row``   optional    1-indexed row of the first **data** row. Row 1
-                            always holds column headers; ``start_row=1`` means
-                            data starts on row 2. Defaults vary by importer.
-``header_row``  optional    0-indexed row index passed to pandas as the column
-                            header. Mutually exclusive with ``start_row`` in
-                            practice — pick the one your importer reads.
-==============  ==========  ===================================================
+.. list-table::
+   :header-rows: 1
+   :widths: 18 12 70
+
+   * - Key
+     - Required
+     - Meaning
+   * - ``format_type``
+     - yes
+     - Must be the literal string ``"xlsx"``.
+   * - ``sheet_name``
+     - yes
+     - Worksheet to read. String name or 0-based index.
+   * - ``start_row``
+     - optional
+     - 1-indexed row of the first **data** row. Row 1 always holds column
+       headers; ``start_row=1`` means data starts on row 2. Defaults vary by
+       importer.
+   * - ``header_row``
+     - optional
+     - 0-indexed row index passed to pandas as the column header. Mutually
+       exclusive with ``start_row`` in practice — pick the one your importer
+       reads.
 
 .. code-block:: json
 

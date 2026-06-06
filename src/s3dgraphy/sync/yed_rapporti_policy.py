@@ -16,7 +16,7 @@ Self-loop folder edges (source == target) are filtered out of ALL
 policies before policy application — they arise from nested folder
 member edges authored in yEd and would otherwise produce noise.
 
-Public API:
+Public API::
 
     FolderEdgePolicy (StrEnum: skip / fan_out / representative / synthetic)
     FolderEdge      (dataclass: src, tgt, src_is_folder, tgt_is_folder, edge_type)
@@ -26,6 +26,7 @@ Public API:
     apply_policy(report, policy, *, all_folders, classified) -> ExpandedRapporti
 
 Implementation notes:
+
 * `analyze_edges` parses <edge> elements via lxml (falling back to
   stdlib `xml.etree.ElementTree`) and classifies each endpoint as a
   folder or a leaf based on the dataclass lookups passed in.

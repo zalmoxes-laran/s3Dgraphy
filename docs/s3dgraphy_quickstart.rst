@@ -369,7 +369,7 @@ Preparing Data for Web Platforms
    exporter.export_graphs()
 
 Database Integration
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -378,10 +378,10 @@ Database Integration
    # For now, export to JSON and use database-specific import tools
 
 Best Practices Summary
----------------------
+----------------------
 
 Naming Conventions
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
 
 * **Use consistent ID formats**: ``US001``, ``SF001``, ``DOC001``
 * **Include site/area prefixes**: ``POMP_A_US001`` for multi-site projects
@@ -397,7 +397,7 @@ Documentation Standards
 * **Version control**: Track all document and interpretation changes
 
 Quality Control
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 * **Regular validation**: Use built-in validators before export
 * **Backup procedures**: Regular exports to multiple formats

@@ -1,11 +1,11 @@
 s3dgraphy Documentation
 ========================
 
-.. image:: https://img.shields.io/badge/version-0.1.32-blue.svg
+.. image:: https://img.shields.io/badge/version-1.6.0-blue.svg
    :target: https://pypi.org/project/s3dgraphy/
    :alt: Version
 
-.. image:: https://img.shields.io/badge/python-3.8+-brightgreen.svg
+.. image:: https://img.shields.io/badge/python-3.9+-brightgreen.svg
    :target: https://python.org
    :alt: Python
 
@@ -251,13 +251,13 @@ JSON Configuration Files
 
 s3dgraphy uses three core JSON configuration files:
 
-1. **s3Dgraphy_node_datamodel.json** (v1.5.1)
+1. **s3Dgraphy_node_datamodel.json** (v1.6.0)
 
    - Defines all node types and properties
    - CIDOC-CRM mappings for each node type
    - Node hierarchy and inheritance
 
-2. **s3Dgraphy_connections_datamodel.json** (v1.5.4)
+2. **s3Dgraphy_connections_datamodel.json** (v1.5.5)
 
    - Defines all edge types
    - CIDOC-CRM mappings for relationships
@@ -401,15 +401,15 @@ Community & Support
 Current Status
 --------------
 
-**Version**: 0.1.31
+**Version**: 1.6.0 (development series ``1.6.0.devN``)
 
-**Datamodel**: nodes v1.5.1, connections v1.5.4
+**Datamodel**: nodes v1.6.0, connections v1.5.5
 
-**Status**: Active development
+**Status**: Active development (Beta)
 
-**Python**: 3.8+
+**Python**: 3.9+
 
-**License**: GPL-3.0
+**License**: GPL-3.0-or-later
 
 Roadmap
 -------
@@ -421,9 +421,14 @@ Completed Features
 - Node type system with CIDOC-CRM mappings
 - GraphML import with UUID slipback
 - GraphML export with container group support
-- XLSX import with mapping system
-- SQLite/pyArchInit import
-- JSON export for web platforms
+- XLSX import with mapping system (per-table mappings + row filters)
+- Unified single-file workbook (``em_data.xlsx``) import **and** export
+- SQLite **and** PostgreSQL pyArchInit bridge (``s3dgraphy.sync``)
+- JSON export for web platforms (Heriverse, ATON)
+- RDF export (Turtle / N-Triples / JSON-LD / TriG) with CIDOC-CRM + HDT-O
+- Temporal inference: TPQ/TAQ chronology closure with paradox detection
+- Property propagation resolvers (node → swimlane → graph fallback)
+- Graph merge with typed conflict resolution
 - Container group nodes (US, USD, VSF as containers with is_part_of edges)
 - Instance chains via changed_from edges
 - Comment/note node skipping during import
@@ -442,7 +447,6 @@ Planned Features
 **Long-term**:
 
 - GeoJSON export for GIS integration
-- RDF/TTL export for semantic web
 - Neo4j export for graph databases
 - Command-line interface (CLI)
 - Standalone GUI application
@@ -475,10 +479,31 @@ Table of Contents
    :maxdepth: 2
    :caption: API Reference
 
+   api/core
    api/nodes
    api/edges
+   api/importers
+   api/exporters
+   api/sync
+   api/classification
+   api/resolvers
+   api/diagnostics
+   api/utils
    api/s3dgraphy_classes_reference
    api/s3dgraphy_edges_reference
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Internals & Design Notes
+
+   internals/propagation
+   internals/temporal
+   internals/transforms
+   internals/merge_patcher
+   internals/classification
+   internals/stratiminer_prompt
+   DATA_FORMALIZATIONS
+   GRAPHML_EXPORT
 
 .. toctree::
    :maxdepth: 2
@@ -493,6 +518,7 @@ Table of Contents
 
    s3dgraphy_changelog
    s3dgraphy_roadmap
+   deprecations
 
 .. toctree::
    :maxdepth: 1
@@ -517,9 +543,9 @@ If you use s3dgraphy in your research, please cite:
    @software{s3dgraphy,
      title = {s3dgraphy: Core Graph Library for Extended Matrix},
      author = {Demetrescu, Emanuel},
-     year = {2025},
+     year = {2026},
      url = {https://github.com/zalmoxes-laran/s3dgraphy},
-     version = {0.1.31}
+     version = {1.6.0}
    }
 
 Indices and Tables

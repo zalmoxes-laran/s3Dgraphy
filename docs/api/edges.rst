@@ -11,5 +11,6 @@ Edge Types Dictionary
 
 .. autodata:: s3dgraphy.edges.edge.EDGE_TYPES
    :annotation:
+   :no-index:
 
 The EDGE_TYPES dictionary contains all valid edge types with their labels and descriptions.

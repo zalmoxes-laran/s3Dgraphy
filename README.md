@@ -29,29 +29,46 @@ pip install s3dgraphy[full]          # All optional dependencies
 ## 🔧 Quick Start
 
 ```python
-import s3dgraphy
+from s3dgraphy import Graph
+from s3dgraphy.nodes import StratigraphicUnit, DocumentNode
 
-# Create a new stratigraphic graph
-graph = s3dgraphy.Graph()
+# Create a new stratigraphic graph (graph_id is required)
+graph = Graph("my_excavation")
 
-# Add stratigraphic units
-us1 = graph.add_node("US001", node_type="US", 
-                     properties={"period": "Roman", "material": "pottery"})
-us2 = graph.add_node("US002", node_type="US", 
-                     properties={"period": "Medieval", "material": "stone"})
+# Build node objects, then add them with add_node()
+wall = StratigraphicUnit("US001", name="US001", description="Stone wall foundation")
+floor = StratigraphicUnit("US002", name="US002", description="Mosaic floor")
+graph.add_node(wall)
+graph.add_node(floor)
 
-# Add stratigraphic relationships
-graph.add_edge(us1, us2, edge_type="ABOVE", 
-               properties={"certainty": "high"})
+# Add a stratigraphic relationship.
+# Canonical direction is recent -> ancient: the floor (US002) is more
+# recent than the wall (US001), so US002 is_after US001.
+graph.add_edge("e1", "US002", "US001", "is_after")
+
+# Attach documentation
+doc = DocumentNode("DOC001", name="DOC001", description="Field photo")
+graph.add_node(doc)
+graph.add_edge("e2", "US001", "DOC001", "has_documentation")
 
 # Query the graph
-print(f"Graph contains {len(graph.nodes)} stratigraphic units")
-print(f"Relationships: {len(graph.edges)}")
+print(f"Graph contains {len(graph.nodes)} nodes and {len(graph.edges)} edges")
+us_units = graph.get_nodes_by_type("US")
 
-# Export to different formats
-graph.export_graphml("stratigraphy.graphml")
-graph.export_json("stratigraphy.json")
+# Export to GraphML (yEd round-trip) — the exporter takes the graph directly
+from s3dgraphy.exporter.graphml import GraphMLExporter
+GraphMLExporter(graph).export("my_excavation.graphml")
 ```
+
+> **Note on the API.** Nodes are *objects* (`StratigraphicUnit`,
+> `DocumentNode`, …) created first and then added with `graph.add_node()`.
+> Edges are created with `graph.add_edge(edge_id, source_id, target_id,
+> edge_type)` using a **canonical** edge type from the connections
+> datamodel (e.g. `is_after`, `has_property`, `has_documentation`). Invalid
+> connections are downgraded to `generic_connection` with a warning rather
+> than silently accepted. See the
+> [API reference](https://docs.extendedmatrix.org/projects/s3dgraphy/) for
+> the full node and edge catalogs.
 
 ## 📚 Core Features
 
@@ -260,12 +277,12 @@ The GPL-3.0 license ensures that s3dgraphy remains free and open source, promoti
 If you use s3dgraphy in your research, please cite:
 
 ```bibtex
-@software{s3dgraphy2024,
+@software{s3dgraphy,
   title={s3dgraphy: 3D Stratigraphic Graph Management Library},
   author={Demetrescu, Emanuel},
-  year={2024},
+  year={2026},
   url={https://github.com/zalmoxes-laran/s3dgraphy},
-  version={0.1.1},
+  version={1.6.0},
   institution={CNR-ISPC (National Research Council - Institute of Heritage Science)}
 }
 ```

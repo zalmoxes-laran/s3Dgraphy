@@ -17,6 +17,12 @@ def _build_legacy_edge_types():
     return edge_types
 
 EDGE_TYPES = _build_legacy_edge_types()
+"""Legacy mapping ``edge_type -> {"label", "description"}``.
+
+Rebuilt from the connections datamodel for backward compatibility; new
+code should query :func:`s3dgraphy.edges.connections_loader.get_connections_datamodel`
+instead. ``Edge`` validates ``edge_type`` against the keys of this dict.
+"""
 
 class Edge:
     """

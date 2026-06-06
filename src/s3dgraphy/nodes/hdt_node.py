@@ -9,12 +9,14 @@ formal propositions) about a heritage entity (HC1). HDTs are hierarchically
 composable — a city HDT contains district HDTs which contain monument HDTs.
 
 Granularity connectors (declared in s3Dgraphy_connections_datamodel.json):
-  * has_digital_twin              — Node → HDTNode  (HP1)
-  * has_digital_twin_component    — HDTNode → HDTNode (HP3 inverse, transitive)
-  * contains_proposition_set      — HDTNode → GraphNode (HP33)
-  * has_digital_object_part       — HDTNode → RepresentationModel* / LinkNode (HP29)
 
-Use case (the Colosseo example):
+* has_digital_twin              — Node → HDTNode  (HP1)
+* has_digital_twin_component    — HDTNode → HDTNode (HP3 inverse, transitive)
+* contains_proposition_set      — HDTNode → GraphNode (HP33)
+* has_digital_object_part       — HDTNode → RepresentationModel* / LinkNode (HP29)
+
+Use case (the Colosseo example)::
+
     colosseo_overall   = HDTNode("hdt_colosseo_overall", name="Colosseo HDT")
     colosseo_flavian   = HDTNode("hdt_colosseo_flavian", name="Colosseo Flavian phase")
     colosseo_medieval  = HDTNode("hdt_colosseo_medieval", name="Colosseo medieval fortress")

@@ -1,10 +1,10 @@
 """Pure-functional helpers for AI06 node grouping.
 
-build_groups_from_sql: scan us_table for the requested grouping
-    dimensions, emit one GroupSpec per (dim, value) pair.
-merge_adhoc_groups: append GroupSpec instances from a GroupStore.
-dimensions_with_data: return the subset of 7 grouping columns
-    that have at least one non-empty value in us_table for sito.
+- ``build_groups_from_sql``: scan us_table for the requested grouping
+  dimensions, emit one GroupSpec per (dim, value) pair.
+- ``merge_adhoc_groups``: append GroupSpec instances from a GroupStore.
+- ``dimensions_with_data``: return the subset of 7 grouping columns
+  that have at least one non-empty value in us_table for sito.
 
 UUID generation: deterministic UUID5 from (sito, group_kind, name)
 so re-export with the same SQL state produces identical UUIDs

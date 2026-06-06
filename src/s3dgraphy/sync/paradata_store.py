@@ -2,9 +2,10 @@
 
 AI05 Phase 2 closure. Manages the 3 node types without an SQL
 counterpart in pyarchinit:
-    - AuthorNode    (authorship metadata)
-    - LicenseNode   (rights / SPDX licence)
-    - EmbargoNode   (embargo dates)
+
+- AuthorNode    (authorship metadata)
+- LicenseNode   (rights / SPDX licence)
+- EmbargoNode   (embargo dates)
 
 File location: {db_path.parent}/paradata_{sito_slug}.graphml
 where sito_slug is `re.sub(r'\\W+', '_', sito).lower()`.

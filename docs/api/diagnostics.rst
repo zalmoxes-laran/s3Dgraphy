@@ -17,8 +17,8 @@ See also
 
 - :doc:`/internals/propagation` — how property resolution walks the
   ``has_data_provenance`` / ``has_paradata_nodegroup`` chains.
-- :doc:`/internals/temporal` — TPQ / TAQ propagation and the
-  ``[chronology paradox]`` warnings that ``attribute_temporal_claim``
-  annotates.
-- :doc:`/internals/chronology` — the high-level chronology calculation
-  pipeline and how diagnostics surface inside it.
+- :doc:`/internals/temporal` — the TPQ / TAQ propagation pipeline, the
+  high-level :meth:`Graph.calculate_chronology` entry point, and the
+  ``[chronology paradox]`` / ``[stratigraphic cycle]`` warnings that
+  ``attribute_temporal_claim`` and ``detect_stratigraphic_cycles``
+  annotate.

@@ -2616,12 +2616,13 @@ class GraphMLImporter:
         """
         Verifica se un nodo è un nodo di continuità (BR).
         Usa una detection multi-segnale:
-          A) '_continuity' nel campo URL o description
-          B) ShapeNode con shape type 'diamond'
-          C) SVGNode il cui SVGContent refid punta alla risorsa
-             ``continuity.svg`` (refid risolto dinamicamente, vedi
-             build_svg_resource_map — yEd numera le Resource per ordine
-             di serializzazione, non c'è un id fisso)
+
+        A) '_continuity' nel campo URL o description
+        B) ShapeNode con shape type 'diamond'
+        C) SVGNode il cui SVGContent refid punta alla risorsa
+           ``continuity.svg`` (refid risolto dinamicamente, vedi
+           build_svg_resource_map — yEd numera le Resource per ordine
+           di serializzazione, non c'è un id fisso)
 
         Args:
             node_element: Elemento XML del nodo

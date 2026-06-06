@@ -6,12 +6,12 @@ SQLite and PostgreSQL backends through the `DbHandle` abstraction
 (Foundation 5.6.2-alpha) — all SQL is expressed as SQLAlchemy
 ``text()`` statements with named bind parameters.
 
-Public API:
+Public API::
 
     import_yed_raw(handle, graphml_path, sito, drafts, *,
                    policy=SKIP, dry_run=False) -> IngestResult
 
-Internal helpers (testable in isolation):
+Internal helpers (testable in isolation)::
 
     _classify_destination(classified)
     _flatten_members(folder, all_folders)

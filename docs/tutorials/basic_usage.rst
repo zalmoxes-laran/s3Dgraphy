@@ -1,5 +1,5 @@
 Basic Usage Tutorial
-===================
+====================
 
 This tutorial will walk you through the basic usage of s3dgraphy, from creating your first graph to adding nodes and relationships.
 
