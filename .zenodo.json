@@ -1,0 +1,24 @@
+{
+    "title": "s3Dgraphy",
+    "upload_type": "software",
+    "access_right": "open",
+    "license": "gpl-3.0-or-later",
+    "language": "eng",
+    "description": "3D Stratigraphic Graph Management Library for archaeological and heritage applications. Part of the Extended Matrix ecosystem.",
+    "creators": [
+        {
+            "name": "Demetrescu, Emanuel",
+            "orcid": "0000-0002-5065-7970",
+            "affiliation": "CNR - Consiglio Nazionale delle Ricerche"
+        }
+    ],
+    "keywords": [
+        "s3Dgraphy",
+        "Extended Matrix",
+        "stratigraphy",
+        "knowledge graph",
+        "archaeology",
+        "cultural heritage",
+        "3D"
+    ]
+}
