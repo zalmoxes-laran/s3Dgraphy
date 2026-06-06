@@ -1,32 +1,41 @@
-name: Archive stable release to Zenodo
+name: Archive release to Zenodo
 
-# Quando pubblichi una Release STABILE (non prerelease) archivia il SORGENTE del
-# tag come nuova versione su Zenodo (concept 20558706), via API deposizioni.
+# Archivia il SORGENTE di un tag come nuova versione su Zenodo (concept 20558706)
+# via API deposizioni. Due modi:
+#   - MANUALE: Actions > "Archive release to Zenodo" > Run workflow > indica il tag
+#   - automatico: alla pubblicazione di una Release stabile (non prerelease)
 # Idempotente e non bloccante. Richiede il secret ZENODO_TOKEN (scope
 # deposit:write + deposit:actions); se manca, lo script salta senza errore.
 #
-# Gira dal branch di DEFAULT (main) per l'evento `release`. Il sorgente viene
-# preso dal tag della release; .zenodo.json e lo script vengono presi da main
-# (canonici), cosi' funziona anche se quel tag non li contiene ancora.
+# Gira dal branch di DEFAULT (main). Il sorgente viene preso dal tag indicato;
+# .zenodo.json e lo script vengono presi da main (canonici), cosi' funziona
+# anche se quel tag non li contiene.
 
 on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Git tag da archiviare su Zenodo (es. v1.6.0)'
+        required: true
+        type: string
   release:
     types: [published]
 
 jobs:
   zenodo:
-    # solo release stabili (le prerelease, incluse le *.dev*, vengono ignorate)
-    if: ${{ !github.event.release.prerelease }}
+    # manuale: sempre; da release: solo stabili (non prerelease, incluse le *.dev*)
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
           fetch-depth: 0
 
       - name: Prepare source archive + canonical metadata/script
         run: |
-          TAG="${{ github.event.release.tag_name }}"
           git archive --format=zip --prefix="s3Dgraphy-${TAG}/" HEAD -o "s3Dgraphy-${TAG}.zip"
           git fetch origin main --depth=1 -q
           git checkout origin/main -- .zenodo.json scripts/zenodo_publish.py
@@ -36,6 +45,5 @@ jobs:
         env:
           ZENODO_TOKEN: ${{ secrets.ZENODO_TOKEN }}
           ZENODO_CONCEPT: "20558706"
-          TAG: ${{ github.event.release.tag_name }}
-          SRC_ZIP: "s3Dgraphy-${{ github.event.release.tag_name }}.zip"
+          SRC_ZIP: "s3Dgraphy-${{ env.TAG }}.zip"
         run: python3 scripts/zenodo_publish.py
