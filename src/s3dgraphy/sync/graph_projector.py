@@ -578,6 +578,11 @@ class GraphProjector:
             except Exception:
                 period_datazione = {}
 
+        # Localized US/USM → canonical alias map (the single source in
+        # sync.rapporti) so non-Italian unita_tipo codes are recognised as
+        # stratigraphic units in the gating + node-class factory below.
+        from .rapporti import canonical_unita_tipo
+
         for (us_val, node_uuid, sito_v, area, unita_tipo,
              periodo_ini, fase_ini, rapporti_raw, d_strat,
              d_interp, attivita, struttura,
@@ -586,6 +591,13 @@ class GraphProjector:
             if not us_name:
                 continue
             ut_str = str(unita_tipo) if unita_tipo is not None else ""
+            # Canonical US/USM code for the structural decisions below
+            # (stratigraphic gating + node-class factory), so localized
+            # codes (SU/WSU/SE/…) are recognised as real stratigraphic
+            # units. attributes['unita_tipo'] keeps the ORIGINAL code
+            # (set further down) for round-trip + the language-aware
+            # rapporti dispatch.
+            ut_canon = canonical_unita_tipo(ut_str)
             node = None
             # Direct hit by composite key (paradata that the bridge
             # correctly classified OR a stratigraphic node already
@@ -602,14 +614,14 @@ class GraphProjector:
             # order (e.g. yEd document order interleaves US01 and
             # DOC.01 — DOC.01 might claim the bridge's '01' placeholder
             # before US01 row is iterated).
-            if node is None and ut_str in (
+            if node is None and ut_canon in (
                 "US", "USM", "USD", "USV", "USVs", "USVn", "USVc",
                 "SF", "VSF", "RSF",
             ):
                 node = nodes_by_key.pop((us_name, "__STRAT__"), None)
                 if node is None:
                     node = _create_stratigraphic_node_for_unita_tipo(
-                        ut_str, us_name, node_uuid or us_name,
+                        ut_canon, us_name, node_uuid or us_name,
                     )
                     if node is not None:
                         try:

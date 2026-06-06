@@ -195,6 +195,9 @@ def test_module_dunder_all_exposed():
         "EDGE_TYPE_TO_RAPPORTI_IT",
         "RAPPORTI_SHORTHAND",
         "EDGE_TYPE_DIRECTION_FORWARD",
+        # Multilingual US/USM alias map (issue #21)
+        "UNITA_TIPO_CANONICAL",
+        "canonical_unita_tipo",
         "CANONICAL_UNIT_TYPES",
         "CONTINUITY_UNIT_TYPES",
         "NON_RAPPORTI_EDGE_TYPES",
