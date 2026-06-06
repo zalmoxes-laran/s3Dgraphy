@@ -72,7 +72,7 @@ jobs:
 
   # NUOVO: Job automatico per release
   auto-publish:
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' && !github.event.release.prerelease
     runs-on: ubuntu-latest
     
     steps:
