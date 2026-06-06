@@ -145,6 +145,69 @@ Cross-tracker references:
   palette mirror at `src/s3dgraphy/templates/em_palette_template.graphml`
   is updated by commit `1c195f1`).
 
+### Fixed — v1.6.0.dev8: multilingual `unita_tipo` recognition (PR #22, closes #21)
+
+pyArchInit localises the US / USM `unita_tipo` codes per UI language
+(its `pyarchinit_i18n_stratigraphic.UNIT_TYPE_ABBREV` is the source of
+truth), so a non-Italian site was silently broken by the canonical-
+edges series shipped in dev7: rows with `SU` / `WSU` / `SE` / `MSE` /
+`UE` / `UEM` / `USZ` / `ΣΜ` / `ΤΣΜ` were skipped by the stratigraphic
+gating in `graph_projector.populate_graph`, and any surviving edges
+fell through to the `>>` / `<<` shorthand in
+`serialize_rapporti_from_edges` because `CANONICAL_UNIT_TYPES` only
+recognised the Italian codes `{"US", "USM"}`.
+
+Fixed by Enzo Cocca (PR #22, closes #21):
+
+- **`s3dgraphy.sync.rapporti.UNITA_TIPO_CANONICAL`** — new dict
+  mapping `localized → canonical` for the US / USM atoms (it/fr/ro ·
+  en/ar · de · es/ca/pt · ro-USM · el). Doubles as the normalisation
+  source via the new public `canonical_unita_tipo()` helper, and
+  `CANONICAL_UNIT_TYPES` is now derived from the dict keys so the two
+  never drift. Co-located with the existing prefix-strip regex that
+  already enumerates `SU|SE|WSU|MSE|UE|…`.
+- **`graph_projector.populate_graph`** — the stratigraphic-row gating
+  and the node-class factory route `unita_tipo` through
+  `canonical_unita_tipo()`. The original code stays verbatim in
+  `attributes['unita_tipo']` so round-trip writes back the
+  site-language value byte-identically; only the dispatch and gating
+  read through the alias map.
+- **`serialize_rapporti_from_edges`** — anchors the d13 verbose label
+  on the source row's own `rapporti` term (capitalised), so the
+  packed string byte-matches the originating `us_table.rapporti` in
+  the site's UI language (`Covers` / `Couvre` / `Bedeckt` / …).
+  Falls back to the canonical Italian verbose when the source carries
+  no `rapporti` attribute (e.g. yEd-imported graphs). Virtual units
+  (`>>` / `<<`) and continuity (`>` / `<`) keep their shorthand.
+
+Real-data verification on a non-Italian site (Al-Khutm, English UI,
+485 US rows): **before** the fix `populate_graph` built 6 nodes / 0
+stratigraphic edges (only the few rows still coded `US`/`USM`); **after**,
+485 nodes / 2368 edges with all-English d13 labels (`Covers`,
+`Covered by`, `Cuts`, `Cut by`, `Abuts`, `Same as`, `Fills`, …), zero
+canonical-Italian leak.
+
+Test surface: +2 files in `tests/sync/` —
+`test_rapporti_multilingual_d13.py` (parametrised over 11 language
+variants, pins multilingual verbose dispatch + localised d13 +
+shorthand preservation + yEd fallback) and
+`test_graph_projector_multilingual.py` (mutates the `mini_volterra`
+fixture to SU/WSU + English `rapporti` and asserts end-to-end node
+build + edge build + original-code preservation + English d13 + no
+Italian leak). Zero regressions vs the post-dev7 baseline.
+
+The pyArchInit-side stop-gap (vendored copy of `sync.rapporti` +
+boot-time monkeypatch on the GraphML exporter import) can be dropped
+once `s3dgraphy-1.6.0.dev8` is on PyPI and EM-blender-tools bumps the
+bundled wheel.
+
+Broader follow-up: the multilingual story for free-text content (RDF
+literal `@xx` language tags on labels / descriptions / notes, CIDOC /
+SKOS-aligned, `em.ttl` translations) is spun out as DP-63 on the
+dev-site, scoped to EM 1.6 under the StratiGraph umbrella. PR #22's
+`UNIT_TYPE_ABBREV`-as-source-of-truth pattern is the precedent for
+propagating the source UI language into the importer plumbing.
+
 ### Added — Connections datamodel (v1.6.0)
 
 - Bug fix: typo `ProperrtyNOde` → `PropertyNode` in
