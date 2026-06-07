@@ -87,7 +87,82 @@ RAPPORTI_TO_EDGE_TYPE: dict[str, str] = {
     "same as": "is_physically_equal_to",
     "bonds with": "is_bonded_to",
     "abuts": "abuts",
+    "supports": "is_abutted_by",   # English reciprocal of "Abuts"
 }
+
+
+# ---------------------------------------------------------------------------
+# Full multilingual coverage
+# ---------------------------------------------------------------------------
+# pyArchInit (and any EM tool with a localized UI) stores relationship labels
+# in the user's language, so parse_rapporti must recognise them all —
+# otherwise a graph projected from a non-IT/EN site builds no edges, and a
+# reciprocity round-trip (e.g. the reciprocal of "Abuts" is "Supports" =
+# is_abutted_by) silently fails. The 10×10 table below mirrors the EM/
+# pyArchInit stratigraphic-relationship vocabulary (10 relations × 10 UI
+# languages: it/en/de/es/fr/ar/ca/ro/pt/el).
+#
+# Index → canonical edge type (same order as each language's term list):
+_REL_INDEX_EDGE_TYPE: tuple[str, ...] = (
+    "is_physically_equal_to",  # 0  Uguale a / Same as
+    "is_bonded_to",            # 1  Si lega a / Connected to
+    "overlies",                # 2  Copre / Covers
+    "is_overlain_by",          # 3  Coperto da / Covered by
+    "fills",                   # 4  Riempie / Fills
+    "is_filled_by",            # 5  Riempito da / Filled by
+    "cuts",                    # 6  Taglia / Cuts
+    "is_cut_by",               # 7  Tagliato da / Cut by
+    "abuts",                   # 8  Si appoggia a / Abuts
+    "is_abutted_by",           # 9  Gli si appoggia / Supports
+)
+
+#: 10 relationship terms per language (same indices as _REL_INDEX_EDGE_TYPE).
+_REL_TERMS_BY_LANG: dict[str, tuple[str, ...]] = {
+    "it": ("Uguale a", "Si lega a", "Copre", "Coperto da", "Riempie",
+           "Riempito da", "Taglia", "Tagliato da", "Si appoggia a",
+           "Gli si appoggia"),
+    "en": ("Same as", "Connected to", "Covers", "Covered by", "Fills",
+           "Filled by", "Cuts", "Cut by", "Abuts", "Supports"),
+    "de": ("Entspricht", "Bindet an", "Liegt über", "Liegt unter",
+           "Verfüllt", "Wird verfüllt durch", "Schneidet",
+           "Wird geschnitten", "Stützt sich auf", "Wird gestützt von"),
+    "es": ("Igual a", "Se liga a", "Cubre", "Cubierto por", "Rellena",
+           "Rellenado por", "Corta", "Cortado por", "Se apoya en",
+           "Le se apoya"),
+    "fr": ("Égal à", "Se lie à", "Couvre", "Couvert par",
+           "Remplit", "Rempli par", "Coupe", "Coupé par",
+           "S’appuie sur", "Lui s’appuie"),
+    "ar": ("مساوي ل", "يرتبط ب",
+           "يغطي", "مغطى من",
+           "يملأ", "ممتلئ من",
+           "يقطع", "مقطوع من",
+           "يستند إلى",
+           "يستند عليه"),
+    "ca": ("Igual a", "Es lliga a", "Cobreix", "Cobert per", "Omple",
+           "Omplert per", "Talla", "Tallat per", "S’recolza en",
+           "Li es recolza"),
+    "ro": ("Egal cu", "Se leagă de", "Acoperă", "Acoperit de",
+           "Umple", "Umplut de", "Taie", "Tăiat de",
+           "Se sprijină pe", "I se sprijină"),
+    "pt": ("Igual a", "Liga-se a", "Cobre", "Coberto por", "Preenche",
+           "Preenchido por", "Corta", "Cortado por", "Apoia-se em",
+           "Apoiado por"),
+    "el": ("Ίσο με", "Συνδέεται με",
+           "Καλύπτει",
+           "Καλύπτεται από",
+           "Γεμίζει",
+           "Γεμίζεται από",
+           "Τέμνει", "Τέμνεται από",
+           "Εφάπτεται", "Υποστηρίζει"),
+}
+
+# Fold every language's terms into RAPPORTI_TO_EDGE_TYPE (keys lowercased to
+# match parse_rapporti's lookup). setdefault keeps the explicit aliases above
+# (e.g. "bonds with").
+for _terms in _REL_TERMS_BY_LANG.values():
+    for _i, _term in enumerate(_terms):
+        RAPPORTI_TO_EDGE_TYPE.setdefault(_term.lower(), _REL_INDEX_EDGE_TYPE[_i])
+del _terms, _i, _term
 
 
 # ---------------------------------------------------------------------------

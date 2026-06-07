@@ -208,6 +208,28 @@ dev-site, scoped to EM 1.6 under the StratiGraph umbrella. PR #22's
 `UNIT_TYPE_ABBREV`-as-source-of-truth pattern is the precedent for
 propagating the source UI language into the importer plumbing.
 
+### Fixed — multilingual relationship-label vocabulary
+
+Follow-up to PR #22: the *unita_tipo* codes became multilingual, but the
+stratigraphic **relationship** labels in `RAPPORTI_TO_EDGE_TYPE` were still
+Italian + partial English. So `parse_rapporti()` silently dropped a label
+from any other UI language — a graph projected from a German / Greek / etc.
+site built no edges, and a reciprocity round-trip failed (the English
+reciprocal of "Abuts" is "Supports" = `is_abutted_by`, which had no entry at
+all). Fixed by Enzo Cocca:
+
+- `sync/rapporti.py`: add `"supports" → is_abutted_by`, and fold the full
+  10-relations × 10-languages EM/pyArchInit vocabulary (it/en/de/es/fr/ar/
+  ca/ro/pt/el) into `RAPPORTI_TO_EDGE_TYPE` via a small index→edge-type table
+  (`_REL_INDEX_EDGE_TYPE` + `_REL_TERMS_BY_LANG`), `setdefault` so explicit
+  aliases (e.g. `"bonds with"`) are preserved. Lowercased keys to match the
+  parser's lookup. Additive — no public-API or behaviour change for existing
+  IT/EN labels.
+- Test: `tests/sync/test_rapporti_multilingual_relationships.py` — every
+  language term resolves to its canonical edge type, `parse_rapporti`
+  recognises labels across all 10 languages, and the reciprocal index pairs
+  map to inverse edge types.
+
 ### Added — Connections datamodel (v1.6.0)
 
 - Bug fix: typo `ProperrtyNOde` → `PropertyNode` in
