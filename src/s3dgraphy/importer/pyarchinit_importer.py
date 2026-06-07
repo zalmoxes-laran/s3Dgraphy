@@ -273,6 +273,7 @@ class PyArchInitImporter(BaseImporter):
                 
                 # Process properties for existing node
                 self._process_pyarchinit_properties(row_dict, existing_node)
+                self._process_location_memberships(row_dict, existing_node)
                 return existing_node
                 
             elif is_enriching_existing:
@@ -317,6 +318,7 @@ class PyArchInitImporter(BaseImporter):
 
                 # Process properties for new node
                 self._process_pyarchinit_properties(row_dict, new_node)
+                self._process_location_memberships(row_dict, new_node)
                 return new_node
 
         except KeyError as e:
@@ -376,6 +378,47 @@ class PyArchInitImporter(BaseImporter):
                     pass
                     # Valore vuoto o mancante - non creare proprietà
                     # print(f"    ⊘ Skipped property: {col_config['property_name']} (empty value)")
+
+    def _process_location_memberships(self, row_dict: Dict[str, Any], strat_node: Node):
+        """Wire spatial membership for columns flagged node_type=='LocationNodeGroup'.
+
+        Each such column (e.g. ``settore``, ``area``) becomes ONE shared
+        :class:`LocationNodeGroup` per distinct value -- deduplicated by
+        ``(kind, value)`` across every row -- and ``strat_node`` is linked to
+        it with an ``is_in_location`` edge.
+
+        Rationale: a sector/area is an *identitary place* (CIDOC E53 Place),
+        not a per-row string property. 200 US in 'Sector 1' must point at a
+        single LocationNodeGroup, not 200 copies. See the property-vs-node
+        note in mappings/pyarchinit/pyarchinit_us_mapping_v2.json.
+        """
+        from ..nodes.group_node import LocationNodeGroup
+
+        valid_kinds = getattr(
+            LocationNodeGroup, "VALID_KINDS", ("toponym", "study", "functional"))
+        for col_name, col_config in self.mapping.get('column_mappings', {}).items():
+            if col_config.get('node_type') != 'LocationNodeGroup':
+                continue
+            value = row_dict.get(col_name, '')
+            if not (value and str(value).strip()):
+                continue
+            kind = col_config.get('location_kind', 'study')
+            if kind not in valid_kinds:
+                self.warnings.append(
+                    f"location_kind '{kind}' for column '{col_name}' not in "
+                    f"{valid_kinds}; falling back to 'study'.")
+                kind = 'study'
+            loc_name = str(value).strip()
+            loc_id = f"loc::{kind}::{loc_name}"  # deterministic -> dedup across rows
+            if self.graph.find_node_by_id(loc_id) is None:
+                self.graph.add_node(LocationNodeGroup(
+                    node_id=loc_id, name=loc_name, kind=kind,
+                    description=col_config.get('description', '')))
+            edge_id = f"{strat_node.node_id}_is_in_location_{loc_id}"
+            if not self.graph.find_edge_by_id(edge_id):
+                self.graph.add_edge(
+                    edge_id=edge_id, edge_source=strat_node.node_id,
+                    edge_target=loc_id, edge_type="is_in_location")
 
     def _get_description_column(self) -> Optional[str]:
         """Get description column from mapping"""
