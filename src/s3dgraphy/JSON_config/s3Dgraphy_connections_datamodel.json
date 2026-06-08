@@ -586,7 +586,7 @@
     "is_in_paradata_nodegroup": {
       "name": "is_in_paradata_nodegroup",
       "label": "Is in paradata nodegroup",
-      "description": "Indicates that a node is included into a paradata node group.",
+      "description": "Indicates that a node is included into a paradata node group. Standard members are the paradata-chain nodes (PropertyNode/DocumentNode/ExtractorNode/CombinerNode/ParadataNode); GeoPositionNode is additionally admitted so the per-graph georeferencing shift can be a member of the graph-scope ParadataNodeGroup (DP-65) — semantically valid only at graph scope.",
       "reverse": {
         "name": "contains_paradata_node",
         "label": "Contains paradata node"
