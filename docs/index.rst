@@ -22,6 +22,14 @@ Extended Matrix Framework (EMF).
 
    **s3dgraphy and Extended Matrix are not the same thing.** Extended Matrix (EM) is a *formal visual language* -- a human-readable notation for stratigraphic sequences, designed to be authored and reviewed by archaeologists using graph editors or AI-assisted tools. s3dgraphy is its *computational counterpart*: the Python library that encodes EM knowledge as a property knowledge graph (GraphML/JSON) and enables software tools to read, write, validate, and exchange that knowledge. Think of EM as the score and s3dgraphy as the engine that plays it.
 
+.. admonition:: Where this manual sits in the EM ecosystem
+   :class: hint
+
+   You are reading the **s3dgraphy** manual — the Python library that
+   powers Extended Matrix. For the broader EM ecosystem (the formal
+   language, EM Tools for Blender, 3DSC, Heriverse), see
+   :ref:`em-ecosystem-map` at the bottom of this page.
+
 What is s3dgraphy?
 ------------------
 
@@ -547,6 +555,8 @@ If you use s3dgraphy in your research, please cite:
      url = {https://github.com/zalmoxes-laran/s3dgraphy},
      version = {1.6.0}
    }
+
+.. include:: _includes/em_ecosystem_map.rst
 
 Indices and Tables
 ==================
