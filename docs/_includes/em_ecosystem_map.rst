@@ -3,9 +3,16 @@
 Where this fits — the Extended Matrix ecosystem
 ================================================
 
-A new user often meets several names at once. Each one solves a
-different problem; this table is the canonical map of where each
-component sits.
+.. note::
+
+   *Extended Matrix* is the name of **the broader project** —
+   a formal language, an open-source tool family and a community.
+   Each individual component below has its own name and its own
+   manual. When you see *Extended Matrix* (or *EM*) **without a
+   qualifier**, the surrounding context normally tells you whether
+   the reference is to the project as a whole or to the formal
+   language specifically. The table below disambiguates the
+   components.
 
 .. list-table::
    :header-rows: 1
@@ -14,10 +21,13 @@ component sits.
    * - Name
      - What it is
      - Where to learn it
-   * - **Extended Matrix (EM)**
-     - The *formal language* used to document stratigraphy and
-       reconstruction processes. Drawn in yEd (with the EM palette)
-       or produced from an ``em_data.xlsx`` worksheet.
+   * - **EM language**
+     - The *formal language* (the notation itself) used to document
+       stratigraphy and reconstruction processes. Drawn in yEd
+       (with the EM palette) or produced from an ``em_data.xlsx``
+       worksheet. This is what the *EM language manual* on
+       ``docs.extendedmatrix.org`` documents — node types,
+       connectors, paradata, canvas conventions, formal semantics.
      - `EM language manual <https://docs.extendedmatrix.org>`_
    * - **EM Tools**
      - The *Blender add-on* that connects an EM graph to 3D content —
@@ -39,14 +49,19 @@ component sits.
        what you author in EM Tools.
      - `Heriverse manual <https://docs.extendedmatrix.org/projects/heriverse/>`_
 
-**If you are unsure which one you need:** start from **EM** if you
-have *evidence to organize*; come to **EM Tools** if you have *3D
-content to annotate*; reach for **3DSC** if you have *raw survey data
-to clean and align*; open **Heriverse** when your work is *ready to
-be published on the web*. The Extended Matrix site at
-`extendedmatrix.org <https://www.extendedmatrix.org>`_ is the
-discovery and orchestration layer above all the manuals — start
-there if you are not sure which manual to open first.
+**If you are unsure which one you need:** start from the **EM
+language** if you have *evidence to organize*; come to **EM Tools**
+if you have *3D content to annotate*; reach for **3DSC** if you have
+*raw survey data to clean and align*; open **Heriverse** when your
+work is *ready to be published on the web*. The Extended Matrix
+site at `extendedmatrix.org <https://www.extendedmatrix.org>`_ is
+the discovery and orchestration layer above all the manuals — start
+there if you are not sure which manual to open first. For
+methodological end-to-end paths that cross multiple tools (a
+photogrammetric pipeline, an anastylosis workflow, a web
+publication), see the
+`Workflows <https://www.extendedmatrix.org/workflows/>`_ collection
+on the site.
 
 .. note::
 
