@@ -1,0 +1,84 @@
+{
+    "name": "pyArchInit US Table (v2 — CIDOC-ready draft)",
+    "description": "DRAFT v2 mapping for pyArchInit us_table. Differences vs v1: (1) site-prefixed composite EMID; (2) settore/area/saggio/ambient become first-class LocationNodeGroup nodes (CIDOC E53 Place) linked via is_in_location, NOT flat string properties; (3) dimensional & material columns are TYPED qualia whose property_name matches em_qualia_types.json so the RDF exporter resolves them to E54 Dimension / E55 Type / E57 Material. Structural axes still TODO (epoch, geoposition, document, author, activity) — see _todo_structural_axes. REQUIRES the _process_location_memberships() engine patch to emit the LocationNodeGroup nodes.",
+    "version": "1.6.0-draft2",
+    "table_settings": {
+        "format_type": "sqlite",
+        "table_name": "us_table",
+        "node_name_template": "{sito}.{area}.{unita_tipo}.{us}",
+        "_comment_template": "Site-level verbatim EMID. Empty components collapse (A..101 -> A.101). Add {sito} so EMIDs are unique across the single multi-site us_table."
+    },
+    "column_mappings": {
+        "sito": {
+            "is_filter": true,
+            "filter_required": true,
+            "display_name": "Site"
+        },
+        "unita_tipo": {
+            "is_filter": true,
+            "filter_required": false,
+            "display_name": "SU type",
+            "_comment": "Drives the StratigraphicNode subclass (US/USM/USV...) via get_stratigraphic_node_class, and is a name component."
+        },
+        "us": {
+            "node_type": "US",
+            "is_id": true
+        },
+        "d_stratigrafica": {
+            "node_type": "US",
+            "is_description": true,
+            "target_id_column": "us"
+        },
+
+        "area": {
+            "node_type": "LocationNodeGroup",
+            "location_kind": "study",
+            "is_filter": true,
+            "filter_required": false,
+            "display_name": "Area",
+            "description": "Excavation area"
+        },
+        "settore": {
+            "node_type": "LocationNodeGroup",
+            "location_kind": "study",
+            "display_name": "Sector",
+            "description": "Excavation sector"
+        },
+        "saggio": {
+            "node_type": "LocationNodeGroup",
+            "location_kind": "study",
+            "display_name": "Trench",
+            "description": "Sondage / trench"
+        },
+        "ambient": {
+            "node_type": "LocationNodeGroup",
+            "location_kind": "functional",
+            "display_name": "Ambient",
+            "description": "Functional space / room"
+        },
+
+        "lunghezza_max":    { "node_type": "PropertyNode", "property_name": "Length",    "display_name": "Length (max)" },
+        "altezza_max":      { "node_type": "PropertyNode", "property_name": "Height",    "display_name": "Height (max)" },
+        "larghezza_media":  { "node_type": "PropertyNode", "property_name": "Width",     "display_name": "Width (mean)" },
+        "profondita_max":   { "node_type": "PropertyNode", "property_name": "Depth",     "display_name": "Depth (max)" },
+        "spessore_usm":     { "node_type": "PropertyNode", "property_name": "Thickness", "display_name": "Thickness (USM)" },
+
+        "colore":                 { "node_type": "PropertyNode", "property_name": "Color",                 "display_name": "Colour" },
+        "consistenza":            { "node_type": "PropertyNode", "property_name": "Compaction",            "display_name": "Compaction" },
+        "inclusi":                { "node_type": "PropertyNode", "property_name": "Inclusions",            "display_name": "Inclusions" },
+        "tecnica_muraria_usm":    { "node_type": "PropertyNode", "property_name": "Construction Technique","display_name": "Masonry technique" },
+        "stato_di_conservazione": { "node_type": "PropertyNode", "property_name": "Conservation State",    "display_name": "Conservation state" },
+        "orientamento":           { "node_type": "PropertyNode", "property_name": "Orientation",           "display_name": "Orientation" }
+    },
+    "_comment_relations": "is_in_location edges are emitted by the _process_location_memberships() patch (one shared node per sector, deduped by kind+value). has_property edges are emitted automatically by _process_pyarchinit_properties() for every column carrying a property_name.",
+    "relations": [],
+    "_todo_structural_axes": {
+        "_comment": "Same node-not-qualia treatment. Each needs its own engine handler, mirroring _process_location_memberships:",
+        "periodo_iniziale / fase_iniziale / periodo_finale / fase_finale": "EpochNode (E52 Time-Span / E4 Period) via has_first_epoch / has_last_epoch",
+        "quota_abs / quota_min_abs / quota_max_abs / posizione": "GeoPositionNode (crmgeo E94 Space Primitive, P161) — GEOMETRIC, distinct from the identitary LocationNodeGroup",
+        "documentazione / doc_usv / n_catalogo_*": "DocumentNode (crmdig) + Extractor chain (crminf) — paradata, P70i is documented in",
+        "schedatore / direttore_us / responsabile_us": "AuthorNode (PROV-O Agent) via attribution",
+        "attivita / struttura": "ActivityNodeGroup (intention axis) via is_in_activity",
+        "rapporti / rapporti2": "stratigraphic-relation EDGES (crmarchaeo AP11/AP13 + em: subproperties abuts/cuts/fills/overlies) — handled by the rapporti subsystem, not by this mapping"
+    }
+}
