@@ -1,77 +1,92 @@
 {
     "name": "pyArchInit US Table",
-    "description": "Mapping for pyArchInit Stratigraphic Units table (us_table)",
-    "version": "1.6.0",
+    "description": "Mapping for pyArchInit us_table -> Extended Matrix graph. Tier 1: identity via entity_uuid passthrough (#14), spatial via LocationNodeGroup (#24), and intrinsic qualia typed -> CIDOC (E54 Dimension / E55 Type / E57 Material) through em_qualia_types.json. Tier 2 (this version): periodo/fase -> EpochNode via has_first_epoch / survive_in_epoch (resolved against periodizzazione_table by epoch_mappings), documentazione/doc_usv -> DocumentNode via has_documentation, schedatore/direttore_us/responsabile_us -> AuthorNode via has_author. Remaining deferred columns are in _tier2_pending_handlers (issue #26).",
+    "version": "1.6.2",
     "table_settings": {
         "format_type": "sqlite",
         "table_name": "us_table",
-        "node_name_template": "{area}.{unita_tipo}.{us}"
+        "node_name_template": "{area}.{settore}.{unita_tipo}{us}",
+        "_comment_template": "Human-readable label, unique WITHIN a site: location (area.settore, dot-separated) + type+number attached (USM1). Site is NOT in the GraphML label (added only in the 3D scene for multi-site). Stable identity is the UUID (entity_uuid -> node_id), not the name. Empty components collapse (1..US1 -> 1.US1)."
     },
     "column_mappings": {
-        "sito": {
-            "is_filter": true,
-            "filter_required": true,
-            "display_name": "Site",
-            "description": "Archaeological site name. Marked as a required filter so consumer applications can restrict the import to a single site (pyArchInit databases typically store many sites in one us_table)."
-        },
-        "area": {
-            "is_filter": true,
-            "filter_required": false,
-            "display_name": "Excavation Area",
-            "description": "Excavation area / sector. Optional secondary filter, combined with 'sito' via AND."
-        },
-        "unita_tipo": {
-            "is_filter": true,
-            "filter_required": false,
-            "display_name": "Stratigraphic Unit Type",
-            "description": "Type of stratigraphic unit (US, USM, etc.). Optional filter combined with sito/area via AND."
-        },
-        "us": {
-            "node_type": "US",
-            "is_id": true
-        },
-        "d_stratigrafica": {
-            "node_type": "US",
-            "is_description": true,
-            "target_id_column": "US"
-        },
-        "d_interpretativa": {
-            "node_type": "PropertyNode",
-            "property_name": "Interpretation",
-            "display_name": "Interpretation",
-            "description": "Interpretation of the stratigraphic unit",
-            "create_empty": true
-        },
-        "attivita": {
-            "node_type": "PropertyNode",
-            "property_name": "Activity",
-            "display_name": "Activity type",
-            "description": "Type of archaeological activity",
-            "create_empty": true
-        },
-        "struttura": {
-            "node_type": "PropertyNode",
-            "property_name": "Structure",
-            "display_name": "Structure type",
-            "description": "Type of archaeological structure",
-            "create_empty": true
-        }
+        "sito":        { "is_filter": true, "filter_required": true,  "display_name": "Site" },
+        "unita_tipo":  { "is_filter": true, "filter_required": false, "display_name": "SU type", "_comment": "Drives the StratigraphicNode subclass (US/USM/USV...) and is a name component." },
+        "us":          { "node_type": "US", "is_id": true },
+        "entity_uuid": { "is_passthrough": true, "display_name": "Stable UUID", "_comment": "Tier-1 identity: value becomes node_id (== EMid, UUID v7) for idempotent re-import. Live demo DB + US_table.py use 'entity_uuid'; Enzo's graph_ingestor queries 'node_uuid' -> reconcile to ONE column name (see #25/#26)." },
+        "d_stratigrafica": { "node_type": "US", "is_description": true, "target_id_column": "us" },
+
+        "area":     { "node_type": "LocationNodeGroup", "location_kind": "study",      "is_filter": true, "filter_required": false, "display_name": "Area",    "description": "Excavation area" },
+        "settore":  { "node_type": "LocationNodeGroup", "location_kind": "study",      "display_name": "Sector",  "description": "Excavation sector" },
+        "saggio":   { "node_type": "LocationNodeGroup", "location_kind": "study",      "display_name": "Trench",  "description": "Sondage / trench" },
+        "ambient":  { "node_type": "LocationNodeGroup", "location_kind": "functional", "display_name": "Ambient", "description": "Functional space / room" },
+
+        "d_interpretativa":       { "node_type": "PropertyNode", "property_name": "Interpretation",         "display_name": "Interpretation" },
+        "lunghezza_max":          { "node_type": "PropertyNode", "property_name": "Length",                 "display_name": "Length (max)" },
+        "larghezza_media":        { "node_type": "PropertyNode", "property_name": "Width",                  "display_name": "Width (mean)" },
+        "altezza_max":            { "node_type": "PropertyNode", "property_name": "Height",                 "display_name": "Height (max)" },
+        "profondita_max":         { "node_type": "PropertyNode", "property_name": "Depth",                  "display_name": "Depth (max)" },
+        "spessore_usm":           { "node_type": "PropertyNode", "property_name": "Thickness",              "display_name": "Thickness (USM)" },
+        "colore":                 { "node_type": "PropertyNode", "property_name": "Color",                  "display_name": "Colour" },
+        "consistenza":            { "node_type": "PropertyNode", "property_name": "Compaction",             "display_name": "Compaction" },
+        "inclusi":                { "node_type": "PropertyNode", "property_name": "Inclusions",             "display_name": "Inclusions" },
+        "tecnica_muraria_usm":    { "node_type": "PropertyNode", "property_name": "Construction Technique", "display_name": "Masonry technique" },
+        "stato_di_conservazione": { "node_type": "PropertyNode", "property_name": "Conservation State",     "display_name": "Conservation state" },
+        "orientamento":           { "node_type": "PropertyNode", "property_name": "Orientation",            "display_name": "Orientation" },
+
+        "attivita":  { "node_type": "PropertyNode", "property_name": "Activity",  "display_name": "Activity",  "_comment": "Tier-1 keeps the legacy PropertyNode behaviour; ActivityNodeGroup (is_in_activity) is a Tier-2 option." },
+        "struttura": { "node_type": "PropertyNode", "property_name": "Structure", "display_name": "Structure" },
+
+        "schedatore":      { "node_type": "AuthorNode", "author_role": "compiler",   "display_name": "Compiler",   "_comment": "Tier-2: person -> shared AuthorNode (deduped by name), has_author edge. Role kept as provenance only." },
+        "direttore_us":    { "node_type": "AuthorNode", "author_role": "director",   "display_name": "Director" },
+        "responsabile_us": { "node_type": "AuthorNode", "author_role": "supervisor", "display_name": "Supervisor" },
+
+        "documentazione":  { "node_type": "DocumentNode", "doc_format": "pyarchinit_checklist", "doc_content_nature_default": "2d_object", "display_name": "Documentation", "_comment": "Tier-2: pyArchInit presence checklist [[label,'Si'],...]; each affirmative entry -> one per-US DocumentNode (has_documentation). All pyArchInit checklist types (Fotografie/Planimetrie/Sezioni/Diapositive/Fotopiano) are 2D." },
+        "doc_usv":         { "node_type": "DocumentNode", "doc_format": "path", "display_name": "USV document file", "_comment": "Tier-2: single file reference -> shared DocumentNode deduped by path, path stored as url." }
     },
-    "relations": [
+    "relations": [],
+    "epoch_mappings": [
         {
-            "source_column": "us",
-            "target_column": "d_interpretativa",
-            "edge_type": "has_property"
+            "edge_type": "has_first_epoch",
+            "period_column": "periodo_iniziale",
+            "phase_column": "fase_iniziale",
+            "site_column": "sito",
+            "_comment": "Initial period/phase -> the epoch in which the US first appears. EpochNode needs a concrete time span, absent from us_table, so resolve the code against periodizzazione_table.",
+            "join": {
+                "table": "periodizzazione_table",
+                "site_column": "sito",
+                "period_column": "periodo",
+                "phase_column": "fase",
+                "start_column": "cron_iniziale",
+                "end_column": "cron_finale",
+                "name_column": "descrizione"
+            }
         },
         {
-            "source_column": "us",
-            "target_column": "attivita",
-            "edge_type": "has_property"
-        },
-        {
-            "source_column": "us",
-            "target_column": "struttura",
-            "edge_type": "has_property"
+            "edge_type": "survive_in_epoch",
+            "period_column": "periodo_finale",
+            "phase_column": "fase_finale",
+            "site_column": "sito",
+            "_comment": "Final period/phase -> the latest epoch the US survives into. Rows without a final period are skipped (no edge).",
+            "join": {
+                "table": "periodizzazione_table",
+                "site_column": "sito",
+                "period_column": "periodo",
+                "phase_column": "fase",
+                "start_column": "cron_iniziale",
+                "end_column": "cron_finale",
+                "name_column": "descrizione"
+            }
         }
-    ]
+    ],
+    "_tier2_done": {
+        "_comment": "Landed in v1.6.2 -- handlers mirror _process_location_memberships. See issue #26.",
+        "periodo_iniziale / fase_iniziale / periodo_finale / fase_finale": "EpochNode via epoch_mappings (has_first_epoch / survive_in_epoch), span resolved through the periodizzazione_table join.",
+        "documentazione / doc_usv": "DocumentNode via has_documentation (checklist -> per-US docs; file path -> shared doc).",
+        "schedatore / direttore_us / responsabile_us": "AuthorNode via has_author (deduped per person)."
+    },
+    "_tier2_pending_handlers": {
+        "_comment": "Still NOT mapped -- need new importer handlers / disambiguation. See issue #26.",
+        "n_catalogo_generale / n_catalogo_interno / n_catalogo_internazionale": "Catalogue identifiers (empty on the demo DB). Closer to inventory ids than documents -- defer until the modelling is decided (DocumentNode vs. a dedicated identifier qualia).",
+        "quota_* (quota_min_usm / quota_max_usm / quota_abs / ...)": "Spatial qualia (Elevation / Absolute Position). Deferred: multiple quote collide on the single-PropertyNode-per-property_name id rule (needs disambiguated ids)."
+    }
 }
