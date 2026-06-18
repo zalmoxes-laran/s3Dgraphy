@@ -91,7 +91,8 @@ def _write_fixture(tmp_path):
             schedatore       TEXT,
             direttore_us     TEXT,
             documentazione   TEXT,
-            doc_usv          TEXT
+            doc_usv          TEXT,
+            node_uuid        TEXT
         )
         """
     )
@@ -121,17 +122,19 @@ def _write_fixture(tmp_path):
 
     # US1: phase 2 ; US2: sub-phase 2.1 ; US3: phase 2 + survives into 1.1.
     checklist = "[['Fotografie', 'Si'], ['Sezioni', 'No']]"
+    # node_uuid = canonical UUID v7 identity (added by the pyArchInit
+    # node_uuid backfill migration); carried into node_id via is_passthrough.
     rows = [
         (1, "S", "1", "A", "US", "layer 1", "2", "2", "", "",
-         "Luca Mandolesi", "", checklist, ""),
+         "Luca Mandolesi", "", checklist, "", "uuid-us-1"),
         (2, "S", "1", "A", "US", "layer 2", "2", "2.1", "", "",
-         "Luca Mandolesi", "", "[]", r"DosCo\plan.dxf"),
+         "Luca Mandolesi", "", "[]", r"DosCo\plan.dxf", "uuid-us-2"),
         (3, "S", "1", "A", "US", "layer 3", "2", "2", "1", "1",
          "Anna Rossi", "Luca Mandolesi", "[['Planimetrie', 'Si']]",
-         r"DosCo\plan.dxf"),
+         r"DosCo\plan.dxf", "uuid-us-3"),
     ]
     cur.executemany(
-        "INSERT INTO us_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+        "INSERT INTO us_table VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
     conn.commit()
     conn.close()
 
@@ -154,6 +157,7 @@ def _write_fixture(tmp_path):
             "settore": {"node_type": "LocationNodeGroup", "location_kind": "study"},
             "unita_tipo": {"display_name": "type"},
             "us": {"is_id": True, "node_type": "US"},
+            "node_uuid": {"is_passthrough": True},
             "d_stratigrafica": {"is_description": True},
             "schedatore": {"node_type": "AuthorNode", "author_role": "compiler"},
             "direttore_us": {"node_type": "AuthorNode", "author_role": "director"},
@@ -305,6 +309,13 @@ def test_path_document_shared(graph):
 # --------------------------------------------------------------------------
 # Edge validity + idempotency
 # --------------------------------------------------------------------------
+def test_passthrough_uses_node_uuid(graph):
+    """The canonical node_uuid (UUID v7) is carried into the US node_id
+    (is_passthrough), so re-import is idempotent on a migrated DB."""
+    us_ids = {n.node_id for n in graph.nodes if n.node_type == "US"}
+    assert us_ids == {"uuid-us-1", "uuid-us-2", "uuid-us-3"}
+
+
 def test_no_generic_connection_downgrades(graph):
     assert not any("not allowed" in w for w in graph.warnings)
 
@@ -329,3 +340,31 @@ def test_reimport_is_idempotent(tmp_path):
 def _us_id(g, name):
     return next(n.node_id for n in g.nodes
                if getattr(n, "node_type", None) == "US" and n.name == name)
+
+
+# --------------------------------------------------------------------------
+# Shipped-file consistency: quota property_names must be real qualia ids
+# --------------------------------------------------------------------------
+def test_shipped_quota_property_names_are_qualia_ids():
+    """Guard against drift between the shipped pyArchInit mapping and
+    em_qualia_types.json: every quota_* column maps to a property_name that
+    exists as a qualia `id` (exact-match resolution in rdf_exporter)."""
+    import json
+    cfg = _REPO_ROOT / "src" / "s3dgraphy"
+    mapping = json.loads(
+        (cfg / "mappings" / "pyarchinit" / "pyarchinit_us_mapping.json")
+        .read_text(encoding="utf-8"))
+    qualia = json.loads(
+        (cfg / "JSON_config" / "em_qualia_types.json").read_text(encoding="utf-8"))
+    qids = {q["id"]
+            for cat in qualia.get("qualia_categories", [])
+            for sub in (cat.get("subcategories") or {}).values()
+            for q in (sub.get("qualia") or [])
+            if q.get("id") and (q.get("mappings") or {}).get("cidoc_crm")}
+    quota_pnames = {
+        col: c["property_name"]
+        for col, c in mapping["column_mappings"].items()
+        if col.startswith("quota_") and c.get("property_name")}
+    assert quota_pnames, "expected quota_* columns in the shipped mapping"
+    missing = {col: pn for col, pn in quota_pnames.items() if pn not in qids}
+    assert not missing, f"quota property_names not found as qualia ids: {missing}"

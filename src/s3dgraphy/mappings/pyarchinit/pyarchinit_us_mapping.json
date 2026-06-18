@@ -1,7 +1,7 @@
 {
     "name": "pyArchInit US Table",
-    "description": "Mapping for pyArchInit us_table -> Extended Matrix graph. Tier 1: identity via entity_uuid passthrough (#14), spatial via LocationNodeGroup (#24), and intrinsic qualia typed -> CIDOC (E54 Dimension / E55 Type / E57 Material) through em_qualia_types.json. Tier 2 (this version): periodo/fase -> EpochNode via has_first_epoch / survive_in_epoch (resolved against periodizzazione_table by epoch_mappings), documentazione/doc_usv -> DocumentNode via has_documentation, schedatore/direttore_us/responsabile_us -> AuthorNode via has_author. Remaining deferred columns are in _tier2_pending_handlers (issue #26).",
-    "version": "1.6.2",
+    "description": "Mapping for pyArchInit us_table -> Extended Matrix graph. Tier 1: identity via node_uuid passthrough (#14; canonical UUID v7 column added by the pyArchInit node_uuid backfill migration), spatial via LocationNodeGroup (#24), and intrinsic qualia typed -> CIDOC (E54 Dimension / E55 Type / E57 Material) through em_qualia_types.json. Tier 2 (this version): periodo/fase -> EpochNode via has_first_epoch / survive_in_epoch (resolved against periodizzazione_table by epoch_mappings), documentazione/doc_usv -> DocumentNode via has_documentation, schedatore/direttore_us/responsabile_us -> AuthorNode via has_author. Remaining deferred columns are in _tier2_pending_handlers (issue #26).",
+    "version": "1.6.4",
     "table_settings": {
         "format_type": "sqlite",
         "table_name": "us_table",
@@ -12,7 +12,7 @@
         "sito":        { "is_filter": true, "filter_required": true,  "display_name": "Site" },
         "unita_tipo":  { "is_filter": true, "filter_required": false, "display_name": "SU type", "_comment": "Drives the StratigraphicNode subclass (US/USM/USV...) and is a name component." },
         "us":          { "node_type": "US", "is_id": true },
-        "entity_uuid": { "is_passthrough": true, "display_name": "Stable UUID", "_comment": "Tier-1 identity: value becomes node_id (== EMid, UUID v7) for idempotent re-import. Live demo DB + US_table.py use 'entity_uuid'; Enzo's graph_ingestor queries 'node_uuid' -> reconcile to ONE column name (see #25/#26)." },
+        "node_uuid": { "is_passthrough": true, "display_name": "Stable UUID", "_comment": "Tier-1 identity: value becomes node_id (== EMid, UUID v7) for idempotent re-import. CANONICAL column = 'node_uuid' (UUID v7), added + backfilled by pyArchInit migration scripts/migrations/2026_05_node_uuid_backfill.py on us_table/inventario_materiali_table/periodizzazione_table (fresh uuid7 per row, NOT copied from the legacy v4 'entity_uuid'); this is what Enzo's graph_ingestor reads. On a PRE-migration DB the column is absent -> importer falls back to uuid4 (run the migration first for idempotent ids). The resident demo DB is pre-migration (only legacy 'entity_uuid')." },
         "d_stratigrafica": { "node_type": "US", "is_description": true, "target_id_column": "us" },
 
         "area":     { "node_type": "LocationNodeGroup", "location_kind": "study",      "is_filter": true, "filter_required": false, "display_name": "Area",    "description": "Excavation area" },
@@ -35,6 +35,15 @@
 
         "attivita":  { "node_type": "PropertyNode", "property_name": "Activity",  "display_name": "Activity",  "_comment": "Tier-1 keeps the legacy PropertyNode behaviour; ActivityNodeGroup (is_in_activity) is a Tier-2 option." },
         "struttura": { "node_type": "PropertyNode", "property_name": "Structure", "display_name": "Structure" },
+
+        "quota_abs":      { "node_type": "PropertyNode", "property_name": "elevation",              "display_name": "Absolute elevation (MASL)", "_comment": "Spatial qualia E54 Dimension. Each quota -> its OWN property_name so they don't collide on the {node_id}_{property_name} id rule. property_name == em_qualia_types.json `id` for exact-match CIDOC resolution (the resolver lowercases but does NOT map spaces->underscores, so snake-case ids are the safe form). NOTE: on the resident demo DB these us_table columns are EMPTY (quote live in the separate pyarchinit_quote table) — populated only on DBs that record quote inline." },
+        "quota_relativa": { "node_type": "PropertyNode", "property_name": "elevation_relative",     "display_name": "Relative elevation" },
+        "quota_min_abs":  { "node_type": "PropertyNode", "property_name": "elevation_min_absolute", "display_name": "Min absolute elevation" },
+        "quota_max_abs":  { "node_type": "PropertyNode", "property_name": "elevation_max_absolute", "display_name": "Max absolute elevation" },
+        "quota_min_rel":  { "node_type": "PropertyNode", "property_name": "elevation_min_relative", "display_name": "Min relative elevation" },
+        "quota_max_rel":  { "node_type": "PropertyNode", "property_name": "elevation_max_relative", "display_name": "Max relative elevation" },
+        "quota_min_usm":  { "node_type": "PropertyNode", "property_name": "elevation_min_usm",      "display_name": "Min elevation (USM)" },
+        "quota_max_usm":  { "node_type": "PropertyNode", "property_name": "elevation_max_usm",      "display_name": "Max elevation (USM)" },
 
         "schedatore":      { "node_type": "AuthorNode", "author_role": "compiler",   "display_name": "Compiler",   "_comment": "Tier-2: person -> shared AuthorNode (deduped by name), has_author edge. Role kept as provenance only." },
         "direttore_us":    { "node_type": "AuthorNode", "author_role": "director",   "display_name": "Director" },
@@ -79,14 +88,15 @@
         }
     ],
     "_tier2_done": {
-        "_comment": "Landed in v1.6.2 -- handlers mirror _process_location_memberships. See issue #26.",
-        "periodo_iniziale / fase_iniziale / periodo_finale / fase_finale": "EpochNode via epoch_mappings (has_first_epoch / survive_in_epoch), span resolved through the periodizzazione_table join.",
-        "documentazione / doc_usv": "DocumentNode via has_documentation (checklist -> per-US docs; file path -> shared doc).",
-        "schedatore / direttore_us / responsabile_us": "AuthorNode via has_author (deduped per person)."
+        "_comment": "Handlers mirror _process_location_memberships. See issue #26.",
+        "periodo_iniziale / fase_iniziale / periodo_finale / fase_finale": "v1.6.2 EpochNode via epoch_mappings (has_first_epoch / survive_in_epoch), span resolved through the periodizzazione_table join.",
+        "documentazione / doc_usv": "v1.6.2 DocumentNode via has_documentation (checklist -> per-US docs; file path -> shared doc).",
+        "schedatore / direttore_us / responsabile_us": "v1.6.2 AuthorNode via has_author (deduped per person).",
+        "quota_abs / quota_relativa / quota_min_abs / quota_max_abs / quota_min_rel / quota_max_rel / quota_min_usm / quota_max_usm": "v1.6.3 spatial qualia E54 Dimension, each a distinct property_name == em_qualia_types.json elevation* id (no collision). Empty on the demo DB (quote live in pyarchinit_quote)."
     },
     "_tier2_pending_handlers": {
-        "_comment": "Still NOT mapped -- need new importer handlers / disambiguation. See issue #26.",
-        "n_catalogo_generale / n_catalogo_interno / n_catalogo_internazionale": "Catalogue identifiers (empty on the demo DB). Closer to inventory ids than documents -- defer until the modelling is decided (DocumentNode vs. a dedicated identifier qualia).",
-        "quota_* (quota_min_usm / quota_max_usm / quota_abs / ...)": "Spatial qualia (Elevation / Absolute Position). Deferred: multiple quote collide on the single-PropertyNode-per-property_name id rule (needs disambiguated ids)."
+        "_comment": "Still NOT mapped -- need new importer handlers / a modelling decision. See issue #26.",
+        "n_catalogo_generale / n_catalogo_interno / n_catalogo_internazionale": "Catalogue identifiers (empty on the demo DB). Closer to inventory ids than documents -- defer until the modelling is decided (DocumentNode vs. a dedicated identifier qualia, cf. em_qualia_types.json 'inventory_number' P48_has_preferred_identifier).",
+        "pyarchinit_quote table": "Per-point elevations (700 rows) live in the separate pyarchinit_quote table, not us_table. A future handler could join it (like periodizzazione_table) for richer elevation qualia / GeoPositionNode points."
     }
 }
