@@ -276,7 +276,7 @@ The connections model includes mappings to:
 - **CRMdig** - Digital provenance extension
 - **CRMgeo** - Geographic extension
 - **CRMinf** - Argumentation extension
-- **CIDOC-S3D** - Extended Matrix custom extension
+- **CRMem** - Extended Matrix custom extension (formerly *CIDOC-S3D*; formal draft = the ``em:`` namespace in ``em.ttl``. The per-type ``CIDOC-S3D:`` strings listed on this page document the legacy v1.5 ``cidoc_s3d`` field, superseded in datamodel v1.6.0 by ``em_extension`` URIs)
 
 Edge Type Categories
 ~~~~~~~~~~~~~~~~~~~~

@@ -150,7 +150,7 @@ class JSONExporter:
             # extra data fields (``model`` / ``prompt_reference``) flow
             # through ``node.data.copy()`` automatically.
             "authors": {},
-            "stratigraphic": {"US": {}, "USVs": {}, "SF": {}, "VSF": {},"USVn": {}, "USD": {}, "serSU": {}, "serUSVn": {}, "serUSVs": {}, "TSU": {}, "SE": {}, "unknown": {}},
+            "stratigraphic": {"US": {}, "USVs": {}, "SF": {}, "VSF": {}, "RSF": {}, "USVn": {}, "USD": {}, "serSU": {}, "serUSVn": {}, "serUSVs": {}, "serUSD": {}, "TSU": {}, "UL": {}, "USN": {}, "BR": {}, "SE": {}, "unknown": {}},
             "epochs": {},
             "groups": {},
             # LocationNodeGroup is a spatial / locational membership
@@ -214,7 +214,7 @@ class JSONExporter:
                 node_data = self._prepare_node_data(node)
                 nodes["embargoes"][node.node_id] = node_data
 
-            elif node.node_type in ["US", "USVs", "SF", "USVn", "USD", "VSF", "serSU", "serUSVn", "serUSVs", "TSU", "SE", "unknown"]:
+            elif node.node_type in ["US", "USVs", "SF", "USVn", "USD", "VSF", "RSF", "serSU", "serUSVn", "serUSVs", "serUSD", "TSU", "UL", "USN", "BR", "SE", "unknown"]:
                 node_data = self._prepare_node_data(node)
                 nodes["stratigraphic"][node.node_type][node.node_id] = node_data
                 
@@ -327,9 +327,9 @@ class JSONExporter:
     # the public node_type strings so the test stays in sync with
     # ``_process_nodes``' stratigraphic branch.
     _STRATIGRAPHIC_NODE_TYPES = frozenset({
-        "US", "USVs", "SF", "VSF", "USVn", "USD",
-        "serSU", "serUSVn", "serUSVs",
-        "TSU", "SE", "unknown",
+        "US", "USVs", "SF", "VSF", "RSF", "USVn", "USD",
+        "serSU", "serUSVn", "serUSVs", "serUSD",
+        "TSU", "UL", "USN", "BR", "SE", "unknown",
     })
 
     def _prepare_node_data(self, node):

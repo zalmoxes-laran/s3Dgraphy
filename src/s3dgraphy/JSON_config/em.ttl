@@ -199,8 +199,8 @@ em:SeriesOfNonStructuralVirtualSU
 em:StratigraphicEvent
     a owl:Class ;
     rdfs:label "Stratigraphic Event (SE)"@en ;
-    rdfs:subClassOf crm:E5_Event ;
-    rdfs:comment "An event that creates, modifies, or destroys a stratigraphic unit (e.g. an earthquake causing a plaster collapse, an act of demolition). More general than crmarchaeo:A4 (Genesis: formation only) or A5 (Modification only): the EM concept spans formation, modification and destruction. May be enriched by a 3D simulation (em:RepresentationModel) of the event itself. Maps to: Python StratigraphicEventNode (node_type='SE')."@en .
+    rdfs:subClassOf crmarchaeo:A5_Stratigraphic_Modification ;
+    rdfs:comment "An event that creates, modifies, or destroys a stratigraphic unit (e.g. an earthquake causing a plaster collapse, an act of demolition). Re-anchored 2026-07-11 from generic crm:E5_Event to crmarchaeo:A5_Stratigraphic_Modification: formation is A4 (subclass of A5), modification is A5, destruction is A5-as-disturbance (AP8) plus A4 genesis of the resulting A3 interface; E5 remains reachable transitively via A5 < S18 < E5. Cf. Guillem et al. 2024 (SWODCH). May be enriched by a 3D simulation (em:RepresentationModel) of the event itself. Maps to: Python StratigraphicEventNode (node_type='SE')."@en .
 
 em:TransformationSU
     a owl:Class ;
@@ -438,5 +438,42 @@ em:physicallyEquals
 
 
 # ============================================================================
-# End of em.ttl v1.6.0
+# v1.6.1 additions (2026-07-10) — serialisation-completeness pass
+# (WP3 coverage analysis, sections 10 / B.1 / B.2). New edge subproperties;
+# no class changes.
+# ============================================================================
+
+em:hasVisualReference
+    a owl:ObjectProperty ;
+    rdfs:label "has visual reference"@en ;
+    rdfs:subPropertyOf crm:P138i_has_representation ;
+    rdfs:domain em:Paradata ;
+    rdfs:range crm:E36_Visual_Item ;
+    rdfs:comment "The paradata node (property / extractor / combiner) is visually illustrated or anchored by a visual document (plate, photograph, annotated image). Distinct from em: extraction sourcing (P67/J7): a visual reference shows, an extraction source justifies. The RDF exporter co-types the target document as E36_Visual_Item. Maps to: connections_datamodel edge 'has_visual_reference'."@en .
+
+em:survivesInEpoch
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf crm:P132_spatiotemporally_overlaps_with ;
+    rdfs:label "survives in epoch"@en ;
+    rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:range crm:E4_Period ;
+    rdfs:comment "The unit's spacetime volume (via P196_defines) overlaps the epoch's: survival through (part of) an epoch is overlap, not containment. Epoch attribution is an interpretive act; its justification travels in the epoch's and edge's paradata chain. Maps to: connections_datamodel edge 'survive_in_epoch'."@en .
+
+em:firstAttestedInEpoch
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf crm:P10_falls_within ;
+    rdfs:label "first attested in epoch"@en ;
+    rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
+    rdfs:range crm:E4_Period ;
+    rdfs:comment "Documented shortcut: the unit was brought into existence (P92i, genesis event / SE node) during the epoch (event P10_falls_within epoch; crmarchaeo:AP25_occurs_during where an SE node is present). Declared subPropertyOf P10 on the unit's defining spacetime volume (P196). Maps to: connections_datamodel edge 'has_first_epoch'."@en .
+
+em:hasAuthor
+    a owl:ObjectProperty ;
+    rdfs:subPropertyOf prov:wasAttributedTo ;
+    rdfs:label "has author"@en ;
+    rdfs:range em:Author ;
+    rdfs:comment "Domain-neutral authorship attribution (any graph entity to a human or AI author). Replaces the earlier P94_has_created reading (invalid domain/range for physical units) and L10_had_input (digital machine events, not authorship). Maps to: connections_datamodel edge 'has_author'."@en .
+
+# ============================================================================
+# End of em.ttl v1.6.1
 # ============================================================================

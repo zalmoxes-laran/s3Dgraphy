@@ -237,10 +237,17 @@ class _Datamodel:
                 result.append(iri)
         return result
 
-    def get_edge_mapping(self, edge_type: str) -> Tuple[Optional[URIRef], Optional[str], bool]:
+    def get_edge_mapping(self, edge_type: str) -> Tuple[Optional[URIRef], Optional[URIRef], Optional[str], bool]:
         """
-        Returns (predicate_iri, type_tag, deprecated).
+        Returns (predicate_iri, extension_iri, type_tag, deprecated).
 
+        predicate_iri  — the core predicate from mapping.cidoc.
+        extension_iri  — the resolved mapping.extension_mapping predicate
+                         (e.g. em:hasVisualReference, em:survivesInEpoch),
+                         or None when absent/unresolvable. The caller emits
+                         BOTH, generalising the AP11 dual-emission pattern:
+                         specific em: subproperty for expressive SPARQL,
+                         generic CRM predicate for CRM-only readers.
         type_tag is set for the AP11 family — caller resolves the specific
         subproperty via AP11_SUBPROPS. deprecated edges should be skipped on
         write (already canonicalised aliases like has_timebranch).
@@ -248,15 +255,22 @@ class _Datamodel:
         edges = self.connections_datamodel.get("edge_types", {})
         entry = edges.get(edge_type) or {}
         if not entry:
-            return None, None, False
+            return None, None, None, False
         deprecated = bool(entry.get("deprecated"))
         mapping = entry.get("mapping") or {}
         type_tag = mapping.get("type_tag")
         cidoc = mapping.get("cidoc")
+        # extension_mapping may carry a legacy parenthesised reverse label,
+        # e.g. "AP13_has_stratigraphic_relation (is_stratigraphic_relation_of)"
+        # — strip it before resolution.
+        ext_raw = mapping.get("extension_mapping")
+        if isinstance(ext_raw, str) and "(" in ext_raw:
+            ext_raw = ext_raw.split("(", 1)[0].strip()
+        ext_iri = _resolve_prefixed(ext_raw)
         # AP11 family: prefer the generic AP11 predicate; caller adds subproperty.
         if type_tag:
-            return CRMARCHAEO.AP11_has_physical_relation, type_tag, deprecated
-        return _resolve_prefixed(cidoc), None, deprecated
+            return CRMARCHAEO.AP11_has_physical_relation, None, type_tag, deprecated
+        return _resolve_prefixed(cidoc), ext_iri, None, deprecated
 
     def get_qualia_crm_iri(self, property_type: Optional[str]) -> Optional[URIRef]:
         """Resolve a property_type string to its CIDOC class IRI.
@@ -518,6 +532,106 @@ class RDFExporter:
         for edge in g.edges:
             self._serialize_edge(g, edge, ctx)
 
+        # CRMinf belief propositions (J4 → I17) — needs the full edge
+        # topology, so it runs as a post-pass after nodes and edges.
+        self._emit_belief_propositions(g, ctx)
+
+    def _emit_belief_propositions(self, g: S3DGraph, ctx) -> None:
+        """J4 linking: connect each argumentation belief to its proposition.
+
+        Design (WP3 coverage analysis, Appendix D.3, approved E.D.
+        2026-07-11). The belief skeleton (<arg> J2_concluded_that
+        <arg>/belief, typed I2) is emitted per argumentation node by
+        ``_emit_belief_skeleton``. This post-pass adds WHAT each belief
+        concludes, derived from the existing graph topology — the user
+        never authors beliefs:
+
+        * Property claim ("US12 has height 3.2 m"): for every chain
+          unit --has_property--> property --has_data_provenance--> arg,
+          emit an I17 One-Proposition Set at <property>/proposition:
+              <i17> a crminf:I17_One-Proposition_Set ;
+                    crminf:J30_has_domain <unit> ;
+                    crminf:J32_has_property_type <s3d:qualia_TYPE> ;
+                    crminf:J31_has_range "VALUE" .
+              <arg>/belief crminf:J4_that <i17> .
+          The J32 target is a placeholder E55 IRI in the s3d: namespace
+          until the SKOS vocabulary layer (Appendix E) provides
+          dereferenceable concept URIs.
+
+        * Reconstruction claim ("there was a colonnade here"): when the
+          justified property is the existence of a virtual-family unit
+          (qualia id 'existence'), the proposition IS the unit itself —
+          em:VirtualSU is declared subclass of crminf:I4 in em.ttl — so
+          the belief links J4 directly to the unit and no I17 is minted.
+
+        * J5 holds to be: when the same argumentation node also
+          justifies a confidence_level property (typed I6_Belief_Value
+          via the qualia catalogue), the belief links J5 to it.
+        """
+        VIRTUAL_TYPES = {"USVs", "USVn", "USD", "VSF",
+                         "serUSVs", "serUSVn", "serUSD"}
+        ARG_TYPES = {"extractor", "combiner"}
+
+        node_by_id = {n.node_id: n for n in g.nodes}
+
+        # property_id → unit_id (has_property: unit → property)
+        prop_unit: Dict[str, str] = {}
+        # arg_id → [property_id] (has_data_provenance: property → arg)
+        arg_props: Dict[str, List[str]] = {}
+
+        for edge in g.edges:
+            if edge.edge_type == "has_property":
+                prop_unit[edge.edge_target] = edge.edge_source
+            elif edge.edge_type == "has_data_provenance":
+                tgt = node_by_id.get(edge.edge_target)
+                if tgt is not None and getattr(tgt, "node_type", None) in ARG_TYPES:
+                    arg_props.setdefault(edge.edge_target, []).append(edge.edge_source)
+
+        for arg_id, prop_ids in arg_props.items():
+            belief_iri = URIRef(str(self._node_iri(g.graph_id, arg_id)) + "/belief")
+            for prop_id in prop_ids:
+                prop_node = node_by_id.get(prop_id)
+                if prop_node is None:
+                    continue
+                ptype = getattr(prop_node, "property_type", None)
+                if not ptype or (isinstance(ptype, str) and ptype.lower() == "string"):
+                    ptype = getattr(prop_node, "name", None) or "unknown"
+                unit_id = prop_unit.get(prop_id)
+
+                # J5: confidence qualia → I6 Belief Value
+                if str(ptype).lower().endswith("confidence_level"):
+                    ctx.add((belief_iri, CRMINF.J5_holds_to_be,
+                             self._node_iri(g.graph_id, prop_id)))
+                    continue
+
+                # Reconstruction claim: belief J4 → the virtual unit (⊂ I4)
+                unit_node = node_by_id.get(unit_id) if unit_id else None
+                if (unit_node is not None
+                        and getattr(unit_node, "node_type", None) in VIRTUAL_TYPES
+                        and str(ptype).lower().endswith("existence")):
+                    ctx.add((belief_iri, CRMINF.J4_that,
+                             self._node_iri(g.graph_id, unit_id)))
+                    self.stats["belief_propositions"] = self.stats.get("belief_propositions", 0) + 1
+                    continue
+
+                # Property claim: mint the I17 One-Proposition Set
+                prop_iri = self._node_iri(g.graph_id, prop_id)
+                i17_iri = URIRef(str(prop_iri) + "/proposition")
+                ctx.add((i17_iri, RDF.type, CRMINF["I17_One-Proposition_Set"]))
+                if unit_id:
+                    ctx.add((i17_iri, CRMINF.J30_has_domain,
+                             self._node_iri(g.graph_id, unit_id)))
+                qualia_iri = S3D["qualia_" + str(ptype).rsplit(".", 1)[-1]]
+                ctx.add((i17_iri, CRMINF.J32_has_property_type, qualia_iri))
+                ctx.add((qualia_iri, RDF.type, CRM.E55_Type))
+                raw_value = getattr(prop_node, "value", None)
+                if raw_value is None or (isinstance(raw_value, str) and not raw_value.strip()):
+                    raw_value = getattr(prop_node, "description", None)
+                if raw_value is not None and (not isinstance(raw_value, str) or raw_value.strip()):
+                    ctx.add((i17_iri, CRMINF.J31_has_range, Literal(raw_value)))
+                ctx.add((belief_iri, CRMINF.J4_that, i17_iri))
+                self.stats["belief_propositions"] = self.stats.get("belief_propositions", 0) + 1
+
     # ── node serialization ──────────────────────────────────────────────────
 
     def _serialize_node(self, g: S3DGraph, node: Any, ctx) -> None:
@@ -698,12 +812,41 @@ class RDFExporter:
             source = getattr(node, "source", None)
             if source:
                 ctx.add((node_iri, CRMINF.J7_is_based_on_evidence_from, Literal(source)))
+            self._emit_belief_skeleton(node_iri, ctx)
+
+        elif node_type == "combiner":
+            self._emit_belief_skeleton(node_iri, ctx)
+
+    def _emit_belief_skeleton(self, node_iri: URIRef, ctx) -> None:
+        """CRMinf belief expansion (I2) for argumentation nodes.
+
+        EM deliberately collapses the CRMinf belief layer: the conclusion of
+        an Extractor (I7 Belief Adoption) or Combiner (I5 Inference Making)
+        is implicit in the existence of the node it justifies. To make the
+        chain CRMinf-complete on export WITHOUT asking users to author
+        beliefs explicitly, each argumentation node deterministically emits
+        its concluded belief:
+
+            <node> J2_concluded_that <node>/belief .
+            <node>/belief a I2_Belief .
+
+        J2 has domain I1_Argumentation — valid for both I5 and I7.
+
+        J4_that and J5_holds_to_be are emitted by the graph-level post-pass
+        ``_emit_belief_propositions`` (design approved E.D. 2026-07-11):
+        property claims get a minted I17 One-Proposition_Set, reconstruction
+        claims link J4 directly to the virtual unit (⊂ I4), confidence_level
+        qualia are linked via J5 as I6 Belief Values.
+        """
+        belief_iri = URIRef(str(node_iri) + "/belief")
+        ctx.add((node_iri, CRMINF.J2_concluded_that, belief_iri))
+        ctx.add((belief_iri, RDF.type, CRMINF.I2_Belief))
 
     # ── edge serialization ──────────────────────────────────────────────────
 
     def _serialize_edge(self, g: S3DGraph, edge: Any, ctx) -> None:
         edge_type = edge.edge_type
-        predicate, type_tag, deprecated = self.datamodel.get_edge_mapping(edge_type)
+        predicate, ext_iri, type_tag, deprecated = self.datamodel.get_edge_mapping(edge_type)
 
         if deprecated:
             self.stats["edges_skipped_deprecated"] += 1
@@ -721,8 +864,22 @@ class RDFExporter:
             self.stats["edges_emitted"] += 1
             return
 
+        # has_visual_reference co-typing: the target document is asserted to
+        # be an E36 Visual Item — required for the P138i_has_representation
+        # mapping to be range-consistent (an E31 Document that visually
+        # anchors a paradata node is also a visual item). See Appendix B.1
+        # of the WP3 coverage analysis (2026-07-10).
+        if edge_type == "has_visual_reference":
+            ctx.add((target_iri, RDF.type, CRM.E36_Visual_Item))
+
         if predicate is not None:
             ctx.add((source_iri, predicate, target_iri))
+            # Dual emission (generalised AP11 pattern): also assert the
+            # specific em:/extension subproperty when one is declared and
+            # resolvable, so expressive SPARQL works without inference
+            # while CRM-only readers still see the core predicate.
+            if ext_iri is not None and ext_iri != predicate:
+                ctx.add((source_iri, ext_iri, target_iri))
             self.stats["edges_emitted"] += 1
         else:
             # Fallback: emit as generic P130_shows_features_of so the

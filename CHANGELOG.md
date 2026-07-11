@@ -2,6 +2,32 @@
 
 All notable changes to **s3dgraphy** are documented here.
 
+## [Unreleased]
+
+### Added (2026-07-11 — .em.json v1 freeze)
+- **`.em.json` v1 native format** (frozen 2026-07-11): `exporter/emjson_exporter.py`
+  (header with format semver, generator, datamodel_versions, ontology_versions;
+  FLAT graph section: nodes[]/edges[]; optional layout section) and
+  `importer/emjson_importer.py` (Node.node_type_map factory, generic
+  constructor binding, graceful degradation for unknown node types,
+  count-stable round-trip). Round-trip test: `tests/test_emjson_roundtrip.py`.
+  Design decision record: EMStudio repo, `docs/emjson-v1-draft.md` — the flat
+  shape makes the bucket-enumeration bug class structurally impossible;
+  the bucketed Heriverse payload (json_exporter) remains as legacy
+  transitional format until Heriverse 1.6 adopts `.em.json`.
+- `referenced_ontology_versions` header block in node and connections
+  datamodels (2026-07-10).
+
+### Changed (2026-07-10/11 — CIDOC serialisation pass, em.ttl → v1.6.1)
+- RDF exporter: dual emission (em: subproperty + CRM predicate) generalised;
+  CRMinf belief skeleton (J2→I2) with J4→I17 One-Proposition Set /
+  J4→virtual-unit / J5→I6 expansion; has_visual_reference → P138i + E36
+  co-typing; has_author → prov:wasAttributedTo; epoch edges → P10/P132
+  (AP13/AP9 removed); SE re-anchored E5 → crmarchaeo:A5; confidence_level
+  qualia → crminf:I6_Belief_Value.
+- json_exporter: RSF, UL, USN, serUSD, BR added to the stratigraphic buckets.
+
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 

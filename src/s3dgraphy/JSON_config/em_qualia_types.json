@@ -1151,9 +1151,9 @@
               {
                 "id": "confidence_level",
                 "name": "Confidence Level",
-                "description": "Numerical confidence in the assertion (0-100%). The EM-canonical scalar for paradata-supported claims.",
+                "description": "Numerical confidence in the assertion (0-100%). The EM-canonical scalar for paradata-supported claims. CRM mapping changed 2026-07-10: was E54_Dimension; a confidence is the value a belief is held with, i.e. crminf:I6_Belief_Value (see WP3 coverage analysis G5 / Appendix C). The RDF exporter's qualia-precedence rule types the PropertyNode accordingly.",
                 "mappings": {
-                  "cidoc_crm": "E54_Dimension"
+                  "cidoc_crm": "crminf:I6_Belief_Value"
                 },
                 "data_type": "percentage",
                 "range": [0, 100],

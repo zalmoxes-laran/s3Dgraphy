@@ -101,7 +101,7 @@ Key Features
    - CRMdig (digital provenance)
    - CRMgeo (geographic)
    - CRMinf (argumentation)
-   - CIDOC-S3D (Extended Matrix custom)
+   - CRMem (Extended Matrix custom extension; formerly CIDOC-S3D — em: namespace in em.ttl)
 
 **Performance Optimized**
    Graph indexing system for efficient queries on large datasets

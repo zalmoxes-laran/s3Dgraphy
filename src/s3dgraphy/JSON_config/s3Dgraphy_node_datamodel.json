@@ -12,6 +12,18 @@
     "PROV-O",
     "CRMs3D"
   ],
+  "referenced_ontology_versions": {
+    "_comment": "Versions of the reference ontologies this datamodel's mappings are audited against. Update via the mapping-update procedure (see docs: 'Updating the CIDOC mapping') whenever a new official release is adopted.",
+    "CIDOC-CRM": {"version": "7.1.3", "source": "https://cidoc-crm.org/versions-of-the-cidoc-crm"},
+    "CRMarchaeo": {"version": "2.1.1", "source": "https://cidoc-crm.org/crmarchaeo/", "note": "official OWL is internally aligned to CIDOC-CRM 7.1.2 and CRMsci 2.0"},
+    "CRMsci": {"version": "3.1", "source": "https://cidoc-crm.org/crmsci/"},
+    "CRMdig": {"version": "5.0", "source": "https://cidoc-crm.org/crmdig/"},
+    "CRMgeo": {"version": "1.2", "source": "https://cidoc-crm.org/crmgeo/"},
+    "CRMinf": {"version": "1.2.1", "source": "https://cidoc-crm.org/crminf/"},
+    "HDT-O": {"version": "1.0", "source": "ECHOES deliverable D7.1 'The Digital Commons' (project 101157364)"},
+    "PROV-O": {"version": "W3C Recommendation 2013-04-30", "source": "https://www.w3.org/TR/prov-o/"},
+    "CRMs3D": {"version": "1.6.0", "source": "internal em.ttl / hdto_extension.ttl companion ontologies"}
+  },
   "node_types": {
     "Node": {
       "class": "Node",
@@ -424,15 +436,15 @@
           "description": "An event that creates, modifies, or destroys a stratigraphic unit (e.g. an earthquake causing a plaster collapse, an act of demolition, the start of construction). Distinct from the resulting unit itself: an SE is the PROCESS, the SU is the result. Can be enriched by a 3D simulation (em:RepresentationModel) of the event. May be paired with its resulting unit to provide a temporal range bracketing the action.",
           "s3Dgraphy_file": "stratigraphic_node.py",
           "mapping": {
-            "cidoc": "E5 Event",
+            "cidoc": "A5 Stratigraphic Modification",
             "cidoc_s3d": null,
-            "alternative": "E5 Event + A4 Stratigraphic Genesis (for formation) or A5 Stratigraphic Modification (for modification) or E64 End of Existence (for destruction)",
-            "rationale": "SE spans formation (A4), modification (A5), and destruction (E64). The generic parent is E5 Event; specific CRMarchaeo subclasses A4/A5 are alternatives used when the event nature is precisely typed. Legacy mapping 'A4 Stratigraphic Genesis' was too narrow (formation only)."
+            "alternative": "A4 Stratigraphic Genesis (when the event creates a unit or an interface) + E64 End of Existence (paired with the BR node for the destroyed unit's end of life)",
+            "rationale": "Changed 2026-07-11 (was generic E5 Event): A5 Stratigraphic Modification covers the whole SE span within CRMarchaeo. Formation is A4 (A4 is a subclass of A5); modification is A5 itself; destruction is A5-as-disturbance (AP8 disturbed) plus, for the cut it produces, A4 genesis of the A3 interface. Cf. Guillem et al. 2024 (SWODCH), which models genesis events as A4 with AP7_produced. E5 remains reachable transitively (A5 is a subclass of S18 Alteration, itself a subclass of E5). See WP3 coverage analysis, Appendix D.1."
           },
           "em_extension": {
             "uri": "em:StratigraphicEvent",
             "rdf_type": "owl:Class",
-            "subclass_of": ["crm:E5_Event"],
+            "subclass_of": ["crmarchaeo:A5_Stratigraphic_Modification"],
             "extension_status": "proposed"
           },
           "properties": {
