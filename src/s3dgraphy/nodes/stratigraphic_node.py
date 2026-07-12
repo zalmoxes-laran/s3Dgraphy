@@ -25,7 +25,19 @@ class StratigraphicUnit(StratigraphicNode):
         self.label = "US (or SU)"
         self.detailed_description = "Stratigraphic Unit (SU) or negative stratigraphic unit."
 
-class StructuralVirtualStratigraphicUnit(StratigraphicNode):
+class VirtualStratigraphicUnit(StratigraphicNode):
+    """Abstract parent of the virtual stratigraphic units (USV/s, USV/n).
+
+    Introduced 2026-07-12 (datamodel curation, EMStudio ADR-001): the
+    connections datamodel references ``VirtualStratigraphicUnit`` in
+    ``allowed_connections`` but no such class existed — the concrete USV
+    classes descended from ``StratigraphicNode`` directly, so class-based
+    rule matching had to special-case the name. No ``node_type``: the class
+    is abstract, only its subclasses are instantiated.
+    """
+
+
+class StructuralVirtualStratigraphicUnit(VirtualStratigraphicUnit):
     node_type = "USVs"
 
     def __init__(self, node_id, name, description=""):
@@ -71,7 +83,7 @@ class SeriesOfDocumentaryStratigraphicUnit(StratigraphicNode):
         self.detailed_description = "Series of Documentary Stratigraphic Units (USD)."
 
 
-class NonStructuralVirtualStratigraphicUnit(StratigraphicNode):
+class NonStructuralVirtualStratigraphicUnit(VirtualStratigraphicUnit):
     node_type = "USVn"
     def __init__(self, node_id, name, description=""):
         super().__init__(node_id, name, description)
