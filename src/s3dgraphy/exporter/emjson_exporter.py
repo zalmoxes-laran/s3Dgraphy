@@ -70,6 +70,14 @@ def _node_payload(node: Any) -> Dict[str, Any]:
     node_data = getattr(node, "data", None)
     if isinstance(node_data, dict):
         data.update({k: v for k, v in node_data.items() if _json_safe(v)})
+    # generic per-node attribute store (the GraphML importer writes Master/
+    # Instance document metadata here: is_master, certainty_class,
+    # border_color, instances) — lossless lift, node.data wins on clashes
+    node_attrs = getattr(node, "attributes", None)
+    if isinstance(node_attrs, dict):
+        for k, v in node_attrs.items():
+            if k not in data and v not in (None, "") and _json_safe(v):
+                data[k] = v
     for attr in _LIFTED_ATTRS:
         if attr in data:
             continue

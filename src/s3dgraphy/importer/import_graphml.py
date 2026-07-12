@@ -2268,14 +2268,34 @@ class GraphMLImporter:
 
         return nodename, nodedescription, nodeurl, nodeshape, node_y_pos, fillcolor, borderstyle, bordertype
 
-    # Mapping from master document border colors to certainty classes.
-    # Red = direct knowledge/presence, Orange = documentary reconstruction,
-    # Yellow-gold = hypothetical positioning.
-    MASTER_CERTAINTY_CLASSES = {
-        "#9B3333": "direct",
-        "#D86400": "reconstructed",
-        "#D8BD30": "hypothetical",
-    }
+    # Colour → geometry-axis variant key, loaded from the DATAMODEL
+    # (em_visual_rules.json → document_variant_styles). The taxonomy lives
+    # in one place only; this importer no longer hardcodes it (curation of
+    # 12 July 2026). Values are the variant keys themselves
+    # (reality_based / observable / asserted / em_based); a thick black
+    # border (master_unknown) and unrecognised colours map to "unknown".
+    # NOTE: legacy values direct/reconstructed/hypothetical are superseded.
+    _variant_by_color = None
+
+    @classmethod
+    def _master_variant_colors(cls):
+        if cls._variant_by_color is None:
+            from ..nodes.base_node import load_json_mapping
+            styles = (load_json_mapping("em_visual_rules.json")
+                      .get("document_variant_styles") or {})
+            out = {}
+            for key, st in styles.items():
+                if key.startswith("_") or not isinstance(st, dict):
+                    continue
+                try:
+                    width = float(st.get("border_width", 0))
+                except (TypeError, ValueError):
+                    width = 0.0
+                color = str(st.get("border_color", "")).upper()
+                if width >= 3.0 and color and key != "master_unknown":
+                    out[color] = key
+            cls._variant_by_color = out
+        return cls._variant_by_color
 
     def _is_master_document(self, border_color, border_width):
         """A master document has a thick border (width >= 3.0).
@@ -2305,11 +2325,7 @@ class GraphMLImporter:
         """
         if not border_color:
             return "unknown"
-        color_upper = border_color.upper()
-        for known_color, certainty in self.MASTER_CERTAINTY_CLASSES.items():
-            if known_color.upper() == color_upper:
-                return certainty
-        return "unknown"
+        return self._master_variant_colors().get(border_color.upper(), "unknown")
 
     @staticmethod
     def _append_instance_record(doc_node, original_id, emid, y_pos):
