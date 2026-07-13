@@ -245,10 +245,23 @@ class GraphMLExporter:
             'has_author', 'has_license', 'has_embargo',
         }
 
-        # Filter out topological AND paradata-internal edges
+        # Structural containment/membership edges — expressed as GraphML
+        # nesting, not as explicit edges. ``is_part_of`` becomes a
+        # US/USD/VSF container group (step 6b); ``is_in_activity`` becomes
+        # an ActivityNodeGroup box (step 5c). Emitting either as an edge
+        # would round-trip as a bogus ``is_after`` (yEd edges carry only a
+        # line style, not a semantic type); the importer re-derives both
+        # relations from the nesting.
+        STRUCTURAL_EDGE_TYPES = {
+            'is_part_of',
+            'is_in_activity',
+        }
+
+        # Filter out topological, paradata-internal AND structural edges
         export_edges = [e for e in self.graph.edges
                         if e.edge_type not in TOPOLOGICAL_EDGE_TYPES
-                        and e.edge_type not in PARADATA_EDGE_TYPES]
+                        and e.edge_type not in PARADATA_EDGE_TYPES
+                        and e.edge_type not in STRUCTURAL_EDGE_TYPES]
 
         # Add minimal temporal edges as is_after
         for source_id, target_id in minimal_edges:
@@ -307,10 +320,115 @@ class GraphMLExporter:
             './/{http://graphml.graphdrawing.org/xmlns}graph'
         )
 
-        # 6. Generate stratigraphic nodes INSIDE the swimlane
+        # 5b. Resolve is_part_of containers (EM 1.6 stratigraphic
+        # containment). A US/USD/VSF node that is the TARGET of one or
+        # more ``is_part_of`` edges is a container: in yEd it is rendered
+        # as a group node (foldertype="group") whose members are nested
+        # inside, NOT as a flat stratigraphic node. The importer restores
+        # the ``is_part_of`` edges purely from that nesting
+        # (``_handle_stratigraphic_container``), so containment MUST be
+        # structural — an explicit ``is_part_of`` edge would round-trip as
+        # a garbage solid-line ``is_after`` (yEd edges carry only a line
+        # style, not a semantic type). ``is_part_of`` is therefore dropped
+        # from ``export_edges`` above and re-expressed here as nesting.
+        strat_by_id = {n.node_id: n for n in strat_nodes}
+        container_members = {}  # container_node_id -> [member node objects]
+        member_ids = set()
+        for e in self.graph.edges:
+            if e.edge_type != 'is_part_of':
+                continue
+            parent = strat_by_id.get(e.edge_target)
+            child = strat_by_id.get(e.edge_source)
+            if parent is None or child is None:
+                continue
+            if getattr(parent, 'node_type', None) not in ('US', 'USD', 'VSF'):
+                continue
+            container_members.setdefault(e.edge_target, []).append(child)
+            member_ids.add(e.edge_source)
+        container_ids = set(container_members.keys())
+
+        # 5c. Resolve is_in_activity membership (EM activities). An
+        # ActivityNodeGroup renders as a yEd group (NodeLabel bg #CCFFFF);
+        # its members nest inside so the importer re-derives is_in_activity
+        # from the nesting. Single-parent tree: a node's physical parent is
+        # its is_part_of container first (step 6b), else its activity, else
+        # the swimlane — priority is_part_of > activity, matching EMStudio
+        # invariant 5. Only STRATIGRAPHIC members and containers are placed
+        # directly; a ParadataNodeGroup member is realised through its PD
+        # group's placement (step 7, keyed on the PD group's us_node, which
+        # shares the activity).
+        from ...nodes.group_node import ActivityNodeGroup
+        activity_by_id = {n.node_id: n for n in self.graph.nodes
+                          if isinstance(n, ActivityNodeGroup)}
+        activity_of = {}                 # member_node_id -> activity id
+        activity_members_present = set()  # activity ids that get a box
+        for e in self.graph.edges:
+            if e.edge_type != 'is_in_activity':
+                continue
+            if e.edge_target not in activity_by_id:
+                continue
+            if e.edge_source in member_ids:
+                continue  # is_part_of wins the physical nesting slot
+            activity_of.setdefault(e.edge_source, e.edge_target)
+            activity_members_present.add(e.edge_target)
+
+        # Members' positions per activity, so the group box is sized to
+        # actually CONTAIN its members. yEd assigns a group node to a
+        # swimlane row by the group's geometry, so a default/placeholder box
+        # (e.g. y=60) drops the whole activity — and visually its members —
+        # into the wrong epoch even though each member's own y is correct.
+        activity_member_pos = {}  # activity id -> [(x, y), ...]
+        for member_id, aid in activity_of.items():
+            if member_id in positions:
+                activity_member_pos.setdefault(aid, []).append(
+                    positions[member_id])
+        # Approx member footprint (px) for the bounding box. _HDR is the
+        # header room above the topmost member — kept small (≈ the group's
+        # top inset) so the box does NOT poke up past its epoch's band top
+        # into the previous (more recent) swimlane row, which would let yEd
+        # reassign the whole activity — and its members — to the wrong epoch.
+        _NW, _NH, _PAD, _HDR = 130.0, 34.0, 24.0, 16.0
+
+        activity_graph_of = {}  # activity id -> nested <graph> element
+        for aid in activity_members_present:
+            pts = activity_member_pos.get(aid) or [(60.0, 60.0)]
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            gx = min(xs) - _PAD
+            gy = min(ys) - _HDR  # room for the group header above members
+            gw = (max(xs) + _NW) - min(xs) + 2 * _PAD
+            gh = (max(ys) + _NH) - min(ys) + _HDR + _PAD
+            act_xml = group_gen.generate_activity_group(
+                activity_by_id[aid], x=gx, y=gy, parent_id=swimlane_id,
+                width=gw, height=gh)
+            swimlane_graph.append(act_xml)
+            activity_graph_of[aid] = act_xml.find(
+                './/{http://graphml.graphdrawing.org/xmlns}graph')
+        if activity_members_present:
+            print(f"Generating {len(activity_members_present)} activity "
+                  f"group(s)...")
+
+        def _slot_for(node_id):
+            """Parent (graph element, nested id) for a top-level swimlane
+            child: its activity box when it is an activity member, else the
+            swimlane itself."""
+            aid = activity_of.get(node_id)
+            if aid is not None and aid in activity_graph_of:
+                return (activity_graph_of[aid],
+                        self.id_manager.uuid_to_nested[aid])
+            return swimlane_graph, swimlane_id
+
+        # 6. Generate stratigraphic nodes INSIDE the swimlane. Container
+        # nodes (emitted as groups in 6b) and their members (nested inside
+        # those groups) are skipped here, but ALL stratigraphic nodes are
+        # still collected in ``stratigraphic_nodes`` so PD-group building
+        # below sees them (a member or container may carry properties).
         print(f"Generating {len(strat_nodes)} stratigraphic nodes inside swimlane...")
         stratigraphic_nodes = []
         for i, node in enumerate(strat_nodes):
+            stratigraphic_nodes.append(node)
+            if node.node_id in container_ids or node.node_id in member_ids:
+                continue  # placement handled in 6b
             # Get position from epoch calculator, or use default grid layout
             if node.node_id in positions:
                 x, y = positions[node.node_id]
@@ -318,11 +436,40 @@ class GraphMLExporter:
                 x = 100.0 + (i % 8) * 150
                 y = 100.0 + (i // 8) * 80
 
+            slot_graph, slot_id = _slot_for(node.node_id)
             node_xml = node_gen.generate_stratigraphic_node(
-                node, x, y, parent_id=swimlane_id
+                node, x, y, parent_id=slot_id
             )
-            swimlane_graph.append(node_xml)
-            stratigraphic_nodes.append(node)
+            slot_graph.append(node_xml)
+
+        # 6b. Emit is_part_of containers as nested yEd group nodes, with
+        # their member stratigraphic nodes placed inside each container's
+        # nested graph. The container carries the US/USD/VSF EMID + name +
+        # description; the importer re-creates the stratigraphic node and
+        # the child->container is_part_of edges from this structure.
+        if container_ids:
+            print(f"Generating {len(container_ids)} is_part_of "
+                  f"container(s) with {len(member_ids)} member(s)...")
+        for cid, members in container_members.items():
+            container = strat_by_id[cid]
+            cx, cy = positions.get(cid, (100.0, 100.0))
+            slot_graph, slot_id = _slot_for(cid)
+            group_xml = group_gen.generate_us_container_group(
+                container, members, x=cx, y=cy, parent_id=slot_id
+            )
+            slot_graph.append(group_xml)
+
+            container_nested_id = self.id_manager.uuid_to_nested[cid]
+            container_graph = group_xml.find(
+                './/{http://graphml.graphdrawing.org/xmlns}graph'
+            )
+            for j, member in enumerate(members):
+                mx, my = positions.get(
+                    member.node_id, (cx + 20.0, cy + 20.0 + j * 40.0))
+                member_xml = node_gen.generate_stratigraphic_node(
+                    member, mx, my, parent_id=container_nested_id
+                )
+                container_graph.append(member_xml)
 
         # 7. Build and generate ParadataNodeGroups INSIDE the swimlane
         print("Building ParadataNodeGroups...")
@@ -341,11 +488,15 @@ class GraphMLExporter:
             pd_x = us_x - 30.0
             pd_y = us_y + 5.0
 
-            # Generate group container INSIDE the swimlane
+            # Nest the PD group where its US node lives: inside the US's
+            # activity box when the US is an activity member (so the
+            # importer re-derives is_in_activity for the PD group too),
+            # else directly in the swimlane.
+            slot_graph, slot_id = _slot_for(us_node.node_id)
             group_xml = group_gen.generate_paradata_group(
-                group_data, x=pd_x, y=pd_y, parent_id=swimlane_id
+                group_data, x=pd_x, y=pd_y, parent_id=slot_id
             )
-            swimlane_graph.append(group_xml)
+            slot_graph.append(group_xml)
 
             # Get nested graph element of the PD group
             group_nested_id = group_data['group_nested_id']

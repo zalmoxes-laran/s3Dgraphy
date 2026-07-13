@@ -771,3 +771,232 @@ def test_transitive_reduction_regression(tmp_path):
             f"expected superset of {expected}")
     finally:
         multi_graph_manager.graphs.pop(graph.graph_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Scenario 5: is_part_of container (EM 1.6 stratigraphic containment)
+# ---------------------------------------------------------------------------
+
+
+def test_is_part_of_container_roundtrip(tmp_path):
+    """A VSF container with two SF members joined by ``is_part_of`` must
+    survive the GraphML round-trip. Containment is expressed as GraphML
+    nesting (a yEd group node coloured by container type), NOT as an
+    explicit edge — an explicit ``is_part_of`` edge would re-import as a
+    bogus solid-line ``is_after`` because yEd edges carry only a line
+    style. The importer re-creates the ``is_part_of`` edges from the
+    nesting, and the container keeps its stratigraphic type + name +
+    description."""
+    graph = Graph(graph_id="rt_container")
+    multi_graph_manager.graphs[graph.graph_id] = graph
+    try:
+        ep = EpochNode(node_id="E1", name="Epoch 1",
+                       start_time=0, end_time=100, color="#888888")
+        graph.add_node(ep)
+
+        VSF = get_stratigraphic_node_class("VSF")
+        SF = get_stratigraphic_node_class("SF")
+
+        container = VSF(node_id="VSF1", name="VSF1",
+                        description="Complete Column")
+        graph.add_node(container)
+        graph.add_edge(edge_id="VSF1_first_E1", edge_source="VSF1",
+                       edge_target="E1", edge_type="has_first_epoch")
+
+        for nid in ("SF1", "SF2"):
+            graph.add_node(SF(node_id=nid, name=nid, description=""))
+            graph.add_edge(edge_id=f"{nid}_first_E1", edge_source=nid,
+                           edge_target="E1", edge_type="has_first_epoch")
+            # is_part_of: member (source) -> container (target)
+            graph.add_edge(edge_id=f"{nid}_is_part_of_VSF1",
+                           edge_source=nid, edge_target="VSF1",
+                           edge_type="is_part_of")
+
+        graphml_path = tmp_path / "container.graphml"
+        GraphMLExporter(graph).export(str(graphml_path))
+
+        # The container must be emitted as a yEd group node, not a flat
+        # stratigraphic node, and coloured with the VSF container colour.
+        raw = graphml_path.read_text(encoding="utf-8")
+        assert 'yfiles.foldertype="group"' in raw
+        assert "#B19F61" in raw  # VSFContainer label backgroundColor
+
+        imported = GraphMLImporter(str(graphml_path)).parse()
+        by_id = {n.node_id: n for n in imported.nodes}
+        part_of = {
+            (by_id[e.edge_source].name, by_id[e.edge_target].name)
+            for e in imported.edges if e.edge_type == "is_part_of"
+        }
+        assert part_of == {("SF1", "VSF1"), ("SF2", "VSF1")}, (
+            f"is_part_of round-trip lost/altered edges; got {part_of}")
+
+        # No stray is_after created from the (dropped) is_part_of edges.
+        assert not any(e.edge_type == "is_after" for e in imported.edges)
+
+        # Container keeps its stratigraphic type + description.
+        restored = next(n for n in imported.nodes if n.name == "VSF1")
+        assert restored.node_type == "VSF"
+        assert restored.description == "Complete Column"
+    finally:
+        multi_graph_manager.graphs.pop(graph.graph_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Scenario 6: continuity (BR) diamond emission
+# ---------------------------------------------------------------------------
+
+
+def test_continuity_diamond_roundtrip(tmp_path):
+    """A virtual unit whose life is extended beyond its birth epoch needs a
+    continuity (BR) diamond in GraphML (materialize_continuity). The BR must
+    be emitted as a ShapeNode of type "diamond" — NOT as a US-shaped fallback
+    — so the importer's EM_check_node_continuity (signal B) recognises it and
+    drives the survive_in_epoch bounding. Without the diamond the BR would
+    round-trip as a US, and the whole graph's continuity would be lost
+    (survive_in_epoch would inflate to the default 'reals live forever')."""
+    graph = Graph(graph_id="rt_continuity")
+    multi_graph_manager.graphs[graph.graph_id] = graph
+    try:
+        # Two epochs: E_old (birth) and E_recent.
+        e_old = EpochNode(node_id="E_old", name="Old",
+                          start_time=0, end_time=100, color="#888888")
+        e_recent = EpochNode(node_id="E_recent", name="Recent",
+                             start_time=100, end_time=200, color="#999999")
+        graph.add_node(e_old)
+        graph.add_node(e_recent)
+
+        # A VIRTUAL unit born in E_old, life EXTENDED into E_recent via
+        # survive_in_epoch → materialize_continuity must emit a diamond.
+        USVn = get_stratigraphic_node_class("USVn")
+        v = USVn(node_id="V1", name="V1", description="")
+        graph.add_node(v)
+        graph.add_edge(edge_id="V1_first", edge_source="V1",
+                       edge_target="E_old", edge_type="has_first_epoch")
+        graph.add_edge(edge_id="V1_survive", edge_source="V1",
+                       edge_target="E_recent", edge_type="survive_in_epoch")
+
+        graphml_path = tmp_path / "continuity.graphml"
+        GraphMLExporter(graph).export(str(graphml_path))
+
+        # The BR uses the official continuity SVG stencil (refid 3), not a
+        # US ShapeNode fallback.
+        raw = graphml_path.read_text(encoding="utf-8")
+        assert 'refid="3"' in raw, (
+            "continuity BR was not emitted as an SVGNode (continuity icon)")
+
+        imported = GraphMLImporter(str(graphml_path)).parse()
+        # The diamond is re-typed as a BR continuity node (signal B), not US.
+        br_nodes = [n for n in imported.nodes
+                    if getattr(n, "node_type", None) == "BR"]
+        assert br_nodes, "exported diamond was not re-imported as a BR node"
+        # The virtual unit itself survives as USVn (not swallowed / re-typed).
+        assert any(n.name == "V1" and n.node_type == "USVn"
+                   for n in imported.nodes)
+    finally:
+        multi_graph_manager.graphs.pop(graph.graph_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Scenario 7: ActivityNodeGroup (is_in_activity)
+# ---------------------------------------------------------------------------
+
+
+def test_activity_group_roundtrip(tmp_path):
+    """Two units grouped into an ActivityNodeGroup by ``is_in_activity``
+    must survive the GraphML round-trip. Like is_part_of, membership is
+    expressed as nesting inside a yEd group whose NodeLabel backgroundColor
+    is #CCFFFF (never as an explicit edge). The importer re-creates the
+    ActivityNodeGroup (colour → type) and the member->activity
+    ``is_in_activity`` edges from the nesting."""
+    from s3dgraphy.nodes.group_node import ActivityNodeGroup
+
+    graph = Graph(graph_id="rt_activity")
+    multi_graph_manager.graphs[graph.graph_id] = graph
+    try:
+        ep = EpochNode(node_id="E1", name="Epoch 1",
+                       start_time=0, end_time=100, color="#888888")
+        graph.add_node(ep)
+
+        act = ActivityNodeGroup(node_id="ACT1", name="VAct.01 Test",
+                                description="an activity")
+        graph.add_node(act)
+
+        US = get_stratigraphic_node_class("US")
+        for nid in ("N1", "N2"):
+            graph.add_node(US(node_id=nid, name=nid, description=""))
+            graph.add_edge(edge_id=f"{nid}_first_E1", edge_source=nid,
+                           edge_target="E1", edge_type="has_first_epoch")
+            # is_in_activity: member (source) -> activity (target)
+            graph.add_edge(edge_id=f"{nid}_in_ACT1", edge_source=nid,
+                           edge_target="ACT1", edge_type="is_in_activity")
+
+        graphml_path = tmp_path / "activity.graphml"
+        GraphMLExporter(graph).export(str(graphml_path))
+
+        raw = graphml_path.read_text(encoding="utf-8")
+        assert 'yfiles.foldertype="group"' in raw
+        assert "#CCFFFF" in raw  # ActivityNodeGroup label backgroundColor
+
+        imported = GraphMLImporter(str(graphml_path)).parse()
+        by_id = {n.node_id: n for n in imported.nodes}
+        in_activity = {
+            (by_id[e.edge_source].name, by_id[e.edge_target].name)
+            for e in imported.edges if e.edge_type == "is_in_activity"
+        }
+        assert in_activity == {("N1", "VAct.01 Test"),
+                               ("N2", "VAct.01 Test")}, (
+            f"is_in_activity round-trip lost/altered edges; got {in_activity}")
+
+        restored = next(n for n in imported.nodes
+                        if n.name == "VAct.01 Test")
+        assert restored.node_type == "ActivityNodeGroup"
+        # No stray is_after created from the (dropped) is_in_activity edges.
+        assert not any(e.edge_type == "is_after" for e in imported.edges)
+    finally:
+        multi_graph_manager.graphs.pop(graph.graph_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Scenario 8: continuity life-span family (SF/USD are birth-only)
+# ---------------------------------------------------------------------------
+
+
+def test_special_finds_are_birth_only(tmp_path):
+    """A Special Find (SF) and a USD born in the oldest epoch with no
+    survival edge are BIRTH-ONLY by default — like virtuals — so the
+    exporter must NOT synthesise a continuity diamond for them. Only the
+    truly persistent types (US, serSU) live to the most recent epoch by
+    default and get a diamond when bounded. Guards the classification
+    decision (Emanuel, 2026-07): SF/RSF/USD/serUSD behave like virtuals
+    for life-span even though their palette family is 'real'."""
+    graph = Graph(graph_id="rt_birthonly")
+    multi_graph_manager.graphs[graph.graph_id] = graph
+    try:
+        # Oldest epoch E0 + a more recent E1 (so "bounded to E0" is real).
+        e0 = EpochNode(node_id="E0", name="Old",
+                       start_time=0, end_time=100, color="#888888")
+        e1 = EpochNode(node_id="E1", name="Recent",
+                       start_time=100, end_time=200, color="#999999")
+        graph.add_node(e0)
+        graph.add_node(e1)
+
+        SF = get_stratigraphic_node_class("SF")
+        USD = get_stratigraphic_node_class("USD")
+        US = get_stratigraphic_node_class("US")
+        # SF + USD born in E0, no survival → birth-only → NO diamond.
+        # US born in E0, no survival → persistent+bounded → ONE diamond.
+        for cls, nid in ((SF, "F1"), (USD, "D1"), (US, "U1")):
+            graph.add_node(cls(node_id=nid, name=nid, description=""))
+            graph.add_edge(edge_id=f"{nid}_first", edge_source=nid,
+                           edge_target="E0", edge_type="has_first_epoch")
+
+        graphml_path = tmp_path / "birthonly.graphml"
+        GraphMLExporter(graph).export(str(graphml_path))
+
+        imported = GraphMLImporter(str(graphml_path)).parse()
+        # Exactly one continuity node — for the bounded US, not SF/USD.
+        br = [n for n in imported.nodes
+              if getattr(n, "node_type", None) == "BR"]
+        assert len(br) == 1, f"expected 1 BR node (bounded US only), got {len(br)}"
+    finally:
+        multi_graph_manager.graphs.pop(graph.graph_id, None)

@@ -165,22 +165,75 @@ class GroupNodeGenerator:
             insets.set('right', '15')
             insets.set('top', '15')
 
-    def generate_activity_group(self, group_data: Dict, x: float = 100.0, y: float = 100.0) -> ET.Element:
+    def generate_activity_group(self, activity_node, x: float = 100.0,
+                                y: float = 100.0,
+                                parent_id: str = None,
+                                width: float = 260.0,
+                                height: float = 240.0) -> ET.Element:
         """
-        Generate ProxyAutoBoundsNode for ActivityNodeGroup.
+        Generate the yEd group node for an ActivityNodeGroup.
 
-        Similar to ParadataNodeGroup but with different background color (#CCFFFF).
+        An activity is rendered as a group node whose NodeLabel
+        backgroundColor is #CCFFFF — the importer's
+        ``determine_group_node_type_by_color`` keys on that colour to
+        restore the ActivityNodeGroup and re-derives ``is_in_activity``
+        from the nesting of the members inside. Members (strat nodes,
+        US/USD/VSF containers, PD groups) are appended by the main
+        exporter into the nested graph returned here.
 
         Args:
-            group_data: Dict with group information
-            x, y: Position coordinates
+            activity_node: the ActivityNodeGroup node (carries EMID/name/
+                description)
+            x, y: position coordinates
+            parent_id: parent nested id (the swimlane)
 
         Returns:
-            node XML element
+            node XML element with an (initially empty) nested graph
         """
-        # Similar structure to paradata group but with ActivityNodeGroup color
-        # Implementation would be similar to generate_paradata_group but with #CCFFFF
-        pass
+        activity_uuid = activity_node.node_id
+        group_nested_id = self.id_manager.get_nested_id(
+            activity_uuid, parent_id=parent_id)
+
+        node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
+        node_elem.set('id', group_nested_id)
+        node_elem.set('yfiles.foldertype', 'group')
+
+        data_emid = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_emid.set('key', 'd7')
+        data_emid.text = activity_uuid
+
+        node_uri = (getattr(activity_node, 'attributes', {}) or {}).get('URI')
+        if node_uri:
+            data_url = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+            data_url.set('key', 'd4')
+            data_url.text = node_uri
+
+        description = getattr(activity_node, 'description', '') or ''
+        if description:
+            data_desc = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+            data_desc.set('key', 'd5')
+            data_desc.text = description
+
+        data_gfx = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_gfx.set('key', 'd6')
+
+        proxy_node = ET.SubElement(data_gfx, f'{{{self.ns_y}}}ProxyAutoBoundsNode')
+        realizers = ET.SubElement(proxy_node, f'{{{self.ns_y}}}Realizers')
+        realizers.set('active', '0')  # open by default
+
+        label_text = getattr(activity_node, 'name', 'Activity')
+        self._add_container_realizer(
+            realizers, label_text, GROUP_COLORS['ActivityNodeGroup'],
+            x, y, closed=False, width=width, height=height)
+        self._add_container_realizer(
+            realizers, label_text, GROUP_COLORS['ActivityNodeGroup'],
+            x, y, closed=True, width=140.0, height=70.0)
+
+        graph_elem = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}graph')
+        graph_elem.set('edgedefault', 'directed')
+        graph_elem.set('id', f'{group_nested_id}:')
+
+        return node_elem
 
     def generate_us_container_group(self, container_node, child_nodes: List,
                                      x: float = 100.0, y: float = 100.0,
@@ -222,6 +275,23 @@ class GroupNodeGenerator:
         data_emid = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
         data_emid.set('key', 'd7')
         data_emid.text = container_uuid
+
+        # Add URL (d4) and description (d5) as direct children so the
+        # importer's EM_extract_group_node_description (which reads the
+        # d5 direct child) restores the container's stratigraphic
+        # description on re-import. A container is a regular US/USD/VSF
+        # node rendered as a yEd group, so its description must survive.
+        node_uri = (getattr(container_node, 'attributes', {}) or {}).get('URI')
+        if node_uri:
+            data_url = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+            data_url.set('key', 'd4')
+            data_url.text = node_uri
+
+        description = getattr(container_node, 'description', '') or ''
+        if description:
+            data_desc = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+            data_desc.set('key', 'd5')
+            data_desc.text = description
 
         # Add nodegraphics - ProxyAutoBoundsNode
         data_gfx = ET.SubElement(node_elem, '{http://graphml.graphdrawing.org/xmlns}data')

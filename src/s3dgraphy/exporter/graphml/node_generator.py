@@ -59,6 +59,18 @@ class NodeGenerator:
         
         # Get visual properties
         node_type = getattr(node, 'node_type', 'US')
+
+        # Continuity (BR) nodes are NOT palette stratigraphic units — they
+        # are the yEd continuity diamond. Emit a diamond ShapeNode so the
+        # importer restores them: EM_check_node_continuity signal B matches
+        # shape type "diamond", and 'diamond' is deliberately absent from
+        # EM_check_node_us' shape list, so the diamond is never mis-read as
+        # a US. This is what bounds a node's life on re-import (drives
+        # survive_in_epoch); without it the diamond falls back to a US
+        # rectangle and the continuity round-trip is lost.
+        if node_type == 'BR':
+            return self._generate_continuity_node(node, nested_id, x, y)
+
         visual_props = self.registry.get_visual_properties(node_type)
         if not visual_props:
             warnings.warn(
@@ -166,7 +178,75 @@ class NodeGenerator:
         # Shape
         shape = ET.SubElement(shape_node, f'{{{self.ns_y}}}Shape')
         shape.set('type', visual_props.shape)
-        
+
+        return node_elem
+
+    #: yEd SVG-resource refid for the continuity stencil. Reserved by
+    #: CanvasGenerator (1=extractor, 2=combiner, 3=continuity) and detected
+    #: by the importer's ``build_svg_resource_map`` / EM_check_node_continuity
+    #: signal C.
+    CONTINUITY_SVG_REFID = '3'
+
+    def _generate_continuity_node(self, node, nested_id: str,
+                                  x: float, y: float) -> ET.Element:
+        """Generate the yEd continuity (BR) node with the OFFICIAL palette
+        icon — an SVGNode referencing the ``continuity.svg`` resource
+        (refid 3), the same stencil yEd users drag from the palette.
+
+        The importer recognises it via ``EM_check_node_continuity`` signal C
+        (SVGNode whose SVGContent refid maps to the 'continuity' role) and
+        reads its y position (``EM_extract_continuity``) to bound the
+        terminated node's ``survive_in_epoch`` span. Mirrors
+        ``generate_extractor_node`` (refid 1/2). No palette-label lookup: BR
+        is not a palette stratigraphic unit.
+        """
+        node_uuid = getattr(node, 'node_id', nested_id)
+        node_elem = ET.Element('{http://graphml.graphdrawing.org/xmlns}node')
+        node_elem.set('id', nested_id)
+
+        description = getattr(node, 'description', '')
+        if description:
+            data_d5 = ET.SubElement(
+                node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+            data_d5.set('key', 'd5')
+            data_d5.text = str(description)
+
+        data_d7 = ET.SubElement(
+            node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d7.set('key', 'd7')
+        data_d7.text = node_uuid
+
+        data_d6 = ET.SubElement(
+            node_elem, '{http://graphml.graphdrawing.org/xmlns}data')
+        data_d6.set('key', 'd6')
+
+        svg_node = ET.SubElement(data_d6, f'{{{self.ns_y}}}SVGNode')
+
+        # Compact footprint, matching the palette continuity stencil (7mm).
+        geometry = ET.SubElement(svg_node, f'{{{self.ns_y}}}Geometry')
+        geometry.set('height', '25.0')
+        geometry.set('width', '25.0')
+        geometry.set('x', str(x))
+        geometry.set('y', str(y))
+
+        fill = ET.SubElement(svg_node, f'{{{self.ns_y}}}Fill')
+        fill.set('color', '#000000')
+        fill.set('transparent', 'false')
+
+        border = ET.SubElement(svg_node, f'{{{self.ns_y}}}BorderStyle')
+        border.set('color', '#000000')
+        border.set('type', 'line')
+        border.set('width', '1.0')
+
+        svg_props = ET.SubElement(svg_node, f'{{{self.ns_y}}}SVGNodeProperties')
+        svg_props.set('usingVisualBounds', 'true')
+
+        svg_model = ET.SubElement(svg_node, f'{{{self.ns_y}}}SVGModel')
+        svg_model.set('svgBoundsPolicy', '0')
+
+        svg_content = ET.SubElement(svg_model, f'{{{self.ns_y}}}SVGContent')
+        svg_content.set('refid', self.CONTINUITY_SVG_REFID)
+
         return node_elem
 
     def generate_property_node(self, node, x: float, y: float,

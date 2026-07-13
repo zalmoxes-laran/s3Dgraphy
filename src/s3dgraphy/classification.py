@@ -130,3 +130,17 @@ SERIES_US_TYPES: frozenset = frozenset(
 
 #: Every stratigraphic subtype known to the datamodel (including BR/SE).
 ALL_US_TYPES: frozenset = frozenset(_subtype_map().keys())
+
+#: Continuity/life-span default. Types here LIVE to the most recent epoch
+#: by default, so a *bounded* life must be marked with an explicit BR
+#: continuity diamond. Every other stratigraphic type — special finds
+#: (SF/RSF), documentary units (USD/serUSD), negatives/transforms
+#: (USN/TSU/UL) and all virtuals — is BIRTH-ONLY by default: it exists only
+#: in its birth epoch and needs a BR diamond only to EXTEND its life.
+#: This mirrors the GraphML importer's positional ``survive_in_epoch`` rule
+#: (``import_graphml.extract_epochs``: only US/serSU get positional survival
+#: when no BR is present), so export (materialize_continuity) and import
+#: agree on which nodes need a diamond. NOT family-derived: SF/RSF/USD are
+#: ``family == "real"`` for palette/colour but life-wise behave like virtuals
+#: (per Emanuel, 2026-07).
+CONTINUITY_PERSISTENT_TYPES: frozenset = frozenset({"US", "serSU"})

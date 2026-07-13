@@ -2054,8 +2054,12 @@ class GraphMLImporter:
         
         # print(f"ContinuityNode class node_type: {ContinuityNode.node_type}")
 
-        # Definisce i tipi di nodi stratigrafici fisici che possono estendersi fino all'ultima epoca
-        list_of_physical_stratigraphic_nodes = ["US", "serSU"]
+        # Tipi che, di default, vivono fino all'ultima epoca (continuità
+        # implicita senza BR). Single source of truth in classification.py —
+        # deve restare allineato con materialize_continuity (export). Ogni
+        # altro tipo (special find, USD, virtuali, …) è birth-only.
+        from ..classification import CONTINUITY_PERSISTENT_TYPES
+        list_of_physical_stratigraphic_nodes = list(CONTINUITY_PERSISTENT_TYPES)
 
         # Crea indici per accesso rapido
         epochs = [n for n in self.graph.nodes if hasattr(n, 'node_type') and n.node_type == "EpochNode"]

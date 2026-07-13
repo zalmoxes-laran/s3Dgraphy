@@ -52,7 +52,7 @@ from __future__ import annotations
 import uuid
 from typing import Dict, List, Set
 
-from ..classification import REAL_US_TYPES, VIRTUAL_US_TYPES
+from ..classification import CONTINUITY_PERSISTENT_TYPES
 from ..edges.edge import Edge
 from ..nodes.epoch_node import EpochNode
 from ..nodes.stratigraphic_node import ContinuityNode, StratigraphicNode
@@ -160,21 +160,22 @@ def materialize_continuity(graph) -> Dict[str, int]:
 
         last_epoch = max(survival_epochs, key=_epoch_start_time)
 
-        # Family-aware decision: when does the round-trip NEED a
-        # diamond to reproduce this exact life chain?
-        if ntype in REAL_US_TYPES:
-            # Default "lives forever". Diamond needed iff bounded.
+        # Life-span decision: when does the round-trip NEED a diamond to
+        # reproduce this exact life chain? Keyed on CONTINUITY_PERSISTENT_TYPES
+        # (US/serSU), NOT on the real/virtual family: special finds (SF/RSF)
+        # and documentary units (USD/serUSD) are family=="real" but life-wise
+        # behave like virtuals — birth-only by default (per Emanuel, 2026-07),
+        # matching the importer's positional survive_in_epoch rule.
+        if ntype in CONTINUITY_PERSISTENT_TYPES:
+            # Default "lives to the most recent epoch". Diamond iff bounded.
             need_br = last_epoch.node_id != latest_epoch_id
-        elif ntype in VIRTUAL_US_TYPES:
-            # Default "lives only at birth". Diamond needed iff the
-            # graph carries any survival edge on this node — i.e. the
-            # life extends beyond first_epoch.
+        else:
+            # Default "lives only at birth" (virtuals, special finds,
+            # documentary, negatives/transforms). Diamond needed iff the
+            # graph carries a survival edge beyond the birth epoch — i.e.
+            # the life has been explicitly extended.
             survives_beyond_birth = survival_ids - {first_epoch.node_id}
             need_br = bool(survives_beyond_birth)
-        else:
-            # Unknown family (helper / not classified). Be
-            # conservative: do not synthesize.
-            need_br = False
 
         if not need_br:
             continue
