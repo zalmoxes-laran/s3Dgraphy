@@ -1,7 +1,8 @@
 {
   "formal_language": "EM",
-  "version": "1.5.3",
+  "version": "1.6.0",
   "_changelog": {
+    "1.6.0": "Version realigned to track the EM language version (EM 1.6); supersedes the 1.5.x line. Added canonical group-container styles for ActivityNodeGroup, ParadataNodeGroup and TimeBranchNodeGroup (mirroring the existing LocationNodeGroup pattern): neutral grey container (fill #F5F5F5, dashed #000000 border, roundrectangle) distinguished by the group title-tab colour in `label_background` — Activity #CCFFFF, Paradata #FFCC99, TimeBranch #99CC00 (green). Sourced from the point-of-truth palette template (templates/em_palette_template.graphml, nodes Att.[xx] / US[xxx]_PD / TB.0), aligning em_visual_rules with the GraphML palette. Previously ParadataNodeGroup and TimeBranchNodeGroup both resolved through the shared grey 'GRAPH' style and could not be told apart; ActivityNodeGroup rendered via the legacy purple-ellipse 'ANG'. Legacy 'ANG' and 'GRAPH' styles retained unchanged for back-compat with other consumers.",
     "1.5.3": "Fix USD / serUSD material colour: RGB was (0.549, 0.103, 0.0) = #8C1A00 (red), should be #D86400 (orange) to match the canonical USD documentary colour used in the GraphML palette template, node_registry defaults and document_variant_styles.observable. USD border_color also corrected from #8C1A00 to #D86400 (serUSD border was already correct).",
     "1.5.2": "Added RSF (Reused Special Find / spolia) node style — octagon, red border (#9B3333), white fill. Sibling of SF/VSF, distinguished by border colour. Originating DP: DP-26.",
     "1.5.1": "Added LocationNodeGroup node style (dashed roundrectangle, kind-based border colour) and is_in_location edge style with primary_modifier override.",
@@ -668,6 +669,42 @@
         "shape": "rectangle"
       },
       "label_position": "over"
+    },
+    "ActivityNodeGroup": {
+      "_comment": "yEd group-folder rendering for an activity (logical grouping of stratigraphic actions). Canonical EM palette (point of truth = templates/em_palette_template.graphml, node 'Att.[xx]'): neutral grey container, dashed black border, distinguished by the CYAN group title-tab (label_background). Supersedes the legacy 'ANG' purple-ellipse style for group-container rendering; ANG kept for back-compat with other consumers.",
+      "style": {
+        "shape": "roundrectangle",
+        "fill_color": "#F5F5F5",
+        "border_color": "#000000",
+        "border_style": "dashed",
+        "border_width": 1.0,
+        "label_background": "#CCFFFF",
+        "label_position": "top"
+      }
+    },
+    "ParadataNodeGroup": {
+      "_comment": "yEd group-folder rendering for a paradata node group (holds all paradata of a stratigraphic unit). Canonical EM palette (point of truth = em_palette_template.graphml, node 'US[xxx]_PD'): neutral grey container, dashed black border, distinguished by the PEACH group title-tab (label_background). Supersedes routing through the shared 'GRAPH' grey style; GRAPH kept for the graph-metadata container.",
+      "style": {
+        "shape": "roundrectangle",
+        "fill_color": "#F5F5F5",
+        "border_color": "#000000",
+        "border_style": "dashed",
+        "border_width": 1.0,
+        "label_background": "#FFCC99",
+        "label_position": "top"
+      }
+    },
+    "TimeBranchNodeGroup": {
+      "_comment": "yEd group-folder rendering for a time branch (alternative reconstructive hypotheses; two TB can be linked by contrasts_with). Canonical EM palette (point of truth = em_palette_template.graphml, node 'TB.0'): neutral grey container, dashed black border, distinguished by the GREEN group title-tab (label_background). Distinct from ParadataNodeGroup, which the legacy shared 'GRAPH' alias could not express.",
+      "style": {
+        "shape": "roundrectangle",
+        "fill_color": "#F5F5F5",
+        "border_color": "#000000",
+        "border_style": "dashed",
+        "border_width": 1.0,
+        "label_background": "#99CC00",
+        "label_position": "top"
+      }
     },
     "LocationNodeGroup": {
       "_comment": "yEd group-folder rendering for spatial / locational membership. Dashed round-rectangle to read clearly as a *group container* and to stay distinct from the solid-rectangle stratigraphic units. Border colour varies by 'kind' (toponym / study / functional). When several is_in_location memberships exist on the same node, only the one with is_primary=true is drawn as a folder; the others are emitted as labels/badges (yEd cannot stack overlapping group folders). See em_data and the Location concept page in the manual.",
