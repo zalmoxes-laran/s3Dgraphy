@@ -1,10 +1,10 @@
 {
     "metadata": {
-      "version": "4.1",
-      "last_updated": "2026-06-18",
+      "version": "4.2",
+      "last_updated": "2026-07-15",
       "maintainers": ["Emanuel Demetrescu"],
       "license": "CC-BY-4.0",
-      "changelog": "v4.1: expanded spatial elevation qualia for pyArchInit us_table quote (all E54_Dimension): elevation_relative, elevation_min_absolute, elevation_max_absolute, elevation_min_relative, elevation_max_relative, elevation_min_usm, elevation_max_usm (the generic 'elevation' = absolute MASL, used by quota_abs). Each pyArchInit quota column maps to its own qualia id so they don't collide on the single-PropertyNode-per-property_name rule. v4.0: verified all v3.0 CIDOC-CRM mappings (correct). Expanded with: volume, area, circumference in dimensional; color, texture, finish, patina, hardness, porosity in material; damage_type, fragility, completeness in state; tool_marks, joining_technique in technical; bounding_box, footprint_area in spatial; duration, terminus_post_quem, terminus_ante_quem, relative_chronology in temporal; ceremonial_function, ritual_function, defensive_function, domestic_function, symbolic_function in telic; school, workshop, period_attribution in stylistic. NEW subcategories: iconographic + semantic under cultural_interpretive (iconographic_subject, narrative_content, iconographic_program, aesthetic_value, religious_significance, monumental_status, attribution). Added provenance_history, exhibition_history, publication_history under administrative; NEW ownership subcategory (current_custodian, ownership_chain). NEW CATEGORY epistemic — meta-qualia central to EM paradata model (confidence_level, certainty_level, uncertainty_factors, methodology_used, validation_method, source_quality, primary_contributor, review_status, last_modified)."
+      "changelog": "v4.2: added optional `rationale` + `example` fields to qualia entries (a plain-language why + a concrete case), shown by the EMStudio vocabulary picker when creating a PropertyNode. Seeded for the temporal qualia (absolute_time_start / absolute_time_end / dating_method); to be filled in for the rest incrementally. v4.1: expanded spatial elevation qualia for pyArchInit us_table quote (all E54_Dimension): elevation_relative, elevation_min_absolute, elevation_max_absolute, elevation_min_relative, elevation_max_relative, elevation_min_usm, elevation_max_usm (the generic 'elevation' = absolute MASL, used by quota_abs). Each pyArchInit quota column maps to its own qualia id so they don't collide on the single-PropertyNode-per-property_name rule. v4.0: verified all v3.0 CIDOC-CRM mappings (correct). Expanded with: volume, area, circumference in dimensional; color, texture, finish, patina, hardness, porosity in material; damage_type, fragility, completeness in state; tool_marks, joining_technique in technical; bounding_box, footprint_area in spatial; duration, terminus_post_quem, terminus_ante_quem, relative_chronology in temporal; ceremonial_function, ritual_function, defensive_function, domestic_function, symbolic_function in telic; school, workshop, period_attribution in stylistic. NEW subcategories: iconographic + semantic under cultural_interpretive (iconographic_subject, narrative_content, iconographic_program, aesthetic_value, religious_significance, monumental_status, attribution). Added provenance_history, exhibition_history, publication_history under administrative; NEW ownership subcategory (current_custodian, ownership_chain). NEW CATEGORY epistemic — meta-qualia central to EM paradata model (confidence_level, certainty_level, uncertainty_factors, methodology_used, validation_method, source_quality, primary_contributor, review_status, last_modified)."
     },
     "qualia_categories": [
       {
@@ -571,7 +571,9 @@
                   "cidoc_crm": "E52_Time-Span"
                 },
                 "data_type": "date",
-                "format": "YYYY-MM-DD"
+                "format": "YYYY-MM-DD",
+                "rationale": "The earliest calendar date at which the element's time-span begins (the begin-of-the-begin). Anchors an epoch or unit on the absolute timeline; pair it with Absolute Time — End to bound the span. Negative years = BCE.",
+                "example": "-27 — start of the Augustan phase of the sanctuary (27 BCE)."
               },
               {
                 "id": "absolute_time_end",
@@ -581,7 +583,9 @@
                   "cidoc_crm": "E52_Time-Span"
                 },
                 "data_type": "date",
-                "format": "YYYY-MM-DD"
+                "format": "YYYY-MM-DD",
+                "rationale": "The latest calendar date at which the element's time-span ends (the end-of-the-end). Together with the start it delimits the absolute chronology of an epoch or unit. Negative years = BCE.",
+                "example": "476 — end of the Late Antique phase (fall of the Western Roman Empire)."
               },
               {
                 "id": "dating_method",
@@ -601,7 +605,9 @@
                   "historical_sources",
                   "stylistic_analysis"
                 ],
-                "expected_extractors": ["dating_analysis", "laboratory_analysis"]
+                "expected_extractors": ["dating_analysis", "laboratory_analysis"],
+                "rationale": "How the chronology was established — records the reliability and paradata behind a date so the reasoning can be judged.",
+                "example": "c14 for a hearth dated by radiocarbon; stratigraphy for a wall dated by its position in the sequence."
               },
               {
                 "id": "duration",
