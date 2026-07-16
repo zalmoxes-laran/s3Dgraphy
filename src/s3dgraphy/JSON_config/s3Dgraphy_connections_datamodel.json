@@ -1,6 +1,6 @@
 {
- "s3Dgraphy_connections_model_version": "1.6.0",
- "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. v1.6.0 (paired with node datamodel v1.6.0) introduces: bug fix on is_in_paradata_nodegroup (typo 'ProperrtyNOde' → 'PropertyNode'); semantic fix on has_documentation (P104_is_subject_to → P70i_is_documented_in — P104 means 'subject to a legal right', not 'has documentation'); deprecation of has_timebranch as duplicate of is_in_timebranch (the latter is the canonical one — used by import_graphml.py and graphml_patcher.py; the former exists only in config JSON); component list aligned with node datamodel (HDT-O, PROV-O added). HDT-O containment properties (hdto:contains_HDT, hdto:contains_SU, hdto:isPrimary) and physical-relation discriminator subproperties (em:abuts, em:cuts, em:fills, em:overlies, em:bonded_to, em:equals as rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation) to be added in v1.6.1. v1.5.3 introduced canonical/reverse directionality with verb-based labels for clear socket identification in node editors. v1.5.4 added 'has_visual_reference' edge type. v1.5.5 added 'is_in_location' edge type with context-sensitive CIDOC mapping (P53 for node→location, P89 for the recursive location→location hierarchy) and an optional 'is_primary' boolean attribute (s3d:isPrimary, proposed).",
+ "s3Dgraphy_connections_model_version": "1.6.1",
+ "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. v1.6.1: has_paradata_nodegroup source extended to include EpochNode — an epoch can now own a ParadataNodeGroup holding its temporal-definition properties (e.g. absolute_time_start/end as PropertyNodes with paradata provenance), mirroring how a StratigraphicNode carries its paradata group. v1.6.0 (paired with node datamodel v1.6.0) introduces: bug fix on is_in_paradata_nodegroup (typo 'ProperrtyNOde' → 'PropertyNode'); semantic fix on has_documentation (P104_is_subject_to → P70i_is_documented_in — P104 means 'subject to a legal right', not 'has documentation'); deprecation of has_timebranch as duplicate of is_in_timebranch (the latter is the canonical one — used by import_graphml.py and graphml_patcher.py; the former exists only in config JSON); component list aligned with node datamodel (HDT-O, PROV-O added). HDT-O containment properties (hdto:contains_HDT, hdto:contains_SU, hdto:isPrimary) and physical-relation discriminator subproperties (em:abuts, em:cuts, em:fills, em:overlies, em:bonded_to, em:equals as rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation) to be added in v1.6.1. v1.5.3 introduced canonical/reverse directionality with verb-based labels for clear socket identification in node editors. v1.5.4 added 'has_visual_reference' edge type. v1.5.5 added 'is_in_location' edge type with context-sensitive CIDOC mapping (P53 for node→location, P89 for the recursive location→location hierarchy) and an optional 'is_primary' boolean attribute (s3d:isPrimary, proposed).",
  "components": [
   "CIDOC-CRM",
   "CRMarchaeo",
@@ -834,7 +834,8 @@
    },
    "allowed_connections": {
     "source": [
-     "StratigraphicNode"
+     "StratigraphicNode",
+     "EpochNode"
     ],
     "target": [
      "ParadataNodeGroup"
