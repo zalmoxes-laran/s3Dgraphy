@@ -1,1097 +1,1121 @@
 {
- "s3Dgraphy_connections_model_version": "1.6.1",
- "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. v1.6.1: has_paradata_nodegroup source extended to include EpochNode — an epoch can now own a ParadataNodeGroup holding its temporal-definition properties (e.g. absolute_time_start/end as PropertyNodes with paradata provenance), mirroring how a StratigraphicNode carries its paradata group. v1.6.0 (paired with node datamodel v1.6.0) introduces: bug fix on is_in_paradata_nodegroup (typo 'ProperrtyNOde' → 'PropertyNode'); semantic fix on has_documentation (P104_is_subject_to → P70i_is_documented_in — P104 means 'subject to a legal right', not 'has documentation'); deprecation of has_timebranch as duplicate of is_in_timebranch (the latter is the canonical one — used by import_graphml.py and graphml_patcher.py; the former exists only in config JSON); component list aligned with node datamodel (HDT-O, PROV-O added). HDT-O containment properties (hdto:contains_HDT, hdto:contains_SU, hdto:isPrimary) and physical-relation discriminator subproperties (em:abuts, em:cuts, em:fills, em:overlies, em:bonded_to, em:equals as rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation) to be added in v1.6.1. v1.5.3 introduced canonical/reverse directionality with verb-based labels for clear socket identification in node editors. v1.5.4 added 'has_visual_reference' edge type. v1.5.5 added 'is_in_location' edge type with context-sensitive CIDOC mapping (P53 for node→location, P89 for the recursive location→location hierarchy) and an optional 'is_primary' boolean attribute (s3d:isPrimary, proposed).",
- "components": [
-  "CIDOC-CRM",
-  "CRMarchaeo",
-  "CRMsci",
-  "CRMdig",
-  "CRMgeo",
-  "CRMinf",
-  "HDT-O",
-  "PROV-O",
-  "CRMs3D"
- ],
- "referenced_ontology_versions": {
-  "_comment": "Versions of the reference ontologies this datamodel's mappings are audited against. Update via the mapping-update procedure (see docs: 'Updating the CIDOC mapping') whenever a new official release is adopted.",
-  "CIDOC-CRM": {
-   "version": "7.1.3",
-   "source": "https://cidoc-crm.org/versions-of-the-cidoc-crm"
-  },
-  "CRMarchaeo": {
-   "version": "2.1.1",
-   "source": "https://cidoc-crm.org/crmarchaeo/",
-   "note": "official OWL is internally aligned to CIDOC-CRM 7.1.2 and CRMsci 2.0"
-  },
-  "CRMsci": {
-   "version": "3.1",
-   "source": "https://cidoc-crm.org/crmsci/"
-  },
-  "CRMdig": {
-   "version": "5.0",
-   "source": "https://cidoc-crm.org/crmdig/"
-  },
-  "CRMgeo": {
-   "version": "1.2",
-   "source": "https://cidoc-crm.org/crmgeo/"
-  },
-  "CRMinf": {
-   "version": "1.2.1",
-   "source": "https://cidoc-crm.org/crminf/"
-  },
-  "HDT-O": {
-   "version": "1.0",
-   "source": "ECHOES deliverable D7.1 'The Digital Commons' (project 101157364)"
-  },
-  "PROV-O": {
-   "version": "W3C Recommendation 2013-04-30",
-   "source": "https://www.w3.org/TR/prov-o/"
-  },
-  "CRMs3D": {
-   "version": "1.6.0",
-   "source": "internal em.ttl / hdto_extension.ttl companion ontologies"
-  }
- },
- "edge_types": {
-  "is_after": {
-   "name": "is_after",
-   "label": "Is after",
-   "description": "Indicates a temporal sequence where one item occurs after another. This is the canonical direction in Extended Matrix (from more recent to more ancient stratigraphic units).",
-   "reverse": {
-    "name": "is_before",
-    "label": "Is before"
-   },
-   "mapping": {
-    "cidoc": "P120_occurs_before",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "AP28_occurs_before (was_occurred_after)",
-    "extension_name": "CRMarchaeo"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "StratigraphicNode"
-    ]
-   }
-  },
-  "changed_from": {
-   "name": "changed_from",
-   "label": "Changed from",
-   "description": "Represents an object that changes over time, indicating temporal transformation.",
-   "reverse": {
-    "name": "changed_to",
-    "label": "Changed to"
-   },
-   "mapping": {
-    "cidoc": "P123_resulted_from",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "AP4_produced_surface (was_surface_produced_by)",
-    "extension_name": "CRMarchaeo"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "StratigraphicNode"
-    ]
-   }
-  },
-  "abuts": {
-   "name": "abuts",
-   "label": "Abuts",
-   "description": "This stratigraphic unit abuts against the target stratigraphic unit.",
-   "reverse": {
-    "name": "is_abutted_by",
-    "label": "Is abutted by"
-   },
-   "mapping": {
-    "cidoc": "",
-    "cidoc_extension": "CRMarchaeo",
-    "extension_mapping": "AP11_has_physical_relation",
-    "extension_name": "CRMarchaeo",
-    "type_tag": "abuts"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "StratigraphicNode"
-    ]
-   }
-  },
-  "cuts": {
-   "name": "cuts",
-   "label": "Cuts",
-   "description": "This stratigraphic unit cuts the target stratigraphic unit.",
-   "reverse": {
-    "name": "is_cut_by",
-    "label": "Is cut by"
-   },
-   "mapping": {
-    "cidoc": "",
-    "cidoc_extension": "CRMarchaeo",
-    "extension_mapping": "AP11_has_physical_relation",
-    "extension_name": "CRMarchaeo",
-    "type_tag": "cuts"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "StratigraphicNode"
-    ]
-   }
-  },
-  "fills": {
-   "name": "fills",
-   "label": "Fills",
-   "description": "This stratigraphic unit fills the target stratigraphic unit (e.g., a deposit filling a cut).",
-   "reverse": {
-    "name": "is_filled_by",
-    "label": "Is filled by"
-   },
-   "mapping": {
-    "cidoc": "",
-    "cidoc_extension": "CRMarchaeo",
-    "extension_mapping": "AP11_has_physical_relation",
-    "extension_name": "CRMarchaeo",
-    "type_tag": "fills"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "StratigraphicNode"
-    ]
-   }
-  },
-  "overlies": {
-   "name": "overlies",
-   "label": "Overlies",
-   "description": "This stratigraphic unit overlies (covers) the target stratigraphic unit.",
-   "reverse": {
-    "name": "is_overlain_by",
-    "label": "Is overlain by"
-   },
-   "mapping": {
-    "cidoc": "",
-    "cidoc_extension": "CRMarchaeo",
-    "extension_mapping": "AP11_has_physical_relation",
-    "extension_name": "CRMarchaeo",
-    "type_tag": "overlies"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "StratigraphicNode"
-    ]
-   }
-  },
-  "is_bonded_to": {
-   "name": "is_bonded_to",
-   "label": "Is bonded to",
-   "description": "This stratigraphic unit is physically bonded to the target stratigraphic unit (e.g., masonry bonding). This is a symmetric relation.",
-   "reverse": null,
-   "mapping": {
-    "cidoc": "",
-    "cidoc_extension": "CRMarchaeo",
-    "extension_mapping": "AP11_has_physical_relation",
-    "extension_name": "CRMarchaeo",
-    "type_tag": "is bonded to"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "StratigraphicNode"
-    ]
-   }
-  },
-  "bonded_to": {
-   "name": "bonded_to",
-   "label": "Bonded to",
-   "description": "Canonical (v5.0 em_data.xlsx) form of the bonding relation: this stratigraphic unit is physically bonded to the target. Symmetric. Allowed between any two StratigraphicNode instances including USVs-USVs when two virtually-reconstructed elements are theoretically bonded (e.g. two missing blocks of the same inferred course).",
-   "reverse": null,
-   "mapping": {
-    "cidoc": "",
-    "cidoc_extension": "CRMarchaeo",
-    "extension_mapping": "AP11_has_physical_relation",
-    "extension_name": "CRMarchaeo",
-    "type_tag": "bonded to"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "StratigraphicNode"
-    ]
-   }
-  },
-  "is_physically_equal_to": {
-   "name": "is_physically_equal_to",
-   "label": "Is physically equal to",
-   "description": "Two stratigraphic units are considered physically the same entity or continuous fabric. This is a symmetric relation.",
-   "reverse": null,
-   "mapping": {
-    "cidoc": "",
-    "cidoc_extension": "CRMarchaeo",
-    "extension_mapping": "AP11_has_physical_relation",
-    "extension_name": "CRMarchaeo",
-    "type_tag": "equals"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "StratigraphicNode"
-    ]
-   }
-  },
-  "equals": {
-   "name": "equals",
-   "label": "Equals",
-   "description": "Canonical (v5.0 em_data.xlsx) form of the 'same physical entity' relation: two distinct unit IDs (from different campaigns or archival sources) refer to the same stratigraphic fact. Symmetric.",
-   "reverse": null,
-   "mapping": {
-    "cidoc": "",
-    "cidoc_extension": "CRMarchaeo",
-    "extension_mapping": "AP11_has_physical_relation",
-    "extension_name": "CRMarchaeo",
-    "type_tag": "equals"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "StratigraphicNode"
-    ]
-   }
-  },
-  "has_same_time": {
-   "name": "has_same_time",
-   "label": "Has same time",
-   "description": "Indicates that two elements are contemporaneous. This is a symmetric relation.",
-   "reverse": null,
-   "mapping": {
-    "cidoc": "P114_is_equal_in_time_to",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "AP22_is_equal_in_time_to",
-    "extension_name": "CRMarchaeo"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "StratigraphicNode"
-    ]
-   }
-  },
-  "has_data_provenance": {
-   "name": "has_data_provenance",
-   "label": "Has data provenance",
-   "description": "Indicates the provenance of data, often linking to source nodes.",
-   "reverse": {
-    "name": "is_data_provenance_of",
-    "label": "Is data provenance of"
-   },
-   "mapping": {
-    "cidoc": "P70i_is_documented_in",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "L22_created_derivative (was_derivative_created_by)",
-    "extension_name": "CRMdig"
-   },
-   "allowed_connections": {
-    "source": [
-     "PropertyNode"
-    ],
-    "target": [
-     "ExtractorNode",
-     "CombinerNode"
-    ]
-   }
-  },
-  "contrasts_with": {
-   "name": "contrasts_with",
-   "label": "Contrasts with",
-   "description": "Represents contrasting or mutually exclusive properties. This is a symmetric relation.",
-   "reverse": null,
-   "mapping": {
-    "cidoc": "P15_was_influenced_by",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "CIDOC-S3D:incompatibleWith",
-    "extension_name": "CIDOC-S3D"
-   },
-   "allowed_connections": {
-    "source": [
-     "TimeBranchNodeGroup"
-    ],
-    "target": [
-     "TimeBranchNodeGroup"
-    ]
-   }
-  },
-  "has_first_epoch": {
-   "name": "has_first_epoch",
-   "label": "Has first epoch",
-   "description": "Indicates the initial epoch associated with a node.",
-   "reverse": {
-    "name": "is_first_epoch_of",
-    "label": "Is first epoch of"
-   },
-   "mapping": {
-    "cidoc": "P10_falls_within",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "em:firstAttestedInEpoch",
-    "extension_name": "EM",
-    "_comment": "Changed 2026-07-10: was P82a (invalid: E52->E61) + AP13 (invalid: A5->A5). Epoch attribution is an interpretive act, not a physical stratigraphic relation. em:firstAttestedInEpoch is a documented shortcut of: unit P92i was brought into existence by genesis event (SE), event P10 falls within epoch (E4). Where an SE node exists, AP25_occurs_during applies between SE and epoch. See WP3 coverage analysis Appendix B.2."
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode",
-     "RepresentationModelNode",
-     "RepresentationModelDocNode",
-     "RepresentationModelSpecialFindNode",
-     "ParadataNodeGroup",
-     "ParadataNode",
-     "ActivityNodeGroup"
-    ],
-    "target": [
-     "EpochNode"
-    ]
-   }
-  },
-  "survive_in_epoch": {
-   "name": "survive_in_epoch",
-   "label": "Survives in epoch",
-   "description": "Indicates that a node continues to exist in a given epoch.",
-   "reverse": {
-    "name": "contains_surviving",
-    "label": "Contains surviving"
-   },
-   "mapping": {
-    "cidoc": "P132_spatiotemporally_overlaps_with",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "em:survivesInEpoch",
-    "extension_name": "EM",
-    "_comment": "Changed 2026-07-10: was P10 (too strong: survival through part of an epoch is overlap, not containment) + AP13 (invalid: A5->A5). The unit's spacetime volume (P196) overlaps the epoch's. See WP3 coverage analysis Appendix B.2."
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode",
-     "RepresentationModelNode",
-     "RepresentationModelDocNode",
-     "RepresentationModelSpecialFindNode"
-    ],
-    "target": [
-     "EpochNode"
-    ]
-   }
-  },
-  "is_in_activity": {
-   "name": "is_in_activity",
-   "label": "Is in activity",
-   "description": "Indicates that a node is part of a specific activity.",
-   "reverse": {
-    "name": "includes_in_activity",
-    "label": "Includes in activity"
-   },
-   "mapping": {
-    "cidoc": "P9_consists_of",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "CIDOC-S3D:participatedInActivity",
-    "extension_name": "CIDOC-S3D"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode",
-     "ParadataNode",
-     "ParadataNodeGroup",
-     "DocumentNode",
-     "ExtractorNode",
-     "CombinerNode",
-     "PropertyNode"
-    ],
-    "target": [
-     "ActivityNodeGroup"
-    ]
-   }
-  },
-  "is_in_location": {
-   "name": "is_in_location",
-   "label": "Is in location",
-   "description": "Indicates that a node belongs to a spatial / locational group (LocationNodeGroup). Membership is m:n (multiple is_in_location edges per source are allowed) and additive (memberships compose; none overrides). The optional 'is_primary' attribute on at most one edge per source disambiguates which membership is rendered as a yEd group folder in em-graph. The same edge type also carries the recursive Location → Location hierarchy (Pompei → Sector 4 → Casa del Fauno → Room 12).",
-   "reverse": {
-    "name": "includes_location",
-    "label": "Includes location"
-   },
-   "mapping": {
-    "cidoc": "P53_has_former_or_current_location",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": null,
-    "extension_name": null,
-    "context_mapping": {
-     "node_to_location": {
-      "applies_when": "source is StratigraphicNode | ParadataNode | ParadataNodeGroup | DocumentNode | ExtractorNode | CombinerNode | PropertyNode and target is LocationNodeGroup",
-      "cidoc": "P53_has_former_or_current_location",
-      "rationale": "CIDOC-core P53 is the canonical predicate connecting an entity to an E53 Place. No s3d: extension predicate is needed."
-     },
-     "location_to_location": {
-      "applies_when": "source is LocationNodeGroup and target is LocationNodeGroup (recursive hierarchy)",
-      "cidoc": "P89_falls_within",
-      "rationale": "CIDOC-core P89 expresses Place-within-Place; reused as-is for the recursive containment of LocationNodeGroups. No s3d: extension predicate is needed."
-     }
+  "s3Dgraphy_connections_model_version": "1.6.2",
+  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. v1.6.1: has_paradata_nodegroup source extended to include EpochNode — an epoch can now own a ParadataNodeGroup holding its temporal-definition properties (e.g. absolute_time_start/end as PropertyNodes with paradata provenance), mirroring how a StratigraphicNode carries its paradata group. v1.6.0 (paired with node datamodel v1.6.0) introduces: bug fix on is_in_paradata_nodegroup (typo 'ProperrtyNOde' → 'PropertyNode'); semantic fix on has_documentation (P104_is_subject_to → P70i_is_documented_in — P104 means 'subject to a legal right', not 'has documentation'); deprecation of has_timebranch as duplicate of is_in_timebranch (the latter is the canonical one — used by import_graphml.py and graphml_patcher.py; the former exists only in config JSON); component list aligned with node datamodel (HDT-O, PROV-O added). HDT-O containment properties (hdto:contains_HDT, hdto:contains_SU, hdto:isPrimary) and physical-relation discriminator subproperties (em:abuts, em:cuts, em:fills, em:overlies, em:bonded_to, em:equals as rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation) to be added in v1.6.1. v1.5.3 introduced canonical/reverse directionality with verb-based labels for clear socket identification in node editors. v1.5.4 added 'has_visual_reference' edge type. v1.5.5 added 'is_in_location' edge type with context-sensitive CIDOC mapping (P53 for node→location, P89 for the recursive location→location hierarchy) and an optional 'is_primary' boolean attribute (s3d:isPrimary, proposed).",
+  "components": [
+    "CIDOC-CRM",
+    "CRMarchaeo",
+    "CRMsci",
+    "CRMdig",
+    "CRMgeo",
+    "CRMinf",
+    "HDT-O",
+    "PROV-O",
+    "CRMs3D"
+  ],
+  "referenced_ontology_versions": {
+    "_comment": "Versions of the reference ontologies this datamodel's mappings are audited against. Update via the mapping-update procedure (see docs: 'Updating the CIDOC mapping') whenever a new official release is adopted.",
+    "CIDOC-CRM": {
+      "version": "7.1.3",
+      "source": "https://cidoc-crm.org/versions-of-the-cidoc-crm"
+    },
+    "CRMarchaeo": {
+      "version": "2.1.1",
+      "source": "https://cidoc-crm.org/crmarchaeo/",
+      "note": "official OWL is internally aligned to CIDOC-CRM 7.1.2 and CRMsci 2.0"
+    },
+    "CRMsci": {
+      "version": "3.1",
+      "source": "https://cidoc-crm.org/crmsci/"
+    },
+    "CRMdig": {
+      "version": "5.0",
+      "source": "https://cidoc-crm.org/crmdig/"
+    },
+    "CRMgeo": {
+      "version": "1.2",
+      "source": "https://cidoc-crm.org/crmgeo/"
+    },
+    "CRMinf": {
+      "version": "1.2.1",
+      "source": "https://cidoc-crm.org/crminf/"
+    },
+    "HDT-O": {
+      "version": "1.0",
+      "source": "ECHOES deliverable D7.1 'The Digital Commons' (project 101157364)"
+    },
+    "PROV-O": {
+      "version": "W3C Recommendation 2013-04-30",
+      "source": "https://www.w3.org/TR/prov-o/"
+    },
+    "CRMs3D": {
+      "version": "1.6.0",
+      "source": "internal em.ttl / hdto_extension.ttl companion ontologies"
     }
-   },
-   "attributes": {
-    "is_primary": {
-     "type": "boolean",
-     "default": false,
-     "required": false,
-     "description": "If true, this membership is the primary one for the source node and is rendered as a yEd group folder in em-graph. At most one is_primary=true edge per source node. Additional memberships render as labels/badges on the node (yEd cannot draw overlapping group folders).",
-     "mapping": {
-      "cidoc": null,
-      "extension_mapping": "s3d:isPrimary",
-      "extension_status": "proposed",
-      "rationale": "No CIDOC-core or CRMarchaeo equivalent — is_primary is a UX/rendering disambiguation flag for the m:n membership pattern (specifically: which membership becomes the yEd group folder in em-graph). Carrying it in the s3d extension namespace preserves the information through a SPARQL round-trip from a CIDOC triplestore. Candidate primitive for a forthcoming CIDOC-S3D extension."
-     }
+  },
+  "edge_types": {
+    "is_after": {
+      "name": "is_after",
+      "label": "Is after",
+      "description": "Indicates a temporal sequence where one item occurs after another. This is the canonical direction in Extended Matrix (from more recent to more ancient stratigraphic units).",
+      "reverse": {
+        "name": "is_before",
+        "label": "Is before"
+      },
+      "mapping": {
+        "cidoc": "P120_occurs_before",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "AP28_occurs_before (was_occurred_after)",
+        "extension_name": "CRMarchaeo"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "StratigraphicNode"
+        ]
+      }
+    },
+    "changed_from": {
+      "name": "changed_from",
+      "label": "Changed from",
+      "description": "Represents an object that changes over time, indicating temporal transformation.",
+      "reverse": {
+        "name": "changed_to",
+        "label": "Changed to"
+      },
+      "mapping": {
+        "cidoc": "P123_resulted_from",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "AP4_produced_surface (was_surface_produced_by)",
+        "extension_name": "CRMarchaeo"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "StratigraphicNode"
+        ]
+      }
+    },
+    "abuts": {
+      "name": "abuts",
+      "label": "Abuts",
+      "description": "This stratigraphic unit abuts against the target stratigraphic unit.",
+      "reverse": {
+        "name": "is_abutted_by",
+        "label": "Is abutted by"
+      },
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "abuts"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "StratigraphicNode"
+        ]
+      }
+    },
+    "cuts": {
+      "name": "cuts",
+      "label": "Cuts",
+      "description": "This stratigraphic unit cuts the target stratigraphic unit.",
+      "reverse": {
+        "name": "is_cut_by",
+        "label": "Is cut by"
+      },
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "cuts"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "StratigraphicNode"
+        ]
+      }
+    },
+    "fills": {
+      "name": "fills",
+      "label": "Fills",
+      "description": "This stratigraphic unit fills the target stratigraphic unit (e.g., a deposit filling a cut).",
+      "reverse": {
+        "name": "is_filled_by",
+        "label": "Is filled by"
+      },
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "fills"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "StratigraphicNode"
+        ]
+      }
+    },
+    "overlies": {
+      "name": "overlies",
+      "label": "Overlies",
+      "description": "This stratigraphic unit overlies (covers) the target stratigraphic unit.",
+      "reverse": {
+        "name": "is_overlain_by",
+        "label": "Is overlain by"
+      },
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "overlies"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "StratigraphicNode"
+        ]
+      }
+    },
+    "is_bonded_to": {
+      "name": "is_bonded_to",
+      "label": "Is bonded to",
+      "description": "This stratigraphic unit is physically bonded to the target stratigraphic unit (e.g., masonry bonding). This is a symmetric relation.",
+      "reverse": null,
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "is bonded to"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "StratigraphicNode"
+        ]
+      }
+    },
+    "bonded_to": {
+      "name": "bonded_to",
+      "label": "Bonded to",
+      "description": "Canonical (v5.0 em_data.xlsx) form of the bonding relation: this stratigraphic unit is physically bonded to the target. Symmetric. Allowed between any two StratigraphicNode instances including USVs-USVs when two virtually-reconstructed elements are theoretically bonded (e.g. two missing blocks of the same inferred course).",
+      "reverse": null,
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "bonded to"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "StratigraphicNode"
+        ]
+      }
+    },
+    "is_physically_equal_to": {
+      "name": "is_physically_equal_to",
+      "label": "Is physically equal to",
+      "description": "Two stratigraphic units are considered physically the same entity or continuous fabric. This is a symmetric relation.",
+      "reverse": null,
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "equals"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "StratigraphicNode"
+        ]
+      }
+    },
+    "equals": {
+      "name": "equals",
+      "label": "Equals",
+      "description": "Canonical (v5.0 em_data.xlsx) form of the 'same physical entity' relation: two distinct unit IDs (from different campaigns or archival sources) refer to the same stratigraphic fact. Symmetric.",
+      "reverse": null,
+      "mapping": {
+        "cidoc": "",
+        "cidoc_extension": "CRMarchaeo",
+        "extension_mapping": "AP11_has_physical_relation",
+        "extension_name": "CRMarchaeo",
+        "type_tag": "equals"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "StratigraphicNode"
+        ]
+      }
+    },
+    "has_same_time": {
+      "name": "has_same_time",
+      "label": "Has same time",
+      "description": "Indicates that two elements are contemporaneous. This is a symmetric relation.",
+      "reverse": null,
+      "mapping": {
+        "cidoc": "P114_is_equal_in_time_to",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "AP22_is_equal_in_time_to",
+        "extension_name": "CRMarchaeo"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "StratigraphicNode"
+        ]
+      }
+    },
+    "has_data_provenance": {
+      "name": "has_data_provenance",
+      "label": "Has data provenance",
+      "description": "Indicates the provenance of data, often linking to source nodes.",
+      "reverse": {
+        "name": "is_data_provenance_of",
+        "label": "Is data provenance of"
+      },
+      "mapping": {
+        "cidoc": "P70i_is_documented_in",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "L22_created_derivative (was_derivative_created_by)",
+        "extension_name": "CRMdig"
+      },
+      "allowed_connections": {
+        "source": [
+          "PropertyNode"
+        ],
+        "target": [
+          "ExtractorNode",
+          "CombinerNode"
+        ]
+      }
+    },
+    "contrasts_with": {
+      "name": "contrasts_with",
+      "label": "Contrasts with",
+      "description": "Represents contrasting or mutually exclusive properties. This is a symmetric relation.",
+      "reverse": null,
+      "mapping": {
+        "cidoc": "P15_was_influenced_by",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "CIDOC-S3D:incompatibleWith",
+        "extension_name": "CIDOC-S3D"
+      },
+      "allowed_connections": {
+        "source": [
+          "TimeBranchNodeGroup"
+        ],
+        "target": [
+          "TimeBranchNodeGroup"
+        ]
+      }
+    },
+    "has_first_epoch": {
+      "name": "has_first_epoch",
+      "label": "Has first epoch",
+      "description": "Indicates the initial epoch associated with a node.",
+      "reverse": {
+        "name": "is_first_epoch_of",
+        "label": "Is first epoch of"
+      },
+      "mapping": {
+        "cidoc": "P10_falls_within",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "em:firstAttestedInEpoch",
+        "extension_name": "EM",
+        "_comment": "Changed 2026-07-10: was P82a (invalid: E52->E61) + AP13 (invalid: A5->A5). Epoch attribution is an interpretive act, not a physical stratigraphic relation. em:firstAttestedInEpoch is a documented shortcut of: unit P92i was brought into existence by genesis event (SE), event P10 falls within epoch (E4). Where an SE node exists, AP25_occurs_during applies between SE and epoch. See WP3 coverage analysis Appendix B.2."
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode",
+          "RepresentationModelNode",
+          "RepresentationModelDocNode",
+          "RepresentationModelSpecialFindNode",
+          "ParadataNodeGroup",
+          "ParadataNode",
+          "ActivityNodeGroup"
+        ],
+        "target": [
+          "EpochNode"
+        ]
+      }
+    },
+    "survive_in_epoch": {
+      "name": "survive_in_epoch",
+      "label": "Survives in epoch",
+      "description": "Indicates that a node continues to exist in a given epoch.",
+      "reverse": {
+        "name": "contains_surviving",
+        "label": "Contains surviving"
+      },
+      "mapping": {
+        "cidoc": "P132_spatiotemporally_overlaps_with",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "em:survivesInEpoch",
+        "extension_name": "EM",
+        "_comment": "Changed 2026-07-10: was P10 (too strong: survival through part of an epoch is overlap, not containment) + AP13 (invalid: A5->A5). The unit's spacetime volume (P196) overlaps the epoch's. See WP3 coverage analysis Appendix B.2."
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode",
+          "RepresentationModelNode",
+          "RepresentationModelDocNode",
+          "RepresentationModelSpecialFindNode"
+        ],
+        "target": [
+          "EpochNode"
+        ]
+      }
+    },
+    "has_sub_epoch": {
+      "name": "has_sub_epoch",
+      "label": "Has sub-epoch",
+      "description": "Splits an epoch into ordered sub-epochs (phases). Source is the parent epoch, target a phase (itself an EpochNode). Phases partition the parent's time-span; when hidden the parent epoch holds all the units, when shown the units are distributed across the phases. Reverse: is_in_epoch.",
+      "reverse": {
+        "name": "is_in_epoch",
+        "label": "Is in epoch"
+      },
+      "mapping": {
+        "cidoc": "P10_falls_within",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "em:hasSubEpoch",
+        "extension_name": "EM",
+        "_comment": "EM 1.6 periodisation: epoch -> phase (sub-epoch). A phase P10 falls within its parent epoch (E4 within E4). Added 2026-07 for the EMStudio phase system."
+      },
+      "allowed_connections": {
+        "source": [
+          "EpochNode"
+        ],
+        "target": [
+          "EpochNode"
+        ]
+      }
+    },
+    "is_in_activity": {
+      "name": "is_in_activity",
+      "label": "Is in activity",
+      "description": "Indicates that a node is part of a specific activity.",
+      "reverse": {
+        "name": "includes_in_activity",
+        "label": "Includes in activity"
+      },
+      "mapping": {
+        "cidoc": "P9_consists_of",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "CIDOC-S3D:participatedInActivity",
+        "extension_name": "CIDOC-S3D"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode",
+          "ParadataNode",
+          "ParadataNodeGroup",
+          "DocumentNode",
+          "ExtractorNode",
+          "CombinerNode",
+          "PropertyNode"
+        ],
+        "target": [
+          "ActivityNodeGroup"
+        ]
+      }
+    },
+    "is_in_location": {
+      "name": "is_in_location",
+      "label": "Is in location",
+      "description": "Indicates that a node belongs to a spatial / locational group (LocationNodeGroup). Membership is m:n (multiple is_in_location edges per source are allowed) and additive (memberships compose; none overrides). The optional 'is_primary' attribute on at most one edge per source disambiguates which membership is rendered as a yEd group folder in em-graph. The same edge type also carries the recursive Location → Location hierarchy (Pompei → Sector 4 → Casa del Fauno → Room 12).",
+      "reverse": {
+        "name": "includes_location",
+        "label": "Includes location"
+      },
+      "mapping": {
+        "cidoc": "P53_has_former_or_current_location",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": null,
+        "extension_name": null,
+        "context_mapping": {
+          "node_to_location": {
+            "applies_when": "source is StratigraphicNode | ParadataNode | ParadataNodeGroup | DocumentNode | ExtractorNode | CombinerNode | PropertyNode and target is LocationNodeGroup",
+            "cidoc": "P53_has_former_or_current_location",
+            "rationale": "CIDOC-core P53 is the canonical predicate connecting an entity to an E53 Place. No s3d: extension predicate is needed."
+          },
+          "location_to_location": {
+            "applies_when": "source is LocationNodeGroup and target is LocationNodeGroup (recursive hierarchy)",
+            "cidoc": "P89_falls_within",
+            "rationale": "CIDOC-core P89 expresses Place-within-Place; reused as-is for the recursive containment of LocationNodeGroups. No s3d: extension predicate is needed."
+          }
+        }
+      },
+      "attributes": {
+        "is_primary": {
+          "type": "boolean",
+          "default": false,
+          "required": false,
+          "description": "If true, this membership is the primary one for the source node and is rendered as a yEd group folder in em-graph. At most one is_primary=true edge per source node. Additional memberships render as labels/badges on the node (yEd cannot draw overlapping group folders).",
+          "mapping": {
+            "cidoc": null,
+            "extension_mapping": "s3d:isPrimary",
+            "extension_status": "proposed",
+            "rationale": "No CIDOC-core or CRMarchaeo equivalent — is_primary is a UX/rendering disambiguation flag for the m:n membership pattern (specifically: which membership becomes the yEd group folder in em-graph). Carrying it in the s3d extension namespace preserves the information through a SPARQL round-trip from a CIDOC triplestore. Candidate primitive for a forthcoming CIDOC-S3D extension."
+          }
+        }
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode",
+          "ParadataNode",
+          "ParadataNodeGroup",
+          "DocumentNode",
+          "ExtractorNode",
+          "CombinerNode",
+          "PropertyNode",
+          "LocationNodeGroup"
+        ],
+        "target": [
+          "LocationNodeGroup"
+        ]
+      }
+    },
+    "has_property": {
+      "name": "has_property",
+      "label": "Has property",
+      "description": "Connects a node to one of its properties.",
+      "reverse": {
+        "name": "is_property_of",
+        "label": "Is property of"
+      },
+      "mapping": {
+        "cidoc": "P43_has_dimension",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "em:hasQualia",
+        "extension_name": "EM",
+        "_comment": "Changed 2026-07-10: AP9_took_matter_from removed (invalid: A4 Stratigraphic Genesis -> S10 Material Substantial, unrelated to property attribution). em:hasQualia is the EM-native predicate declared in em.ttl. See WP3 coverage analysis section 10."
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode",
+          "DocumentNode"
+        ],
+        "target": [
+          "PropertyNode"
+        ]
+      }
+    },
+    "extracted_from": {
+      "name": "extracted_from",
+      "label": "Extracted from",
+      "description": "Indicates that information is derived from a particular source.",
+      "reverse": {
+        "name": "is_source_for_extraction",
+        "label": "Is source for extraction"
+      },
+      "mapping": {
+        "cidoc": "P67_refers_to",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "J7_is_based_on_evidence_from (is_evidence_for)",
+        "extension_name": "CRMinf"
+      },
+      "allowed_connections": {
+        "source": [
+          "ExtractorNode"
+        ],
+        "target": [
+          "DocumentNode"
+        ]
+      }
+    },
+    "combines": {
+      "name": "combines",
+      "label": "Combines",
+      "description": "Indicates that a node combines information from various sources.",
+      "reverse": {
+        "name": "is_combined_by",
+        "label": "Is combined by"
+      },
+      "mapping": {
+        "cidoc": "P16_used_specific_object",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "J1_used_as_premise (was_premise_for)",
+        "extension_name": "CRMinf"
+      },
+      "allowed_connections": {
+        "source": [
+          "CombinerNode"
+        ],
+        "target": [
+          "ExtractorNode"
+        ]
+      }
+    },
+    "is_in_timebranch": {
+      "name": "is_in_timebranch",
+      "label": "Is in timebranch",
+      "description": "Indicates that a node belongs to a specific time branch.",
+      "reverse": {
+        "name": "contains_in_timebranch",
+        "label": "Contains in timebranch"
+      },
+      "mapping": {
+        "cidoc": "P67_refers_to",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "CIDOC-S3D:belongsToAlternative",
+        "extension_name": "CIDOC-S3D"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "TimeBranchNodeGroup"
+        ]
+      }
+    },
+    "has_timebranch": {
+      "name": "has_timebranch",
+      "label": "Has timebranch",
+      "deprecated": true,
+      "deprecated_since": "1.6.0",
+      "deprecated_reason": "Duplicate of is_in_timebranch with identical mapping and allowed_connections. Verified usage in /src: is_in_timebranch is the canonical form (used by importer/import_graphml.py:1510 and exporter/graphml/graphml_patcher.py:73); has_timebranch exists only in JSON config files (this one + em_visual_rules.json). Kept temporarily for backward compatibility on read; writers MUST emit is_in_timebranch. Scheduled for removal in 1.7.0.",
+      "description": "[DEPRECATED in 1.6.0 — use is_in_timebranch] Indicates that a node is connected to a specific time branch.",
+      "reverse": {
+        "name": "is_timebranch_of",
+        "label": "Is timebranch of"
+      },
+      "mapping": {
+        "cidoc": "P67_refers_to",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "CIDOC-S3D:belongsToAlternative",
+        "extension_name": "CIDOC-S3D"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode"
+        ],
+        "target": [
+          "TimeBranchNodeGroup"
+        ]
+      }
+    },
+    "has_author": {
+      "name": "has_author",
+      "label": "Has author",
+      "description": "Represents the connection of a node with its author. Target can be an AuthorNode (human) or AuthorAINode (AI-assisted authoring). Source covers the full range of EM node types so that the resolver can walk from any scope level down to the author.",
+      "reverse": {
+        "name": "is_author_of",
+        "label": "Is author of"
+      },
+      "mapping": {
+        "cidoc": "prov:wasAttributedTo",
+        "cidoc_extension": "PROV-O",
+        "extension_mapping": "em:hasAuthor",
+        "extension_name": "EM",
+        "_comment": "Changed 2026-07-10: was P94_has_created (invalid: domain E65 Creation, range E28 Conceptual Object - cannot hold for physical SU nodes) + L10_had_input (describes digital machine events, not authorship). prov:wasAttributedTo is domain-neutral (any entity -> agent) and covers human and AI authors uniformly; PROV-O is already a declared component. Property-graph JSON untouched: importers and Heriverse unaffected. See WP3 coverage analysis section 10."
+      },
+      "allowed_connections": {
+        "source": [
+          "GraphNode",
+          "StratigraphicNode",
+          "ParadataNode",
+          "GroupNode",
+          "DocumentNode",
+          "ExtractorNode",
+          "CombinerNode",
+          "PropertyNode",
+          "EpochNode"
+        ],
+        "target": [
+          "AuthorNode",
+          "AuthorAINode"
+        ]
+      }
+    },
+    "has_geoposition": {
+      "name": "has_geoposition",
+      "label": "Has geoposition",
+      "description": "Represents a connection with the geoposition node of a given node.",
+      "reverse": {
+        "name": "is_geoposition_of",
+        "label": "Is geoposition of"
+      },
+      "mapping": {
+        "cidoc": "P53_has_former_or_current_location",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "Q4_has_spatial_projection",
+        "extension_name": "CRMgeo"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode",
+          "ParadataNode",
+          "RepresentationModelNode",
+          "RepresentationModelDocNode",
+          "RepresentationModelSpecialFindNode"
+        ],
+        "target": [
+          "GeoPositionNode"
+        ]
+      }
+    },
+    "has_linked_resource": {
+      "name": "has_linked_resource",
+      "label": "Has linked resource",
+      "description": "Connects a node to its linked resource(s).",
+      "reverse": {
+        "name": "is_linked_resource_of",
+        "label": "Is linked resource of"
+      },
+      "mapping": {
+        "cidoc": "P67_refers_to",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "L19_stores (is_stored_on)",
+        "extension_name": "CRMdig"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode",
+          "ParadataNode",
+          "DocumentNode",
+          "RepresentationModelNode",
+          "RepresentationModelDocNode",
+          "RepresentationModelSpecialFindNode"
+        ],
+        "target": [
+          "LinkNode"
+        ]
+      }
+    },
+    "has_representation_model": {
+      "name": "has_representation_model",
+      "label": "Has representation model",
+      "description": "Connects epochs with their representation models in 3D space.",
+      "reverse": {
+        "name": "is_representation_model_of",
+        "label": "Is representation model of"
+      },
+      "mapping": {
+        "cidoc": "P138i_has_representation",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "CIDOC-S3D:has3DRepresentation",
+        "extension_name": "CIDOC-S3D"
+      },
+      "allowed_connections": {
+        "source": [
+          "EpochNode",
+          "StratigraphicNode",
+          "DocumentNode"
+        ],
+        "target": [
+          "RepresentationModelNode"
+        ]
+      }
+    },
+    "has_representation_model_doc": {
+      "name": "has_representation_model_doc",
+      "label": "Has document representation model",
+      "description": "Connects extractors, combiners and documents node to their representation model in 3D space.",
+      "reverse": {
+        "name": "is_doc_representation_model_of",
+        "label": "Is doc representation model of"
+      },
+      "mapping": {
+        "cidoc": "P138i_has_representation",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "CIDOC-S3D:has3DRepresentation",
+        "extension_name": "CIDOC-S3D"
+      },
+      "allowed_connections": {
+        "source": [
+          "ExtractorNode",
+          "DocumentNode",
+          "CombinerNode"
+        ],
+        "target": [
+          "RepresentationModelDocNode",
+          "RepresentationModelSpecialFindNode"
+        ]
+      }
+    },
+    "has_representation_model_sf": {
+      "name": "has_representation_model_sf",
+      "label": "Has special find representation model",
+      "description": "Connects special find units to their representation model in 3D space.",
+      "reverse": {
+        "name": "is_sf_representation_model_of",
+        "label": "Is special find representation model of"
+      },
+      "mapping": {
+        "cidoc": "P138i_has_representation",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "CIDOC-S3D:has3DRepresentation",
+        "extension_name": "CIDOC-S3D"
+      },
+      "allowed_connections": {
+        "source": [
+          "SpecialFindUnit"
+        ],
+        "target": [
+          "RepresentationModelSpecialFindNode"
+        ]
+      }
+    },
+    "has_semantic_shape": {
+      "name": "has_semantic_shape",
+      "label": "Has semantic shape",
+      "description": "Connects any node to its semantic shape representation in 3D space.",
+      "reverse": {
+        "name": "is_semantic_shape_of",
+        "label": "Is semantic shape of"
+      },
+      "mapping": {
+        "cidoc": "P138i_has_representation",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "CIDOC-S3D:hasSymbolicSpatialRepresentation",
+        "extension_name": "CIDOC-S3D"
+      },
+      "allowed_connections": {
+        "source": [
+          "Node"
+        ],
+        "target": [
+          "SemanticShapeNode"
+        ]
+      }
+    },
+    "is_in_paradata_nodegroup": {
+      "name": "is_in_paradata_nodegroup",
+      "label": "Is in paradata nodegroup",
+      "description": "Indicates that a node is included into a paradata node group. Standard members are the paradata-chain nodes (PropertyNode/DocumentNode/ExtractorNode/CombinerNode/ParadataNode); GeoPositionNode is additionally admitted so the per-graph georeferencing shift can be a member of the graph-scope ParadataNodeGroup (DP-65) — semantically valid only at graph scope.",
+      "reverse": {
+        "name": "contains_paradata_node",
+        "label": "Contains paradata node"
+      },
+      "mapping": {
+        "cidoc": "P106_is_composed_of",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "CIDOC-S3D:isPartOfParadataGroup",
+        "extension_name": "CIDOC-S3D"
+      },
+      "allowed_connections": {
+        "source": [
+          "PropertyNode",
+          "DocumentNode",
+          "ExtractorNode",
+          "CombinerNode",
+          "ParadataNode",
+          "GeoPositionNode"
+        ],
+        "target": [
+          "ParadataNodeGroup"
+        ]
+      }
+    },
+    "has_paradata_nodegroup": {
+      "name": "has_paradata_nodegroup",
+      "label": "Has paradata nodegroup",
+      "description": "Indicates that a node belongs to a paradata node group.",
+      "reverse": {
+        "name": "is_paradata_nodegroup_of",
+        "label": "Is paradata nodegroup of"
+      },
+      "mapping": {
+        "cidoc": "P70_documents",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "CIDOC-S3D:hasParadataDocumentation",
+        "extension_name": "CIDOC-S3D"
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode",
+          "EpochNode"
+        ],
+        "target": [
+          "ParadataNodeGroup"
+        ]
+      }
+    },
+    "has_license": {
+      "name": "has_license",
+      "label": "Has license",
+      "description": "Indicates that a resource is subject to a specific license.",
+      "reverse": {
+        "name": "is_license_of",
+        "label": "Is license of"
+      },
+      "mapping": {
+        "cidoc": "P104_is_subject_to",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": null,
+        "extension_name": null
+      },
+      "allowed_connections": {
+        "source": [
+          "Node",
+          "GraphNode"
+        ],
+        "target": [
+          "LicenseNode"
+        ]
+      }
+    },
+    "has_embargo": {
+      "name": "has_embargo",
+      "label": "Has embargo",
+      "description": "Indicates that an element is subject to a temporal embargo. Source can be any node (GraphNode for canvas-wide embargo, LicenseNode for license-scoped embargo, or any node for node-scoped embargo), mirroring has_license.",
+      "reverse": {
+        "name": "is_embargo_of",
+        "label": "Is embargo of"
+      },
+      "mapping": {
+        "cidoc": "P104_is_subject_to",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": null,
+        "extension_name": null
+      },
+      "allowed_connections": {
+        "source": [
+          "Node",
+          "GraphNode",
+          "LicenseNode"
+        ],
+        "target": [
+          "EmbargoNode"
+        ]
+      }
+    },
+    "has_documentation": {
+      "name": "has_documentation",
+      "label": "Has documentation",
+      "description": "Indicates that the element has an associated documentation node.",
+      "reverse": {
+        "name": "is_documentation_of",
+        "label": "Is documentation of"
+      },
+      "mapping": {
+        "cidoc": "P70i_is_documented_in",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": null,
+        "extension_name": null,
+        "rationale": "P70i_is_documented_in (inverse of P70_documents) is the canonical CRM predicate to link an entity to a document about it. Earlier v1.5.5 used P104_is_subject_to which is semantically wrong (P104 means 'subject to a legal right or rule', not 'has documentation about it')."
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode",
+          "SpecialFindUnit",
+          "VirtualStratigraphicUnit"
+        ],
+        "target": [
+          "DocumentNode"
+        ]
+      }
+    },
+    "has_visual_reference": {
+      "name": "has_visual_reference",
+      "label": "Has visual reference",
+      "description": "Indicates that the element has an associated visual reference.",
+      "reverse": {
+        "name": "is_visual_reference_of",
+        "label": "Is visual reference of"
+      },
+      "mapping": {
+        "cidoc": "P138i_has_representation",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "em:hasVisualReference",
+        "extension_name": "EM",
+        "_comment": "Mapped 2026-07-10 (was NOTyetMAPPED): the paradata node is visually illustrated/anchored by a document. E36 Visual Item P138 represents E1; edge direction node->document matches P138i, consistent with the has_representation_model family. The exporter co-types the target document as E36. Distinct from extracted_from (P67/J7): a visual reference shows, an extraction source justifies. See WP3 coverage analysis Appendix B.1."
+      },
+      "allowed_connections": {
+        "source": [
+          "PropertyNode",
+          "ExtractorNode",
+          "CombinerNode",
+          "ParadataNode"
+        ],
+        "target": [
+          "DocumentNode"
+        ]
+      }
+    },
+    "is_part_of": {
+      "name": "is_part_of",
+      "label": "Is part of",
+      "description": "Indicates physical containment: a node is physically contained within a stratigraphic unit (e.g., a Special Find reused inside a wall).",
+      "reverse": {
+        "name": "has_part",
+        "label": "Has part"
+      },
+      "mapping": {
+        "cidoc": "P46i_forms_part_of",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "P46_is_composed_of",
+        "extension_name": "CIDOC-CRM"
+      },
+      "allowed_connections": {
+        "source": [
+          "SpecialFindUnit",
+          "VirtualSpecialFindUnit",
+          "StratigraphicUnit",
+          "DocumentaryStratigraphicUnit",
+          "VirtualStratigraphicUnit"
+        ],
+        "target": [
+          "StratigraphicUnit",
+          "DocumentaryStratigraphicUnit",
+          "VirtualSpecialFindUnit"
+        ]
+      }
+    },
+    "has_digital_twin": {
+      "name": "has_digital_twin",
+      "label": "Has digital twin",
+      "description": "Links a real-world heritage entity (or any node representing one) to its Heritage Digital Twin (HDTNode). HDT-O HP1 per ECHOES D7.1 §4.2.",
+      "reverse": {
+        "name": "is_digital_twin_of",
+        "label": "Is digital twin of"
+      },
+      "mapping": {
+        "cidoc": "hdto:HP1_has_digital_twin",
+        "cidoc_extension": "HDT-O",
+        "extension_mapping": null,
+        "extension_name": "HDT-O",
+        "rationale": "Per D7.1 §4.2 HP1: 'links a CH entity with a corresponding digital twin that aggregates structured knowledge about it'. Quantification many-to-many (0,n : 0,n)."
+      },
+      "allowed_connections": {
+        "source": [
+          "StratigraphicNode",
+          "Node"
+        ],
+        "target": [
+          "HDTNode"
+        ]
+      }
+    },
+    "has_digital_twin_component": {
+      "name": "has_digital_twin_component",
+      "label": "Has digital twin component",
+      "description": "Hierarchical containment between HDTs. A parent HDT has component child-HDTs. HDT-O HP3 (inverse) per ECHOES D7.1 §4.2. Use case: Colosseo_HDT_overall has_digital_twin_component Colosseo_HDT_Flavian / Colosseo_HDT_medieval_fortress / Colosseo_HDT_christian_site_1800. Transitive: chains of containment are inferred.",
+      "reverse": {
+        "name": "is_digital_twin_component_of",
+        "label": "Is digital twin component of"
+      },
+      "mapping": {
+        "cidoc": "hdto:HP3i_has_digital_twin_component",
+        "cidoc_extension": "HDT-O",
+        "extension_mapping": null,
+        "extension_name": "HDT-O",
+        "rationale": "Per D7.1 §4.2 HP3: 'enables the hierarchical organization of digital twins, allowing the digital twin of a specific asset to be part of a larger digital twin representing a city, archaeological site, or cultural landscape'. Component is not limited to physical/geographical: encompasses any main-associated relationship. Quantification many-to-many (0,n : 0,n)."
+      },
+      "allowed_connections": {
+        "source": [
+          "HDTNode"
+        ],
+        "target": [
+          "HDTNode"
+        ]
+      }
+    },
+    "contains_proposition_set": {
+      "name": "contains_proposition_set",
+      "label": "Contains proposition set",
+      "description": "Links an HDT (HDTNode) to a Heritage Proposition Set (GraphNode / em:EMGraph) it currently aggregates. HDT-O HP33 per ECHOES D7.1 §4.2. This is the canonical way to attach an EM graph to an HDT. An EM graph can be a proposition set of multiple HDTs (many-to-many).",
+      "reverse": {
+        "name": "is_proposition_set_of",
+        "label": "Is proposition set of"
+      },
+      "mapping": {
+        "cidoc": "hdto:HP33_contains",
+        "cidoc_extension": "HDT-O",
+        "extension_mapping": null,
+        "extension_name": "HDT-O",
+        "rationale": "Per D7.1 §4.2 HP33: 'associates an HC2 HDT with an HC16 Heritage Proposition Set currently valid within it'. Version chains tracked via HP30 added / HP31 deleted / HP32 replaced. Deprecation tracked via HP34 contained (was proposition set of)."
+      },
+      "allowed_connections": {
+        "source": [
+          "HDTNode"
+        ],
+        "target": [
+          "GraphNode"
+        ]
+      }
+    },
+    "has_digital_object_part": {
+      "name": "has_digital_object_part",
+      "label": "Has digital object part",
+      "description": "Links an HDT (or any HC14 Volatile Digital Object) to an auxiliary digital object that is NOT a proposition set — e.g., a 3D survey database, a point cloud, a generic linked resource. HDT-O HP29 per ECHOES D7.1 §4.2.",
+      "reverse": {
+        "name": "is_digital_object_part_of",
+        "label": "Is digital object part of"
+      },
+      "mapping": {
+        "cidoc": "hdto:HP29_has_digital_object_part",
+        "cidoc_extension": "HDT-O",
+        "extension_mapping": "P106_is_composed_of",
+        "extension_name": "CIDOC-CRM",
+        "rationale": "Per D7.1 §4.2 HP29: 'associates an HC14 Volatile Digital Object with a structural part that is itself a digital object'. Subproperty of crm:P106_is_composed_of. Example: HDT of Pisa Leaning Tower has digital part a 3D survey project database (crmdig:D1)."
+      },
+      "allowed_connections": {
+        "source": [
+          "HDTNode"
+        ],
+        "target": [
+          "RepresentationModelNode",
+          "RepresentationModelDocNode",
+          "RepresentationModelSpecialFindNode",
+          "LinkNode"
+        ]
+      }
+    },
+    "generic_connection": {
+      "name": "generic_connection",
+      "label": "Generic connection",
+      "description": "Represents a non-specific connection between two nodes. This is a symmetric relation.",
+      "reverse": null,
+      "mapping": {
+        "cidoc": "P130_shows_features_of",
+        "cidoc_extension": "CIDOC-CRM",
+        "extension_mapping": "AP11_has_physical_relation (is_physical_relation_from)",
+        "extension_name": "CRMarchaeo"
+      },
+      "allowed_connections": {
+        "source": [
+          "Node"
+        ],
+        "target": [
+          "Node"
+        ]
+      }
     }
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode",
-     "ParadataNode",
-     "ParadataNodeGroup",
-     "DocumentNode",
-     "ExtractorNode",
-     "CombinerNode",
-     "PropertyNode",
-     "LocationNodeGroup"
-    ],
-    "target": [
-     "LocationNodeGroup"
-    ]
-   }
-  },
-  "has_property": {
-   "name": "has_property",
-   "label": "Has property",
-   "description": "Connects a node to one of its properties.",
-   "reverse": {
-    "name": "is_property_of",
-    "label": "Is property of"
-   },
-   "mapping": {
-    "cidoc": "P43_has_dimension",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "em:hasQualia",
-    "extension_name": "EM",
-    "_comment": "Changed 2026-07-10: AP9_took_matter_from removed (invalid: A4 Stratigraphic Genesis -> S10 Material Substantial, unrelated to property attribution). em:hasQualia is the EM-native predicate declared in em.ttl. See WP3 coverage analysis section 10."
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode",
-     "DocumentNode"
-    ],
-    "target": [
-     "PropertyNode"
-    ]
-   }
-  },
-  "extracted_from": {
-   "name": "extracted_from",
-   "label": "Extracted from",
-   "description": "Indicates that information is derived from a particular source.",
-   "reverse": {
-    "name": "is_source_for_extraction",
-    "label": "Is source for extraction"
-   },
-   "mapping": {
-    "cidoc": "P67_refers_to",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "J7_is_based_on_evidence_from (is_evidence_for)",
-    "extension_name": "CRMinf"
-   },
-   "allowed_connections": {
-    "source": [
-     "ExtractorNode"
-    ],
-    "target": [
-     "DocumentNode"
-    ]
-   }
-  },
-  "combines": {
-   "name": "combines",
-   "label": "Combines",
-   "description": "Indicates that a node combines information from various sources.",
-   "reverse": {
-    "name": "is_combined_by",
-    "label": "Is combined by"
-   },
-   "mapping": {
-    "cidoc": "P16_used_specific_object",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "J1_used_as_premise (was_premise_for)",
-    "extension_name": "CRMinf"
-   },
-   "allowed_connections": {
-    "source": [
-     "CombinerNode"
-    ],
-    "target": [
-     "ExtractorNode"
-    ]
-   }
-  },
-  "is_in_timebranch": {
-   "name": "is_in_timebranch",
-   "label": "Is in timebranch",
-   "description": "Indicates that a node belongs to a specific time branch.",
-   "reverse": {
-    "name": "contains_in_timebranch",
-    "label": "Contains in timebranch"
-   },
-   "mapping": {
-    "cidoc": "P67_refers_to",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "CIDOC-S3D:belongsToAlternative",
-    "extension_name": "CIDOC-S3D"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "TimeBranchNodeGroup"
-    ]
-   }
-  },
-  "has_timebranch": {
-   "name": "has_timebranch",
-   "label": "Has timebranch",
-   "deprecated": true,
-   "deprecated_since": "1.6.0",
-   "deprecated_reason": "Duplicate of is_in_timebranch with identical mapping and allowed_connections. Verified usage in /src: is_in_timebranch is the canonical form (used by importer/import_graphml.py:1510 and exporter/graphml/graphml_patcher.py:73); has_timebranch exists only in JSON config files (this one + em_visual_rules.json). Kept temporarily for backward compatibility on read; writers MUST emit is_in_timebranch. Scheduled for removal in 1.7.0.",
-   "description": "[DEPRECATED in 1.6.0 — use is_in_timebranch] Indicates that a node is connected to a specific time branch.",
-   "reverse": {
-    "name": "is_timebranch_of",
-    "label": "Is timebranch of"
-   },
-   "mapping": {
-    "cidoc": "P67_refers_to",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "CIDOC-S3D:belongsToAlternative",
-    "extension_name": "CIDOC-S3D"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode"
-    ],
-    "target": [
-     "TimeBranchNodeGroup"
-    ]
-   }
-  },
-  "has_author": {
-   "name": "has_author",
-   "label": "Has author",
-   "description": "Represents the connection of a node with its author. Target can be an AuthorNode (human) or AuthorAINode (AI-assisted authoring). Source covers the full range of EM node types so that the resolver can walk from any scope level down to the author.",
-   "reverse": {
-    "name": "is_author_of",
-    "label": "Is author of"
-   },
-   "mapping": {
-    "cidoc": "prov:wasAttributedTo",
-    "cidoc_extension": "PROV-O",
-    "extension_mapping": "em:hasAuthor",
-    "extension_name": "EM",
-    "_comment": "Changed 2026-07-10: was P94_has_created (invalid: domain E65 Creation, range E28 Conceptual Object - cannot hold for physical SU nodes) + L10_had_input (describes digital machine events, not authorship). prov:wasAttributedTo is domain-neutral (any entity -> agent) and covers human and AI authors uniformly; PROV-O is already a declared component. Property-graph JSON untouched: importers and Heriverse unaffected. See WP3 coverage analysis section 10."
-   },
-   "allowed_connections": {
-    "source": [
-     "GraphNode",
-     "StratigraphicNode",
-     "ParadataNode",
-     "GroupNode",
-     "DocumentNode",
-     "ExtractorNode",
-     "CombinerNode",
-     "PropertyNode",
-     "EpochNode"
-    ],
-    "target": [
-     "AuthorNode",
-     "AuthorAINode"
-    ]
-   }
-  },
-  "has_geoposition": {
-   "name": "has_geoposition",
-   "label": "Has geoposition",
-   "description": "Represents a connection with the geoposition node of a given node.",
-   "reverse": {
-    "name": "is_geoposition_of",
-    "label": "Is geoposition of"
-   },
-   "mapping": {
-    "cidoc": "P53_has_former_or_current_location",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "Q4_has_spatial_projection",
-    "extension_name": "CRMgeo"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode",
-     "ParadataNode",
-     "RepresentationModelNode",
-     "RepresentationModelDocNode",
-     "RepresentationModelSpecialFindNode"
-    ],
-    "target": [
-     "GeoPositionNode"
-    ]
-   }
-  },
-  "has_linked_resource": {
-   "name": "has_linked_resource",
-   "label": "Has linked resource",
-   "description": "Connects a node to its linked resource(s).",
-   "reverse": {
-    "name": "is_linked_resource_of",
-    "label": "Is linked resource of"
-   },
-   "mapping": {
-    "cidoc": "P67_refers_to",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "L19_stores (is_stored_on)",
-    "extension_name": "CRMdig"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode",
-     "ParadataNode",
-     "DocumentNode",
-     "RepresentationModelNode",
-     "RepresentationModelDocNode",
-     "RepresentationModelSpecialFindNode"
-    ],
-    "target": [
-     "LinkNode"
-    ]
-   }
-  },
-  "has_representation_model": {
-   "name": "has_representation_model",
-   "label": "Has representation model",
-   "description": "Connects epochs with their representation models in 3D space.",
-   "reverse": {
-    "name": "is_representation_model_of",
-    "label": "Is representation model of"
-   },
-   "mapping": {
-    "cidoc": "P138i_has_representation",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "CIDOC-S3D:has3DRepresentation",
-    "extension_name": "CIDOC-S3D"
-   },
-   "allowed_connections": {
-    "source": [
-     "EpochNode",
-     "StratigraphicNode",
-     "DocumentNode"
-    ],
-    "target": [
-     "RepresentationModelNode"
-    ]
-   }
-  },
-  "has_representation_model_doc": {
-   "name": "has_representation_model_doc",
-   "label": "Has document representation model",
-   "description": "Connects extractors, combiners and documents node to their representation model in 3D space.",
-   "reverse": {
-    "name": "is_doc_representation_model_of",
-    "label": "Is doc representation model of"
-   },
-   "mapping": {
-    "cidoc": "P138i_has_representation",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "CIDOC-S3D:has3DRepresentation",
-    "extension_name": "CIDOC-S3D"
-   },
-   "allowed_connections": {
-    "source": [
-     "ExtractorNode",
-     "DocumentNode",
-     "CombinerNode"
-    ],
-    "target": [
-     "RepresentationModelDocNode",
-     "RepresentationModelSpecialFindNode"
-    ]
-   }
-  },
-  "has_representation_model_sf": {
-   "name": "has_representation_model_sf",
-   "label": "Has special find representation model",
-   "description": "Connects special find units to their representation model in 3D space.",
-   "reverse": {
-    "name": "is_sf_representation_model_of",
-    "label": "Is special find representation model of"
-   },
-   "mapping": {
-    "cidoc": "P138i_has_representation",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "CIDOC-S3D:has3DRepresentation",
-    "extension_name": "CIDOC-S3D"
-   },
-   "allowed_connections": {
-    "source": [
-     "SpecialFindUnit"
-    ],
-    "target": [
-     "RepresentationModelSpecialFindNode"
-    ]
-   }
-  },
-  "has_semantic_shape": {
-   "name": "has_semantic_shape",
-   "label": "Has semantic shape",
-   "description": "Connects any node to its semantic shape representation in 3D space.",
-   "reverse": {
-    "name": "is_semantic_shape_of",
-    "label": "Is semantic shape of"
-   },
-   "mapping": {
-    "cidoc": "P138i_has_representation",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "CIDOC-S3D:hasSymbolicSpatialRepresentation",
-    "extension_name": "CIDOC-S3D"
-   },
-   "allowed_connections": {
-    "source": [
-     "Node"
-    ],
-    "target": [
-     "SemanticShapeNode"
-    ]
-   }
-  },
-  "is_in_paradata_nodegroup": {
-   "name": "is_in_paradata_nodegroup",
-   "label": "Is in paradata nodegroup",
-   "description": "Indicates that a node is included into a paradata node group. Standard members are the paradata-chain nodes (PropertyNode/DocumentNode/ExtractorNode/CombinerNode/ParadataNode); GeoPositionNode is additionally admitted so the per-graph georeferencing shift can be a member of the graph-scope ParadataNodeGroup (DP-65) — semantically valid only at graph scope.",
-   "reverse": {
-    "name": "contains_paradata_node",
-    "label": "Contains paradata node"
-   },
-   "mapping": {
-    "cidoc": "P106_is_composed_of",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "CIDOC-S3D:isPartOfParadataGroup",
-    "extension_name": "CIDOC-S3D"
-   },
-   "allowed_connections": {
-    "source": [
-     "PropertyNode",
-     "DocumentNode",
-     "ExtractorNode",
-     "CombinerNode",
-     "ParadataNode",
-     "GeoPositionNode"
-    ],
-    "target": [
-     "ParadataNodeGroup"
-    ]
-   }
-  },
-  "has_paradata_nodegroup": {
-   "name": "has_paradata_nodegroup",
-   "label": "Has paradata nodegroup",
-   "description": "Indicates that a node belongs to a paradata node group.",
-   "reverse": {
-    "name": "is_paradata_nodegroup_of",
-    "label": "Is paradata nodegroup of"
-   },
-   "mapping": {
-    "cidoc": "P70_documents",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "CIDOC-S3D:hasParadataDocumentation",
-    "extension_name": "CIDOC-S3D"
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode",
-     "EpochNode"
-    ],
-    "target": [
-     "ParadataNodeGroup"
-    ]
-   }
-  },
-  "has_license": {
-   "name": "has_license",
-   "label": "Has license",
-   "description": "Indicates that a resource is subject to a specific license.",
-   "reverse": {
-    "name": "is_license_of",
-    "label": "Is license of"
-   },
-   "mapping": {
-    "cidoc": "P104_is_subject_to",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": null,
-    "extension_name": null
-   },
-   "allowed_connections": {
-    "source": [
-     "Node",
-     "GraphNode"
-    ],
-    "target": [
-     "LicenseNode"
-    ]
-   }
-  },
-  "has_embargo": {
-   "name": "has_embargo",
-   "label": "Has embargo",
-   "description": "Indicates that an element is subject to a temporal embargo. Source can be any node (GraphNode for canvas-wide embargo, LicenseNode for license-scoped embargo, or any node for node-scoped embargo), mirroring has_license.",
-   "reverse": {
-    "name": "is_embargo_of",
-    "label": "Is embargo of"
-   },
-   "mapping": {
-    "cidoc": "P104_is_subject_to",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": null,
-    "extension_name": null
-   },
-   "allowed_connections": {
-    "source": [
-     "Node",
-     "GraphNode",
-     "LicenseNode"
-    ],
-    "target": [
-     "EmbargoNode"
-    ]
-   }
-  },
-  "has_documentation": {
-   "name": "has_documentation",
-   "label": "Has documentation",
-   "description": "Indicates that the element has an associated documentation node.",
-   "reverse": {
-    "name": "is_documentation_of",
-    "label": "Is documentation of"
-   },
-   "mapping": {
-    "cidoc": "P70i_is_documented_in",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": null,
-    "extension_name": null,
-    "rationale": "P70i_is_documented_in (inverse of P70_documents) is the canonical CRM predicate to link an entity to a document about it. Earlier v1.5.5 used P104_is_subject_to which is semantically wrong (P104 means 'subject to a legal right or rule', not 'has documentation about it')."
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode",
-     "SpecialFindUnit",
-     "VirtualStratigraphicUnit"
-    ],
-    "target": [
-     "DocumentNode"
-    ]
-   }
-  },
-  "has_visual_reference": {
-   "name": "has_visual_reference",
-   "label": "Has visual reference",
-   "description": "Indicates that the element has an associated visual reference.",
-   "reverse": {
-    "name": "is_visual_reference_of",
-    "label": "Is visual reference of"
-   },
-   "mapping": {
-    "cidoc": "P138i_has_representation",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "em:hasVisualReference",
-    "extension_name": "EM",
-    "_comment": "Mapped 2026-07-10 (was NOTyetMAPPED): the paradata node is visually illustrated/anchored by a document. E36 Visual Item P138 represents E1; edge direction node->document matches P138i, consistent with the has_representation_model family. The exporter co-types the target document as E36. Distinct from extracted_from (P67/J7): a visual reference shows, an extraction source justifies. See WP3 coverage analysis Appendix B.1."
-   },
-   "allowed_connections": {
-    "source": [
-     "PropertyNode",
-     "ExtractorNode",
-     "CombinerNode",
-     "ParadataNode"
-    ],
-    "target": [
-     "DocumentNode"
-    ]
-   }
-  },
-  "is_part_of": {
-   "name": "is_part_of",
-   "label": "Is part of",
-   "description": "Indicates physical containment: a node is physically contained within a stratigraphic unit (e.g., a Special Find reused inside a wall).",
-   "reverse": {
-    "name": "has_part",
-    "label": "Has part"
-   },
-   "mapping": {
-    "cidoc": "P46i_forms_part_of",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "P46_is_composed_of",
-    "extension_name": "CIDOC-CRM"
-   },
-   "allowed_connections": {
-    "source": [
-     "SpecialFindUnit",
-     "VirtualSpecialFindUnit",
-     "StratigraphicUnit",
-     "DocumentaryStratigraphicUnit",
-     "VirtualStratigraphicUnit"
-    ],
-    "target": [
-     "StratigraphicUnit",
-     "DocumentaryStratigraphicUnit",
-     "VirtualSpecialFindUnit"
-    ]
-   }
-  },
-  "has_digital_twin": {
-   "name": "has_digital_twin",
-   "label": "Has digital twin",
-   "description": "Links a real-world heritage entity (or any node representing one) to its Heritage Digital Twin (HDTNode). HDT-O HP1 per ECHOES D7.1 §4.2.",
-   "reverse": {
-    "name": "is_digital_twin_of",
-    "label": "Is digital twin of"
-   },
-   "mapping": {
-    "cidoc": "hdto:HP1_has_digital_twin",
-    "cidoc_extension": "HDT-O",
-    "extension_mapping": null,
-    "extension_name": "HDT-O",
-    "rationale": "Per D7.1 §4.2 HP1: 'links a CH entity with a corresponding digital twin that aggregates structured knowledge about it'. Quantification many-to-many (0,n : 0,n)."
-   },
-   "allowed_connections": {
-    "source": [
-     "StratigraphicNode",
-     "Node"
-    ],
-    "target": [
-     "HDTNode"
-    ]
-   }
-  },
-  "has_digital_twin_component": {
-   "name": "has_digital_twin_component",
-   "label": "Has digital twin component",
-   "description": "Hierarchical containment between HDTs. A parent HDT has component child-HDTs. HDT-O HP3 (inverse) per ECHOES D7.1 §4.2. Use case: Colosseo_HDT_overall has_digital_twin_component Colosseo_HDT_Flavian / Colosseo_HDT_medieval_fortress / Colosseo_HDT_christian_site_1800. Transitive: chains of containment are inferred.",
-   "reverse": {
-    "name": "is_digital_twin_component_of",
-    "label": "Is digital twin component of"
-   },
-   "mapping": {
-    "cidoc": "hdto:HP3i_has_digital_twin_component",
-    "cidoc_extension": "HDT-O",
-    "extension_mapping": null,
-    "extension_name": "HDT-O",
-    "rationale": "Per D7.1 §4.2 HP3: 'enables the hierarchical organization of digital twins, allowing the digital twin of a specific asset to be part of a larger digital twin representing a city, archaeological site, or cultural landscape'. Component is not limited to physical/geographical: encompasses any main-associated relationship. Quantification many-to-many (0,n : 0,n)."
-   },
-   "allowed_connections": {
-    "source": [
-     "HDTNode"
-    ],
-    "target": [
-     "HDTNode"
-    ]
-   }
-  },
-  "contains_proposition_set": {
-   "name": "contains_proposition_set",
-   "label": "Contains proposition set",
-   "description": "Links an HDT (HDTNode) to a Heritage Proposition Set (GraphNode / em:EMGraph) it currently aggregates. HDT-O HP33 per ECHOES D7.1 §4.2. This is the canonical way to attach an EM graph to an HDT. An EM graph can be a proposition set of multiple HDTs (many-to-many).",
-   "reverse": {
-    "name": "is_proposition_set_of",
-    "label": "Is proposition set of"
-   },
-   "mapping": {
-    "cidoc": "hdto:HP33_contains",
-    "cidoc_extension": "HDT-O",
-    "extension_mapping": null,
-    "extension_name": "HDT-O",
-    "rationale": "Per D7.1 §4.2 HP33: 'associates an HC2 HDT with an HC16 Heritage Proposition Set currently valid within it'. Version chains tracked via HP30 added / HP31 deleted / HP32 replaced. Deprecation tracked via HP34 contained (was proposition set of)."
-   },
-   "allowed_connections": {
-    "source": [
-     "HDTNode"
-    ],
-    "target": [
-     "GraphNode"
-    ]
-   }
-  },
-  "has_digital_object_part": {
-   "name": "has_digital_object_part",
-   "label": "Has digital object part",
-   "description": "Links an HDT (or any HC14 Volatile Digital Object) to an auxiliary digital object that is NOT a proposition set — e.g., a 3D survey database, a point cloud, a generic linked resource. HDT-O HP29 per ECHOES D7.1 §4.2.",
-   "reverse": {
-    "name": "is_digital_object_part_of",
-    "label": "Is digital object part of"
-   },
-   "mapping": {
-    "cidoc": "hdto:HP29_has_digital_object_part",
-    "cidoc_extension": "HDT-O",
-    "extension_mapping": "P106_is_composed_of",
-    "extension_name": "CIDOC-CRM",
-    "rationale": "Per D7.1 §4.2 HP29: 'associates an HC14 Volatile Digital Object with a structural part that is itself a digital object'. Subproperty of crm:P106_is_composed_of. Example: HDT of Pisa Leaning Tower has digital part a 3D survey project database (crmdig:D1)."
-   },
-   "allowed_connections": {
-    "source": [
-     "HDTNode"
-    ],
-    "target": [
-     "RepresentationModelNode",
-     "RepresentationModelDocNode",
-     "RepresentationModelSpecialFindNode",
-     "LinkNode"
-    ]
-   }
-  },
-  "generic_connection": {
-   "name": "generic_connection",
-   "label": "Generic connection",
-   "description": "Represents a non-specific connection between two nodes. This is a symmetric relation.",
-   "reverse": null,
-   "mapping": {
-    "cidoc": "P130_shows_features_of",
-    "cidoc_extension": "CIDOC-CRM",
-    "extension_mapping": "AP11_has_physical_relation (is_physical_relation_from)",
-    "extension_name": "CRMarchaeo"
-   },
-   "allowed_connections": {
-    "source": [
-     "Node"
-    ],
-    "target": [
-     "Node"
-    ]
-   }
   }
- }
 }
