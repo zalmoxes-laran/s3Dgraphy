@@ -1,7 +1,8 @@
 {
   "formal_language": "EM",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "_changelog": {
+    "1.6.1": "Align USVs and fix the TSU/USN border↔material swap against the point-of-truth palette (templates/em_palette_template.graphml). USVs: border_color #0546CC→#248FE7 and fill_color #CCCCCC→#000000 (black), material RGB updated to match #248FE7 — the canonical yEd 'virtual structural unit' look (node USV100). TSU had a grey 2D border (#808080) over a red material (#540808); the palette shows TSU red, so border_color #808080→#540909 (aligned to its own material, matching the US/RSF red family). USN was the mirror error (red 2D border over grey material); border_color #540909→#8C8C8C (aligned to its neutral-grey material, fitting a negative/cut unit). border_width was already 4 on all stratigraphic types.",
     "1.6.0": "Version realigned to track the EM language version (EM 1.6); supersedes the 1.5.x line. Added canonical group-container styles for ActivityNodeGroup, ParadataNodeGroup and TimeBranchNodeGroup (mirroring the existing LocationNodeGroup pattern): neutral grey container (fill #F5F5F5, dashed #000000 border, roundrectangle) distinguished by the group title-tab colour in `label_background` — Activity #CCFFFF, Paradata #FFCC99, TimeBranch #99CC00 (green). Sourced from the point-of-truth palette template (templates/em_palette_template.graphml, nodes Att.[xx] / US[xxx]_PD / TB.0), aligning em_visual_rules with the GraphML palette. Previously ParadataNodeGroup and TimeBranchNodeGroup both resolved through the shared grey 'GRAPH' style and could not be told apart; ActivityNodeGroup rendered via the legacy purple-ellipse 'ANG'. Legacy 'ANG' and 'GRAPH' styles retained unchanged for back-compat with other consumers.",
     "1.5.3": "Fix USD / serUSD material colour: RGB was (0.549, 0.103, 0.0) = #8C1A00 (red), should be #D86400 (orange) to match the canonical USD documentary colour used in the GraphML palette template, node_registry defaults and document_variant_styles.observable. USD border_color also corrected from #8C1A00 to #D86400 (serUSD border was already correct).",
     "1.5.2": "Added RSF (Reused Special Find / spolia) node style — octagon, red border (#9B3333), white fill. Sibling of SF/VSF, distinguished by border colour. Originating DP: DP-26.",
@@ -24,7 +25,8 @@
         "border_color": "#540909",
         "fill_color": "#F0F0F0",
         "border_style": "solid",
-        "shape": "rectangle"
+        "shape": "rectangle",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -44,7 +46,8 @@
         "border_color": "#083107",
         "fill_color": "#000000",
         "border_style": "solid",
-        "shape": "hexagon"
+        "shape": "hexagon",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -55,16 +58,17 @@
       "style": {
         "material": {
           "color": {
-            "r": 0.018,
-            "g": 0.275,
-            "b": 0.799,
+            "r": 0.141,
+            "g": 0.561,
+            "b": 0.906,
             "a": 1.0
           }
         },
-        "border_color": "#0546CC",
-        "fill_color": "#CCCCCC",
+        "border_color": "#248FE7",
+        "fill_color": "#000000",
         "border_style": "solid",
-        "shape": "parallelogram"
+        "shape": "parallelogram",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -84,7 +88,8 @@
         "border_color": "#70581E",
         "fill_color": "#CCCCCC",
         "border_style": "solid",
-        "shape": "octagon"
+        "shape": "octagon",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -104,7 +109,8 @@
         "border_color": "#AF8208",
         "fill_color": "#CCCCCC",
         "border_style": "solid",
-        "shape": "octagon"
+        "shape": "octagon",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -116,15 +122,16 @@
         "material": {
           "color": {
             "r": 0.608,
-            "g": 0.200,
-            "b": 0.200,
+            "g": 0.2,
+            "b": 0.2,
             "a": 1.0
           }
         },
         "border_color": "#9B3333",
         "fill_color": "#FFFFFF",
         "border_style": "solid",
-        "shape": "octagon"
+        "shape": "octagon",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -144,7 +151,8 @@
         "border_color": "#D86400",
         "fill_color": "#F5F5F5",
         "border_style": "solid",
-        "shape": "rounded_rectangle"
+        "shape": "rounded_rectangle",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -164,7 +172,8 @@
         "border_color": "#540909",
         "fill_color": "#EFEFEF",
         "border_style": "solid",
-        "shape": "ellipse"
+        "shape": "ellipse",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -184,7 +193,8 @@
         "border_color": "#D86400",
         "fill_color": "#FFFFFF",
         "border_style": "solid",
-        "shape": "ellipse"
+        "shape": "ellipse",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -204,7 +214,8 @@
         "border_color": "#083107",
         "fill_color": "#000000",
         "border_style": "solid",
-        "shape": "ellipse"
+        "shape": "ellipse",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -224,7 +235,8 @@
         "border_color": "#0546CC",
         "fill_color": "#000000",
         "border_style": "solid",
-        "shape": "ellipse"
+        "shape": "ellipse",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -241,10 +253,11 @@
             "a": 1.0
           }
         },
-        "border_color": "#808080",
+        "border_color": "#540909",
         "fill_color": "#DDDDDD",
         "border_style": "dotted",
-        "shape": "rectangle"
+        "shape": "rectangle",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -264,7 +277,8 @@
         "border_color": "#000000",
         "fill_color": "#FFFFFF",
         "border_style": "solid",
-        "shape": "diamond"
+        "shape": "diamond",
+        "border_width": 4
       },
       "label_position": "center"
     },
@@ -284,7 +298,8 @@
         "border_color": "#000000",
         "fill_color": "#FFFFFF",
         "border_style": "dashed",
-        "shape": "triangle"
+        "shape": "triangle",
+        "border_width": 4
       },
       "label_position": "over"
     },
@@ -663,10 +678,11 @@
             "a": 1.0
           }
         },
-        "border_color": "#540909",
+        "border_color": "#8C8C8C",
         "fill_color": "#F0F0F0",
         "border_style": "dashed",
-        "shape": "rectangle"
+        "shape": "rectangle",
+        "border_width": 4
       },
       "label_position": "over"
     },
