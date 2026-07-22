@@ -142,6 +142,11 @@
    "node_type": "RSF",
    "description": "Reused Special Find (RSF) — re-used architectural / decorative"
   },
+  "SemanticShapeNode": {
+   "parent": "Node",
+   "node_type": "semantic_shape",
+   "description": "Nodo che rappresenta una forma semantica nello spazio 3D."
+  },
   "SeriesOfDocumentaryStratigraphicUnit": {
    "parent": "StratigraphicNode",
    "node_type": "serUSD",
