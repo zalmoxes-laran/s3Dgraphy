@@ -29,20 +29,23 @@ app and defaults. Never ask an archaeologist to configure endpoints/realms/bucke
 
 ---
 
-## P1-A — [SG] Split the generated registry (Option B)
-- [ ] Change `s3dgraphy.tools.sync_node_datamodel` to write the flat class registry to
+## P1-A — [SG] Split the generated registry (Option B) ✅ DONE (commits f3c4841, e9d7940)
+- [x] Change `s3dgraphy.tools.sync_node_datamodel` to write the flat class registry to
       a **separate file** `JSON_config/node_registry.generated.json` (not the
       `node_types` block inside the datamodel).
-- [ ] Keep the hand-authored **categorized sections** (mappings) in
+- [x] Keep the hand-authored **categorized sections** (mappings) in
       `s3Dgraphy_node_datamodel.json` — that file becomes human-only.
-- [ ] Fix the **`SemanticShapeNode` drift** (confirm it is a registered `Node`
-      subclass; run `python -m s3dgraphy.tools.sync_node_datamodel`).
-- [ ] Update any Python reader if needed (`rdf_exporter` reads categorized entries —
-      should be unaffected; verify).
-- [ ] Coordinate the **consumer** side in EMStudio (see its P1-J): `rules.ts` +
-      `sync-datamodels.sh` must point at the new registry file.
-- **DoD:** `sync_node_datamodel --check` clean; drift-guard test green; datamodel file
-  contains only hand-authored semantics.
+      (node_types now holds only the base `Node` entry.)
+- [x] Fix the **`SemanticShapeNode` drift** (was defined but never imported in
+      `nodes/__init__.py` → undiscovered; imported it → registry 43→44 classes).
+- [x] Update any Python reader if needed (`rdf_exporter` reads categorized entries by
+      their `class` field — **verified** the CIDOC class-index is byte-identical
+      before/after the datamodel cleanup).
+- [x] Coordinate the **consumer** side in EMStudio (see its P1-J): `rules.ts` +
+      `sync-datamodels.sh` now point at the new registry file.
+- **DoD:** ✅ `sync_node_datamodel --check` clean (44); drift-guard test green;
+  datamodel `node_types` = `{Node}` (hand-authored semantics only); full suite
+  shows no new failures vs the pre-session baseline.
 
 ## P1-B — [SG] Domain-validate a few mappings
 - [ ] Review `ContinuityNode → E64 End of Existence`, `WorkingUnit → E25`, and confirm
