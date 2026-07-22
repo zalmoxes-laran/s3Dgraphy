@@ -72,6 +72,11 @@
    "node_type": "hdt",
    "description": "HC2 Heritage Digital Twin (HDT-O / ECHOES D7.1)."
   },
+  "HeritageEntityNode": {
+   "parent": "Node",
+   "node_type": "heritage_entity",
+   "description": "HC1 Heritage Entity (HDT-O / ECHOES D7.1)."
+  },
   "LicenseNode": {
    "parent": "Node",
    "node_type": "license",

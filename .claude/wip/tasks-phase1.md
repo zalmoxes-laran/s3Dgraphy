@@ -55,15 +55,20 @@ app and defaults. Never ask an archaeologist to configure endpoints/realms/bucke
       note to each `mapping.rationale`; no mapping changed).
 - **DoD:** ✅ annotations committed; generated registry untouched (`--check` in sync, 44).
 
-## P1-C — [SG] Additive HDTO coverage (S1)
-- [ ] Audit HDTO **HC1–HC20 / HP1–HP26+** against existing EM node types → build a
-      coverage table (already-mappable vs must-add).
-- [ ] Add **only the missing/non-mappable** classes as new node types (the way
-      `HDTNode → HC2` was seeded) with categorized `mapping` + `em_extension.uri`.
-- [ ] Gate HC/HP behind the **HDTO view** so the EM palette is unchanged for
-      stratigraphers.
-- **DoD:** coverage table in the repo; author + project an HDT-aware graph to RDF;
-  `rdf_exporter` emits the HDTO types (namespaces already declared).
+## P1-C — [SG] Additive HDTO coverage (S1) ✅ DONE (uncommitted — E.D. commits; see report)
+- [x] Audit HDTO **HC1–HC20 / HP1–HP26+** against existing EM node types → coverage
+      table at `docs/hdto-coverage.md` (mapped / mappable / added / defer / out-of-scope).
+- [x] Add **only the missing/non-mappable** class: **HC1 `HeritageEntityNode`** (new
+      Python class + `hdto_nodes` datamodel entry, `mapping.cidoc` + `em_extension.uri`
+      = `hdto:HC1`), the way `HDTNode → HC2` was seeded. Everything else HC1–HC20 is
+      already mapped (HC2/HC16/HC14), mappable (HC5/HC17), or deferred (no scope creep).
+      HP1/HP3/HP29/HP33 edges already existed. `sync_node_datamodel` re-run → registry 45.
+- [x] Gate behind the **HDT-O view**: HDT-O node types are in the datamodel + project to
+      RDF but are NOT in the EMStudio palette allowlist (`palette-ui.ts` SECTIONS), so the
+      stratigrapher palette is unchanged; `hdto_nodes` section = the machine-readable view.
+- **DoD:** ✅ coverage table committed-in-tree; authored + projected an HC1→HC2→HC16 graph
+  to TTL — `rdf_exporter` emits `hdto:HC1/HC2/HP1/HP33` (`tests/test_hdto_projection.py`).
+  Full suite: no new failures vs baseline (+2 passing).
 
 ## P1-D — [SG] Authority registry + resolver (S5)
 - [ ] Create `authorities/` with offline **JSON-LD snapshots** + `provenance.json` +

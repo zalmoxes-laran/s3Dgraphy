@@ -1236,6 +1236,35 @@
    }
   }
  },
+ "hdto_nodes": {
+  "_section_note": "HDT-O (ECHOES D7.1) layer node types — the HDTO VIEW. Gated out of the default stratigrapher palette (EMStudio palette-ui lists node types explicitly; these are omitted). Authored in HDT-aware tooling and projected to RDF. HC2 (HDTNode) and HC16 (GraphNode/em:EMGraph) are the pre-existing HDT-O-view members in container_nodes.",
+  "HeritageEntityNode": {
+   "class": "HeritageEntityNode",
+   "parent": "Node",
+   "abbreviation": "HE",
+   "label": "Heritage Entity",
+   "description": "HC1 Heritage Entity (HDT-O, ECHOES D7.1): the real-world entity socially recognized as having cultural/historical/scientific value that an HC2 Heritage Digital Twin (HDTNode) is a digital twin of. Completes the canonical HDT-O chain HC1 -has_digital_twin(HP1)-> HC2 -contains_proposition_set(HP33)-> HC16 (em:EMGraph/GraphNode). HDT-O-view node: not shown in the stratigrapher palette (like HDTNode/GraphNode). HC3 Tangible / HC4 Intangible specializations are deferred.",
+   "s3Dgraphy_file": "heritage_entity_node.py",
+   "mapping": {
+    "cidoc": "hdto:HC1_Heritage_Entity",
+    "cidoc_s3d": null,
+    "alternative": "hdto:HC1_Heritage_Entity ⊂ crm:E1_CRM_Entity",
+    "rationale": "HC1 is the canonical HDT-O class for the real-world heritage referent. Multi-typed via crm:E1 so consumers that don't know HDT-O still see a CRM Entity. Added in P1-C to give the has_digital_twin (HP1) edge a properly typed source (previously modelled as a generic Node/StratigraphicNode)."
+   },
+   "em_extension": {
+    "uri": "hdto:HC1_Heritage_Entity",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "crm:E1_CRM_Entity"
+    ],
+    "extension_status": "imported-from-D7.1"
+   },
+   "properties": {
+    "name": "P1_is_identified_by",
+    "description": "P3_has_note"
+   }
+  }
+ },
  "fallback_nodes": {
   "UnknownNode": {
    "class": "UnknownNode",

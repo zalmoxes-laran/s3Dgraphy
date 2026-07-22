@@ -42,6 +42,7 @@ from .embargo_node import EmbargoNode
 from .license_node import LicenseNode
 from .graph_node import GraphNode
 from .hdt_node import HDTNode
+from .heritage_entity_node import HeritageEntityNode
 from .semantic_shape_node import SemanticShapeNode
 
 # Define what is available for import when using 'from nodes import *'
@@ -85,5 +86,6 @@ __all__ = [
     "LicenseNode",
     "GraphNode",
     "HDTNode",
+    "HeritageEntityNode",
     "SemanticShapeNode"
 ]
