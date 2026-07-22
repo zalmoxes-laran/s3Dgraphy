@@ -79,8 +79,9 @@ app and defaults. Never ask an archaeologist to configure endpoints/realms/bucke
 
 ## P1-E — [SG] Projection hardening → TTL round-trip ✅ DONE (commits 3773895, 7ac7b04)
 - [x] Property graph → **intermediate TTL** (the verification checkpoint) via
-      `rdf_exporter`; **drop Oxigraph** (removed the `rdf-embedded`/pyoxigraph extra;
-      `rdf` extra keeps rdflib>=7.0). Hardened the qualia-IRI minting (slugify) so real
+      `rdf_exporter`; **Oxigraph not pursued** in Phase 1 (TTL now → Virtuoso later) —
+      the optional `rdf-embedded`/pyoxigraph extra is KEPT (ready for a later embedded
+      SPARQL workflow), just unused. Hardened the qualia-IRI minting (slugify) so real
       graphs with free-text property types (e.g. "max level") emit valid Turtle.
 - [x] Add a **lossless round-trip test** (em.json → TTL → reload) on `TempluMare`
       (`tests/test_ttl_roundtrip.py`; fixture vendored under `tests/fixtures/`).
