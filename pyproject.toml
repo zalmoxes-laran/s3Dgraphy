@@ -66,7 +66,7 @@ Changelog = "https://github.com/zalmoxes-laran/s3dgraphy/blob/main/CHANGELOG.md"
 # Optional features — pip install s3dgraphy[<extra>]
 #
 # Pattern: each feature that requires extra runtime libraries is opt-in.
-# This keeps the core install small and avoids forcing rdflib/pyoxigraph
+# This keeps the core install small and avoids forcing rdflib
 # on consumers that only need GraphML/JSON/xlsx pipelines.
 #
 # Recommended for most users:
@@ -78,12 +78,6 @@ rdf = [
     # via s3dgraphy.exporter.rdf_exporter. Without this extra, importing
     # RDFExporter raises ImportError (gracefully handled by exporter/__init__.py).
     "rdflib>=7.0",
-]
-rdf-embedded = [
-    # RDF export + embedded SPARQL store (no separate server required).
-    # Planned for s3dgraphy v1.6.3+ (SPARQL endpoint read/write workflow).
-    "rdflib>=7.0",
-    "pyoxigraph>=0.4",
 ]
 visualization = [
     # Plotting / network visualization helpers. networkx itself is strict
@@ -125,7 +119,7 @@ docs = [
 # without the dev/docs tooling. The dev/docs/test stacks stay separate
 # so CI-style installs don't pull editor/QA deps.
 full = [
-    "s3dgraphy[rdf-embedded,visualization,sync]",
+    "s3dgraphy[rdf,visualization,sync]",
 ]
 all = [
     "s3dgraphy[full,dev,docs,postgres]",
