@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -92,6 +93,19 @@ PREFIX_MAP: Dict[str, Namespace] = {
 # ─────────────────────────────────────────────────────────────────────────────
 # IRI resolution helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _iri_local(text: str) -> str:
+    """Slugify a free-text label into a safe IRI local part.
+
+    Property/qualia types are user text (e.g. ``"max level"``,
+    ``"Shape; dimensions"``); minted verbatim they yield IRIs with spaces or
+    ``;`` that rdflib refuses to serialize as Turtle. Keep [A-Za-z0-9_.-],
+    collapse every other run to a single ``_``, and trim. Deterministic, so
+    equal inputs still mint the same IRI (intra-graph joins hold).
+    """
+    slug = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(text)).strip("_")
+    return slug or "unknown"
+
 
 def _resolve_prefixed(name: Optional[str]) -> Optional[URIRef]:
     """
@@ -621,7 +635,7 @@ class RDFExporter:
                 if unit_id:
                     ctx.add((i17_iri, CRMINF.J30_has_domain,
                              self._node_iri(g.graph_id, unit_id)))
-                qualia_iri = S3D["qualia_" + str(ptype).rsplit(".", 1)[-1]]
+                qualia_iri = S3D["qualia_" + _iri_local(str(ptype).rsplit(".", 1)[-1])]
                 ctx.add((i17_iri, CRMINF.J32_has_property_type, qualia_iri))
                 ctx.add((qualia_iri, RDF.type, CRM.E55_Type))
                 raw_value = getattr(prop_node, "value", None)
