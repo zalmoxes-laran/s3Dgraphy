@@ -1,6 +1,11 @@
 # s3Dgraphy/importer/xlsx_importer.py
 
-import pandas as pd
+# pandas is imported lazily inside the methods that need it: it is an
+# xlsx-only dependency, and importing it at module load would force it onto
+# every consumer of the importer package (importer/__init__ imports this
+# module eagerly) — including the GraphML/em.json path, which never touches
+# Excel. Keeping it lazy lets lightweight builds (e.g. the EMStudio desktop
+# sidecar) exclude pandas/numpy entirely.
 from typing import Dict, Any
 from .base_importer import BaseImporter
 from ..graph import Graph
@@ -57,6 +62,7 @@ class XLSXImporter(BaseImporter):
     
     def parse(self) -> Graph:
         """Parse the Excel file and create nodes in the graph."""
+        import pandas as pd
         try:
             # ✅ Leggi configurazione tabella
             table_settings = self.mapping.get('table_settings', {})
@@ -154,6 +160,7 @@ class XLSXImporter(BaseImporter):
         Returns:
             list: List of sheet names
         """
+        import pandas as pd
         try:
             return pd.ExcelFile(self.filepath).sheet_names
         except Exception as e:
@@ -168,6 +175,7 @@ class XLSXImporter(BaseImporter):
         sorted. Used by consumers to populate a filter dropdown ahead
         of import.
         """
+        import pandas as pd
         self._validate_filter_column(column)
         table_settings = self.mapping.get('table_settings', {})
         start_row = table_settings.get('start_row', 0)
