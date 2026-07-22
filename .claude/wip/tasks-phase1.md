@@ -47,12 +47,13 @@ app and defaults. Never ask an archaeologist to configure endpoints/realms/bucke
   datamodel `node_types` = `{Node}` (hand-authored semantics only); full suite
   shows no new failures vs the pre-session baseline.
 
-## P1-B — [SG] Domain-validate a few mappings
-- [ ] Review `ContinuityNode → E64 End of Existence`, `WorkingUnit → E25`, and confirm
+## P1-B — [SG] Domain-validate a few mappings ✅ DONE (commit d6f6b74)
+- [x] Review `ContinuityNode → E64 End of Existence`, `WorkingUnit → E25`, and confirm
       `PropertyNode → E1` is the intended **qualia-refined fallback** (real CIDOC class
-      comes from `em_qualia_types.json` `mappings.cidoc_crm`).
-- [ ] Annotate decisions in the categorized sections (add `rationale` where useful).
-- **DoD:** annotations committed; **no** mappings added to the generated registry.
+      comes from `em_qualia_types.json` `mappings.cidoc_crm`). All three confirmed.
+- [x] Annotate decisions in the categorized sections (appended a dated domain-validation
+      note to each `mapping.rationale`; no mapping changed).
+- **DoD:** ✅ annotations committed; generated registry untouched (`--check` in sync, 44).
 
 ## P1-C — [SG] Additive HDTO coverage (S1)
 - [ ] Audit HDTO **HC1–HC20 / HP1–HP26+** against existing EM node types → build a
@@ -76,11 +77,15 @@ app and defaults. Never ask an archaeologist to configure endpoints/realms/bucke
 - **DoD:** qualia + HDTO `E55/E53/E52/E39` resolve, redundant hits ranked; offline
   snapshot committed; never leaves an identifier empty.
 
-## P1-E — [SG] Projection hardening → TTL round-trip
-- [ ] Property graph → **intermediate TTL** (the verification checkpoint) via
-      `rdf_exporter`; **drop Oxigraph** (TTL now → Virtuoso later).
-- [ ] Add a **lossless round-trip test** (em.json → TTL → reload) on `TempluMare`.
-- **DoD:** validated TTL out; round-trip test green.
+## P1-E — [SG] Projection hardening → TTL round-trip ✅ DONE (commits 3773895, 7ac7b04)
+- [x] Property graph → **intermediate TTL** (the verification checkpoint) via
+      `rdf_exporter`; **drop Oxigraph** (removed the `rdf-embedded`/pyoxigraph extra;
+      `rdf` extra keeps rdflib>=7.0). Hardened the qualia-IRI minting (slugify) so real
+      graphs with free-text property types (e.g. "max level") emit valid Turtle.
+- [x] Add a **lossless round-trip test** (em.json → TTL → reload) on `TempluMare`
+      (`tests/test_ttl_roundtrip.py`; fixture vendored under `tests/fixtures/`).
+- **DoD:** ✅ validated TTL out (206 nodes/527 edges, nodes_unmapped=0); round-trip
+  test green (parse→serialize→parse isomorphic); no new failures vs baseline.
 
 ## P1-F — [SG] Define the access-API surface (pure ops, no web framework)
 - [ ] Expose a clean, documented **operation surface** (functions + CLI):
