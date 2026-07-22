@@ -1,0 +1,221 @@
+{
+ "_generated": "by `python -m s3dgraphy.tools.sync_node_datamodel` — DO NOT hand-edit. The flat class hierarchy (parent/node_type/description) is derived from the Python Node subclasses; hand-authored semantics and CIDOC mappings live in s3Dgraphy_node_datamodel.json.",
+ "s3Dgraphy_data_model_version": "1.6.0",
+ "node_types": {
+  "ActivityNodeGroup": {
+   "parent": "GroupNode",
+   "node_type": "ActivityNodeGroup",
+   "description": "Nodo gruppo per attività. Una attività è un gruppo logico di azioni che vengono tenute insieme per un fine narrativo e di ordine delle informazioni (es: costruzione di una stanza di un edificio nell'anno x, attività di restauro di varie parti di quella stanza 20 anni dopo)"
+  },
+  "AuthorAINode": {
+   "parent": "AuthorNode",
+   "node_type": "author_ai",
+   "description": "AI-generated author node (subclass of :class:`AuthorNode`)."
+  },
+  "AuthorNode": {
+   "parent": "Node",
+   "node_type": "author",
+   "description": "Human author node."
+  },
+  "CombinerNode": {
+   "parent": "ParadataNode",
+   "node_type": "combiner",
+   "description": "Nodo che rappresenta un ragionamento che combina informazioni da più sorgenti."
+  },
+  "ContinuityNode": {
+   "parent": "StratigraphicNode",
+   "node_type": "BR",
+   "description": ""
+  },
+  "DocumentNode": {
+   "parent": "ParadataNode",
+   "node_type": "document",
+   "description": "Represents a document in the Extended Matrix."
+  },
+  "DocumentaryStratigraphicUnit": {
+   "parent": "StratigraphicNode",
+   "node_type": "USD",
+   "description": ""
+  },
+  "EmbargoNode": {
+   "parent": "Node",
+   "node_type": "embargo",
+   "description": "Classe per rappresentare un nodo embargo nel grafo."
+  },
+  "EpochNode": {
+   "parent": "Node",
+   "node_type": "EpochNode",
+   "description": "Nodo che rappresenta un'epoca temporale. Si tratta di un insieme di comodo che permette di attribuire d'ufficio una serie di azioni ad un delta temporale. Una volta che i dati puntuali sulla cronologia, espressi come proprietà start_time ed end_time delle singole US viene definito grazie ad elementi dtanti, tali nodi epoca vengono ignorati laddove ci sono i suddetti dati puntuali."
+  },
+  "ExtractorNode": {
+   "parent": "ParadataNode",
+   "node_type": "extractor",
+   "description": "Nodo che rappresenta l'estrazione di informazioni da una fonte."
+  },
+  "GeoPositionNode": {
+   "parent": "Node",
+   "node_type": "geo_position",
+   "description": "Classe per rappresentare un nodo GeoPosition all'interno del grafo."
+  },
+  "GraphNode": {
+   "parent": "Node",
+   "node_type": "graph",
+   "description": "It represents the node of the graph itself within the system."
+  },
+  "GroupNode": {
+   "parent": "Node",
+   "node_type": "Group",
+   "description": "Nodo che rappresenta un gruppo di nodi. Tali gruppi possono essere di vari tipi: vedi sottoclassi di seguito."
+  },
+  "HDTNode": {
+   "parent": "Node",
+   "node_type": "hdt",
+   "description": "HC2 Heritage Digital Twin (HDT-O / ECHOES D7.1)."
+  },
+  "LicenseNode": {
+   "parent": "Node",
+   "node_type": "license",
+   "description": "Classe per rappresentare un nodo di licenza nel grafo."
+  },
+  "LinkNode": {
+   "parent": "Node",
+   "node_type": "link",
+   "description": "Classe per rappresentare un nodo di collegamento (LinkNode) nel grafo."
+  },
+  "LocationNodeGroup": {
+   "parent": "GroupNode",
+   "node_type": "LocationNodeGroup",
+   "description": "Group node for spatial / locational membership of stratigraphic units"
+  },
+  "NegativeStratigraphicUnit": {
+   "parent": "StratigraphicNode",
+   "node_type": "USN",
+   "description": "Negative Stratigraphic Unit (US negativa / USN)."
+  },
+  "Node": {
+   "parent": null,
+   "node_type": "Node",
+   "description": "Base class to represent a node in the graph."
+  },
+  "NonStructuralVirtualStratigraphicUnit": {
+   "parent": "VirtualStratigraphicUnit",
+   "node_type": "USVn",
+   "description": ""
+  },
+  "ParadataNode": {
+   "parent": "Node",
+   "node_type": "ParadataNode",
+   "description": "Classe base per i nodi che rappresentano metadati o informazioni su come i dati sono stati generati."
+  },
+  "ParadataNodeGroup": {
+   "parent": "GroupNode",
+   "node_type": "ParadataNodeGroup",
+   "description": "Nodo gruppo per paradata. Questo gruppo tiene insieme tutti i paradati relativi ad una unità stratigrafica: normalmente si chiama \"[nome_US]_PD\" (ParaData)"
+  },
+  "PropertyNode": {
+   "parent": "ParadataNode",
+   "node_type": "property",
+   "description": "Nodo che rappresenta una proprietà associata a un altro nodo."
+  },
+  "RepresentationModelDocNode": {
+   "parent": "RepresentationNode",
+   "node_type": "representation_model_doc",
+   "description": "Node representing a 3D model or spatialized image for documents."
+  },
+  "RepresentationModelNode": {
+   "parent": "RepresentationNode",
+   "node_type": "representation_model",
+   "description": "Node representing a 3D model or spatialized image."
+  },
+  "RepresentationModelSpecialFindNode": {
+   "parent": "RepresentationNode",
+   "node_type": "representation_model_sf",
+   "description": "Node representing a 3D model for special finds."
+  },
+  "RepresentationNode": {
+   "parent": "Node",
+   "node_type": "representation_node",
+   "description": "Base class for all representation nodes in 3D space."
+  },
+  "ReusedSpecialFind": {
+   "parent": "StratigraphicNode",
+   "node_type": "RSF",
+   "description": "Reused Special Find (RSF) — re-used architectural / decorative"
+  },
+  "SeriesOfDocumentaryStratigraphicUnit": {
+   "parent": "StratigraphicNode",
+   "node_type": "serUSD",
+   "description": ""
+  },
+  "SeriesOfNonStructuralVirtualStratigraphicUnit": {
+   "parent": "StratigraphicNode",
+   "node_type": "serUSVn",
+   "description": ""
+  },
+  "SeriesOfStratigraphicUnit": {
+   "parent": "StratigraphicNode",
+   "node_type": "serSU",
+   "description": ""
+  },
+  "SeriesOfStructuralVirtualStratigraphicUnit": {
+   "parent": "StratigraphicNode",
+   "node_type": "serUSVs",
+   "description": ""
+  },
+  "SpecialFindUnit": {
+   "parent": "StratigraphicNode",
+   "node_type": "SF",
+   "description": ""
+  },
+  "StratigraphicEventNode": {
+   "parent": "StratigraphicNode",
+   "node_type": "SE",
+   "description": ""
+  },
+  "StratigraphicNode": {
+   "parent": "Node",
+   "node_type": "StratigraphicNode",
+   "description": "Base class for all stratigraphic units within the graph structure."
+  },
+  "StratigraphicUnit": {
+   "parent": "StratigraphicNode",
+   "node_type": "US",
+   "description": ""
+  },
+  "StructuralVirtualStratigraphicUnit": {
+   "parent": "VirtualStratigraphicUnit",
+   "node_type": "USVs",
+   "description": ""
+  },
+  "TimeBranchNodeGroup": {
+   "parent": "GroupNode",
+   "node_type": "TimeBranchNodeGroup",
+   "description": "Group node to aggregate all elements belonging to a time branch. Two TB can be connected by a \"contrasts_with\" edge."
+  },
+  "TransformationStratigraphicUnit": {
+   "parent": "StratigraphicNode",
+   "node_type": "TSU",
+   "description": ""
+  },
+  "UnknownNode": {
+   "parent": "StratigraphicNode",
+   "node_type": "unknown",
+   "description": ""
+  },
+  "VirtualSpecialFindUnit": {
+   "parent": "StratigraphicNode",
+   "node_type": "VSF",
+   "description": ""
+  },
+  "VirtualStratigraphicUnit": {
+   "parent": "StratigraphicNode",
+   "node_type": null,
+   "description": "Abstract parent of the virtual stratigraphic units (USV/s, USV/n)."
+  },
+  "WorkingUnit": {
+   "parent": "StratigraphicNode",
+   "node_type": "UL",
+   "description": ""
+  }
+ }
+}
