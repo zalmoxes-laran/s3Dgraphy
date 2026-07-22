@@ -437,7 +437,7 @@
       "cidoc": "E25 Human-Made Feature",
       "cidoc_s3d": null,
       "alternative": "E25 Human-Made Feature + P108i_was_produced_by E12 Production",
-      "rationale": "UL is the trace, not the act that produced it. v1.6.0 corrects the legacy 'E12 Production' (= the production event itself) to 'E25 Human-Made Feature' (= the observable trace). The production event is modelled separately and linked via P108i."
+      "rationale": "UL is the trace, not the act that produced it. v1.6.0 corrects the legacy 'E12 Production' (= the production event itself) to 'E25 Human-Made Feature' (= the observable trace). The production event is modelled separately and linked via P108i. Domain-validated 2026-07-22 (P1-B): E25 Human-Made Feature confirmed — UL is the observable trace; the producing act stays a separate E12 Production via P108i."
      },
      "em_extension": {
       "uri": "em:WorkingUnit",
@@ -466,7 +466,7 @@
       "cidoc": "E64 End of Existence",
       "cidoc_s3d": null,
       "alternative": "E64 End of Existence + A5 Stratigraphic Modification (when the end-of-life is itself a stratigraphic modification event)",
-      "rationale": "E64 End_of_Existence is the canonical CIDOC class for the cessation event. A5 is an alternative when the cessation is also itself a stratigraphic modification."
+      "rationale": "E64 End_of_Existence is the canonical CIDOC class for the cessation event. A5 is an alternative when the cessation is also itself a stratigraphic modification. Domain-validated 2026-07-22 (P1-B): E64 End of Existence confirmed as the canonical cessation event for BR (end of life of a SU/USV)."
      },
      "em_extension": {
       "uri": "em:ContinuityNode",
@@ -754,7 +754,7 @@
       "cidoc": "E1 CRM Entity",
       "cidoc_s3d": null,
       "alternative": "DEPENDS ON property_type — see em_qualia_types.json: physical_material.dimensional → E54_Dimension; physical_material.material → E57_Material; cultural_interpretive.semantic → crminf:I4_Proposition_Set; functional → E55_Type; etc.",
-      "rationale": "PropertyNode is a generic shell — its specific CRM class depends on the qualia it expresses. The RDF exporter resolves this conditionally (em.ttl declares em:Qualia as E1 placeholder; the qualia-specific class is added at serialization)."
+      "rationale": "PropertyNode is a generic shell — its specific CRM class depends on the qualia it expresses. The RDF exporter resolves this conditionally (em.ttl declares em:Qualia as E1 placeholder; the qualia-specific class is added at serialization). Domain-validated 2026-07-22 (P1-B): E1 CRM Entity is the INTENDED qualia-refined fallback, not a missing mapping — the concrete CIDOC class comes from em_qualia_types.json `mappings.cidoc_crm` per property_type (height→E54, color/functional→E55, material→E57, interpretive→crminf:I4), resolved by rdf_exporter.get_qualia_crm_iri."
      },
      "em_extension": {
       "uri": "em:Qualia",
