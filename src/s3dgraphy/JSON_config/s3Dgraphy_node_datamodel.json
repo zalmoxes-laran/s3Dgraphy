@@ -1321,6 +1321,90 @@
    }
   }
  },
+ "dtc_nodes": {
+  "_section_note": "DTC (Digital Twin Chain) substrate profile — the ECHOES deliverable: the DIGITAL PROVENANCE that produces documents (raw acquisitions -> processing -> produced digital objects). Distinct from EM-paradata (interpretation ON a document = CRMinf/HC17). Option A naming: EM-native ...Node classes, CRMdig+PROV-O mapping in em_extension, no D-numbers in the UI. Gated OUT of the stratigrapher palette (like hdto_nodes). Per-kind vocabulary is DATA-DRIVEN + expandable in em_visual_rules.json -> dtc_kinds (via utils.get_dtc_kinds). EM commons (Author/License/Embargo/LinkNode) are reused via existing edges, not duplicated.",
+  "DTCInputNode": {
+   "class": "DTCInputNode",
+   "parent": "DTCNode",
+   "abbreviation": "DIN",
+   "label": "DTC Input",
+   "description": "A DTC INPUT chunk: a raw digital acquisition (photo set, laser scan, topographic survey, ...) consumed by a processing step. The specific acquisition kind is data.dtc_kind, from the `input` axis of the expandable DTC vocabulary (em_visual_rules.json -> dtc_kinds). Projected as a crmdig:D1_Digital_Object / prov:Entity; its role as an input is expressed by the dtc_had_input edge, not its type.",
+   "s3Dgraphy_file": "dtc_input_node.py",
+   "mapping": {
+    "cidoc": "crmdig:D1_Digital_Object",
+    "cidoc_s3d": null,
+    "alternative": "crmdig:D1_Digital_Object == prov:Entity (dual CRMdig + PROV-O)",
+    "rationale": "An acquisition is a digital object (crmdig:D1). Multi-typed prov:Entity so a PROV-O reader sees the provenance graph. INPUT vs OUTPUT is not a type distinction (both are D1 digital objects) — the direction is carried by the chain edges (dtc_had_input / dtc_had_output)."
+   },
+   "em_extension": {
+    "uri": "crmdig:D1_Digital_Object",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "prov:Entity"
+    ],
+    "extension_status": "profile-DTC-ECHOES"
+   },
+   "properties": {
+    "name": "P1_is_identified_by",
+    "description": "P3_has_note",
+    "dtc_kind": "P2_has_type"
+   }
+  },
+  "DTCProcessNode": {
+   "class": "DTCProcessNode",
+   "parent": "DTCNode",
+   "abbreviation": "DPR",
+   "label": "DTC Process",
+   "description": "A DTC PROCESS chunk: the transformation/processing event that turns inputs into produced digital objects (data.dtc_kind from the `process` axis, e.g. transformation). Projected as a crmdig:D7_Digital_Machine_Event / prov:Activity; its inputs and outputs are the dtc_had_input (prov:used) and dtc_had_output (prov:generated) edges.",
+   "s3Dgraphy_file": "dtc_process_node.py",
+   "mapping": {
+    "cidoc": "crmdig:D7_Digital_Machine_Event",
+    "cidoc_s3d": null,
+    "alternative": "crmdig:D7_Digital_Machine_Event == prov:Activity (dual CRMdig + PROV-O)",
+    "rationale": "A digital processing step is a crmdig:D7 Digital Machine Event. Multi-typed prov:Activity so the PROV-O used/generated pattern applies directly."
+   },
+   "em_extension": {
+    "uri": "crmdig:D7_Digital_Machine_Event",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "prov:Activity"
+    ],
+    "extension_status": "profile-DTC-ECHOES"
+   },
+   "properties": {
+    "name": "P1_is_identified_by",
+    "description": "P3_has_note",
+    "dtc_kind": "P2_has_type"
+   }
+  },
+  "DTCOutputNode": {
+   "class": "DTCOutputNode",
+   "parent": "DTCNode",
+   "abbreviation": "DOU",
+   "label": "DTC Output",
+   "description": "A DTC OUTPUT chunk: a produced digital object / document (point cloud, mesh, DEM, orthophoto, vector features; data.dtc_kind from the `output` axis). Projected as a crmdig:D1_Digital_Object / prov:Entity; produced by its process (dtc_had_output / prov:generated) and derived from the inputs (dtc_derived_from / prov:wasDerivedFrom). Reuses the EM LinkNode (has_linked_resource / crm:P67) to point at its real file (future: a MinIO asset id). Does NOT preclude a later shared-UUID identity with the EM DocumentNode.",
+   "s3Dgraphy_file": "dtc_output_node.py",
+   "mapping": {
+    "cidoc": "crmdig:D1_Digital_Object",
+    "cidoc_s3d": null,
+    "alternative": "crmdig:D1_Digital_Object == prov:Entity (dual CRMdig + PROV-O)",
+    "rationale": "A produced digital object is a crmdig:D1. Multi-typed prov:Entity for the PROV-O derivation graph. Same class as INPUT (both digital objects); role is edge-borne."
+   },
+   "em_extension": {
+    "uri": "crmdig:D1_Digital_Object",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "prov:Entity"
+    ],
+    "extension_status": "profile-DTC-ECHOES"
+   },
+   "properties": {
+    "name": "P1_is_identified_by",
+    "description": "P3_has_note",
+    "dtc_kind": "P2_has_type"
+   }
+  }
+ },
  "fallback_nodes": {
   "UnknownNode": {
    "class": "UnknownNode",

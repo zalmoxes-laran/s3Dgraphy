@@ -654,7 +654,10 @@
           "ExtractorNode",
           "CombinerNode",
           "PropertyNode",
-          "EpochNode"
+          "EpochNode",
+          "DTCInputNode",
+          "DTCProcessNode",
+          "DTCOutputNode"
         ],
         "target": [
           "AuthorNode",
@@ -710,7 +713,9 @@
           "DocumentNode",
           "RepresentationModelNode",
           "RepresentationModelDocNode",
-          "RepresentationModelSpecialFindNode"
+          "RepresentationModelSpecialFindNode",
+          "DTCOutputNode",
+          "DTCInputNode"
         ],
         "target": [
           "LinkNode"
@@ -1190,6 +1195,78 @@
         ],
         "target": [
           "HeritageEntityNode"
+        ]
+      }
+    },
+    "dtc_had_input": {
+      "name": "dtc_had_input",
+      "label": "DTC process had input",
+      "description": "DTC chain: a processing step (DTCProcess) consumed an acquisition (DTCInput). ECHOES DTC substrate profile. Dual projection CRMdig + PROV-O.",
+      "reverse": {
+        "name": "dtc_was_input_of",
+        "label": "Was input of DTC process"
+      },
+      "mapping": {
+        "cidoc": "crmdig:L10_had_input",
+        "cidoc_extension": "CRMdig",
+        "extension_mapping": "prov:used",
+        "extension_name": "PROV-O",
+        "rationale": "crmdig:L10_had_input (D7 Digital Machine Event -> input digital object). Dual-emitted with prov:used (Activity used Entity) — same direction (Process -> Input) — so CRMdig and PROV-O readers both see the acquisition consumption."
+      },
+      "allowed_connections": {
+        "source": [
+          "DTCProcessNode"
+        ],
+        "target": [
+          "DTCInputNode"
+        ]
+      }
+    },
+    "dtc_had_output": {
+      "name": "dtc_had_output",
+      "label": "DTC process had output",
+      "description": "DTC chain: a processing step (DTCProcess) produced a digital object (DTCOutput). ECHOES DTC substrate profile. Dual projection CRMdig + PROV-O.",
+      "reverse": {
+        "name": "dtc_was_output_of",
+        "label": "Was output of DTC process"
+      },
+      "mapping": {
+        "cidoc": "crmdig:L11_had_output",
+        "cidoc_extension": "CRMdig",
+        "extension_mapping": "prov:generated",
+        "extension_name": "PROV-O",
+        "rationale": "crmdig:L11_had_output (D7 Digital Machine Event -> produced digital object). Dual-emitted with prov:generated (Activity generated Entity) — same direction (Process -> Output)."
+      },
+      "allowed_connections": {
+        "source": [
+          "DTCProcessNode"
+        ],
+        "target": [
+          "DTCOutputNode"
+        ]
+      }
+    },
+    "dtc_derived_from": {
+      "name": "dtc_derived_from",
+      "label": "DTC output derived from input",
+      "description": "DTC chain: a produced object (DTCOutput) was derived from an acquisition (DTCInput) — the direct provenance shortcut alongside the process. ECHOES DTC substrate profile. Dual projection CRMdig + PROV-O.",
+      "reverse": {
+        "name": "dtc_derivation_source_for",
+        "label": "Was derivation source for"
+      },
+      "mapping": {
+        "cidoc": "crmdig:L21_used_as_derivation_source",
+        "cidoc_extension": "CRMdig",
+        "extension_mapping": "prov:wasDerivedFrom",
+        "extension_name": "PROV-O",
+        "rationale": "crmdig:L21_used_as_derivation_source (derived object -> source object) with prov:wasDerivedFrom (Entity derived from Entity) — same direction (Output -> Input). Expresses derivation directly, independent of naming the process."
+      },
+      "allowed_connections": {
+        "source": [
+          "DTCOutputNode"
+        ],
+        "target": [
+          "DTCInputNode"
         ]
       }
     },

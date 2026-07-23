@@ -291,6 +291,31 @@ def get_document_vocabularies():
     return roles_t, natures_t, geoms_t
 
 
+def get_dtc_kinds():
+    """DATA-DRIVEN, expandable per-kind vocabulary for the DTC profile (ECHOES).
+
+    Reads the ``dtc_kinds`` block of ``em_visual_rules.json`` (the single source
+    of truth, mirroring the Master-Document axis vocabularies) and returns a dict
+    mapping each base kind → a tuple of its specific-kind keys::
+
+        {"input": ("photo", "laserscanner", "topographic"),
+         "process": ("transformation",),
+         "output": ("pointcloud", "mesh", "dem", ...)}
+
+    Keys starting with ``_`` (e.g. ``_comment``) are skipped. Adding a new kind
+    in the JSON flows through to the DTC node classes' ``kind`` validation with
+    no code change.
+    """
+    rules = _load_visual_rules()
+    section = rules.get("dtc_kinds", {}) or {}
+    out = {}
+    for base, kinds in section.items():
+        if base.startswith("_") or not isinstance(kinds, dict):
+            continue
+        out[base] = tuple(k for k in kinds if not k.startswith("_"))
+    return out
+
+
 def get_document_variant_style(variant_key: str) -> dict:
     """Return the render-style dict for a DocumentNode variant key.
 

@@ -27,6 +27,26 @@
    "node_type": "BR",
    "description": ""
   },
+  "DTCInputNode": {
+   "parent": "DTCNode",
+   "node_type": "dtc_input",
+   "description": "DTC input acquisition (ECHOES DTC profile). ``dtc_kind`` ∈ the ``input``"
+  },
+  "DTCNode": {
+   "parent": "Node",
+   "node_type": null,
+   "description": "Abstract base for a DTC chain chunk. Concrete subclasses set ``node_type``"
+  },
+  "DTCOutputNode": {
+   "parent": "DTCNode",
+   "node_type": "dtc_output",
+   "description": "DTC produced digital object (ECHOES DTC profile). ``dtc_kind`` ∈ the"
+  },
+  "DTCProcessNode": {
+   "parent": "DTCNode",
+   "node_type": "dtc_process",
+   "description": "DTC processing step (ECHOES DTC profile). ``dtc_kind`` ∈ the ``process``"
+  },
   "DocumentNode": {
    "parent": "ParadataNode",
    "node_type": "document",

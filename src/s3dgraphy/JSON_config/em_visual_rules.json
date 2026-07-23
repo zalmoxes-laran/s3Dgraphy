@@ -807,6 +807,26 @@
       "description": "3D reconstruction produced via the Extended Matrix methodology — the document itself IS an EM-derived reconstruction. Typical case: a hypothesis model built from another EM graph, used here as a comparative or derivative source."
     }
   },
+  "dtc_kinds": {
+    "_comment": "DATA-DRIVEN, EXPANDABLE per-kind vocabulary for the DTC substrate profile (ECHOES). Mirrors the Master-Document axis vocabularies above (document_roles/content_natures): the three base kinds (input/process/output) each list specific kinds seeded from the 2017 DTC palette. Adding a new kind (e.g. audio, spectroscopy) is a JSON entry here (+ a glyph) — NOT a code change; the DTC node classes validate against these keys via s3dgraphy.utils.get_dtc_kinds(). `glyph` names the 2017 DTC SVG (wired in the later glyph/visual-manager slice; recorded here as data only).",
+    "input": {
+      "photo": { "label": "Photograph", "glyph": "09_photos", "description": "Photographic acquisition (single image or set)." },
+      "laserscanner": { "label": "Laser scan", "glyph": "10_laserscanner", "description": "Terrestrial/close-range laser scanning acquisition." },
+      "topographic": { "label": "Topographic survey", "glyph": "01_topographicnetwork", "description": "Total-station / topographic-network acquisition." }
+    },
+    "process": {
+      "transformation": { "label": "Transformation", "glyph": "00_transformation", "description": "A processing/transformation step turning inputs into produced digital objects." }
+    },
+    "output": {
+      "pointcloud": { "label": "Point cloud", "glyph": "02_pointcloud", "description": "Produced point cloud." },
+      "mesh": { "label": "Mesh", "glyph": "03_mesh", "description": "Produced 3D mesh model." },
+      "dem": { "label": "DEM", "glyph": "07_DEM", "description": "Digital Elevation Model." },
+      "orthophoto": { "label": "Orthophoto", "glyph": "08_ortophoto", "description": "Produced orthophoto / orthomosaic." },
+      "points": { "label": "Points", "glyph": "04_points", "description": "Vector point features." },
+      "lines": { "label": "Lines", "glyph": "05_lines", "description": "Vector line features." },
+      "polygons": { "label": "Polygons", "glyph": "06_polygons", "description": "Vector polygon features." }
+    }
+  },
   "edge_style": {
     "is_before": {
       "style": {

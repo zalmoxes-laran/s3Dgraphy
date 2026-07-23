@@ -874,6 +874,14 @@ class RDFExporter:
         elif node_type == "combiner":
             self._emit_belief_skeleton(node_iri, ctx)
 
+        elif node_type in ("dtc_input", "dtc_process", "dtc_output"):
+            # DTC substrate profile (ECHOES): the specific kind (photo, mesh, …)
+            # projects as crm:P2_has_type. The rdf:type (crmdig:D1/D7 + prov:
+            # Entity/Activity) is emitted from em_extension by the generic pass.
+            kind = data.get("dtc_kind")
+            if kind:
+                ctx.add((node_iri, CRM.P2_has_type, Literal(kind)))
+
     def _emit_belief_skeleton(self, node_iri: URIRef, ctx) -> None:
         """CRMinf belief expansion (I2) for argumentation nodes.
 
