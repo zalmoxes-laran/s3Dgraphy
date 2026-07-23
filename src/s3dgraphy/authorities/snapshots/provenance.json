@@ -27,6 +27,15 @@
       "retrieved_method": "hand-seeded sample (P1-D mechanism proof)",
       "snapshot_date": "2026-07-23",
       "license_ref": "getty"
+    },
+    "tgn": {
+      "name": "Getty Thesaurus of Geographic Names (TGN)",
+      "facet": "WHERE",
+      "homepage": "https://www.getty.edu/research/tools/vocabularies/tgn/",
+      "scheme": "http://vocab.getty.edu/tgn/",
+      "retrieved_method": "hand-seeded sample (P1-D mechanism proof)",
+      "snapshot_date": "2026-07-23",
+      "license_ref": "getty"
     }
   }
 }

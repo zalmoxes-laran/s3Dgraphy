@@ -149,6 +149,11 @@ s3dgraphy = [
     "mappings/*",
     "mappings/*.json",
 ]
+# authorities snapshots (P1-D) are DATA files in a subpackage — ship them in the
+# wheel so the offline resolver works when installed (e.g. bundled into Blender).
+"s3dgraphy.authorities" = [
+    "snapshots/*",
+]
 
 [tool.black]
 line-length = 88

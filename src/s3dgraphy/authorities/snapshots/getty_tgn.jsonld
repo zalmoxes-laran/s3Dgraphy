@@ -1,0 +1,25 @@
+{
+  "_note": "Hand-seeded MINIMAL sample for the P1-D authority mechanism (WHERE facet) — NOT an official Getty TGN dump. Verify IRIs and replace with real snapshots before production (see provenance.json).",
+  "@context": {
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "prefLabel": "skos:prefLabel",
+    "altLabel": "skos:altLabel",
+    "broader": { "@id": "skos:broader", "@type": "@id" }
+  },
+  "authority": "tgn",
+  "facet": "WHERE",
+  "scheme": "http://vocab.getty.edu/tgn/",
+  "@graph": [
+    {
+      "@id": "http://vocab.getty.edu/tgn/7002619",
+      "prefLabel": "Sarmizegetusa",
+      "altLabel": ["Ulpia Traiana Sarmizegetusa", "Sarmizegetusa Regia",
+                   "Colonia Ulpia Traiana Augusta Dacica Sarmizegetusa"]
+    },
+    {
+      "@id": "http://vocab.getty.edu/tgn/7000874",
+      "prefLabel": "Roma",
+      "altLabel": ["Rome", "Roma (comune)"]
+    }
+  ]
+}

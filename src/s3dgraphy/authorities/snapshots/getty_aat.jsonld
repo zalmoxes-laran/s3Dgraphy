@@ -36,6 +36,16 @@
       "@id": "http://vocab.getty.edu/aat/300266485",
       "prefLabel": "opus reticulatum",
       "altLabel": ["reticulate work"]
+    },
+    {
+      "@id": "http://vocab.getty.edu/aat/300007595",
+      "prefLabel": "temples",
+      "altLabel": ["temple", "temple (building)"]
+    },
+    {
+      "@id": "http://vocab.getty.edu/aat/300007466",
+      "prefLabel": "amphitheaters",
+      "altLabel": ["amphitheater", "amphitheatre"]
     }
   ]
 }
