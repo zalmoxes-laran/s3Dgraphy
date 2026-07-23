@@ -1,0 +1,41 @@
+{
+  "_note": "Hand-seeded MINIMAL sample for the P1-D authority mechanism — NOT an official Getty dump. Verify IRIs and replace with real snapshots before production (see provenance.json).",
+  "@context": {
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "prefLabel": "skos:prefLabel",
+    "altLabel": "skos:altLabel",
+    "broader": { "@id": "skos:broader", "@type": "@id" },
+    "inScheme": { "@id": "skos:inScheme", "@type": "@id" }
+  },
+  "authority": "aat",
+  "facet": "WHAT",
+  "scheme": "http://vocab.getty.edu/aat/",
+  "@graph": [
+    {
+      "@id": "http://vocab.getty.edu/aat/300015342",
+      "prefLabel": "mosaic",
+      "altLabel": ["mosaics", "mosaic work"]
+    },
+    {
+      "@id": "http://vocab.getty.edu/aat/300177433",
+      "prefLabel": "fresco",
+      "altLabel": ["frescoes", "frescos", "buon fresco"]
+    },
+    {
+      "@id": "http://vocab.getty.edu/aat/300005544",
+      "prefLabel": "brick",
+      "altLabel": ["bricks"],
+      "broader": "http://vocab.getty.edu/aat/300010358"
+    },
+    {
+      "@id": "http://vocab.getty.edu/aat/300010358",
+      "prefLabel": "ceramic (material)",
+      "altLabel": ["ceramics"]
+    },
+    {
+      "@id": "http://vocab.getty.edu/aat/300266485",
+      "prefLabel": "opus reticulatum",
+      "altLabel": ["reticulate work"]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "_note": "Per-authority provenance for the offline snapshots in this directory. These are hand-seeded MINIMAL samples proving the P1-D mechanism, NOT official dumps — retrieved_method reflects that. Replace with real, dated exports before production; keep this file in step.",
+  "authorities": {
+    "periodo": {
+      "name": "PeriodO",
+      "facet": "WHEN",
+      "homepage": "https://perio.do/",
+      "scheme": "http://n2t.net/ark:/99152/p0",
+      "retrieved_method": "hand-seeded sample (P1-D mechanism proof)",
+      "snapshot_date": "2026-07-23",
+      "license_ref": "periodo"
+    },
+    "chronontology": {
+      "name": "ChronOntology (DAI iDAI.chronontology)",
+      "facet": "WHEN",
+      "homepage": "https://chronontology.dainst.org/",
+      "scheme": "https://chronontology.dainst.org/period/",
+      "retrieved_method": "hand-seeded sample (P1-D mechanism proof)",
+      "snapshot_date": "2026-07-23",
+      "license_ref": "chronontology"
+    },
+    "aat": {
+      "name": "Getty Art & Architecture Thesaurus (AAT)",
+      "facet": "WHAT",
+      "homepage": "https://www.getty.edu/research/tools/vocabularies/aat/",
+      "scheme": "http://vocab.getty.edu/aat/",
+      "retrieved_method": "hand-seeded sample (P1-D mechanism proof)",
+      "snapshot_date": "2026-07-23",
+      "license_ref": "getty"
+    }
+  }
+}

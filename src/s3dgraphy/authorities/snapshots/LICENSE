@@ -1,0 +1,22 @@
+Authority snapshot licensing
+=============================
+
+The files in this directory are HAND-SEEDED MINIMAL SAMPLES created to prove the
+P1-D authority mechanism (offline resolve → ranked authority_refs → RDF
+projection). They are NOT official dumps. The labels/IRIs are illustrative and
+must be replaced with real, dated exports before production use.
+
+When real snapshots are ingested, each authority retains its own upstream terms;
+record them here per authority and honour them in any redistribution:
+
+- periodo (PeriodO)        — data released under CC0 1.0 (Public Domain).
+                             https://perio.do/
+- chronontology            — iDAI.chronontology / DAI; check current terms of use
+                             before redistributing period definitions.
+                             https://chronontology.dainst.org/
+- getty (AAT/TGN/ULAN)     — Getty Vocabularies published as Linked Open Data
+                             under ODC-BY 1.0 (attribution required).
+                             https://www.getty.edu/research/tools/vocabularies/
+
+The resolver attaches the per-authority `license_ref` (see provenance.json) to
+every candidate it returns, so downstream consumers can honour these terms.

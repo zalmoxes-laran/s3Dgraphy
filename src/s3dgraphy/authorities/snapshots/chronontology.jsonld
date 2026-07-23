@@ -1,0 +1,23 @@
+{
+  "_note": "Hand-seeded MINIMAL sample for the P1-D authority mechanism — NOT an official ChronOntology dump. Verify IRIs and replace with real snapshots before production (see provenance.json).",
+  "@context": {
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "prefLabel": "skos:prefLabel",
+    "altLabel": "skos:altLabel"
+  },
+  "authority": "chronontology",
+  "facet": "WHEN",
+  "scheme": "https://chronontology.dainst.org/period/",
+  "@graph": [
+    {
+      "@id": "https://chronontology.dainst.org/period/rj5F4YIcRTQR",
+      "prefLabel": "Roman Imperial period",
+      "altLabel": ["Roman Empire", "Imperial period"]
+    },
+    {
+      "@id": "https://chronontology.dainst.org/period/X3zX9m2q7Kd1",
+      "prefLabel": "Roman period",
+      "altLabel": ["Roman"]
+    }
+  ]
+}

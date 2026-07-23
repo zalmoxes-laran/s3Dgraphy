@@ -1,0 +1,29 @@
+{
+  "_note": "Hand-seeded MINIMAL sample for the P1-D authority mechanism — NOT an official PeriodO dump. Verify ARKs and replace with real snapshots before production (see provenance.json).",
+  "@context": {
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "prefLabel": "skos:prefLabel",
+    "altLabel": "skos:altLabel",
+    "broader": { "@id": "skos:broader", "@type": "@id" }
+  },
+  "authority": "periodo",
+  "facet": "WHEN",
+  "scheme": "http://n2t.net/ark:/99152/p0",
+  "@graph": [
+    {
+      "@id": "http://n2t.net/ark:/99152/p0qhb66hrvw",
+      "prefLabel": "Roman period",
+      "altLabel": ["Roman", "Roman Age"]
+    },
+    {
+      "@id": "http://n2t.net/ark:/99152/p0qhb66xt7k",
+      "prefLabel": "Late Antiquity",
+      "altLabel": ["Late Antique period"]
+    },
+    {
+      "@id": "http://n2t.net/ark:/99152/p0qhb66j3f2",
+      "prefLabel": "Republican period",
+      "altLabel": ["Roman Republic"]
+    }
+  ]
+}

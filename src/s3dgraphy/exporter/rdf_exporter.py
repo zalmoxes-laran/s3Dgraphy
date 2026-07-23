@@ -48,7 +48,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 try:
     from rdflib import ConjunctiveGraph, Literal, Namespace, URIRef
-    from rdflib.namespace import DCTERMS, OWL, PROV, RDF, RDFS, XSD
+    from rdflib.namespace import DCTERMS, OWL, PROV, RDF, RDFS, SKOS, XSD
 except ImportError as _e:  # pragma: no cover
     raise ImportError(
         "RDFExporter requires rdflib. Install with: pip install rdflib"
@@ -71,7 +71,7 @@ CRMDIG     = Namespace("http://www.cidoc-crm.org/extensions/crmdig/")
 CRMGEO     = Namespace("http://www.cidoc-crm.org/extensions/crmgeo/")
 HDTO       = Namespace("https://w3id.org/hdto/ontology#")
 
-DEFAULT_BASE_URI = "https://example.org/em/"
+DEFAULT_BASE_URI = "https://w3id.org/em/id/"
 
 PREFIX_MAP: Dict[str, Namespace] = {
     "em":         EM,
@@ -84,10 +84,25 @@ PREFIX_MAP: Dict[str, Namespace] = {
     "hdto":       HDTO,
     "prov":       PROV,
     "dcterms":    DCTERMS,
+    "skos":       Namespace(str(SKOS)),
     "rdfs":       Namespace(str(RDFS)),
     "owl":        Namespace(str(OWL)),
     "xsd":        Namespace(str(XSD)),
 }
+
+# authority_ref `match` strength → RDF predicate (E.D.: concept alignment via
+# SKOS; owl:sameAs ONLY for a human-confirmed identity, NEVER for a ranked or
+# uncertain candidate; unqualified default = skos:closeMatch).
+AUTHORITY_MATCH_PREDICATE: Dict[str, URIRef] = {
+    "exact":    SKOS.exactMatch,
+    "close":    SKOS.closeMatch,
+    "broad":    SKOS.broadMatch,
+    "narrow":   SKOS.narrowMatch,
+    "related":  SKOS.relatedMatch,
+    "sameAs":   OWL.sameAs,
+    "identity": OWL.sameAs,
+}
+DEFAULT_AUTHORITY_PREDICATE: URIRef = SKOS.closeMatch
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -673,10 +688,38 @@ class RDFExporter:
             ctx.add((node_iri, DCTERMS.description, Literal(desc)))
         ctx.add((node_iri, DCTERMS.identifier, Literal(node.node_id)))
 
+        # Authority cross-references (P1-D) — GENERALISED to any node carrying
+        # `data.authority_refs` (nodes AND qualia). Redundant by design: every
+        # ranked ref is emitted, with the strength-aware predicate.
+        self._serialize_authority_refs(node, node_iri, ctx)
+
         # Type-specific (node_type already computed above for primary IRI logic)
         self._serialize_type_specific(node, node_type, node_iri, ctx)
 
         self.stats["nodes"] += 1
+
+    def _serialize_authority_refs(self, node: Any, node_iri: URIRef, ctx) -> None:
+        """Emit `data.authority_refs` as SKOS/OWL alignment triples.
+
+        Each ref ``{uri, authority, label, rank, match}`` becomes
+        ``<node> <predicate(match)> <uri>`` where the predicate is chosen by
+        match strength (default skos:closeMatch). Non-http URIs are skipped
+        (an authority ref must be a resolvable IRI)."""
+        data = getattr(node, "data", {}) or {}
+        refs = data.get("authority_refs")
+        if not isinstance(refs, list):
+            return
+        for ref in refs:
+            if not isinstance(ref, dict):
+                continue
+            uri = ref.get("uri")
+            if not uri or not (isinstance(uri, str)
+                               and uri.startswith(("http://", "https://"))):
+                continue
+            pred = AUTHORITY_MATCH_PREDICATE.get(
+                ref.get("match"), DEFAULT_AUTHORITY_PREDICATE)
+            ctx.add((node_iri, pred, URIRef(uri)))
+            self.stats["authority_refs"] = self.stats.get("authority_refs", 0) + 1
 
     def _compute_primary_iri(self, node: Any, cls_name: str,
                              node_type: Optional[str]) -> Optional[URIRef]:
@@ -821,21 +864,6 @@ class RDFExporter:
                 v = data.get(axis)
                 if v is not None:
                     ctx.add((node_iri, EM[axis], Literal(v)))
-
-        elif node_type == "heritage_entity":
-            # HC1 authority link(s). Interim projection of the plain authority
-            # URI(s) authored in EMStudio's per-graph HDT-O panel, carried in
-            # `data.authority_refs` (the P1-D-shaped list). Emitted as
-            # rdfs:seeAlso — consistent with link/license URLs above — until
-            # P1-D adds the ranked, facet-typed authority layer (E55/E53/E39…).
-            for ref in (data.get("authority_refs") or []):
-                uri = ref.get("uri") if isinstance(ref, dict) else None
-                if not uri:
-                    continue
-                if isinstance(uri, str) and uri.startswith(("http://", "https://")):
-                    ctx.add((node_iri, RDFS.seeAlso, URIRef(uri)))
-                else:
-                    ctx.add((node_iri, RDFS.seeAlso, Literal(uri)))
 
         elif node_type == "extractor":
             source = getattr(node, "source", None)
