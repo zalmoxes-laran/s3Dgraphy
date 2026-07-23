@@ -822,6 +822,21 @@ class RDFExporter:
                 if v is not None:
                     ctx.add((node_iri, EM[axis], Literal(v)))
 
+        elif node_type == "heritage_entity":
+            # HC1 authority link(s). Interim projection of the plain authority
+            # URI(s) authored in EMStudio's per-graph HDT-O panel, carried in
+            # `data.authority_refs` (the P1-D-shaped list). Emitted as
+            # rdfs:seeAlso — consistent with link/license URLs above — until
+            # P1-D adds the ranked, facet-typed authority layer (E55/E53/E39…).
+            for ref in (data.get("authority_refs") or []):
+                uri = ref.get("uri") if isinstance(ref, dict) else None
+                if not uri:
+                    continue
+                if isinstance(uri, str) and uri.startswith(("http://", "https://")):
+                    ctx.add((node_iri, RDFS.seeAlso, URIRef(uri)))
+                else:
+                    ctx.add((node_iri, RDFS.seeAlso, Literal(uri)))
+
         elif node_type == "extractor":
             source = getattr(node, "source", None)
             if source:
