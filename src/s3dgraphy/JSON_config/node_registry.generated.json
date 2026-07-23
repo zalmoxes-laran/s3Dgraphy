@@ -117,6 +117,11 @@
    "node_type": "ParadataNodeGroup",
    "description": "Nodo gruppo per paradata. Questo gruppo tiene insieme tutti i paradati relativi ad una unità stratigrafica: normalmente si chiama \"[nome_US]_PD\" (ParaData)"
   },
+  "ProjectNode": {
+   "parent": "Node",
+   "node_type": "project",
+   "description": "HC13 Project (HDT-O / ECHOES D7.1)."
+  },
   "PropertyNode": {
    "parent": "ParadataNode",
    "node_type": "property",
@@ -196,6 +201,11 @@
    "parent": "VirtualStratigraphicUnit",
    "node_type": "USVs",
    "description": ""
+  },
+  "StudyNode": {
+   "parent": "Node",
+   "node_type": "study",
+   "description": "HC9 Study (HDT-O / ECHOES D7.1)."
   },
   "TimeBranchNodeGroup": {
    "parent": "GroupNode",

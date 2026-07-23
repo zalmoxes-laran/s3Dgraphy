@@ -27,17 +27,17 @@ archaeology authoring concern.
 | HC5 | Digital Representation | `RepresentationModelNode` family (`crmdig:D1`) | mappable |
 | HC6 | Sensor | — | out-of-scope (IoT / SensorThings) |
 | HC7 | Digital Audiovisual Object | `RepresentationModel*` covers 3D; AV n/a | defer |
-| HC9 | Study | — | defer (research context) |
+| HC9 | Study | **`StudyNode`** (`hdto_nodes`, → `hdto:HC9` ⊂ `crm:E7`) | **added** |
 | HC10 | Heritage Valuation | — | defer |
 | HC11 | Digital Twin Maintenance | — | defer (HDT lifecycle) |
 | HC12 | Heritage Declaration Event | — | defer |
-| HC13 | Project | — | defer (research-project context; candidate) |
+| HC13 | Project | **`ProjectNode`** (`hdto_nodes`, → `hdto:HC13` ⊂ `crm:E7`) | **added** |
 | HC14 | Volatile Digital Object | superclass of HC2 (declared in `hdto_extension.ttl`; `HDTNode` `subclass_of` HC14) | ontology-only |
 | HC15 | Persistent Digital Object | snapshot infrastructure (ttl) | defer / ontology-only |
 | HC16 | Heritage Proposition Set | `GraphNode` = `em:EMGraph` (em.ttl declares `EMGraph ⊂ HC16`) | mapped |
-| HC17 | Observation with Inference | `ParadataNode` (`crminf:I1_Argumentation`) — bridge noted in ttl | mappable |
-| HC18 | Provenance Statement | `ExtractorNode`/`CombinerNode` (crminf provenance) | mappable / defer |
-| HC19 | Provenance Assessment | — | defer |
+| HC17 | Observation with Inference | `ParadataNode` / `ExtractorNode` / `CombinerNode` (CRMinf: I1 Argumentation, I7 Belief Adoption, I5 Inference Making) — the interpretation side | mappable |
+| HC18 | Provenance Statement | GENESIS-side summary that links into the **DTC chain** (CRMdig + PROV-O); an HC18 links to ≥1 DTC chain. **NOT** Extractor/Combiner (those are CRMinf interpretation / HC17). | defer → DTC profile |
+| HC19 | Provenance Assessment | GENESIS-side, paired with HC18 (CRMdig + PROV-O) | defer → DTC profile |
 | HC20 | Criminal Activity | — | out-of-scope |
 
 > HC21–HC29 (SensorThings API module) are a separate D7.1 section, out of P1-C scope.
@@ -54,25 +54,41 @@ chain works with them):
 | HP3 / HP3i | (is/has) digital twin component of | `has_digital_twin_component` (HDTNode → HDTNode) | present |
 | HP29 | has digital object part | `has_digital_object_part` (HDTNode → Representation*/Link) | present |
 | HP33 / HP33i | contains / is proposition set of | `contains_proposition_set` (HDTNode → GraphNode) | present |
+| HP23 | was about | `study_about_heritage` (StudyNode → HeritageEntityNode) | **added** |
+| HP25 | has created | `study_produced_proposition_set` (StudyNode → GraphNode; range widened E31→HC16/E73) | **added** |
+| (crm:P9) | consists of | `includes_study` (ProjectNode → StudyNode) — CRM fallback; D7.1 has no HC13→HC9 property | **added** |
 | HP9 / HP21 / HP22 | is visual repr. / is 3D repr. output of / represents | EM representation edges | mappable |
-| HP2, HP4–HP8, HP10, HP12–HP20, HP23–HP26 | story / narration / manifestation / valuation / study | — | defer (domains/ranges are deferred classes) |
+| HP2, HP4–HP8, HP10, HP12–HP20, HP24, HP26 | story / narration / manifestation / valuation / disciplinary focus | — | defer (domains/ranges are deferred classes) |
 | HP28, HP30–HP32, HP34 | snapshot / added-deleted-replaced content | — | defer (HC11 maintenance / versioning; ttl-only) |
 
-## What P1-C added (and why so little)
+## What was added (and why so little)
 
-Only **HC1 `HeritageEntityNode`** was missing to complete and project the
-canonical authoring chain **HC1 → (HP1) → HC2 → (HP33) → HC16**. Everything
-else HC1–HC20 is either already mapped (HC2, HC16, HC14), mappable to an
-existing EM node (HC5, HC17), or outside the archaeology authoring scope
-(sensors, valuation, maintenance, provenance chains) — deferred to avoid scope
-creep, to be added the same additive way when a concrete use-case needs them.
+- **P1-C**: **HC1 `HeritageEntityNode`** — completes the core chain
+  **HC1 → (HP1) → HC2 → (HP33) → HC16**.
+- **HC9/HC13 session**: **HC9 `StudyNode`** and **HC13 `ProjectNode`** — the
+  research-context framing agreed with E.D.: a graph = a **Study** whose content
+  is a proposition set (HC16 = EMGraph), **about** an HC1, optionally under a
+  **Project**:
+  `Project ─includes(crm:P9)→ Study ─was_about(HP23)→ HeritageEntity`,
+  `Study ─produced(HP25)→ GraphNode(HC16)`.
+  Project→Study uses `crm:P9_consists_of` because D7.1 declares no direct
+  HC13→HC9 property (documented in the edge + `hdto_extension.ttl`).
+
+Everything else HC1–HC20 stays mapped (HC2, HC16, HC14), mappable to an existing
+EM node (HC5, HC17), or outside the archaeology authoring scope — added the same
+additive way when a concrete use-case needs it. In particular **HC18/HC19
+(provenance)** are the GENESIS-side summary that links into the **DTC chain**
+(CRMdig + PROV-O), distinct from the CRMinf interpretation side (HC17 /
+Extractor / Combiner); their fine granularity is deferred to the **DTC profile**.
 
 **Gating (HDT-O view):** HDT-O node types live in the datamodel and project to
 RDF, but are **not** in the EMStudio palette allowlist (`palette-ui.ts`
 `SECTIONS`), so the stratigrapher palette is unchanged. The dedicated
-`hdto_nodes` datamodel section is the machine-readable HDT-O-view grouping;
-`HDTNode`/`GraphNode` remain in `container_nodes` (pre-existing HDT-O members).
+`hdto_nodes` datamodel section (HeritageEntityNode, StudyNode, ProjectNode) is
+the machine-readable HDT-O-view grouping; `HDTNode`/`GraphNode` remain in
+`container_nodes` (pre-existing HDT-O members).
 
-**Verification:** `tests/test_hdto_projection.py` authors an HC1→HC2→HC16 graph
-and asserts the exporter emits `hdto:HC1_Heritage_Entity`, `HC2`, `HP1`, `HP33`
-into valid Turtle.
+**Verification:** `tests/test_hdto_projection.py` authors both an HC1→HC2→HC16
+graph and a full Project→Study→HC1→HC2→HC16 graph and asserts the exporter emits
+the HDT-O classes/properties (HC1/HC2/HC9/HC13, HP1/HP23/HP25/HP33, crm:P9) into
+valid Turtle.

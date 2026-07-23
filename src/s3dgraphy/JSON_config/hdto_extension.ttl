@@ -52,7 +52,7 @@
     dcterms:license <https://creativecommons.org/licenses/by/4.0/> ;
     dcterms:issued "2026-05-23"^^xsd:date ;
     owl:versionInfo "0.2-aligned-with-D7.1" ;
-    rdfs:comment "Subset of HDT-O classes and properties (HC1, HC2, HC14, HC15, HC16; HP1, HP3, HP29, HP33) needed by s3dgraphy v1.6.0 to express granularity of heritage digital twins. Aligned with ECHOES Deliverable D7.1 (May 2024). The namespace (w3id.org/hdto/) is a placeholder pending the official ECHOES publication."@en .
+    rdfs:comment "Subset of HDT-O classes and properties (HC1, HC2, HC9, HC13, HC14, HC15, HC16; HP1, HP3, HP23, HP25, HP29, HP33) needed by s3dgraphy v1.6.0 to express granularity of heritage digital twins and the Project→Study→proposition-set framing. Aligned with ECHOES Deliverable D7.1 (May 2024). The namespace (w3id.org/hdto/) is a placeholder pending the official ECHOES publication."@en .
 
 
 # ============================================================================
@@ -88,6 +88,19 @@ hdto:HC16_Heritage_Proposition_Set
     rdfs:label "Heritage Proposition Set"@en ;
     rdfs:subClassOf crm:E73_Information_Object ;
     rdfs:comment "A named graph carrying a set of formal propositions about (or related to) heritage entities. The atomic content unit that an HC2 Heritage Digital Twin aggregates: an HC2 'contains' (HP33) one or more HC16 instances. Version chains across editing actions are documented via HP30 added content / HP31 deleted content / HP32 replaced. An s3dgraphy em:EMGraph IS a Heritage Proposition Set (formally declared in em.ttl via owl:equivalentClass / subClassOf)."@en .
+
+
+hdto:HC9_Study
+    a owl:Class ;
+    rdfs:label "Study"@en ;
+    rdfs:subClassOf crm:E7_Activity ;
+    rdfs:comment "A scholarly activity (research, analysis or documentation, in any SSH / natural / exact-science domain) about a Heritage Entity (HC1), explicating a disciplinary focus and the part of the entity investigated. A study is about (HP23) one or more HC1 and has created (HP25) documentary outputs (crm:E31 Document) — in s3dgraphy the EM proposition set (HC16 / em:EMGraph). ECHOES D7.1."@en .
+
+hdto:HC13_Project
+    a owl:Class ;
+    rdfs:label "Project"@en ;
+    rdfs:subClassOf crm:E7_Activity ;
+    rdfs:comment "Coordinated activities of institutions or research groups to produce heritage-related outcomes; the organizational context under which studies (HC9) are carried out and under which HDTs are created and curated (HC11 Digital Twin Maintenance is carried out under a project, HP20). ECHOES D7.1."@en .
 
 
 # ============================================================================
@@ -144,6 +157,29 @@ hdto:HP33i_is_proposition_set_of
     rdfs:domain hdto:HC16_Heritage_Proposition_Set ;
     rdfs:range hdto:HC2_Heritage_Digital_Twin ;
     rdfs:comment "Inverse of HP33 contains. Used in s3dgraphy to express that an em:EMGraph is a proposition set within a specific HC2 HDT (or several HC2s — many-to-many membership)."@en .
+
+
+hdto:HP23_was_about
+    a owl:ObjectProperty ;
+    rdfs:label "was about"@en ;
+    rdfs:domain hdto:HC9_Study ;
+    rdfs:range hdto:HC1_Heritage_Entity ;
+    rdfs:subPropertyOf crm:P16_used_specific_object ;
+    rdfs:comment "Associates an HC9 Study with the HC1 Heritage Entity/entities it investigated. Per D7.1 (Domain HC9, Range HC1; subproperty of crm:E7.P16 used specific object; many-to-many, necessary)."@en .
+
+hdto:HP25_has_created
+    a owl:ObjectProperty ;
+    rdfs:label "has created"@en ;
+    rdfs:domain hdto:HC9_Study ;
+    rdfs:range crm:E31_Document ;
+    rdfs:subPropertyOf crm:P94_has_created ;
+    rdfs:comment "Associates an HC9 Study with the persistent documentary output it created (crm:E31 Document). Per D7.1 (subproperty of crm:E65.P94 has created; one-to-many, necessary, dependent). In s3dgraphy the created output is the EM proposition set (HC16 / em:EMGraph, an E73 Information Object)."@en .
+
+# Project → Study containment: D7.1 declares no direct HC13→HC9 property.
+# s3dgraphy expresses "Project includes Study" with crm:P9_consists_of
+# (activity/period composition) in the connections datamodel (edge
+# 'includes_study'), consistent with HP20 being a crm:P9i subproperty. No new
+# HDT-O property is minted here.
 
 
 # ============================================================================

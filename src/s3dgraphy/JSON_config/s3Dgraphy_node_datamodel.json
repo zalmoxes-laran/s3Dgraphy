@@ -1263,6 +1263,58 @@
     "name": "P1_is_identified_by",
     "description": "P3_has_note"
    }
+  },
+  "ProjectNode": {
+   "class": "ProjectNode",
+   "parent": "Node",
+   "abbreviation": "PRJ",
+   "label": "Project",
+   "description": "HC13 Project (HDT-O, ECHOES D7.1): the coordinated activities of institutions/research groups producing heritage-related outcomes; the organizational context under which studies are carried out and under which HDTs are created and curated (HC11 maintenance is carried out under a project, HP20). Includes studies via crm:P9_consists_of (D7.1 defines no direct HC13->HC9 property). HDT-O-view node: not shown in the stratigrapher palette.",
+   "s3Dgraphy_file": "project_node.py",
+   "mapping": {
+    "cidoc": "hdto:HC13_Project",
+    "cidoc_s3d": null,
+    "alternative": "hdto:HC13_Project ⊂ crm:E7_Activity",
+    "rationale": "HC13 is the canonical HDT-O class for the research/organizational project. Multi-typed via crm:E7 Activity so consumers that don't know HDT-O still see a CRM Activity."
+   },
+   "em_extension": {
+    "uri": "hdto:HC13_Project",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "crm:E7_Activity"
+    ],
+    "extension_status": "imported-from-D7.1"
+   },
+   "properties": {
+    "name": "P1_is_identified_by",
+    "description": "P3_has_note"
+   }
+  },
+  "StudyNode": {
+   "class": "StudyNode",
+   "parent": "Node",
+   "abbreviation": "STD",
+   "label": "Study",
+   "description": "HC9 Study (HDT-O, ECHOES D7.1): a scholarly activity (research/analysis/documentation, any domain) about a Heritage Entity (HC1), with a disciplinary focus, that produces documentary outputs contributing to an HDT. In EM a study heads a proposition set (HC16/em:EMGraph). Chain: Project -includes(crm:P9)-> Study -was_about(HP23)-> HeritageEntity ; Study -produced(HP25)-> GraphNode. HDT-O-view node: not shown in the stratigrapher palette.",
+   "s3Dgraphy_file": "study_node.py",
+   "mapping": {
+    "cidoc": "hdto:HC9_Study",
+    "cidoc_s3d": null,
+    "alternative": "hdto:HC9_Study ⊂ crm:E7_Activity; results in crm:E31 Document (HP25)",
+    "rationale": "HC9 is the canonical HDT-O class for a scholarly study. Multi-typed via crm:E7 Activity. Per D7.1 a study is 'about' (HP23) an HC1 Heritage Entity and 'has created' (HP25) its documentary output — modelled here as the EM proposition set (HC16/em:EMGraph)."
+   },
+   "em_extension": {
+    "uri": "hdto:HC9_Study",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "crm:E7_Activity"
+    ],
+    "extension_status": "imported-from-D7.1"
+   },
+   "properties": {
+    "name": "P1_is_identified_by",
+    "description": "P3_has_note"
+   }
   }
  },
  "fallback_nodes": {
