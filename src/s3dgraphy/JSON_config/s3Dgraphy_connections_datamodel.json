@@ -1169,6 +1169,30 @@
         ]
       }
     },
+    "heritage_part_of": {
+      "name": "heritage_part_of",
+      "label": "Is part of heritage entity",
+      "description": "Part-whole BETWEEN Heritage Entities (HC1): the source entity forms part of the target entity — e.g. the porphyry Tetrarchs (HC1) forms part of San Marco (HC1). D7.1 declares no HC1->HC1 part-whole property; modelled with CIDOC-CRM crm:P46i_forms_part_of via the extension mechanism.",
+      "reverse": {
+        "name": "heritage_has_part",
+        "label": "Has part (heritage entity)"
+      },
+      "mapping": {
+        "cidoc": "crm:P46i_forms_part_of",
+        "cidoc_extension": null,
+        "extension_mapping": "P46i_forms_part_of",
+        "extension_name": "CIDOC-CRM",
+        "rationale": "No HDT-O property connects HC1 Heritage Entity to HC1 Heritage Entity (D7.1). crm:P46 is composed of / P46i forms part of expresses part-whole; source = part, target = whole (reverse heritage_has_part = crm:P46_is_composed_of). Domain/range E18 Physical Thing => fits tangible heritage (HC3 aspect of HC1); intangible-entity composition is deferred."
+      },
+      "allowed_connections": {
+        "source": [
+          "HeritageEntityNode"
+        ],
+        "target": [
+          "HeritageEntityNode"
+        ]
+      }
+    },
     "generic_connection": {
       "name": "generic_connection",
       "label": "Generic connection",

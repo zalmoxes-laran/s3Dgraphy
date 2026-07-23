@@ -24,7 +24,7 @@ archaeology authoring concern.
 | HC2 | Heritage Digital Twin | `HDTNode` (→ `hdto:HC2`) | mapped |
 | HC3 | Tangible Aspect of an HC1 | specialization of HC1 | defer |
 | HC4 | Intangible Heritage Entity | specialization of HC1 | defer |
-| HC5 | Digital Representation | `RepresentationModelNode` family (`crmdig:D1`) | mappable |
+| HC5 | Digital Representation | `RepresentationModelNode` family — **Type-A annotated** `hdto:HC5` (keeps `crmdig:D1`) | **annotated** |
 | HC6 | Sensor | — | out-of-scope (IoT / SensorThings) |
 | HC7 | Digital Audiovisual Object | `RepresentationModel*` covers 3D; AV n/a | defer |
 | HC9 | Study | **`StudyNode`** (`hdto_nodes`, → `hdto:HC9` ⊂ `crm:E7`) | **added** |
@@ -35,7 +35,7 @@ archaeology authoring concern.
 | HC14 | Volatile Digital Object | superclass of HC2 (declared in `hdto_extension.ttl`; `HDTNode` `subclass_of` HC14) | ontology-only |
 | HC15 | Persistent Digital Object | snapshot infrastructure (ttl) | defer / ontology-only |
 | HC16 | Heritage Proposition Set | `GraphNode` = `em:EMGraph` (em.ttl declares `EMGraph ⊂ HC16`) | mapped |
-| HC17 | Observation with Inference | `ParadataNode` / `ExtractorNode` / `CombinerNode` (CRMinf: I1 Argumentation, I7 Belief Adoption, I5 Inference Making) — the interpretation side | mappable |
+| HC17 | Observation with Inference | `ParadataNode` — **Type-A annotated** `hdto:HC17` (keeps `crminf:I1`); Extractor/Combiner (I7/I5) remain the interpretation side | **annotated** |
 | HC18 | Provenance Statement | GENESIS-side summary that links into the **DTC chain** (CRMdig + PROV-O); an HC18 links to ≥1 DTC chain. **NOT** Extractor/Combiner (those are CRMinf interpretation / HC17). | defer → DTC profile |
 | HC19 | Provenance Assessment | GENESIS-side, paired with HC18 (CRMdig + PROV-O) | defer → DTC profile |
 | HC20 | Criminal Activity | — | out-of-scope |
@@ -57,6 +57,7 @@ chain works with them):
 | HP23 | was about | `study_about_heritage` (StudyNode → HeritageEntityNode) | **added** |
 | HP25 | has created | `study_produced_proposition_set` (StudyNode → GraphNode; range widened E31→HC16/E73) | **added** |
 | (crm:P9) | consists of | `includes_study` (ProjectNode → StudyNode) — CRM fallback; D7.1 has no HC13→HC9 property | **added** |
+| (crm:P46i) | forms part of | `heritage_part_of` (HeritageEntityNode → HeritageEntityNode) — CRM fallback; D7.1 has no HC1→HC1 property; E18 → tangible heritage | **added** |
 | HP9 / HP21 / HP22 | is visual repr. / is 3D repr. output of / represents | EM representation edges | mappable |
 | HP2, HP4–HP8, HP10, HP12–HP20, HP24, HP26 | story / narration / manifestation / valuation / disciplinary focus | — | defer (domains/ranges are deferred classes) |
 | HP28, HP30–HP32, HP34 | snapshot / added-deleted-replaced content | — | defer (HC11 maintenance / versioning; ttl-only) |
@@ -73,9 +74,18 @@ chain works with them):
   `Study ─produced(HP25)→ GraphNode(HC16)`.
   Project→Study uses `crm:P9_consists_of` because D7.1 declares no direct
   HC13→HC9 property (documented in the edge + `hdto_extension.ttl`).
+- **HC1-part / Type-A session**:
+  - **HC1 part-whole** edge `heritage_part_of` (HeritageEntityNode →
+    HeritageEntityNode) — e.g. the porphyry Tetrarchs forms part of San Marco.
+    D7.1 has no HC1→HC1 property → `crm:P46i_forms_part_of` (E18, tangible),
+    documented.
+  - **Type-A annotations** (no new classes): `RepresentationModelNode` family
+    also `hdto:HC5` (keeps `crmdig:D1`); `ParadataNode` also `hdto:HC17` (keeps
+    `crminf:I1`) — added to each node's `em_extension.subclass_of`, so the
+    exporter multi-types the instance.
 
-Everything else HC1–HC20 stays mapped (HC2, HC16, HC14), mappable to an existing
-EM node (HC5, HC17), or outside the archaeology authoring scope — added the same
+Everything else HC1–HC20 stays mapped (HC2, HC16, HC14) or outside the
+archaeology authoring scope — added the same
 additive way when a concrete use-case needs it. In particular **HC18/HC19
 (provenance)** are the GENESIS-side summary that links into the **DTC chain**
 (CRMdig + PROV-O), distinct from the CRMinf interpretation side (HC17 /

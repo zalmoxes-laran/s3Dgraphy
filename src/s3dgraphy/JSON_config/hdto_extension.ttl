@@ -2,6 +2,7 @@
 @prefix crm:       <http://www.cidoc-crm.org/cidoc-crm/> .
 @prefix crmdig:    <http://www.cidoc-crm.org/extensions/crmdig/> .
 @prefix crmarchaeo: <http://www.cidoc-crm.org/extensions/crmarchaeo/> .
+@prefix crminf:    <http://www.cidoc-crm.org/extensions/crminf/> .
 @prefix em:        <https://w3id.org/em/ontology#> .
 @prefix rdfs:      <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix owl:       <http://www.w3.org/2002/07/owl#> .
@@ -52,7 +53,7 @@
     dcterms:license <https://creativecommons.org/licenses/by/4.0/> ;
     dcterms:issued "2026-05-23"^^xsd:date ;
     owl:versionInfo "0.2-aligned-with-D7.1" ;
-    rdfs:comment "Subset of HDT-O classes and properties (HC1, HC2, HC9, HC13, HC14, HC15, HC16; HP1, HP3, HP23, HP25, HP29, HP33) needed by s3dgraphy v1.6.0 to express granularity of heritage digital twins and the Project→Study→proposition-set framing. Aligned with ECHOES Deliverable D7.1 (May 2024). The namespace (w3id.org/hdto/) is a placeholder pending the official ECHOES publication."@en .
+    rdfs:comment "Subset of HDT-O classes and properties (HC1, HC2, HC5, HC9, HC13, HC14, HC15, HC16, HC17; HP1, HP3, HP23, HP25, HP29, HP33) needed by s3dgraphy v1.6.0 to express granularity of heritage digital twins, the Project→Study→proposition-set framing, HC1 part-whole (crm:P46i), and Type-A annotations (HC5 on representations, HC17 on paradata). Aligned with ECHOES Deliverable D7.1 (May 2024). The namespace (w3id.org/hdto/) is a placeholder pending the official ECHOES publication."@en .
 
 
 # ============================================================================
@@ -101,6 +102,19 @@ hdto:HC13_Project
     rdfs:label "Project"@en ;
     rdfs:subClassOf crm:E7_Activity ;
     rdfs:comment "Coordinated activities of institutions or research groups to produce heritage-related outcomes; the organizational context under which studies (HC9) are carried out and under which HDTs are created and curated (HC11 Digital Twin Maintenance is carried out under a project, HP20). ECHOES D7.1."@en .
+
+
+hdto:HC5_Digital_Representation
+    a owl:Class ;
+    rdfs:label "Digital Representation"@en ;
+    rdfs:subClassOf crmdig:D1_Digital_Object ;
+    rdfs:comment "A digital representation (3D model, image, ...) of a heritage entity or its parts. EM RepresentationModel* nodes are digital objects (crmdig:D1) Type-A annotated as HC5. ECHOES D7.1."@en .
+
+hdto:HC17_Observation_with_Inference
+    a owl:Class ;
+    rdfs:label "Observation with Inference"@en ;
+    rdfs:subClassOf crminf:I1_Argumentation ;
+    rdfs:comment "An observation carrying inferential reasoning about a heritage entity — the natural bridge to the EM paradata/argumentation chain. EM ParadataNode (crminf:I1) is Type-A annotated as HC17. ECHOES D7.1."@en .
 
 
 # ============================================================================
@@ -180,6 +194,12 @@ hdto:HP25_has_created
 # (activity/period composition) in the connections datamodel (edge
 # 'includes_study'), consistent with HP20 being a crm:P9i subproperty. No new
 # HDT-O property is minted here.
+#
+# HC1 → HC1 part-whole: D7.1 declares no HC1→HC1 property. s3dgraphy expresses
+# "Heritage Entity forms part of Heritage Entity" with crm:P46i_forms_part_of
+# (connections edge 'heritage_part_of'; reverse crm:P46_is_composed_of).
+# Domain/range E18 Physical Thing => fits tangible heritage (HC3 aspect);
+# intangible-entity composition is deferred. No new HDT-O property is minted.
 
 
 # ============================================================================

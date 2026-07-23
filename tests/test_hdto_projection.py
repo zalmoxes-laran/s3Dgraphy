@@ -15,6 +15,7 @@ rdflib = pytest.importorskip("rdflib")  # projection needs the [rdf] extra
 from s3dgraphy.graph import Graph
 from s3dgraphy.nodes import (
     HeritageEntityNode, HDTNode, GraphNode, StudyNode, ProjectNode,
+    RepresentationModelNode, ParadataNode,
 )
 from s3dgraphy.exporter.rdf_exporter import RDFExporter
 
@@ -88,6 +89,28 @@ def test_project_study_chain_projects_hdto(tmp_path):
     assert f"{CRM}P9_consists_of" in preds         # Project → Study (CRM fallback)
     assert f"{HDTO}HP1_has_digital_twin" in preds  # HC1 → HC2
     assert f"{HDTO}HP33_contains" in preds         # HC2 → HC16
+
+
+def test_hc1_part_of_and_type_a_annotations(tmp_path):
+    """HC1→HC1 part-whole projects (crm:P46i), and Type-A multi-typing projects
+    hdto:HC5 on a RepresentationModel and hdto:HC17 on a ParadataNode."""
+    g = Graph(graph_id="typea")
+    g.add_node(HeritageEntityNode("sanmarco", name="San Marco"))
+    g.add_node(HeritageEntityNode("tetrarchs", name="Porphyry Tetrarchs"))
+    g.add_node(RepresentationModelNode("rm1", "3D model of the apse"))
+    g.add_node(ParadataNode("pd1", "reasoning"))
+    g.add_edge(edge_id="p1", edge_source="tetrarchs", edge_target="sanmarco",
+               edge_type="heritage_part_of")
+
+    out = RDFExporter(str(tmp_path / "typea.ttl"), format="turtle").export_single_graph(g)
+    gg = rdflib.Graph()
+    gg.parse(out, format="turtle")  # valid Turtle
+
+    preds = {str(p) for p in gg.predicates()}
+    types = {str(o) for o in gg.objects(predicate=rdflib.RDF.type)}
+    assert f"{CRM}P46i_forms_part_of" in preds, "HC1→HC1 part-whole not projected"
+    assert f"{HDTO}HC5_Digital_Representation" in types, "RepresentationModel not annotated HC5"
+    assert f"{HDTO}HC17_Observation_with_Inference" in types, "ParadataNode not annotated HC17"
 
 
 def test_hdto_view_nodes_are_gated_from_the_palette():

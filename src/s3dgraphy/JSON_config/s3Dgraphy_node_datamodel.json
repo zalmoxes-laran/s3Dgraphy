@@ -733,7 +733,8 @@
     "uri": "em:Paradata",
     "rdf_type": "owl:Class",
     "subclass_of": [
-     "crminf:I1_Argumentation"
+     "crminf:I1_Argumentation",
+     "hdto:HC17_Observation_with_Inference"
     ],
     "extension_status": "proposed"
    },
@@ -946,7 +947,8 @@
     "uri": "em:StratigraphicRepresentation",
     "rdf_type": "owl:Class",
     "subclass_of": [
-     "em:RepresentationModel"
+     "em:RepresentationModel",
+     "hdto:HC5_Digital_Representation"
     ],
     "extension_status": "proposed"
    },
@@ -979,7 +981,8 @@
     "uri": "em:DocumentaryRepresentation",
     "rdf_type": "owl:Class",
     "subclass_of": [
-     "em:RepresentationModel"
+     "em:RepresentationModel",
+     "hdto:HC5_Digital_Representation"
     ],
     "extension_status": "proposed"
    },
@@ -1012,7 +1015,8 @@
     "uri": "em:SpecialFindRepresentation",
     "rdf_type": "owl:Class",
     "subclass_of": [
-     "em:RepresentationModel"
+     "em:RepresentationModel",
+     "hdto:HC5_Digital_Representation"
     ],
     "extension_status": "proposed"
    },
