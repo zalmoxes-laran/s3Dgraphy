@@ -855,6 +855,16 @@ class RDFExporter:
                     ctx.add((node_iri, RDFS.seeAlso, Literal(url)))
             if url_type:
                 ctx.add((node_iri, CRM.P2_has_type, Literal(url_type)))
+            # DTC OUTPUT (slice b): a LinkNode that is a DTC output — carries
+            # data.dtc_kind — is the produced digital object (Resource). Beyond
+            # its E73/url it is a crmdig:D1_Digital_Object / prov:Entity (the
+            # process prov:generated it via dtc_had_output) and its kind projects
+            # as crm:P2_has_type. RM/Document referencing it keep their own types.
+            dtc_kind = data.get("dtc_kind")
+            if dtc_kind:
+                ctx.add((node_iri, RDF.type, CRMDIG.D1_Digital_Object))
+                ctx.add((node_iri, RDF.type, PROV.Entity))
+                ctx.add((node_iri, CRM.P2_has_type, Literal(dtc_kind)))
 
         elif node_type == "geo_position":
             epsg = data.get("epsg")
@@ -874,10 +884,12 @@ class RDFExporter:
         elif node_type == "combiner":
             self._emit_belief_skeleton(node_iri, ctx)
 
-        elif node_type in ("dtc_input", "dtc_process", "dtc_output"):
-            # DTC substrate profile (ECHOES): the specific kind (photo, mesh, …)
-            # projects as crm:P2_has_type. The rdf:type (crmdig:D1/D7 + prov:
-            # Entity/Activity) is emitted from em_extension by the generic pass.
+        elif node_type in ("dtc_input", "dtc_process"):
+            # DTC substrate profile (ECHOES): the specific kind (photo,
+            # transformation, …) projects as crm:P2_has_type. The rdf:type
+            # (crmdig:D1/D7 + prov:Entity/Activity) is emitted from em_extension
+            # by the generic pass. The OUTPUT kind is handled in the `link`
+            # branch (the output is a Resource/LinkNode).
             kind = data.get("dtc_kind")
             if kind:
                 ctx.add((node_iri, CRM.P2_has_type, Literal(kind)))

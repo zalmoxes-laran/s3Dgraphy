@@ -1,20 +1,27 @@
 """DTCNode — abstract base for the DTC substrate profile (ECHOES deliverable).
 
 The **Digital Twin Chain (DTC)** captures the DIGITAL PROVENANCE that *produces*
-documents: raw acquisitions (INPUT) → processing (PROCESS) → produced digital
-objects (OUTPUT). It is distinct from EM-paradata (interpretation *on* a document
-= CRMinf / HDT-O HC17): DTC is about how the digital objects came to be.
+documents: raw acquisitions (INPUT) → processing (PROCESS) → a produced RESOURCE
+(the OUTPUT — a file: mesh/orthophoto/table…). It is distinct from EM-paradata
+(interpretation *on* a document = CRMinf / HDT-O HC17): DTC is about how the
+digital objects came to be.
+
+The OUTPUT is a **Resource** (the EM ``LinkNode``, E73/D1 — the shared hinge a
+RepresentationModel and/or a Document may reference), NOT a dedicated node class:
+so DTC has two concrete chunk classes, :class:`DTCInputNode` and
+:class:`DTCProcessNode`; the process links to its produced resource via the
+``dtc_had_output`` edge (target LinkNode). (A later micro-slice may likewise make
+the INPUT a Resource and retire DTCInputNode.)
 
 Naming (Option A): EM-native ``...Node`` classes; the CIDOC/CRMdig + PROV-O
 mapping lives in ``em_extension`` (no D-numbers in the UI). Gated out of the
 stratigrapher palette (like the HDT-O nodes). One node = a **Chunk**; the
 assembled provenance = a **Chain**.
 
-Three concrete kinds (subclasses): :class:`DTCInputNode`, :class:`DTCProcessNode`,
-:class:`DTCOutputNode`. Each carries a ``dtc_kind`` — a specific kind drawn from a
-DATA-DRIVEN, expandable vocabulary (``dtc_kinds`` in ``em_visual_rules.json``, read
-via :func:`s3dgraphy.utils.get_dtc_kinds`): adding a new kind (audio,
-spectroscopy…) is a JSON entry (+ a glyph), NOT a code change.
+Each chunk (and the output Resource) carries a ``dtc_kind`` — a specific kind
+drawn from a DATA-DRIVEN, expandable vocabulary (``dtc_kinds`` in
+``em_visual_rules.json``, read via :func:`s3dgraphy.utils.get_dtc_kinds`): adding a
+new kind (audio, spectroscopy…) is a JSON entry (+ a glyph), NOT a code change.
 
 EM commons are REUSED, never duplicated: Author (agent), License, Embargo, and
 LinkNode (the file pointer to the produced object) attach to the chain via the

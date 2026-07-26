@@ -1322,7 +1322,7 @@
   }
  },
  "dtc_nodes": {
-  "_section_note": "DTC (Digital Twin Chain) substrate profile — the ECHOES deliverable: the DIGITAL PROVENANCE that produces documents (raw acquisitions -> processing -> produced digital objects). Distinct from EM-paradata (interpretation ON a document = CRMinf/HC17). Option A naming: EM-native ...Node classes, CRMdig+PROV-O mapping in em_extension, no D-numbers in the UI. Gated OUT of the stratigrapher palette (like hdto_nodes). Per-kind vocabulary is DATA-DRIVEN + expandable in em_visual_rules.json -> dtc_kinds (via utils.get_dtc_kinds). EM commons (Author/License/Embargo/LinkNode) are reused via existing edges, not duplicated.",
+  "_section_note": "DTC (Digital Twin Chain) substrate profile — the ECHOES deliverable: the DIGITAL PROVENANCE that produces documents (raw acquisitions -> processing -> a produced RESOURCE). Distinct from EM-paradata (interpretation ON a document = CRMinf/HC17). Two chunk classes only — DTCInputNode + DTCProcessNode; the OUTPUT is a RESOURCE = the EM LinkNode (E73/D1, the shared hinge a RepresentationModel/Document may reference), NOT a dedicated class: the process links to it via dtc_had_output (target LinkNode); the output LinkNode carries data.dtc_kind + resource_type and projects crmdig:D1 + prov:Entity + P2(dtc_kind). Option A naming: EM-native ...Node classes, CRMdig+PROV-O mapping in em_extension, no D-numbers in the UI. Gated OUT of the stratigrapher palette (like hdto_nodes). Per-kind vocabulary is DATA-DRIVEN + expandable in em_visual_rules.json -> dtc_kinds (via utils.get_dtc_kinds). EM commons (Author/License/Embargo/LinkNode) are reused via existing edges, not duplicated. (Making DTCInput a Resource / retiring DTCInputNode is a later micro-slice.)",
   "DTCInputNode": {
    "class": "DTCInputNode",
    "parent": "DTCNode",
@@ -1368,33 +1368,6 @@
     "rdf_type": "owl:Class",
     "subclass_of": [
      "prov:Activity"
-    ],
-    "extension_status": "profile-DTC-ECHOES"
-   },
-   "properties": {
-    "name": "P1_is_identified_by",
-    "description": "P3_has_note",
-    "dtc_kind": "P2_has_type"
-   }
-  },
-  "DTCOutputNode": {
-   "class": "DTCOutputNode",
-   "parent": "DTCNode",
-   "abbreviation": "DOU",
-   "label": "DTC Output",
-   "description": "A DTC OUTPUT chunk: a produced digital object / document (point cloud, mesh, DEM, orthophoto, vector features; data.dtc_kind from the `output` axis). Projected as a crmdig:D1_Digital_Object / prov:Entity; produced by its process (dtc_had_output / prov:generated) and derived from the inputs (dtc_derived_from / prov:wasDerivedFrom). Reuses the EM LinkNode (has_linked_resource / crm:P67) to point at its real file (future: a MinIO asset id). Does NOT preclude a later shared-UUID identity with the EM DocumentNode.",
-   "s3Dgraphy_file": "dtc_output_node.py",
-   "mapping": {
-    "cidoc": "crmdig:D1_Digital_Object",
-    "cidoc_s3d": null,
-    "alternative": "crmdig:D1_Digital_Object == prov:Entity (dual CRMdig + PROV-O)",
-    "rationale": "A produced digital object is a crmdig:D1. Multi-typed prov:Entity for the PROV-O derivation graph. Same class as INPUT (both digital objects); role is edge-borne."
-   },
-   "em_extension": {
-    "uri": "crmdig:D1_Digital_Object",
-    "rdf_type": "owl:Class",
-    "subclass_of": [
-     "prov:Entity"
     ],
     "extension_status": "profile-DTC-ECHOES"
    },

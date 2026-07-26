@@ -656,8 +656,7 @@
           "PropertyNode",
           "EpochNode",
           "DTCInputNode",
-          "DTCProcessNode",
-          "DTCOutputNode"
+          "DTCProcessNode"
         ],
         "target": [
           "AuthorNode",
@@ -714,7 +713,6 @@
           "RepresentationModelNode",
           "RepresentationModelDocNode",
           "RepresentationModelSpecialFindNode",
-          "DTCOutputNode",
           "DTCInputNode"
         ],
         "target": [
@@ -1225,7 +1223,7 @@
     "dtc_had_output": {
       "name": "dtc_had_output",
       "label": "DTC process had output",
-      "description": "DTC chain: a processing step (DTCProcess) produced a digital object (DTCOutput). ECHOES DTC substrate profile. Dual projection CRMdig + PROV-O.",
+      "description": "DTC chain: a processing step (DTCProcess) produced a RESOURCE (a file: mesh/orthophoto/table…) — the LinkNode (E73/D1), which is the SHARED HINGE that a RepresentationModel and/or a Document may reference. The produced LinkNode carries data.dtc_kind + resource_type. ECHOES DTC substrate profile. Dual projection CRMdig + PROV-O.",
       "reverse": {
         "name": "dtc_was_output_of",
         "label": "Was output of DTC process"
@@ -1235,21 +1233,21 @@
         "cidoc_extension": "CRMdig",
         "extension_mapping": "prov:generated",
         "extension_name": "PROV-O",
-        "rationale": "crmdig:L11_had_output (D7 Digital Machine Event -> produced digital object). Dual-emitted with prov:generated (Activity generated Entity) — same direction (Process -> Output)."
+        "rationale": "crmdig:L11_had_output (D7 Digital Machine Event -> produced digital object). Dual-emitted with prov:generated (Activity generated Entity) — same direction (Process -> Output). Target is the Resource (LinkNode) — the output is a resource, not a RepresentationModel/Document (those merely reference it)."
       },
       "allowed_connections": {
         "source": [
           "DTCProcessNode"
         ],
         "target": [
-          "DTCOutputNode"
+          "LinkNode"
         ]
       }
     },
     "dtc_derived_from": {
       "name": "dtc_derived_from",
       "label": "DTC output derived from input",
-      "description": "DTC chain: a produced object (DTCOutput) was derived from an acquisition (DTCInput) — the direct provenance shortcut alongside the process. ECHOES DTC substrate profile. Dual projection CRMdig + PROV-O.",
+      "description": "DTC chain: the produced RESOURCE (LinkNode) was derived from an acquisition (DTCInput) — the direct provenance shortcut alongside the process. ECHOES DTC substrate profile. Dual projection CRMdig + PROV-O.",
       "reverse": {
         "name": "dtc_derivation_source_for",
         "label": "Was derivation source for"
@@ -1259,11 +1257,11 @@
         "cidoc_extension": "CRMdig",
         "extension_mapping": "prov:wasDerivedFrom",
         "extension_name": "PROV-O",
-        "rationale": "crmdig:L21_used_as_derivation_source (derived object -> source object) with prov:wasDerivedFrom (Entity derived from Entity) — same direction (Output -> Input). Expresses derivation directly, independent of naming the process."
+        "rationale": "crmdig:L21_used_as_derivation_source (derived object -> source object) with prov:wasDerivedFrom (Entity derived from Entity) — same direction (output Resource -> Input). Expresses derivation directly, independent of naming the process."
       },
       "allowed_connections": {
         "source": [
-          "DTCOutputNode"
+          "LinkNode"
         ],
         "target": [
           "DTCInputNode"
