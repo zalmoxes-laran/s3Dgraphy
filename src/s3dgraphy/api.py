@@ -197,6 +197,82 @@ def authority_facets() -> List[str]:
         return []
 
 
+# ── resource layer (R0: stable-ID resolver seam) ──────────────────────────────
+# Resources are LinkNodes (E73). Their stable, storage-agnostic ID is the node
+# UUID; the ``url`` is the *current locator*, not the identity. A pluggable
+# resolver maps ID → a concrete Location. See :mod:`s3dgraphy.resources`.
+def _resource_locator(node: Any) -> str:
+    """The current locator of a resource node (LinkNode ``url``)."""
+    url = getattr(node, "url", None)
+    if url is None:
+        url = (getattr(node, "data", {}) or {}).get("url", "")
+    return url or ""
+
+
+def list_resources(graph: Graph) -> List[Dict[str, Any]]:
+    """List the resources in a graph. Resources = LinkNodes (E73). Returns, per
+    resource, its stable ``id`` (node UUID), ``name``, current ``locator`` and
+    the classified location ``kind`` — a pure read, no I/O on the locator."""
+    from .resources import classify_locator, stable_resource_id
+    out: List[Dict[str, Any]] = []
+    for node in getattr(graph, "nodes", []) or []:
+        if getattr(node, "node_type", None) != "link":
+            continue
+        locator = _resource_locator(node)
+        out.append({
+            "id": stable_resource_id(node),
+            "name": getattr(node, "name", ""),
+            "locator": locator,
+            "kind": classify_locator(locator),
+        })
+    return out
+
+
+def resolve_resource(graph: Graph, resource_id: str, *, registry: Any = None
+                     ) -> Optional[Dict[str, Any]]:
+    """Resolve a resource's stable ID to a Location dict via the resolver.
+
+    Looks up the LinkNode by its ``node_id`` (the stable ID), reads its current
+    locator, and asks the resolver registry (default: passthrough) to map it to
+    a :class:`~s3dgraphy.resources.Location`. Returns the Location as a dict
+    ``{kind, value, exists}``, or ``None`` if no such resource exists."""
+    from .resources import default_registry
+    node = graph.find_node_by_id(resource_id)
+    if node is None or getattr(node, "node_type", None) != "link":
+        return None
+    locator = _resource_locator(node)
+    reg = registry if registry is not None else default_registry()
+    loc = reg.resolve(resource_id, locator, graph=graph)
+    return loc.to_dict() if loc is not None else None
+
+
+def register_resource(graph: Graph, locator: str, *, name: Optional[str] = None,
+                      resource_id: Optional[str] = None,
+                      url_type: Optional[str] = None,
+                      description: Optional[str] = None) -> Dict[str, Any]:
+    """Register a resource: assign a stable ID and store a locator (R0 STUB).
+
+    Creates a LinkNode carrying a new stable ID (a UUID unless ``resource_id`` is
+    given) and the ``locator`` as its current ``url``, and adds it to the graph.
+    This is the *identity + locator* half only — real ingest (copying bytes into
+    an FS-index or MinIO store) is R1/R2, which will resolve the same ID through
+    their backends. Returns ``{id, locator, kind}``."""
+    import uuid
+    from .nodes.link_node import LinkNode
+    from .resources import classify_locator
+
+    rid = resource_id or str(uuid.uuid4())
+    node = LinkNode(
+        node_id=rid,
+        name=name or "Unnamed Resource",
+        url=locator or "",
+        url_type=url_type or "",
+        description=description or "",
+    )
+    graph.add_node(node)
+    return {"id": rid, "locator": locator or "", "kind": classify_locator(locator or "")}
+
+
 # ── thin CLI (part of the surface; no web deps) ────────────────────────────────
 def main(argv: Optional[List[str]] = None) -> int:
     """`python -m s3dgraphy.api <op> ...` — a thin CLI over the ops above."""
@@ -214,6 +290,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     r = sub.add_parser("resolve", help="resolve an authority term")
     r.add_argument("term")
     r.add_argument("facet")
+    sub.add_parser("list-resources", help="list a graph's resources (LinkNodes)").add_argument("path")
+    rr = sub.add_parser("resolve-resource", help="resolve a resource ID → Location")
+    rr.add_argument("path")
+    rr.add_argument("resource_id")
     args = ap.parse_args(argv)
 
     if args.op in ("open", "validate", "project-ttl", "graphml"):
@@ -234,6 +314,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(json.dumps(graphml_to_emjson(Path(args.path).read_bytes())))
     elif args.op == "resolve":
         print(json.dumps(resolve_authority(args.term, args.facet), indent=2))
+    elif args.op in ("list-resources", "resolve-resource"):
+        with open(args.path, encoding="utf-8") as f:
+            doc = json.load(f)
+        graph, warnings = load_emjson(doc)
+        for w in warnings:
+            print(f"warning: {w}", file=sys.stderr)
+        if args.op == "list-resources":
+            print(json.dumps(list_resources(graph), indent=2))
+        else:
+            print(json.dumps(resolve_resource(graph, args.resource_id), indent=2))
     return 0
 
 
