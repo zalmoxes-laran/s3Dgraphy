@@ -884,12 +884,12 @@ class RDFExporter:
         elif node_type == "combiner":
             self._emit_belief_skeleton(node_iri, ctx)
 
-        elif node_type in ("dtc_input", "dtc_process"):
-            # DTC substrate profile (ECHOES): the specific kind (photo,
-            # transformation, …) projects as crm:P2_has_type. The rdf:type
-            # (crmdig:D1/D7 + prov:Entity/Activity) is emitted from em_extension
-            # by the generic pass. The OUTPUT kind is handled in the `link`
-            # branch (the output is a Resource/LinkNode).
+        elif node_type == "dtc_process":
+            # DTC substrate profile (ECHOES): the process kind (e.g.
+            # transformation) projects as crm:P2_has_type. The rdf:type
+            # (crmdig:D7 + prov:Activity) is emitted from em_extension by the
+            # generic pass. INPUT and OUTPUT kinds are handled in the `link`
+            # branch (both are Resources/LinkNodes).
             kind = data.get("dtc_kind")
             if kind:
                 ctx.add((node_iri, CRM.P2_has_type, Literal(kind)))

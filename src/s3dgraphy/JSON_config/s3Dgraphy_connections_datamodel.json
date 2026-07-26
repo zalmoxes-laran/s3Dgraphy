@@ -655,7 +655,6 @@
           "CombinerNode",
           "PropertyNode",
           "EpochNode",
-          "DTCInputNode",
           "DTCProcessNode"
         ],
         "target": [
@@ -712,8 +711,7 @@
           "DocumentNode",
           "RepresentationModelNode",
           "RepresentationModelDocNode",
-          "RepresentationModelSpecialFindNode",
-          "DTCInputNode"
+          "RepresentationModelSpecialFindNode"
         ],
         "target": [
           "LinkNode"
@@ -1199,7 +1197,7 @@
     "dtc_had_input": {
       "name": "dtc_had_input",
       "label": "DTC process had input",
-      "description": "DTC chain: a processing step (DTCProcess) consumed an acquisition (DTCInput). ECHOES DTC substrate profile. Dual projection CRMdig + PROV-O.",
+      "description": "DTC chain: a processing step (DTCProcess) consumed an input RESOURCE — a raw acquisition (photo/laser scan/…) = the LinkNode (E73/D1). ECHOES DTC substrate profile. Dual projection CRMdig + PROV-O.",
       "reverse": {
         "name": "dtc_was_input_of",
         "label": "Was input of DTC process"
@@ -1209,14 +1207,14 @@
         "cidoc_extension": "CRMdig",
         "extension_mapping": "prov:used",
         "extension_name": "PROV-O",
-        "rationale": "crmdig:L10_had_input (D7 Digital Machine Event -> input digital object). Dual-emitted with prov:used (Activity used Entity) — same direction (Process -> Input) — so CRMdig and PROV-O readers both see the acquisition consumption."
+        "rationale": "crmdig:L10_had_input (D7 Digital Machine Event -> input digital object). Dual-emitted with prov:used (Activity used Entity) — same direction (Process -> input Resource) — so CRMdig and PROV-O readers both see the acquisition consumption. Target is the Resource (LinkNode); the input is a resource, symmetric to the output."
       },
       "allowed_connections": {
         "source": [
           "DTCProcessNode"
         ],
         "target": [
-          "DTCInputNode"
+          "LinkNode"
         ]
       }
     },
@@ -1264,7 +1262,7 @@
           "LinkNode"
         ],
         "target": [
-          "DTCInputNode"
+          "LinkNode"
         ]
       }
     },

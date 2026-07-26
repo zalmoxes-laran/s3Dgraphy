@@ -27,11 +27,6 @@
    "node_type": "BR",
    "description": ""
   },
-  "DTCInputNode": {
-   "parent": "DTCNode",
-   "node_type": "dtc_input",
-   "description": "DTC input acquisition (ECHOES DTC profile). ``dtc_kind`` ∈ the ``input``"
-  },
   "DTCNode": {
    "parent": "Node",
    "node_type": null,

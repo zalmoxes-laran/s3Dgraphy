@@ -1,9 +1,9 @@
 """DTC substrate profile (ECHOES) — author a chain and project it to CRMdig + PROV-O.
 
-Slice b model: what the DTC PRODUCES is a RESOURCE = the LinkNode (E73/D1), the
-shared hinge. Chain: photos (DTCInput) → transformation (DTCProcess) → an OUTPUT
-RESOURCE (LinkNode, dtc_kind=mesh, resource_type=mesh, with a file url); the
-resource is derived from the photos; a RepresentationModel references it in scene
+Model (post input+output Resource): BOTH the input and the output are RESOURCES
+= LinkNodes (E73/D1); DTCProcessNode is the only DTC node. Chain: photo (INPUT
+Resource) → transformation (DTCProcess) → mesh (OUTPUT Resource); the output is
+derived from the input; a RepresentationModel references the output in scene
 (has_linked_resource); Author reused via has_author.
 """
 
@@ -13,7 +13,7 @@ rdflib = pytest.importorskip("rdflib")
 
 from s3dgraphy.graph import Graph
 from s3dgraphy.nodes import (
-    DTCInputNode, DTCProcessNode, AuthorNode, LinkNode, RepresentationModelNode,
+    DTCProcessNode, AuthorNode, LinkNode, RepresentationModelNode,
 )
 from s3dgraphy.exporter.rdf_exporter import RDFExporter, DEFAULT_BASE_URI
 
@@ -22,9 +22,8 @@ PROV = "http://www.w3.org/ns/prov#"
 CRM = "http://www.cidoc-crm.org/cidoc-crm/"
 
 
-def _output_resource(node_id="out1", name="Site mesh", kind="mesh",
-                     url="https://assets.example/mesh.obj") -> LinkNode:
-    """A DTC-output Resource: a LinkNode carrying dtc_kind + resource_type."""
+def _resource(node_id, name, kind, url) -> LinkNode:
+    """A DTC Resource (input or output): a LinkNode carrying dtc_kind + resource_type."""
     lk = LinkNode(node_id, name=name, url=url)
     lk.data["dtc_kind"] = kind
     lk.data["resource_type"] = kind
@@ -33,16 +32,16 @@ def _output_resource(node_id="out1", name="Site mesh", kind="mesh",
 
 def _chain() -> Graph:
     g = Graph(graph_id="dtc_demo")
-    g.add_node(DTCInputNode("in1", name="Photo set", dtc_kind="photo"))
+    g.add_node(_resource("in1", "Photo set", "photo", "https://assets.example/photos.zip"))
     g.add_node(DTCProcessNode("proc1", name="Photogrammetry", dtc_kind="transformation"))
-    g.add_node(_output_resource())                       # the OUTPUT resource (LinkNode)
+    g.add_node(_resource("out1", "Site mesh", "mesh", "https://assets.example/mesh.obj"))
     g.add_node(AuthorNode("auth1", name="M. Rossi"))
     g.add_node(RepresentationModelNode("rm1", "Mesh in scene"))
-    g.add_edge("e1", "proc1", "in1", "dtc_had_input")    # process → input
+    g.add_edge("e1", "proc1", "in1", "dtc_had_input")    # process → input RESOURCE
     g.add_edge("e2", "proc1", "out1", "dtc_had_output")  # process → output RESOURCE
-    g.add_edge("e3", "out1", "in1", "dtc_derived_from")  # resource → input
+    g.add_edge("e3", "out1", "in1", "dtc_derived_from")  # output → input RESOURCE
     g.add_edge("e4", "proc1", "auth1", "has_author")     # reused Author
-    g.add_edge("e5", "rm1", "out1", "has_linked_resource")  # RM → the resource (scene facet)
+    g.add_edge("e5", "rm1", "out1", "has_linked_resource")  # RM → the output resource (scene facet)
     return g
 
 
@@ -53,15 +52,16 @@ def _project(tmp_path):
     return g
 
 
-def test_output_resource_types(tmp_path):
-    """The output Resource (LinkNode) is a crmdig:D1 / prov:Entity (beyond E73)."""
+def test_input_and_output_resource_types(tmp_path):
+    """BOTH the input and output Resources (LinkNodes) are crmdig:D1 / prov:Entity
+    (beyond E73), symmetric — the role is edge-borne."""
     g = _project(tmp_path)
-    res = rdflib.URIRef(f"{DEFAULT_BASE_URI}graph/dtc_demo/node/out1")
-    types = {str(o) for o in g.objects(subject=res, predicate=rdflib.RDF.type)}
-    assert f"{CRMDIG}D1_Digital_Object" in types
-    assert f"{PROV}Entity" in types
-    assert "http://www.cidoc-crm.org/cidoc-crm/E73_Information_Object" in types \
-        or any("E73" in t for t in types)  # keeps its resource identity too
+    for node_id in ("in1", "out1"):
+        res = rdflib.URIRef(f"{DEFAULT_BASE_URI}graph/dtc_demo/node/{node_id}")
+        types = {str(o) for o in g.objects(subject=res, predicate=rdflib.RDF.type)}
+        assert f"{CRMDIG}D1_Digital_Object" in types, node_id
+        assert f"{PROV}Entity" in types, node_id
+        assert any("E73" in t for t in types), node_id  # keeps its resource identity
 
 
 def test_dtc_node_types(tmp_path):
@@ -97,10 +97,10 @@ def test_dtc_kind_projected(tmp_path):
 
 
 def test_dtc_kind_validation_is_data_driven():
-    # a kind outside the vocabulary is rejected; a seeded one is accepted
+    # the surviving DTC node (Process) still validates its kind against dtc_kinds
     with pytest.raises(ValueError):
-        DTCInputNode("x", dtc_kind="not_a_real_kind")
-    assert DTCInputNode("y", dtc_kind="photo").data["dtc_kind"] == "photo"
+        DTCProcessNode("x", dtc_kind="not_a_real_kind")
+    assert DTCProcessNode("y", dtc_kind="transformation").data["dtc_kind"] == "transformation"
 
 
 def test_dtc_emjson_roundtrip():
@@ -111,29 +111,31 @@ def test_dtc_emjson_roundtrip():
     doc = build_emjson(_chain())
     g2, _warnings = parse_emjson(doc)
     by = {n.node_id: n for n in g2.nodes}
-    assert (by["in1"].data or {}).get("dtc_kind") == "photo"
+    # input + output are both Resources (links) carrying dtc_kind + resource_type
+    for nid, kind in (("in1", "photo"), ("out1", "mesh")):
+        assert by[nid].node_type == "link", nid
+        assert (by[nid].data or {}).get("dtc_kind") == kind, nid
+        assert (by[nid].data or {}).get("resource_type") == kind, nid
     assert (by["proc1"].data or {}).get("dtc_kind") == "transformation"
-    out = by["out1"]
-    assert out.node_type == "link"
-    assert (out.data or {}).get("dtc_kind") == "mesh"
-    assert (out.data or {}).get("resource_type") == "mesh"
     ets = {e.edge_type for e in g2.edges}
     assert {"dtc_had_input", "dtc_had_output", "dtc_derived_from"} <= ets
 
 
-def test_dtc_output_node_retired():
-    """DTCOutputNode is gone: not importable, not in the datamodel/registry."""
+def test_dtc_input_output_nodes_retired():
+    """Both DTCInputNode and DTCOutputNode are gone (input+output are Resources);
+    DTCProcessNode is the ONLY DTC node, still gated in dtc_nodes."""
     import json
     from pathlib import Path
     import s3dgraphy.nodes as nodes
+    assert not hasattr(nodes, "DTCInputNode")
     assert not hasattr(nodes, "DTCOutputNode")
     cfg = Path(__file__).parents[1] / "src/s3dgraphy/JSON_config"
     dm = json.loads((cfg / "s3Dgraphy_node_datamodel.json").read_text(encoding="utf-8"))
     reg = json.loads((cfg / "node_registry.generated.json").read_text(encoding="utf-8"))
-    assert "DTCOutputNode" not in dm.get("dtc_nodes", {})
-    assert "DTCOutputNode" not in reg["node_types"]
-    # the surviving DTC chunk classes are still gated in dtc_nodes
-    for cls in ("DTCInputNode", "DTCProcessNode"):
-        assert cls in dm.get("dtc_nodes", {})
-        for sec in ("stratigraphic_nodes", "paradata_nodes", "temporal_nodes"):
-            assert cls not in dm.get(sec, {})
+    dtc_classes = {c for c in dm.get("dtc_nodes", {}) if not c.startswith("_")}
+    assert dtc_classes == {"DTCProcessNode"}
+    for cls in ("DTCInputNode", "DTCOutputNode"):
+        assert cls not in reg["node_types"]
+    # the surviving DTC node is gated out of the stratigrapher sections
+    for sec in ("stratigraphic_nodes", "paradata_nodes", "temporal_nodes"):
+        assert "DTCProcessNode" not in dm.get(sec, {})

@@ -46,10 +46,10 @@ from .heritage_entity_node import HeritageEntityNode
 from .study_node import StudyNode
 from .project_node import ProjectNode
 from .semantic_shape_node import SemanticShapeNode
-# DTC substrate profile (ECHOES): base + input/process chunks. The OUTPUT is a
-# Resource (LinkNode), NOT a dedicated class (slice b) — see dtc_had_output.
+# DTC substrate profile (ECHOES): DTCProcessNode is the ONLY DTC node. Both the
+# INPUT and the OUTPUT are Resources (LinkNode, E73/D1) — see dtc_had_input /
+# dtc_had_output (target LinkNode). DTCInputNode/DTCOutputNode were retired.
 from .dtc_node import DTCNode
-from .dtc_input_node import DTCInputNode
 from .dtc_process_node import DTCProcessNode
 
 # Define what is available for import when using 'from nodes import *'
@@ -98,6 +98,5 @@ __all__ = [
     "ProjectNode",
     "SemanticShapeNode",
     "DTCNode",
-    "DTCInputNode",
     "DTCProcessNode",
 ]
