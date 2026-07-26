@@ -273,6 +273,19 @@ def register_resource(graph: Graph, locator: str, *, name: Optional[str] = None,
     return {"id": rid, "locator": locator or "", "kind": classify_locator(locator or "")}
 
 
+def scan_fs_resources(folder: str) -> List[Dict[str, Any]]:
+    """Scan a folder with the FS-index backend (R1) and return its manifest
+    entries as dicts (id, rel_path, name, resource_type, mtime, present).
+
+    Pure/offline: files are indexed in place (Tropy-like) and minted stable IDs;
+    it moves no bytes and touches no graph. Callers that want resolution build a
+    registry and ``register`` the returned backend above passthrough."""
+    from .resources import FSIndexBackend
+    backend = FSIndexBackend(folder)
+    backend.scan()
+    return [e.to_dict() for e in backend.entries()]
+
+
 # ── thin CLI (part of the surface; no web deps) ────────────────────────────────
 def main(argv: Optional[List[str]] = None) -> int:
     """`python -m s3dgraphy.api <op> ...` — a thin CLI over the ops above."""
@@ -294,6 +307,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     rr = sub.add_parser("resolve-resource", help="resolve a resource ID → Location")
     rr.add_argument("path")
     rr.add_argument("resource_id")
+    sub.add_parser("scan-resources", help="FS-index scan a folder → manifest").add_argument("folder")
     args = ap.parse_args(argv)
 
     if args.op in ("open", "validate", "project-ttl", "graphml"):
@@ -324,6 +338,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(json.dumps(list_resources(graph), indent=2))
         else:
             print(json.dumps(resolve_resource(graph, args.resource_id), indent=2))
+    elif args.op == "scan-resources":
+        print(json.dumps(scan_fs_resources(args.folder), indent=2))
     return 0
 
 

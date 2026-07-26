@@ -32,6 +32,14 @@ from .resolver import (
     default_registry,
     stable_resource_id,
 )
+from .fs_backend import (
+    DOSCO_NODE_TYPES,
+    FSIndexBackend,
+    ManifestEntry,
+    Orphan,
+    ScanResult,
+    classify_resource_type,
+)
 
 __all__ = [
     "LOCATION_KINDS",
@@ -42,4 +50,11 @@ __all__ = [
     "classify_locator",
     "default_registry",
     "stable_resource_id",
+    # R1 — FS-index backend
+    "FSIndexBackend",
+    "ManifestEntry",
+    "ScanResult",
+    "Orphan",
+    "classify_resource_type",
+    "DOSCO_NODE_TYPES",
 ]
