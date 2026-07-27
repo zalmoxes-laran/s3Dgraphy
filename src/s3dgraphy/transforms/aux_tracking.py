@@ -467,6 +467,49 @@ def revert_injector(graph, injector_id: str) -> Dict[str, int]:
     }
 
 
+def bake_injector(graph, injector_id: str) -> Dict[str, int]:
+    """Promote a single injector's content to graph-native (the scoped **bake**),
+    the symmetric counterpart of :func:`revert_injector`.
+
+    Where ``revert_injector`` REMOVES an injector's injected nodes/edges,
+    ``bake_injector`` KEEPS them and only drops their ``injected_by`` tag (and any
+    ``_aux_overrides`` attributed to this injector), so they become permanent
+    graph content. ``clear_aux_tags`` does the same graph-wide; this restricts the
+    promotion to one injector so other live auxiliaries stay temporary.
+
+    Returns ``{"nodes", "edges", "overrides_cleared"}`` counts.
+    """
+    nodes = 0
+    edges = 0
+    overrides_cleared = 0
+
+    for n in graph.nodes:
+        attrs = getattr(n, "attributes", None)
+        if not attrs:
+            continue
+        if attrs.get("injected_by") == injector_id:
+            attrs.pop("injected_by", None)
+            nodes += 1
+        overrides = attrs.get("_aux_overrides")
+        if overrides:
+            for attr_name in [k for k, r in overrides.items()
+                              if r.get("injector") == injector_id]:
+                del overrides[attr_name]
+                overrides_cleared += 1
+            if not overrides:
+                del attrs["_aux_overrides"]
+
+    for e in graph.edges:
+        attrs = getattr(e, "attributes", None)
+        if not attrs:
+            continue
+        if attrs.get("injected_by") == injector_id:
+            attrs.pop("injected_by", None)
+            edges += 1
+
+    return {"nodes": nodes, "edges": edges, "overrides_cleared": overrides_cleared}
+
+
 # ---------------------------------------------------------------------------
 # Attribute accessor utilities
 # ---------------------------------------------------------------------------

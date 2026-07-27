@@ -286,6 +286,33 @@ def scan_fs_resources(folder: str) -> List[Dict[str, Any]]:
     return [e.to_dict() for e in backend.entries()]
 
 
+# ── DTC residency (R3: detach ↔ inject ↔ bake) ─────────────────────────────────
+# A DTC can live WITH the asset store (a standalone record) rather than baked into
+# em.json, and be baked back on demand. Resources are referenced by stable ID.
+def detach_dtc(graph: Graph, process_id: str) -> Dict[str, Any]:
+    """Extract the DTC anchored on ``process_id`` into a standalone JSON record
+    (resources keyed by stable ID). Read-only — the graph is not mutated."""
+    from .dtc import detach_dtc as _detach
+    return _detach(graph, process_id)
+
+
+def inject_dtc(graph: Graph, record: Dict[str, Any], *,
+               injector_id: Optional[str] = None) -> Dict[str, Any]:
+    """Re-create a DTC from a :func:`detach_dtc` record into ``graph``. Created
+    nodes/edges are tagged ``injected_by`` (temporary); resources already present
+    (by stable ID) are reused. Returns
+    ``{injector_id, process_id, resource_ids, created}``."""
+    from .dtc import inject_dtc as _inject
+    return _inject(graph, record, injector_id=injector_id)
+
+
+def bake_dtc(graph: Graph, injector_id: str) -> Dict[str, int]:
+    """Promote an injected DTC to persistent (drop ``injected_by``) — the
+    ``bake → em.json`` export. Returns ``{nodes, edges, overrides_cleared}``."""
+    from .dtc import bake_dtc as _bake
+    return _bake(graph, injector_id)
+
+
 # ── thin CLI (part of the surface; no web deps) ────────────────────────────────
 def main(argv: Optional[List[str]] = None) -> int:
     """`python -m s3dgraphy.api <op> ...` — a thin CLI over the ops above."""
@@ -308,6 +335,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     rr.add_argument("path")
     rr.add_argument("resource_id")
     sub.add_parser("scan-resources", help="FS-index scan a folder → manifest").add_argument("folder")
+    dd = sub.add_parser("detach-dtc", help="extract a DTC → standalone JSON record")
+    dd.add_argument("path")
+    dd.add_argument("process_id")
     args = ap.parse_args(argv)
 
     if args.op in ("open", "validate", "project-ttl", "graphml"):
@@ -340,6 +370,13 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(json.dumps(resolve_resource(graph, args.resource_id), indent=2))
     elif args.op == "scan-resources":
         print(json.dumps(scan_fs_resources(args.folder), indent=2))
+    elif args.op == "detach-dtc":
+        with open(args.path, encoding="utf-8") as f:
+            doc = json.load(f)
+        graph, warnings = load_emjson(doc)
+        for w in warnings:
+            print(f"warning: {w}", file=sys.stderr)
+        print(json.dumps(detach_dtc(graph, args.process_id), indent=2))
     return 0
 
 

@@ -26,6 +26,7 @@ from .aux_tracking import (
     iter_orphans,
     clear_orphans,
     revert_injector,
+    bake_injector,
     MISSING_SENTINEL,
 )
 
@@ -45,5 +46,6 @@ __all__ = [
     "iter_orphans",
     "clear_orphans",
     "revert_injector",
+    "bake_injector",
     "MISSING_SENTINEL",
 ]
