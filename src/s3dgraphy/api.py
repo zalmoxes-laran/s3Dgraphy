@@ -362,6 +362,37 @@ def scan_fs_resources(folder: str) -> List[Dict[str, Any]]:
     return [e.to_dict() for e in backend.entries()]
 
 
+def ingest_minio_resource(path: str, *, config: Any = None) -> Dict[str, Any]:
+    """Ingest a file into the SHARED MinIO/S3 store (R2) and return
+    ``{id, object_key, s3_uri}``.
+
+    By default the connection is read from the ``S3_*`` environment (the SAME
+    vars Heriverse-Server uses → one shared object store); pass an explicit
+    :class:`~s3dgraphy.resources.MinioConfig` to override. The stable ``id`` is
+    the same storage-agnostic identity the FS backend uses (one id whether FS or
+    MinIO). Needs the optional ``minio`` SDK (``pip install s3dgraphy[minio]``)
+    AND a reachable server — raises :class:`MissingDependency` if the SDK is
+    absent."""
+    from .resources import MinioBackend, MinioConfig
+    cfg = config or MinioConfig.from_env()
+    backend = MinioBackend(cfg)
+    rid, key = backend.ingest(path)
+    return {"id": rid, "object_key": key, "s3_uri": f"s3://{cfg.bucket}/{key}"}
+
+
+def presign_minio_resource(object_key: str, *, config: Any = None,
+                           expires_seconds: int = 3600) -> Dict[str, Any]:
+    """Presign a shared-MinIO ``object_key`` (as returned by
+    :func:`ingest_minio_resource`) into a short-lived fetchable
+    ``{object_key, http_url}``. Stateless (presign by key, no manifest). Connection
+    from the ``S3_*`` env by default. Raises :class:`MissingDependency` without the
+    ``minio`` SDK."""
+    from .resources import MinioBackend, MinioConfig
+    cfg = config or MinioConfig.from_env()
+    loc = MinioBackend(cfg).presign_key(object_key, expires_seconds=expires_seconds)
+    return {"object_key": object_key, "http_url": loc.value}
+
+
 # ── DTC residency (R3: detach ↔ inject ↔ bake) ─────────────────────────────────
 # A DTC can live WITH the asset store (a standalone record) rather than baked into
 # em.json, and be baked back on demand. Resources are referenced by stable ID.

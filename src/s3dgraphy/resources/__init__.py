@@ -40,6 +40,11 @@ from .fs_backend import (
     ScanResult,
     classify_resource_type,
 )
+from .minio_backend import (
+    MinioBackend,
+    MinioConfig,
+    MinioEntry,
+)
 
 __all__ = [
     "LOCATION_KINDS",
@@ -57,4 +62,8 @@ __all__ = [
     "Orphan",
     "classify_resource_type",
     "DOSCO_NODE_TYPES",
+    # R2 — MinIO / S3 backend (optional 'minio' extra)
+    "MinioBackend",
+    "MinioConfig",
+    "MinioEntry",
 ]
