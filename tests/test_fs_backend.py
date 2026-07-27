@@ -210,3 +210,36 @@ def test_default_registry_unchanged_by_r1():
     reg = default_registry()
     assert [b.name for b in reg.backends()] == ["passthrough"]
     assert isinstance(reg.backends()[0], PassthroughBackend)
+
+
+# ── shelf_resources (R5: the Shelf op the em-bridge routes to) ─────────────────
+def test_shelf_resources_manifest_backed_stable_ids(tmp_path):
+    _mk(tmp_path, "D.01 photo.jpg")
+    _mk(tmp_path, "D.42.pdf")
+    _mk(tmp_path, "notes.txt")     # off-convention → not on the Shelf
+    _mk(tmp_path, "D.05.03.png")   # extractor-like → not on the Shelf
+    folder = str(tmp_path)
+    shelf1 = api.shelf_resources(None, folder)
+    assert {e["key_id"] for e in shelf1} == {"D.01", "D.42"}
+    # a persisted manifest keeps stable IDs across calls (single ID space)
+    assert (tmp_path / ".em_resources_manifest.json").is_file()
+    shelf2 = api.shelf_resources(None, folder)
+    id_of = lambda s, k: next(e["resource_id"] for e in s if e["key_id"] == k)
+    assert id_of(shelf1, "D.42") == id_of(shelf2, "D.42")
+
+
+def test_shelf_resources_excludes_id_adopted(tmp_path):
+    from s3dgraphy.nodes.document_node import DocumentNode
+    from s3dgraphy import api as _api
+    _mk(tmp_path, "D.01.jpg")
+    _mk(tmp_path, "D.42.pdf")
+    folder = str(tmp_path)
+    rid = next(e["resource_id"] for e in api.shelf_resources(None, folder)
+               if e["key_id"] == "D.42")
+    # a graph that hatted D.42 under the adopted stable ID → D.42 leaves the Shelf
+    g = Graph(graph_id="g")
+    g.add_node(DocumentNode(node_id=rid, name="whatever-name"))
+    doc = _api.graph_to_emjson(g)
+    shelf = api.shelf_resources(doc, folder)
+    assert rid not in {e["resource_id"] for e in shelf}
+    assert {e["key_id"] for e in shelf} == {"D.01"}

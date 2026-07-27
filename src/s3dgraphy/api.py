@@ -228,6 +228,82 @@ def list_resources(graph: Graph) -> List[Dict[str, Any]]:
     return out
 
 
+def shelf_resources(doc: Optional[EmJson], folder: str, *,
+                    graph_code: Optional[str] = None) -> List[Dict[str, Any]]:
+    """The **Shelf** for a library/DosCo ``folder`` given the current em.json
+    ``doc``: the un-hatted resources (orphans) with their stable IDs.
+
+    Scans ``folder`` with the FS-index backend (R1), then returns the orphans —
+    files with no matching graph node (DosCo EM-id convention filters applied) —
+    additionally excluding any whose FS stable ID is already a node in ``doc``
+    (ID-adoption aware, so a hatted resource leaves the Shelf). ``doc`` may be
+    ``None`` (empty graph → every on-convention Document-id file is on the Shelf).
+    Returns dicts ``{resource_id, key_id, filename, rel_path}``.
+
+    Manifest-backed: reuses a ``.em_resources_manifest.json`` persisted IN the
+    folder (same filename EMTools R4 uses) so stable IDs survive across scans and
+    across tools — one ID space per folder, the "single connector". A hatted
+    resource therefore keeps the same ID that was adopted as its node_id."""
+    import json as _json
+    import os as _os
+    from .resources import FSIndexBackend
+    manifest_name = ".em_resources_manifest.json"
+    mpath = _os.path.join(folder, manifest_name)
+    backend = None
+    if _os.path.isfile(mpath):
+        try:
+            with open(mpath, encoding="utf-8") as fh:
+                backend = FSIndexBackend.from_manifest(_json.load(fh))
+            backend.folder = _os.path.abspath(folder)
+        except Exception:
+            backend = None
+    if backend is None:
+        backend = FSIndexBackend(folder)
+    backend.rescan()
+    if _os.path.isdir(folder):
+        try:
+            with open(mpath, "w", encoding="utf-8") as fh:
+                _json.dump(backend.to_manifest(), fh, indent=2)
+        except Exception:
+            pass
+
+    # The Shelf needs only each node's id/name/node_type — read them straight
+    # from the em.json dict rather than a full ``load_emjson`` parse, so the
+    # Shelf stays robust to header/version quirks (e.g. a freshly-created empty
+    # doc) and stays decoupled from the importer. A tiny shim gives
+    # ``FSIndexBackend.orphans`` the node view it expects (name-convention
+    # exclusion); the id-adoption exclusion uses the same ids.
+    class _ShimNode:
+        __slots__ = ("node_id", "name", "node_type")
+
+        def __init__(self, nid, name, ntype):
+            self.node_id, self.name, self.node_type = nid, name, ntype
+
+    class _ShimGraph:
+        def __init__(self, nodes):
+            self.nodes = nodes
+
+    graph = None
+    node_ids: set = set()
+    if doc is not None:
+        raw_nodes = ((doc.get("graph") or {}).get("nodes")) or []
+        shim = [_ShimNode(n.get("id"), n.get("name", ""), n.get("node_type") or n.get("type"))
+                for n in raw_nodes if isinstance(n, dict)]
+        graph = _ShimGraph(shim)
+        node_ids = {n.node_id for n in shim if n.node_id}
+    out: List[Dict[str, Any]] = []
+    for orphan in backend.orphans(graph, graph_code=graph_code):
+        if orphan.resource_id in node_ids:
+            continue  # already hatted (ID adopted) — off the Shelf
+        out.append({
+            "resource_id": orphan.resource_id,
+            "key_id": orphan.key_id,
+            "filename": orphan.filename,
+            "rel_path": orphan.rel_path,
+        })
+    return out
+
+
 def resolve_resource(graph: Graph, resource_id: str, *, registry: Any = None
                      ) -> Optional[Dict[str, Any]]:
     """Resolve a resource's stable ID to a Location dict via the resolver.
