@@ -188,6 +188,27 @@ def test_presign_key_is_stateless(tmp_path):
     assert client.presigned == [("assets", "some/known/key.obj")]
 
 
+# ── api op forwards resource_id (promote keeps the stable ID) ──────────────────
+def test_api_ingest_forwards_resource_id(monkeypatch):
+    import s3dgraphy.resources as R
+    seen = {}
+
+    class _FakeBackend:
+        def __init__(self, cfg):
+            self.cfg = cfg
+
+        def ingest(self, path, *, resource_id=None, object_key=None):
+            seen["resource_id"] = resource_id
+            return (resource_id or "minted", f"{resource_id}/x.obj")
+
+    monkeypatch.setattr(R, "MinioBackend", _FakeBackend)
+    out = api.ingest_minio_resource("/local/x.obj", resource_id="keep-me",
+                                    config=MinioConfig(bucket="b"))
+    # the existing stable ID is preserved end-to-end (one ID space FS↔MinIO)
+    assert seen["resource_id"] == "keep-me"
+    assert out["id"] == "keep-me" and out["s3_uri"] == "s3://b/keep-me/x.obj"
+
+
 # ── the seam stays S3-dep-free ──────────────────────────────────────────────────
 def test_construction_pulls_no_s3_dep(monkeypatch):
     # Force `from minio import Minio` to fail; constructing the backend (and any

@@ -77,6 +77,14 @@ def _instantiate(node_type: str, payload: Dict[str, Any],
         node = Node(payload["id"], payload.get("name", payload["id"]),
                     payload.get("description", ""))
 
+    # Aux-lifecycle bookkeeping keys live in node.attributes (where
+    # is_injected / bake_injector / the volatile-save policy read them), not in
+    # node.data. The emjson exporter lifts node.attributes into data{}, so on
+    # import we must route these back to node.attributes — otherwise the
+    # injected_by / _aux_overrides lifecycle does not survive an em.json
+    # round-trip (e.g. the em-bridge inject-dtc → bake-dtc flow).
+    _ATTR_KEYS = ("injected_by", "_aux_overrides")
+
     # Restore remaining data keys: known attributes as attributes, the rest
     # into node.data (creating it when the class has none).
     consumed = set(kwargs) | {"id", "name", "description"}
@@ -84,8 +92,12 @@ def _instantiate(node_type: str, payload: Dict[str, Any],
     if leftover:
         if not isinstance(getattr(node, "data", None), dict):
             node.data = {}
+        if not isinstance(getattr(node, "attributes", None), dict):
+            node.attributes = {}
         for k, v in leftover.items():
-            if hasattr(node, k) and not isinstance(getattr(node, k), dict):
+            if k in _ATTR_KEYS:
+                node.attributes[k] = v
+            elif hasattr(node, k) and not isinstance(getattr(node, k), dict):
                 try:
                     setattr(node, k, v)
                 except Exception:

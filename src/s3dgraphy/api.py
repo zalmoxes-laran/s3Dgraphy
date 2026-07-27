@@ -362,21 +362,24 @@ def scan_fs_resources(folder: str) -> List[Dict[str, Any]]:
     return [e.to_dict() for e in backend.entries()]
 
 
-def ingest_minio_resource(path: str, *, config: Any = None) -> Dict[str, Any]:
+def ingest_minio_resource(path: str, *, resource_id: Optional[str] = None,
+                          config: Any = None) -> Dict[str, Any]:
     """Ingest a file into the SHARED MinIO/S3 store (R2) and return
     ``{id, object_key, s3_uri}``.
 
+    ``resource_id`` (optional): reuse an EXISTING stable ID instead of minting a
+    fresh one — this is how "promote to MinIO" keeps a resource's identity (the
+    SAME id whether it lives on the file system or in MinIO — one ID space).
+
     By default the connection is read from the ``S3_*`` environment (the SAME
     vars Heriverse-Server uses → one shared object store); pass an explicit
-    :class:`~s3dgraphy.resources.MinioConfig` to override. The stable ``id`` is
-    the same storage-agnostic identity the FS backend uses (one id whether FS or
-    MinIO). Needs the optional ``minio`` SDK (``pip install s3dgraphy[minio]``)
-    AND a reachable server — raises :class:`MissingDependency` if the SDK is
-    absent."""
+    :class:`~s3dgraphy.resources.MinioConfig` to override. Needs the optional
+    ``minio`` SDK (``pip install s3dgraphy[minio]``) AND a reachable server —
+    raises :class:`MissingDependency` if the SDK is absent."""
     from .resources import MinioBackend, MinioConfig
     cfg = config or MinioConfig.from_env()
     backend = MinioBackend(cfg)
-    rid, key = backend.ingest(path)
+    rid, key = backend.ingest(path, resource_id=resource_id)
     return {"id": rid, "object_key": key, "s3_uri": f"s3://{cfg.bucket}/{key}"}
 
 
