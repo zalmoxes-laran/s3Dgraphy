@@ -27,6 +27,11 @@
    "node_type": "BR",
    "description": ""
   },
+  "DTCAcquisitionNode": {
+   "parent": "DTCNode",
+   "node_type": "dtc_acquisition",
+   "description": "DTC acquisition/ingestion event (ECHOES DTC profile, acquisition seam)."
+  },
   "DTCNode": {
    "parent": "Node",
    "node_type": null,

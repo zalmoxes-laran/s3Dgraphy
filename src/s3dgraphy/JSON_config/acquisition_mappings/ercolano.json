@@ -1,0 +1,24 @@
+{
+  "mapping_version": "0",
+  "source": "ercolano",
+  "tier": 0,
+  "_comment": "Per-source acquisition mapping (design decision E.D. 2026-07-30): translate a raw ERCOLANO record into an AcquisitionDescriptor, the way the xlsx-import mappings translate spreadsheet rows. Ercolano is a Tier-0 OPAQUE repo (flat metadata, no genesis/interpretation) → source.capabilities = [] and no payload_graph. Add a sibling <repo>.json for each future source; the generic loader (s3dgraphy.acquisition.mapping.apply_mapping) applies any of them. 'descriptor_defaults' are the constants for this source; 'field_map' maps a dotted descriptor path <- a key in the raw record (record value wins when present).",
+  "descriptor_defaults": {
+    "schema_version": "0",
+    "source": {"repo_id": "ercolano", "capabilities": []},
+    "acquisition": {"agent": "openshelf@0", "method": "download"},
+    "rights": {"license": "unknown"}
+  },
+  "field_map": {
+    "asset.ref": "url",
+    "asset.media_type": "media_type",
+    "asset.name": "title",
+    "source.record_id": "record_id",
+    "source.record_url": "record_url",
+    "rights.license": "license",
+    "rights.holder": "rights_holder",
+    "rights.url": "rights_url",
+    "acquisition.retrieved_at": "retrieved_at",
+    "acquisition.method": "method"
+  }
+}

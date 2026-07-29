@@ -46,11 +46,14 @@ from .heritage_entity_node import HeritageEntityNode
 from .study_node import StudyNode
 from .project_node import ProjectNode
 from .semantic_shape_node import SemanticShapeNode
-# DTC substrate profile (ECHOES): DTCProcessNode is the ONLY DTC node. Both the
-# INPUT and the OUTPUT are Resources (LinkNode, E73/D1) — see dtc_had_input /
-# dtc_had_output (target LinkNode). DTCInputNode/DTCOutputNode were retired.
+# DTC substrate profile (ECHOES). Two event classes: DTCProcessNode (genesis /
+# transformation, crmdig:D7) and DTCAcquisitionNode (acquisition / ingestion,
+# crmdig:D12 ⊂ D7). Both the INPUT and the OUTPUT are Resources (LinkNode, E73/D1)
+# — see dtc_had_input / dtc_had_output (target LinkNode). DTCInputNode/
+# DTCOutputNode were retired.
 from .dtc_node import DTCNode
 from .dtc_process_node import DTCProcessNode
+from .dtc_acquisition_node import DTCAcquisitionNode
 
 # Define what is available for import when using 'from nodes import *'
 __all__ = [
@@ -99,4 +102,5 @@ __all__ = [
     "SemanticShapeNode",
     "DTCNode",
     "DTCProcessNode",
+    "DTCAcquisitionNode",
 ]

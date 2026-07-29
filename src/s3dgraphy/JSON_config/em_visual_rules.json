@@ -817,6 +817,11 @@
     "process": {
       "transformation": { "label": "Transformation", "glyph": "00_transformation", "description": "A processing/transformation step turning inputs into produced digital objects." }
     },
+    "acquisition": {
+      "download": { "label": "Download", "glyph": null, "description": "Retrieval of a digital object from a remote (opaque, Tier-0) repository." },
+      "ingest": { "label": "Ingest", "glyph": null, "description": "Generic ingestion of a digital object into the study." },
+      "local_import": { "label": "Local import", "glyph": null, "description": "Acquisition from the local file system (project-folder search) — the local analog of remote acquisition." }
+    },
     "output": {
       "pointcloud": { "label": "Point cloud", "glyph": "02_pointcloud", "description": "Produced point cloud." },
       "mesh": { "label": "Mesh", "glyph": "03_mesh", "description": "Produced 3D mesh model." },
