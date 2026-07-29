@@ -12,8 +12,8 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 # graph.data marker so a shelf self-identifies (standalone file AND multigraph
-# member). Heriverse ShelfGraph convention.
-SHELF_COLLECTION = "shelf"
+# member) — the Heriverse **ShelfGraph** convention (E.D. 2026-07-30).
+SHELF_COLLECTION = "ShelfGraph"
 # conventional multigraph id for the per-study shelf (any id is accepted).
 DEFAULT_SHELF_ID = "shelf"
 

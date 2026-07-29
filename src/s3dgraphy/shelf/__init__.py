@@ -6,8 +6,8 @@ It is representable in two interchangeable ways, both reusing the existing
 machinery — NO new node type, NO datamodel change:
 
   * as a **member of the multigraph** — a plain :class:`~s3dgraphy.graph.Graph`
-    tagged as a shelf (``graph.data["em_collection"] == "shelf"``), consistent
-    with the Heriverse ShelfGraph convention;
+    tagged as a shelf (``graph.data["em_collection"] == "ShelfGraph"``), the
+    Heriverse **ShelfGraph** convention;
   * as a **standalone, reusable em.json file** — a shelf is a file in its own
     right, importable into any study (save/load via the existing em.json I/O).
 
