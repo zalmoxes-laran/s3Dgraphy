@@ -479,6 +479,35 @@ def instantiate_from_shelf(shelf: Graph, resource_id: str,
     return _i(shelf, resource_id, target_graph)
 
 
+# ── Acquisition seam (Shelf v2 Session B: Tier-0 hook) ─────────────────────────
+# An opaque source emits an AcquisitionDescriptor (versioned, canonical schema in
+# JSON_config); s3Dgraphy consumes it into a Resource + a distinct acquisition DTC
+# event (crmdig:D12) on the Shelf. Per-source JSON mappings (xlsx-import style)
+# customize each repo's records. See :mod:`s3dgraphy.acquisition`.
+def acquire_from_descriptor(descriptor: Any, shelf: Optional[Graph] = None
+                            ) -> Tuple[Dict[str, Any], Graph]:
+    """Tier-0 acquisition: descriptor (dict or AcquisitionDescriptor) → ``(info,
+    shelf)``. Creates/reuses the Resource + its acquisition event on ``shelf``
+    (a new shelf when ``None``). Raises if the descriptor carries a payload_graph
+    (Tier 1/2 — later)."""
+    from .acquisition import acquire_from_descriptor as _a
+    return _a(descriptor, shelf)
+
+
+def apply_acquisition_mapping(source_or_path: str,
+                              record: Dict[str, Any]) -> Dict[str, Any]:
+    """Translate a raw source ``record`` into an AcquisitionDescriptor dict using
+    the per-source mapping (``source`` name or explicit path). Ercolano ships."""
+    from .acquisition import apply_mapping, load_mapping
+    return apply_mapping(load_mapping(source_or_path), record)
+
+
+def acquisition_schema() -> Dict[str, Any]:
+    """The canonical AcquisitionDescriptor JSON Schema (versioned)."""
+    from .acquisition import schema
+    return schema()
+
+
 # ── thin CLI (part of the surface; no web deps) ────────────────────────────────
 def main(argv: Optional[List[str]] = None) -> int:
     """`python -m s3dgraphy.api <op> ...` — a thin CLI over the ops above."""
@@ -528,6 +557,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     si.add_argument("path")
     si.add_argument("resource_id")
     si.add_argument("target")
+    # ── Acquisition (Tier 0): descriptor / mapped record → Resource + event on a shelf ──
+    aq = sub.add_parser("acquire", help="Tier-0 acquire a descriptor onto a shelf")
+    aq.add_argument("descriptor", help="path to an AcquisitionDescriptor .json")
+    aq.add_argument("--shelf", required=True, help="shelf em.json (created if missing)")
+    am = sub.add_parser("acquire-map",
+                        help="map a raw source record → descriptor, then acquire onto a shelf")
+    am.add_argument("source", help="per-source mapping name (e.g. ercolano) or path")
+    am.add_argument("record", help="path to a raw source record .json")
+    am.add_argument("--shelf", required=True, help="shelf em.json (created if missing)")
     args = ap.parse_args(argv)
 
     if args.op in ("open", "validate", "project-ttl", "graphml"):
@@ -613,6 +651,28 @@ def main(argv: Optional[List[str]] = None) -> int:
         export_emjson(target, args.target)
         print(json.dumps({"ok": True, "resource_id": node.node_id,
                           "target": args.target}))
+    elif args.op in ("acquire", "acquire-map"):
+        import os as _os
+        if args.op == "acquire":
+            with open(args.descriptor, encoding="utf-8") as f:
+                descriptor = json.load(f)
+        else:  # acquire-map
+            with open(args.record, encoding="utf-8") as f:
+                record = json.load(f)
+            descriptor = apply_acquisition_mapping(args.source, record)
+        # load-or-create the shelf
+        if _os.path.isfile(args.shelf):
+            shelf, sw = load_shelf(args.shelf)
+            for w in sw:
+                print(f"warning: {w}", file=sys.stderr)
+        else:
+            shelf = new_shelf()
+        info, shelf = acquire_from_descriptor(descriptor, shelf)
+        save_shelf(shelf, args.shelf)
+        out = {"ok": True, "shelf": args.shelf, **info}
+        if args.op == "acquire-map":
+            out["descriptor"] = descriptor
+        print(json.dumps(out, indent=2))
     return 0
 
 

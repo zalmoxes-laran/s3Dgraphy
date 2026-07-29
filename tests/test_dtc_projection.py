@@ -122,8 +122,10 @@ def test_dtc_emjson_roundtrip():
 
 
 def test_dtc_input_output_nodes_retired():
-    """Both DTCInputNode and DTCOutputNode are gone (input+output are Resources);
-    DTCProcessNode is the ONLY DTC node, still gated in dtc_nodes."""
+    """Both DTCInputNode and DTCOutputNode are gone (input+output are Resources).
+    The DTC event classes are the genesis DTCProcessNode and (Session B) the
+    acquisition DTCAcquisitionNode — both gated in dtc_nodes, none on the
+    stratigrapher palette."""
     import json
     from pathlib import Path
     import s3dgraphy.nodes as nodes
@@ -133,9 +135,10 @@ def test_dtc_input_output_nodes_retired():
     dm = json.loads((cfg / "s3Dgraphy_node_datamodel.json").read_text(encoding="utf-8"))
     reg = json.loads((cfg / "node_registry.generated.json").read_text(encoding="utf-8"))
     dtc_classes = {c for c in dm.get("dtc_nodes", {}) if not c.startswith("_")}
-    assert dtc_classes == {"DTCProcessNode"}
+    assert dtc_classes == {"DTCProcessNode", "DTCAcquisitionNode"}
     for cls in ("DTCInputNode", "DTCOutputNode"):
         assert cls not in reg["node_types"]
-    # the surviving DTC node is gated out of the stratigrapher sections
+    # the DTC event nodes are gated out of the stratigrapher sections
     for sec in ("stratigraphic_nodes", "paradata_nodes", "temporal_nodes"):
         assert "DTCProcessNode" not in dm.get(sec, {})
+        assert "DTCAcquisitionNode" not in dm.get(sec, {})
