@@ -423,6 +423,62 @@ def bake_dtc(graph: Graph, injector_id: str) -> Dict[str, int]:
     return _bake(graph, injector_id)
 
 
+# ── Shelf substrate (Shelf v2 core: a collection of un-hatted resources) ───────
+# A shelf-graph is a Graph of LinkNode resources (R0 stable IDs), representable as
+# a multigraph member OR a standalone reusable em.json. Each entry preserves its
+# capability/origin for downstream tier badges. See :mod:`s3dgraphy.shelf`.
+def new_shelf(graph_id: str = "shelf", name: Optional[str] = None) -> Graph:
+    """Create an empty shelf-graph (tagged as a shelf collection)."""
+    from .shelf import new_shelf as _n
+    return _n(graph_id=graph_id, name=name)
+
+
+def add_to_shelf(shelf: Graph, locator: str, *, resource_id: Optional[str] = None,
+                 name: Optional[str] = None, url_type: Optional[str] = None,
+                 description: Optional[str] = None,
+                 resource_type: Optional[str] = None,
+                 origin: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Add a resource to the shelf (reuse-not-duplicate by ``resource_id``);
+    ``origin`` = the capability/origin envelope, preserved. Returns the entry."""
+    from .shelf import add_to_shelf as _a
+    return _a(shelf, locator, resource_id=resource_id, name=name,
+              url_type=url_type, description=description,
+              resource_type=resource_type, origin=origin)
+
+
+def list_shelf(shelf: Graph) -> List[Dict[str, Any]]:
+    """List the shelf's resources — id/name/locator/kind + resource_type/origin
+    (aligned with :func:`list_resources` / :func:`shelf_resources`)."""
+    from .shelf import list_shelf as _l
+    return _l(shelf)
+
+
+def remove_from_shelf(shelf: Graph, resource_id: str) -> bool:
+    """Remove a resource from the shelf. Returns True if it was present."""
+    from .shelf import remove_from_shelf as _r
+    return _r(shelf, resource_id)
+
+
+def save_shelf(shelf: Graph, path: str) -> str:
+    """Persist the shelf as a STANDALONE em.json file. Returns the path."""
+    from .shelf import save_shelf as _s
+    return _s(shelf, path)
+
+
+def load_shelf(path: str) -> Tuple[Graph, List[str]]:
+    """Load a standalone shelf em.json file → ``(graph, warnings)``."""
+    from .shelf import load_shelf as _l
+    return _l(path)
+
+
+def instantiate_from_shelf(shelf: Graph, resource_id: str,
+                           target_graph: Graph) -> Any:
+    """Reference a shelf resource into ``target_graph`` by its stable ID
+    (reuse-not-duplicate; capability/origin preserved). Returns the target node."""
+    from .shelf import instantiate_from_shelf as _i
+    return _i(shelf, resource_id, target_graph)
+
+
 # ── thin CLI (part of the surface; no web deps) ────────────────────────────────
 def main(argv: Optional[List[str]] = None) -> int:
     """`python -m s3dgraphy.api <op> ...` — a thin CLI over the ops above."""
@@ -448,6 +504,30 @@ def main(argv: Optional[List[str]] = None) -> int:
     dd = sub.add_parser("detach-dtc", help="extract a DTC → standalone JSON record")
     dd.add_argument("path")
     dd.add_argument("process_id")
+    # ── Shelf substrate (all operate on a standalone shelf em.json file) ──────
+    sn = sub.add_parser("shelf-new", help="create an empty standalone shelf em.json")
+    sn.add_argument("path")
+    sn.add_argument("--graph-id", default="shelf")
+    sn.add_argument("--name", default=None)
+    sub.add_parser("shelf-list", help="list a shelf's resources").add_argument("path")
+    sa = sub.add_parser("shelf-add", help="add a resource to a shelf (saved back)")
+    sa.add_argument("path")
+    sa.add_argument("locator")
+    sa.add_argument("--resource-id", default=None)
+    sa.add_argument("--name", default=None)
+    sa.add_argument("--resource-type", default=None)
+    sa.add_argument("--origin-repo", default=None, help="source repo id (origin)")
+    sa.add_argument("--capabilities", default=None,
+                    help="comma-separated source capabilities, e.g. genesis,interpretation")
+    sa.add_argument("--scope", default=None, help="payload scope (origin)")
+    srm = sub.add_parser("shelf-remove", help="remove a resource from a shelf (saved back)")
+    srm.add_argument("path")
+    srm.add_argument("resource_id")
+    si = sub.add_parser("shelf-instantiate",
+                        help="reference a shelf resource into a target em.json (saved back)")
+    si.add_argument("path")
+    si.add_argument("resource_id")
+    si.add_argument("target")
     args = ap.parse_args(argv)
 
     if args.op in ("open", "validate", "project-ttl", "graphml"):
@@ -487,6 +567,52 @@ def main(argv: Optional[List[str]] = None) -> int:
         for w in warnings:
             print(f"warning: {w}", file=sys.stderr)
         print(json.dumps(detach_dtc(graph, args.process_id), indent=2))
+    elif args.op == "shelf-new":
+        shelf = new_shelf(graph_id=args.graph_id, name=args.name)
+        save_shelf(shelf, args.path)
+        print(json.dumps({"ok": True, "path": args.path, "graph_id": args.graph_id}))
+    elif args.op == "shelf-list":
+        shelf, warnings = load_shelf(args.path)
+        for w in warnings:
+            print(f"warning: {w}", file=sys.stderr)
+        print(json.dumps(list_shelf(shelf), indent=2))
+    elif args.op == "shelf-add":
+        shelf, warnings = load_shelf(args.path)
+        for w in warnings:
+            print(f"warning: {w}", file=sys.stderr)
+        origin = None
+        if args.origin_repo or args.capabilities or args.scope:
+            origin = {}
+            if args.origin_repo:
+                origin["repo"] = args.origin_repo
+            if args.capabilities:
+                origin["capabilities"] = [c.strip() for c in args.capabilities.split(",") if c.strip()]
+            if args.scope:
+                origin["scope"] = args.scope
+        entry = add_to_shelf(shelf, args.locator, resource_id=args.resource_id,
+                             name=args.name, resource_type=args.resource_type,
+                             origin=origin)
+        save_shelf(shelf, args.path)
+        print(json.dumps(entry, indent=2))
+    elif args.op == "shelf-remove":
+        shelf, warnings = load_shelf(args.path)
+        for w in warnings:
+            print(f"warning: {w}", file=sys.stderr)
+        removed = remove_from_shelf(shelf, args.resource_id)
+        save_shelf(shelf, args.path)
+        print(json.dumps({"ok": True, "removed": removed}))
+    elif args.op == "shelf-instantiate":
+        shelf, sw = load_shelf(args.path)
+        for w in sw:
+            print(f"warning: {w}", file=sys.stderr)
+        target, tw = load_emjson_file(args.target)
+        for w in tw:
+            print(f"warning: {w}", file=sys.stderr)
+        node = instantiate_from_shelf(shelf, args.resource_id, target)
+        from .exporter.emjson_exporter import export_emjson
+        export_emjson(target, args.target)
+        print(json.dumps({"ok": True, "resource_id": node.node_id,
+                          "target": args.target}))
     return 0
 
 

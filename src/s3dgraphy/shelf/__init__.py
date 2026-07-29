@@ -1,0 +1,48 @@
+"""s3dgraphy.shelf — the Shelf substrate (Shelf v2 core, Session A).
+
+A **shelf-graph** is a first-class collection of **un-hatted resources**
+(un-instantiated LinkNodes = R0 stable IDs not yet referenced by a Document/RM).
+It is representable in two interchangeable ways, both reusing the existing
+machinery — NO new node type, NO datamodel change:
+
+  * as a **member of the multigraph** — a plain :class:`~s3dgraphy.graph.Graph`
+    tagged as a shelf (``graph.data["em_collection"] == "shelf"``), consistent
+    with the Heriverse ShelfGraph convention;
+  * as a **standalone, reusable em.json file** — a shelf is a file in its own
+    right, importable into any study (save/load via the existing em.json I/O).
+
+Each shelf entry is a LinkNode (E73) carrying its resource identity (the stable
+ID, R0) PLUS its **capability/origin** (repo, resource type, and any acquisition
+scope) on ``node.data["origin"]`` — preserved end-to-end so a downstream UI can
+badge the source tier. This substrate never strips it.
+
+Pure library: no UI, no connectors, no OpenShelf/web. Instantiation is
+reference-by-stable-ID (reuse-not-duplicate): the same resource is referenced
+into a study graph by its ID, never cloned under a new ID.
+"""
+
+from .core import (
+    DEFAULT_SHELF_ID,
+    SHELF_COLLECTION,
+    add_to_shelf,
+    instantiate_from_shelf,
+    is_shelf,
+    list_shelf,
+    load_shelf,
+    new_shelf,
+    remove_from_shelf,
+    save_shelf,
+)
+
+__all__ = [
+    "SHELF_COLLECTION",
+    "DEFAULT_SHELF_ID",
+    "new_shelf",
+    "is_shelf",
+    "add_to_shelf",
+    "list_shelf",
+    "remove_from_shelf",
+    "save_shelf",
+    "load_shelf",
+    "instantiate_from_shelf",
+]
