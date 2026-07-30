@@ -497,9 +497,16 @@ def acquire_from_descriptor(descriptor: Any, shelf: Optional[Graph] = None
 def apply_acquisition_mapping(source_or_path: str,
                               record: Dict[str, Any]) -> Dict[str, Any]:
     """Translate a raw source ``record`` into an AcquisitionDescriptor dict using
-    the per-source mapping (``source`` name or explicit path). Ercolano ships."""
+    the per-source mapping (``source`` name or explicit path). Ercolano + fs ship."""
     from .acquisition import apply_mapping, load_mapping
     return apply_mapping(load_mapping(source_or_path), record)
+
+
+def fs_acquisition_record(path: str) -> Dict[str, Any]:
+    """Build a raw file-system record (filename/path/size/ext/media_type/…) for the
+    ``fs`` mapping from a local ``path`` — the local project-folder acquisition source."""
+    from .acquisition import fs_record
+    return fs_record(path)
 
 
 def acquisition_schema() -> Dict[str, Any]:

@@ -1,0 +1,20 @@
+{
+  "mapping_version": "0",
+  "source": "fs",
+  "tier": 0,
+  "_comment": "Per-source acquisition mapping for the LOCAL FILE SYSTEM (project-folder search) — the local analog of a remote Tier-0 repo (design §3: 'same shape, source = the disk'). Opaque Tier 0 → source.capabilities = [] and no payload_graph. Build the raw record with s3dgraphy.acquisition.fs_record(path) (filename/path/size/ext/media_type/record_id/record_url), then apply_mapping('fs', record). Mirrors ercolano.json; the generic loader applies either. The UI reflects exactly these mapping fields (name/media_type/size/…) per E.D.",
+  "descriptor_defaults": {
+    "schema_version": "0",
+    "source": {"repo_id": "filesystem", "capabilities": []},
+    "acquisition": {"agent": "emtools-shelf@0", "method": "local_import"},
+    "rights": {"license": "unknown"}
+  },
+  "field_map": {
+    "asset.ref": "path",
+    "asset.name": "filename",
+    "asset.media_type": "media_type",
+    "asset.size": "size",
+    "source.record_id": "record_id",
+    "source.record_url": "record_url"
+  }
+}

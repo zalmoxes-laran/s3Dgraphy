@@ -72,3 +72,38 @@ def apply_mapping(mapping: Dict[str, Any], record: Dict[str, Any]) -> Dict[str, 
         if key in record and record[key] not in (None, ""):
             _set_path(descriptor, dotted, record[key])
     return descriptor
+
+
+# 3D media-type hints (extensions the browser/mimetypes stdlib does not know).
+_FS_MEDIA_TYPES = {
+    "glb": "model/gltf-binary", "gltf": "model/gltf+json", "obj": "model/obj",
+    "fbx": "model/fbx", "ply": "model/ply", "stl": "model/stl",
+    "3ds": "model/x-3ds", "dae": "model/vnd.collada+xml",
+    "usd": "model/vnd.usd", "usdz": "model/vnd.usdz+zip",
+}
+
+
+def fs_record(path: str) -> Dict[str, Any]:
+    """Build a raw FILE-SYSTEM record for the ``fs`` mapping from a local ``path``:
+    ``{filename, path, record_id, record_url, size, ext, media_type}``. The local
+    analog of a remote repo record (design §3). ``record_id`` = the absolute path,
+    so re-scanning the same file re-uses the same stable Resource id (idempotent)."""
+    import mimetypes
+    import os
+    ap = os.path.abspath(path)
+    filename = os.path.basename(ap)
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    try:
+        size = os.path.getsize(ap)
+    except OSError:
+        size = 0
+    media_type = _FS_MEDIA_TYPES.get(ext) or (mimetypes.guess_type(filename)[0] or "")
+    return {
+        "filename": filename,
+        "path": ap,
+        "record_id": ap,
+        "record_url": "file://" + ap,
+        "size": size,
+        "ext": ext,
+        "media_type": media_type,
+    }

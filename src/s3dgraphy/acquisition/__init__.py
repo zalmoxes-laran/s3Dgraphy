@@ -16,7 +16,7 @@ from .descriptor import (
     AcquisitionError,
     schema,
 )
-from .mapping import apply_mapping, available_mappings, load_mapping
+from .mapping import apply_mapping, available_mappings, fs_record, load_mapping
 from .acquire import acquire_from_descriptor
 
 __all__ = [
@@ -27,5 +27,6 @@ __all__ = [
     "load_mapping",
     "apply_mapping",
     "available_mappings",
+    "fs_record",
     "acquire_from_descriptor",
 ]
