@@ -25,12 +25,14 @@ from .core import (
     DEFAULT_SHELF_ID,
     SHELF_COLLECTION,
     add_to_shelf,
+    hat_as_representation_model,
     instantiate_from_shelf,
     is_shelf,
     list_shelf,
     load_shelf,
     new_shelf,
     remove_from_shelf,
+    remove_resource,
     save_shelf,
 )
 
@@ -42,7 +44,9 @@ __all__ = [
     "add_to_shelf",
     "list_shelf",
     "remove_from_shelf",
+    "remove_resource",
     "save_shelf",
     "load_shelf",
     "instantiate_from_shelf",
+    "hat_as_representation_model",
 ]

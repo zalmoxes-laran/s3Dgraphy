@@ -479,6 +479,29 @@ def instantiate_from_shelf(shelf: Graph, resource_id: str,
     return _i(shelf, resource_id, target_graph)
 
 
+def hat_as_representation_model(target_graph: Graph, resource_id: str, *,
+                                shelf: Optional[Graph] = None,
+                                rm_id: Optional[str] = None,
+                                name: Optional[str] = None,
+                                attach_to: Optional[str] = None) -> Dict[str, Any]:
+    """Hat a shelf resource into ``target_graph`` as a RepresentationModel: the
+    Resource is referenced by stable ID (R0 hinge) and an RM node references it via
+    ``has_linked_resource`` (P67); optionally attached to an entity via
+    ``has_representation_model`` (P138i). Reuse-not-duplicate + idempotent. Returns
+    ``{rm_id, resource_id, created, attached}``. No mesh import (EMTools does that)."""
+    from .shelf import hat_as_representation_model as _h
+    return _h(target_graph, resource_id, shelf=shelf, rm_id=rm_id, name=name,
+              attach_to=attach_to)
+
+
+def remove_shelf_resource(graph: Graph, resource_id: str) -> Dict[str, Any]:
+    """Remove a shelf resource + clean up its now-orphan acquisition event (kept
+    if the resource is still referenced, e.g. hatted). Returns
+    ``{removed, referenced, events_removed}``."""
+    from .shelf import remove_resource as _r
+    return _r(graph, resource_id)
+
+
 # ── Acquisition seam (Shelf v2 Session B: Tier-0 hook) ─────────────────────────
 # An opaque source emits an AcquisitionDescriptor (versioned, canonical schema in
 # JSON_config); s3Dgraphy consumes it into a Resource + a distinct acquisition DTC
