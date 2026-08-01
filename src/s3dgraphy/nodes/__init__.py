@@ -35,7 +35,9 @@ from .group_node import (
 )
 from .paradata_node import ParadataNode
 from .geo_position_node import GeoPositionNode
-from .representation_node import RepresentationModelNode
+from .representation_node import (RepresentationModelNode,
+                                  RepresentationModelDocNode,
+                                  RepresentationModelSpecialFindNode)
 from .author_node import AuthorNode, AuthorAINode
 from .link_node import LinkNode
 from .embargo_node import EmbargoNode
@@ -89,6 +91,8 @@ __all__ = [
     "ParadataNode",
     "GeoPositionNode",
     "RepresentationModelNode",
+    "RepresentationModelDocNode",
+    "RepresentationModelSpecialFindNode",
     "AuthorNode",
     "AuthorAINode",
     "LinkNode",

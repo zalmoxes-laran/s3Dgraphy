@@ -479,19 +479,87 @@ def instantiate_from_shelf(shelf: Graph, resource_id: str,
     return _i(shelf, resource_id, target_graph)
 
 
+# Hatting facets. The ROLE picks the facet, and facets are NOT exclusive — the
+# same Resource can be an RM of an epoch AND a Document in a paradata chain. Every
+# facet keeps the P67 hinge (facet ─has_linked_resource→ LinkNode); what differs is
+# the edge towards what it represents / documents.
+def hat_facets() -> Tuple[str, ...]:
+    """The hatting facet names: ``("rm", "rmsf", "rmdoc", "document")``."""
+    from .shelf import FACETS
+    return FACETS
+
+
+def attach_candidates(facet: str, graph: Graph) -> List[Dict[str, Any]]:
+    """The nodes of ``graph`` a ``facet`` may attach to, as
+    ``[{id, name, node_type, edge}]`` — derived from the datamodel's
+    ``allowed_connections``, so a UI picker never hardcodes a type list. ``rm``
+    yields the epochs in chronological order (first = ``has_first_epoch``)."""
+    from .shelf import attach_candidates as _c
+    return _c(facet, graph)
 def hat_as_representation_model(target_graph: Graph, resource_id: str, *,
                                 shelf: Optional[Graph] = None,
                                 rm_id: Optional[str] = None,
                                 name: Optional[str] = None,
+                                epochs: Optional[List[str]] = None,
                                 attach_to: Optional[str] = None) -> Dict[str, Any]:
     """Hat a shelf resource into ``target_graph`` as a RepresentationModel: the
     Resource is referenced by stable ID (R0 hinge) and an RM node references it via
-    ``has_linked_resource`` (P67); optionally attached to an entity via
-    ``has_representation_model`` (P138i). Reuse-not-duplicate + idempotent. Returns
-    ``{rm_id, resource_id, created, attached}``. No mesh import (EMTools does that)."""
+    ``has_linked_resource`` (P67). An RM represents a STATE, so it binds to one or
+    more **EpochNodes** (``epochs``, ordered: first → ``has_first_epoch``, rest →
+    ``survive_in_epoch``); non-epoch targets are refused and returned in
+    ``skipped``. ``attach_to`` is the deprecated single-epoch alias.
+    Reuse-not-duplicate + idempotent. Returns
+    ``{rm_id, resource_id, created, epochs, skipped, attached}``. No mesh import
+    (EMTools does that)."""
     from .shelf import hat_as_representation_model as _h
     return _h(target_graph, resource_id, shelf=shelf, rm_id=rm_id, name=name,
+              epochs=epochs, attach_to=attach_to)
+
+
+def hat_as_rmsf(target_graph: Graph, resource_id: str, *,
+                shelf: Optional[Graph] = None, rmsf_id: Optional[str] = None,
+                name: Optional[str] = None,
+                attach_to: Optional[str] = None) -> Dict[str, Any]:
+    """Hat a shelf resource as a RepresentationModelSpecialFind: RMSF ─P67→ Resource
+    plus ``SF ─has_representation_model_sf→ RMSF`` (P138i) when ``attach_to`` names a
+    Special Find. Returns ``{rmsf_id, resource_id, created, attached}``."""
+    from .shelf import hat_as_rmsf as _h
+    return _h(target_graph, resource_id, shelf=shelf, rmsf_id=rmsf_id, name=name,
               attach_to=attach_to)
+
+
+def hat_as_rmdoc(target_graph: Graph, resource_id: str, *,
+                 shelf: Optional[Graph] = None, rmdoc_id: Optional[str] = None,
+                 name: Optional[str] = None, attach_to: Optional[str] = None,
+                 free_placement: bool = True) -> Dict[str, Any]:
+    """Hat a shelf resource as a RepresentationModelDoc — a Document instantiated in
+    the 3D scene (e.g. a historical photo in place). RMDoc ─P67→ Resource plus
+    ``Document ─has_representation_model_doc→ RMDoc`` (P138i) when ``attach_to``
+    names a Document. Placement is free/manual (no epoch, no stratigraphy).
+    Returns ``{rmdoc_id, resource_id, created, attached, placement}``."""
+    from .shelf import hat_as_rmdoc as _h
+    return _h(target_graph, resource_id, shelf=shelf, rmdoc_id=rmdoc_id, name=name,
+              attach_to=attach_to, free_placement=free_placement)
+
+
+def hat_as_document(target_graph: Graph, resource_id: str, *,
+                    shelf: Optional[Graph] = None, doc_id: Optional[str] = None,
+                    name: Optional[str] = None, description: str = "",
+                    role: Optional[str] = None,
+                    content_nature: Optional[str] = None,
+                    geometry: Optional[str] = None, mark_as_master: bool = True,
+                    attach_to: Optional[str] = None) -> Dict[str, Any]:
+    """Hat a shelf resource as a Document (E31) — a SOURCE, with no placement: the
+    paradata entry point an ExtractorNode can later read from (``extracted_from``).
+    Document ─P67→ Resource; ``attach_to`` picks its edge from the datamodel
+    (Extractor → ``extracted_from``, stratigraphic → ``has_documentation``, other
+    paradata → ``has_visual_reference``). ``doc_id`` naming an existing DocumentNode
+    reuses it (one document shape with EMTools' ``create_master_document_node``).
+    Returns ``{doc_id, resource_id, created, attached, attach_edge}``."""
+    from .shelf import hat_as_document as _h
+    return _h(target_graph, resource_id, shelf=shelf, doc_id=doc_id, name=name,
+              description=description, role=role, content_nature=content_nature,
+              geometry=geometry, mark_as_master=mark_as_master, attach_to=attach_to)
 
 
 def remove_shelf_resource(graph: Graph, resource_id: str) -> Dict[str, Any]:

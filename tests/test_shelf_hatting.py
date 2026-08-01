@@ -50,17 +50,20 @@ def test_hat_is_idempotent():
     assert len(rms) == 1 and len(links) == 1 and len(edges) == 1  # no duplicates
 
 
-def test_hat_attach_to_entity_p138i():
+def test_hat_refuses_a_us_target():
+    """C3 correction of C2.1: an RM represents a STATE and binds to an EPOCH, not
+    to a stratigraphic unit. A US target is refused (returned in ``skipped``) —
+    a US is documented by a Document, see test_shelf_facets."""
     from s3dgraphy.nodes.stratigraphic_node import StratigraphicUnit
     shelf = _shelf_with_resource()
     study = Graph(graph_id="study")
     study.add_node(StratigraphicUnit(node_id="US1", name="US 1"))
     out = api.hat_as_representation_model(study, "r1", shelf=shelf, rm_id="lamp_model",
                                          attach_to="US1")
-    assert out["attached"] is True
-    # entity ─has_representation_model→ RM (P138i)
-    assert any(e.edge_source == "US1" and e.edge_target == "lamp_model"
-               and e.edge_type == "has_representation_model" for e in study.edges)
+    assert out["attached"] is False and out["skipped"] == ["US1"]
+    assert not any(e.edge_source == "US1" and e.edge_target == "lamp_model"
+                   for e in study.edges)
+    assert not any(e.edge_type == "generic_connection" for e in study.edges)
 
 
 def test_hat_requires_resource_present_without_shelf():

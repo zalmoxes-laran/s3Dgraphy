@@ -23,9 +23,14 @@ into a study graph by its ID, never cloned under a new ID.
 
 from .core import (
     DEFAULT_SHELF_ID,
+    FACETS,
     SHELF_COLLECTION,
     add_to_shelf,
+    attach_candidates,
+    hat_as_document,
     hat_as_representation_model,
+    hat_as_rmdoc,
+    hat_as_rmsf,
     instantiate_from_shelf,
     is_shelf,
     list_shelf,
@@ -49,4 +54,9 @@ __all__ = [
     "load_shelf",
     "instantiate_from_shelf",
     "hat_as_representation_model",
+    "hat_as_rmsf",
+    "hat_as_rmdoc",
+    "hat_as_document",
+    "FACETS",
+    "attach_candidates",
 ]
