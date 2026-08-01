@@ -107,7 +107,26 @@ class Graph:
         """
         Validates if a connection type between two nodes is allowed by the rules.
 
-        Uses the v1.5.3 connections datamodel for validation.
+        The connections datamodel is the only authority: an edge is allowed when
+        both endpoints are instances of the classes its ``allowed_connections``
+        name (inheritance included, so ``StratigraphicUnit`` satisfies
+        ``StratigraphicNode``).
+
+        Two DIFFERENT lookups are involved and must not be conflated — that
+        conflation was the bug this method used to carry. The endpoints arrive as
+        **node_type** strings (``US``, ``extractor``) and resolve through
+        ``Node.node_type_map``, which is keyed by node_type. The datamodel's
+        allowed entries are **class names** (``StratigraphicNode``,
+        ``SpecialFindUnit``) and resolve through
+        :func:`~s3dgraphy.edges.connection_resolver.resolve_node_class`, which
+        scans the registered classes and their MRO. Resolving the class names
+        through the node_type map instead made every unmatched name fall back to
+        ``object`` (accepting anything) and — worse — made
+        ``"StratigraphicNode"`` resolve to ``VirtualStratigraphicUnit``, whose
+        node_type happens to be that string: so ``is_after`` between two REAL
+        stratigraphic units was refused and :meth:`add_edge` rewrote it to
+        ``generic_connection``. Fourteen edge types — the whole stratigraphic
+        vocabulary — were affected.
 
         Args:
             source_node_type (str): The type of the source node.
@@ -115,36 +134,12 @@ class Graph:
             edge_type (str): The type of edge connecting the nodes.
 
         Returns:
-            bool: True if the connection is allowed, False otherwise.
+            bool: True if the connection is allowed, False otherwise. An unknown
+            node_type or an unknown edge type is refused.
         """
-        # Get node classes from the node_type_map
-        source_class = Node.node_type_map.get(source_node_type)
-        target_class = Node.node_type_map.get(target_node_type)
-
-        if source_class is None or target_class is None:
-            return False
-
-        # Get allowed connections from the datamodel
-        edge_def = _connections_datamodel.get_edge_definition(edge_type)
-        if edge_def is None:
-            return False
-
-        allowed_sources = edge_def['allowed_connections']['source']
-        allowed_targets = edge_def['allowed_connections']['target']
-
-        # Check if source and target node types are allowed
-        # This uses issubclass to support inheritance (e.g., StratigraphicUnit is a StratigraphicNode)
-        source_allowed = any(
-            issubclass(source_class, Node.node_type_map.get(allowed_source, object))
-            for allowed_source in allowed_sources
-        )
-
-        target_allowed = any(
-            issubclass(target_class, Node.node_type_map.get(allowed_target, object))
-            for allowed_target in allowed_targets
-        )
-
-        return source_allowed and target_allowed
+        from .edges.connection_resolver import connection_allowed_by_type
+        return connection_allowed_by_type(source_node_type, target_node_type,
+                                          edge_type)
 
     def add_warning(self, message):
         """Adds a warning message to the warnings list."""
@@ -232,7 +227,10 @@ class Graph:
             "stratigraphic_nodes_found": 0,
             "connections_created": 0,
             "connections_already_existing": 0,
-            "errors": 0
+            "errors": 0,
+            # how many times the LEGACY generic_connection branch had to guess —
+            # non-zero means the graph was imported with the pre-Se1 resolver
+            "legacy_generic_guesses": 0,
         }
         
         # Definisci i tipi di unità stratigrafiche riconosciuti
@@ -281,15 +279,22 @@ class Graph:
             for edge in self.edges:
                 if edge.edge_target == group.node_id and edge.edge_type == "has_paradata_nodegroup":
                     source_node = self.find_node_by_id(edge.edge_source)
-                    #print(f"  - Trovato stronzo edge {edge.edge_id} con source {edge.edge_source} e target {edge.edge_target}")
                     if source_node and hasattr(source_node, 'node_type'):
                         if source_node.node_type in stratigraphic_types:
                             stratigraphic_nodes.append(source_node)
                             if verbose:
                                 pass
                                 # print(f"  - Unità stratigrafica collegata al gruppo: {source_node.name} (Tipo: {source_node.node_type})")
-            
-            # Se non troviamo nulla, proviamo con edge_type "generic_connection"
+
+            # LEGACY ONLY — graphs degraded by the old connection resolver.
+            # `has_paradata_nodegroup` names `StratigraphicNode` as its source;
+            # until Se1 that name resolved to the wrong class, so every such edge
+            # was rewritten to `generic_connection` at import and the canonical
+            # loop above found nothing. This branch was the workaround: it reads
+            # UNTYPED edges as if they were the paradata link, which is a guess by
+            # definition. It is no longer a normal path — re-import the GraphML
+            # with the fixed core and it stops firing. Guesses are counted in
+            # `stats["legacy_generic_guesses"]` so a caller can see it happened.
             if not stratigraphic_nodes:
                 for edge in self.edges:
                     if edge.edge_target == group.node_id and edge.edge_type == "generic_connection":
@@ -297,6 +302,7 @@ class Graph:
                         if source_node and hasattr(source_node, 'node_type'):
                             if source_node.node_type in stratigraphic_types:
                                 stratigraphic_nodes.append(source_node)
+                                stats["legacy_generic_guesses"] += 1
                                 if verbose:
                                     pass
                                     # print(f"  - Unità stratigrafica collegata al gruppo (generic_connection): {source_node.name} (Tipo: {source_node.node_type})")
@@ -333,6 +339,19 @@ class Graph:
                         edge_id = f"{strat_node.node_id}_has_property_{prop_node.node_id}"
                         try:
                             new_edge = self.add_edge(edge_id, strat_node.node_id, prop_node.node_id, "has_property")
+                            # This edge is DERIVED, not authored: it materialises
+                            # "US → group → property" as a direct link so every
+                            # consumer can read properties the same way. Marking it
+                            # keeps three things true — it can be recomputed without
+                            # duplicating, it can be told apart from an authored
+                            # has_property, and it does not lose WHICH paradata
+                            # group justified it (the direct edge alone throws that
+                            # away). In-memory only for now: the em.json edge
+                            # payload has no attributes field yet (that is the
+                            # schema step), and the propagation re-runs at every
+                            # import, so the mark is always regenerated.
+                            new_edge.attributes["derived"] = True
+                            new_edge.attributes["derived_from"] = group.node_id
                             stats["connections_created"] += 1
                             if verbose:
                                 pass

@@ -606,6 +606,43 @@ def acquisition_schema() -> Dict[str, Any]:
     return schema()
 
 
+# ── connection resolution: REPORT-ONLY (S1) ───────────────────────────────────
+# `Graph.validate_connection` is permissive by construction (it resolves the
+# datamodel's CLASS names through the node_type-keyed map). These two ops measure
+# what a CORRECT resolver would decide, changing nothing: no graph is mutated and
+# `add_edge` keeps degrading exactly as it does today.
+def connection_report(graph: Graph, *, max_cases: int = 0,
+                      diagnose_generic_edges: bool = False) -> Dict[str, Any]:
+    """What a correct resolver would decide about ``graph``'s edges. Returns
+    ``{total_edges, resolved, would_degrade, already_generic, unknown_edge_type,
+    dangling, delta, cases}`` — ``delta`` is the blast radius: edges that would
+    degrade to ``generic_connection`` but are accepted by the current permissive
+    core, i.e. exactly what a strict switch would change. With
+    ``diagnose_generic_edges`` it also adds ``generic_diagnosis`` (see
+    :func:`diagnose_generic_connections`). Read-only."""
+    from .edges.connection_resolver import connection_report as _r
+    return _r(graph, max_cases=max_cases,
+              diagnose_generic_edges=diagnose_generic_edges)
+
+
+def diagnose_generic_connections(graph: Graph, *, max_cases: int = 0) -> Dict[str, Any]:
+    """Of the edges ALREADY typed ``generic_connection``, what type would their
+    endpoints allow? Returns ``{total_generic, recoverable, ambiguous,
+    no_candidate, dangling, cases}`` — ``recoverable`` = exactly one edge type
+    fits, so the lost type is unambiguously reconstructible. **Diagnostic only**:
+    nothing is re-typed and no graph is mutated."""
+    from .edges.connection_resolver import diagnose_generic as _d
+    return _d(graph, max_cases=max_cases)
+
+
+def resolve_edge_type(source_node: Any, target_node: Any, declared_type: str) -> str:
+    """The type an edge WOULD carry under correct resolution — the declared type
+    when the datamodel allows it, else ``generic_connection``. Pure; does not
+    touch any graph and does not change how edges are actually created."""
+    from .edges.connection_resolver import resolve_edge_type as _r
+    return _r(source_node, target_node, declared_type)
+
+
 # ── thin CLI (part of the surface; no web deps) ────────────────────────────────
 def main(argv: Optional[List[str]] = None) -> int:
     """`python -m s3dgraphy.api <op> ...` — a thin CLI over the ops above."""
@@ -628,6 +665,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     rr.add_argument("path")
     rr.add_argument("resource_id")
     sub.add_parser("scan-resources", help="FS-index scan a folder → manifest").add_argument("folder")
+    cr = sub.add_parser("connection-report",
+                        help="REPORT-ONLY: what a correct connection resolver "
+                             "would decide about an .em.json (changes nothing)")
+    cr.add_argument("path")
+    cr.add_argument("--json", action="store_true", help="machine-readable output")
+    cr.add_argument("--max-cases", type=int, default=0,
+                    help="truncate the case list (0 = all)")
+    cr.add_argument("--diagnose-generic", action="store_true",
+                    help="also ask what type the already-generic edges would "
+                         "take, judging by their endpoints (diagnostic only)")
     dd = sub.add_parser("detach-dtc", help="extract a DTC → standalone JSON record")
     dd.add_argument("path")
     dd.add_argument("process_id")
@@ -696,6 +743,19 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(json.dumps(resolve_resource(graph, args.resource_id), indent=2))
     elif args.op == "scan-resources":
         print(json.dumps(scan_fs_resources(args.folder), indent=2))
+    elif args.op == "connection-report":
+        with open(args.path, encoding="utf-8") as f:
+            doc = json.load(f)
+        graph, warnings = load_emjson(doc)
+        for w in warnings:
+            print(f"warning: {w}", file=sys.stderr)
+        rep = connection_report(graph, max_cases=args.max_cases,
+                                diagnose_generic_edges=args.diagnose_generic)
+        if args.json:
+            print(json.dumps(rep, indent=2))
+        else:
+            from .edges.connection_resolver import format_connection_report
+            print(format_connection_report(rep))
     elif args.op == "detach-dtc":
         with open(args.path, encoding="utf-8") as f:
             doc = json.load(f)

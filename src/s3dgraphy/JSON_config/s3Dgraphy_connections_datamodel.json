@@ -1242,8 +1242,9 @@
         "rationale": "crmdig:L10_had_input (D7 Digital Machine Event -> input digital object). Dual-emitted with prov:used (Activity used Entity) — same direction (Process -> input Resource) — so CRMdig and PROV-O readers both see the acquisition consumption. Target is the Resource (LinkNode); the input is a resource, symmetric to the output."
       },
       "allowed_connections": {
+        "_note": "Source is the DTC event BASE class: both chunk types link to their Resources — DTCProcessNode (genesis, D7) and DTCAcquisitionNode (acquisition/ingestion, D12), per the dtc_nodes section note. Listing only DTCProcessNode used to pass by accident, because the old validator could not resolve the name and fell back to accepting anything.",
         "source": [
-          "DTCProcessNode"
+          "DTCNode"
         ],
         "target": [
           "LinkNode"
@@ -1266,8 +1267,9 @@
         "rationale": "crmdig:L11_had_output (D7 Digital Machine Event -> produced digital object). Dual-emitted with prov:generated (Activity generated Entity) — same direction (Process -> Output). Target is the Resource (LinkNode) — the output is a resource, not a RepresentationModel/Document (those merely reference it)."
       },
       "allowed_connections": {
+        "_note": "Source is the DTC event BASE class: both chunk types link to their Resources — DTCProcessNode (genesis, D7) and DTCAcquisitionNode (acquisition/ingestion, D12), per the dtc_nodes section note. Listing only DTCProcessNode used to pass by accident, because the old validator could not resolve the name and fell back to accepting anything.",
         "source": [
-          "DTCProcessNode"
+          "DTCNode"
         ],
         "target": [
           "LinkNode"

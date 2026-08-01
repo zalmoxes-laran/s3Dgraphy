@@ -222,66 +222,18 @@ def _reference_resource(target_graph: Any, resource_id: str, shelf: Any):
     return res
 
 
-_CLASS_BY_NAME: Dict[str, Any] = {}
-
-
-def _resolve_node_class(class_name: str):
-    """The node CLASS behind a datamodel ``allowed_connections`` entry, or None.
-
-    ``allowed_connections`` lists CLASS names (``SpecialFindUnit``,
-    ``ExtractorNode``, …) while ``Node.node_type_map`` is keyed by *node_type*
-    (``SF``, ``extractor``, …), so a plain lookup misses. We scan the registered
-    classes AND their MRO, which also resolves the abstract bases the datamodel
-    uses (``StratigraphicNode``, ``ParadataNode``, ``RepresentationNode``) —
-    those are never registered under their own name."""
-    if class_name in _CLASS_BY_NAME:
-        return _CLASS_BY_NAME[class_name]
-    from ..nodes.base_node import Node
-    found = None
-    for cls in Node.node_type_map.values():
-        for base in getattr(cls, "__mro__", ()):
-            if base.__name__ == class_name:
-                found = base
-                break
-        if found is not None:
-            break
-    _CLASS_BY_NAME[class_name] = found
-    return found
-
-
-def _endpoint_ok(node_or_class: Any, class_names: List[str]) -> bool:
-    """True if the endpoint (a node INSTANCE or a node CLASS) is one of the
-    datamodel's allowed classes. Unresolvable names keep the permissive
-    behaviour — we never refuse on a name we cannot map."""
-    classes = [c for c in (_resolve_node_class(n) for n in class_names)
-               if c is not None]
-    if not classes:
-        return True
-    cls = node_or_class if isinstance(node_or_class, type) else type(node_or_class)
-    return issubclass(cls, tuple(classes))
-
-
-def _allowed_endpoints(edge_type: str):
-    """``(source_class_names, target_class_names)`` for ``edge_type``, or None."""
-    from ..edges import get_connections_datamodel
-    edge_def = get_connections_datamodel().get_edge_definition(edge_type)
-    if edge_def is None:
-        return None
-    allowed = edge_def.get("allowed_connections") or {}
-    return (allowed.get("source") or [], allowed.get("target") or [])
-
-
-def _connection_allowed(src: Any, tgt: Any, edge_type: str) -> bool:
-    """Datamodel check for ``src ─edge_type→ tgt`` — the connections datamodel is
-    the only authority here, never a hardcoded type list.
-
-    This is stricter than :meth:`Graph.validate_connection`, which resolves the
-    allowed CLASS names through the node_type-keyed map and therefore lets any
-    endpoint pass whenever the name is not also a node_type."""
-    ends = _allowed_endpoints(edge_type)
-    if ends is None:
-        return False
-    return _endpoint_ok(src, ends[0]) and _endpoint_ok(tgt, ends[1])
+# Correct resolution of the datamodel's allowed_connections. Written here for C3,
+# now shared: the canonical implementation lives in `edges.connection_resolver`
+# (S1) so the report-only pass in the core and these facet ops cannot drift.
+# Stricter than `Graph.validate_connection`, which resolves the allowed CLASS
+# names through the node_type-keyed map and therefore lets any endpoint pass
+# whenever the name is not also a node_type.
+from ..edges.connection_resolver import (  # noqa: E402
+    allowed_endpoints as _allowed_endpoints,
+    connection_allowed as _connection_allowed,
+    endpoint_matches as _endpoint_ok,
+    resolve_node_class as _resolve_node_class,
+)
 
 
 def _attach(target_graph: Any, src_id: str, tgt_id: str, edge_type: str) -> bool:

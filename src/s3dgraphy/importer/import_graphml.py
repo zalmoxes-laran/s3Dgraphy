@@ -1521,6 +1521,15 @@ class GraphMLImporter:
                 description=""
             )
             self.graph.add_node(generic_node)
+            # The shape/colour did not match any EM node type, so this node has
+            # no type at all. Its name often reveals the intent (`SF04.2`,
+            # `D38.1`) but reading a type out of a label would be guessing: the
+            # author is told instead. Every edge touching it stays untyped too —
+            # an edge cannot be resolved when one endpoint has no type.
+            self.graph.add_warning(
+                f"Node '{node_name or uuid_id}' has no recognised EM type (its "
+                f"yEd shape/colour matches no node type): it and its connections "
+                f"stay untyped. Classify it in the source graph.")
 
 
 
@@ -1639,6 +1648,16 @@ class GraphMLImporter:
                 description=group_description,
                 y_pos=group_y_pos
             )
+            # No palette colour, so no EM role: the file simply does not say what
+            # this box means. We neither guess it nor silently drop it — the
+            # author is told, and can classify it (or leave it organisational).
+            # Its members keep their membership edges; see the report's
+            # "author warnings" column.
+            self.graph.add_warning(
+                f"Group '{group_name}' has no EM role (not a ParadataNodeGroup / "
+                f"ActivityNodeGroup / TimeBranch / US-USD-VSF container): it is "
+                f"kept as an organisational box. Classify it with a palette "
+                f"colour if it should carry meaning.")
 
         # Aggiungi attributi di tracciamento
         group_node.attributes['original_id'] = original_id
@@ -1931,9 +1950,13 @@ class GraphMLImporter:
             # print(f"Set graph ID to: {graph.graph_id}")
             # print(f"Set graph name to: {graph.name}")
                 
-            # Crea il nodo grafo stesso
-            from ..nodes.base_node import Node
-            graph_node = Node(
+            # Crea il nodo grafo stesso. `GraphNode` (node_type "graph") esiste
+            # apposta — "it allows the graph itself to be linked to other nodes,
+            # such as authors and licences" — e il datamodel lo ammette come
+            # source di has_author. Un `Node` nudo, invece, non ha alcun tipo: il
+            # nodo finiva fra i "non tipizzati" e ogni suo arco veniva rifiutato.
+            from ..nodes.graph_node import GraphNode
+            graph_node = GraphNode(
                 node_id=graph.graph_id,
                 name=stringa_pulita
             )
@@ -1970,12 +1993,16 @@ class GraphMLImporter:
                 if author_id not in graph.data['authors']:
                     graph.data['authors'].append(author_id)
                 
-                # Crea l'edge tra autore e grafo
+                # Crea l'edge tra grafo e autore. Direzione: il grafo HA un
+                # autore, quindi source=grafo, target=autore — come dichiara il
+                # datamodel (has_author: GraphNode|… → AuthorNode) e come lo legge
+                # il resto della libreria (diagnostics._has_author_target parte
+                # dal nodo di origine). Era invertito, e l'arco degradava.
                 edge_id = f"authorship_{author_id}"
                 graph.add_edge(
                     edge_id=edge_id,
-                    edge_source=author_id,
-                    edge_target=graph.graph_id,
+                    edge_source=graph.graph_id,
+                    edge_target=author_id,
                     edge_type="has_author"
                 )
                 # print(f"Added author node and edge: {author_id}")
@@ -2111,6 +2138,17 @@ class GraphMLImporter:
                 pass
                 # print(f"Found continuity for node {node.name} ({node.node_id}): {connected_continuity_node.node_id}")
             
+            # A node only gets its swimlane epoch if the datamodel admits
+            # has_first_epoch for its type. A role-less base GroupNode does not:
+            # it is an organisational box, its members already carry their own
+            # epoch, and the edge would only be rewritten to generic_connection.
+            # The author is told about the group itself (handle_group_node), not
+            # about the edge that could not exist.
+            from ..edges.connection_resolver import connection_allowed_by_type
+            if not connection_allowed_by_type(getattr(node, 'node_type', ''),
+                                              "EpochNode", "has_first_epoch"):
+                continue
+
             # Connetti alle epoche appropriate
             for epoch in epochs:
                 if epoch.min_y < node.attributes['y_pos'] < epoch.max_y:
@@ -3141,6 +3179,47 @@ class GraphMLImporter:
         self.graph.add_node(node)
         return node
 
+    _STRAT_TYPES_CACHE = None
+
+    @classmethod
+    def _stratigraphic_types(cls):
+        """The stratigraphic node_types, from the datamodel's own classification
+        rather than a hand-kept list.
+
+        ``ALL_US_TYPES`` is the canonical set (US, USD, USN, USVn, USVs, SF, VSF,
+        RSF, TSU, SE, UL, BR and the four series). ``StratigraphicNode`` is added
+        because it is the legacy node_type ``VirtualStratigraphicUnit`` registers
+        itself under, and real graphs still carry it. ``unknown`` is deliberately
+        NOT here: an UnknownNode is not a stratigraphic unit, and treating it as
+        one made the reclassification below fire on nodes it knew nothing about."""
+        if cls._STRAT_TYPES_CACHE is None:
+            from ..classification import ALL_US_TYPES
+            cls._STRAT_TYPES_CACHE = set(ALL_US_TYPES) | {"StratigraphicNode"}
+        return cls._STRAT_TYPES_CACHE
+
+    def _reclassify_by_endpoints(self, source_node, target_node, declared):
+        """Re-read a mis-typed connector from its endpoints alone.
+
+        First the curated endpoint rules (the same ones a dashed connector goes
+        through). If the outcome is still something the datamodel refuses, fall
+        back to the datamodel itself: when exactly ONE edge type is admitted
+        between those two endpoints, that type is the only possible reading and
+        is used. When several are admitted, or none, nothing is invented — the
+        declared type is returned and `add_edge` will degrade it with a warning,
+        which is the honest outcome for an authorial anomaly."""
+        from ..edges.connection_resolver import (candidate_edge_types,
+                                                 connection_allowed)
+        guess = self.enhance_edge_type("has_data_provenance", source_node, target_node)
+        if guess != "has_data_provenance" and connection_allowed(source_node,
+                                                                 target_node, guess):
+            return guess
+        if connection_allowed(source_node, target_node, guess):
+            return guess          # the dashed default itself is valid here
+        candidates = candidate_edge_types(source_node, target_node)
+        if len(candidates) == 1:
+            return candidates[0]
+        return declared
+
     def enhance_edge_type(self, edge_type, source_node, target_node):
         """
         Enhances the edge type based on the types of the connected nodes.
@@ -3155,13 +3234,21 @@ class GraphMLImporter:
         """
         if not source_node or not target_node:
             return edge_type
-            
-        # Definizione dei tipi stratigrafici
-        stratigraphic_types = ['US', 'USVs', 'USVn', 'VSF', 'SF', 'USD', 'serSU', 
-                            'serUSVn', 'serUSVs', 'TSU', 'SE', 'BR', 'unknown']
+
+        stratigraphic_types = self._stratigraphic_types()
 
         source_type = source_node.node_type if hasattr(source_node, 'node_type') else ""
         target_type = target_node.node_type if hasattr(target_node, 'node_type') else ""
+
+        # A solid line typed `is_after` whose endpoints are NOT both stratigraphic
+        # is a mis-drawn connector, not a stratigraphic relation: yEd carries the
+        # style, and the style was wrong. The endpoints tell the truth, so it is
+        # re-read through the same endpoint rules as a dashed connector. Valid
+        # stratigraphic `is_after` is never touched.
+        if edge_type == "is_after" and not (source_type in stratigraphic_types
+                                            and target_type in stratigraphic_types):
+            return self._reclassify_by_endpoints(source_node, target_node,
+                                                 declared="is_after")
         
         # print(f"Enhancing edge type {edge_type}: {source_type} -> {target_type}")
 
@@ -3204,6 +3291,15 @@ class GraphMLImporter:
                 isinstance(target_node, ExtractorNode)):
                 edge_type = "combines"
                 # print(f"Enhanced to combines: CombinerNode -> ExtractorNode")
+
+            # Any OTHER paradata node -> DocumentNode. The extraction case above
+            # takes precedence; what is left (a PropertyNode, a Combiner, a bare
+            # ParadataNode pointing at a document) has exactly ONE relation the
+            # datamodel admits for those endpoints: has_visual_reference
+            # ("the element has an associated visual reference").
+            elif (isinstance(source_node, (PropertyNode, CombinerNode, ParadataNode))
+                  and isinstance(target_node, DocumentNode)):
+                edge_type = "has_visual_reference"
         
         # Post-processing per generic_connection
         elif edge_type == "generic_connection":
