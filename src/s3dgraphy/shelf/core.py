@@ -469,7 +469,7 @@ def hat_as_document(target_graph: Any, resource_id: str, *, shelf: Any = None,
                     doc_id: Optional[str] = None, name: Optional[str] = None,
                     description: str = "", role: Optional[str] = None,
                     content_nature: Optional[str] = None,
-                    geometry: Optional[str] = None, mark_as_master: bool = True,
+                    geometry: Optional[str] = None, mark_as_canonical: bool = True,
                     attach_to: Optional[str] = None) -> Dict[str, Any]:
     """Hat a shelf resource as a **Document** (E31) — a SOURCE, no placement.
 
@@ -483,7 +483,7 @@ def hat_as_document(target_graph: Any, resource_id: str, *, shelf: Any = None,
     ``has_linked_resource`` (P67). ``role`` / ``content_nature`` / ``geometry``
     are the three EM 1.6 classification axes, passed through to
     :class:`DocumentNode` (which validates them against ``em_visual_rules``);
-    ``mark_as_master`` sets ``attributes['em_master_document']``, the flag
+    ``mark_as_canonical`` sets ``attributes['em_canonical_document']``, the flag
     EMTools' Document Manager / GraphML patcher already use.
 
     ``doc_id`` naming an EXISTING DocumentNode reuses it — that is how EMTools
@@ -500,10 +500,10 @@ def hat_as_document(target_graph: Any, resource_id: str, *, shelf: Any = None,
                             name=name or _res_name(r, resource_id),
                             description=description, role=role,
                             content_nature=content_nature, geometry=geometry)
-        if mark_as_master:
+        if mark_as_canonical:
             if getattr(node, "attributes", None) is None:
                 node.attributes = {}
-            node.attributes["em_master_document"] = True
+            node.attributes["em_canonical_document"] = True
         return node
 
     doc, created, res = _hat_facet(

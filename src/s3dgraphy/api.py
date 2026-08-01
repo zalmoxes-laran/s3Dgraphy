@@ -547,7 +547,7 @@ def hat_as_document(target_graph: Graph, resource_id: str, *,
                     name: Optional[str] = None, description: str = "",
                     role: Optional[str] = None,
                     content_nature: Optional[str] = None,
-                    geometry: Optional[str] = None, mark_as_master: bool = True,
+                    geometry: Optional[str] = None, mark_as_canonical: bool = True,
                     attach_to: Optional[str] = None) -> Dict[str, Any]:
     """Hat a shelf resource as a Document (E31) — a SOURCE, with no placement: the
     paradata entry point an ExtractorNode can later read from (``extracted_from``).
@@ -559,7 +559,7 @@ def hat_as_document(target_graph: Graph, resource_id: str, *,
     from .shelf import hat_as_document as _h
     return _h(target_graph, resource_id, shelf=shelf, doc_id=doc_id, name=name,
               description=description, role=role, content_nature=content_nature,
-              geometry=geometry, mark_as_master=mark_as_master, attach_to=attach_to)
+              geometry=geometry, mark_as_canonical=mark_as_canonical, attach_to=attach_to)
 
 
 def remove_shelf_resource(graph: Graph, resource_id: str) -> Dict[str, Any]:

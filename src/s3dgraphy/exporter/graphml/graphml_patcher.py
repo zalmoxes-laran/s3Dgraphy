@@ -520,9 +520,8 @@ class GraphMLPatcher:
             if node_type in INTERNAL_NODE_TYPES:
                 return f"internal type {node_type!r}"
             if isinstance(node, DocumentNode):
-                if not (getattr(node, 'attributes', None) or {}).get(
-                        'em_master_document'):
-                    return "DocumentNode without em_master_document"
+                if not (isinstance(node, DocumentNode) and node.is_canonical()):
+                    return "DocumentNode that is not canonical"
             if node.node_id in self._existing_xml_emids:
                 return (f"EMID {node.node_id[:12]}... already in XML")
             return None

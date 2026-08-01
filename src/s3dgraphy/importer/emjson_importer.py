@@ -29,12 +29,32 @@ from .. import nodes as _nodes_module  # noqa: F401
 
 FORMAT_NAME = "em.json"
 SUPPORTED_MAJOR = 1
+#: schema version written by files that predate the field (S2a)
+LEGACY_SCHEMA_VERSION = 0
 
 _NEUTRAL_DEFAULTS: Dict[str, Any] = {"start_time": 0, "end_time": 0}
 
 
 class EmJsonImportError(ValueError):
     pass
+
+
+def schema_version_of(doc: Dict[str, Any]) -> int:
+    """The em.json SCHEMA version of a document, tolerantly.
+
+    A file written before the field existed reports ``LEGACY_SCHEMA_VERSION``
+    (0) — that is the honest answer, not an error: those documents are perfectly
+    readable, they simply predate any schema evolution. Anything unparseable is
+    read as legacy too, on the same principle: the reader never refuses a
+    document over a version field it cannot make sense of. See
+    ``exporter.emjson_exporter.SCHEMA_VERSION`` for the current value and its
+    history."""
+    header = doc.get("header") or {}
+    raw = header.get("schema_version", LEGACY_SCHEMA_VERSION)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return LEGACY_SCHEMA_VERSION
 
 
 def _instantiate(node_type: str, payload: Dict[str, Any],
@@ -120,6 +140,18 @@ def parse_emjson(doc: Dict[str, Any]) -> Tuple[Graph, List[str]]:
     if not major.isdigit() or int(major) != SUPPORTED_MAJOR:
         raise EmJsonImportError(f"unsupported em.json version '{version}'")
 
+    # Schema version: read, never refused. A file from the future is read anyway
+    # — the format is additive, so unknown fields are simply ignored — but the
+    # reader says so, because silently dropping content the writer meant to
+    # carry is worse than a warning.
+    from ..exporter.emjson_exporter import SCHEMA_VERSION as _CURRENT_SCHEMA
+    schema_version = schema_version_of(doc)
+    if schema_version > _CURRENT_SCHEMA:
+        warnings.append(
+            f"em.json schema_version {schema_version} is newer than this "
+            f"s3dgraphy knows ({_CURRENT_SCHEMA}): reading it anyway, fields "
+            f"introduced after {_CURRENT_SCHEMA} are ignored")
+
     gsec = doc.get("graph") or {}
     if not gsec.get("graph_id"):
         raise EmJsonImportError("graph.graph_id is missing")
@@ -131,6 +163,9 @@ def parse_emjson(doc: Dict[str, Any]) -> Tuple[Graph, List[str]]:
         graph.description = {"default": gsec["description"]}
     if isinstance(gsec.get("data"), dict):
         graph.data.update(gsec["data"])
+    # recorded so a consumer (and the S6 version banner) can tell what it read
+    graph.attributes["emjson_schema_version"] = schema_version
+    graph.attributes["emjson_format_version"] = version
 
     # Graph.__init__ auto-creates a default geo_position node. When the
     # document carries its own geo_position node(s), drop the synthetic one
@@ -147,16 +182,27 @@ def parse_emjson(doc: Dict[str, Any]) -> Tuple[Graph, List[str]]:
             warnings.append(f"skipped node without id/node_type: {payload}")
             continue
         node = _instantiate(payload["node_type"], payload, warnings)
+        # schema <2 spelled the canonical-document flags "master": carry them
+        # over so the in-memory graph speaks one language whatever wrote the file
+        from ..nodes.document_node import normalise_canonical_attributes
+        normalise_canonical_attributes(getattr(node, "attributes", None))
+        normalise_canonical_attributes(getattr(node, "data", None))
         graph.add_node(node)
 
     for e in gsec.get("edges", []):
         try:
-            graph.add_edge(
+            edge = graph.add_edge(
                 e.get("id") or f"{e['source']}__{e['edge_type']}__{e['target']}",
                 e["source"], e["target"], e["edge_type"],
             )
         except Exception as exc:
             warnings.append(f"skipped edge {e.get('id')!r}: {exc}")
+            continue
+        # schema 1+: per-edge attributes (e.g. the paradata propagation's
+        # derived / derived_from). Absent on legacy files, which is fine.
+        attrs = e.get("attributes")
+        if isinstance(attrs, dict) and attrs and edge is not None:
+            edge.attributes.update(attrs)
 
     return graph, warnings
 

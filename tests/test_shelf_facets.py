@@ -160,7 +160,7 @@ def test_document_references_resource_without_placement():
     assert isinstance(doc, DocumentNode) and doc.node_type == "document"
     assert doc.data.get("content_nature") == "3d_object"      # facets passed through
     assert doc.data.get("geometry") == "reality_based"
-    assert doc.attributes.get("em_master_document") is True   # EMTools convention
+    assert doc.is_canonical() is True          # the canonical-document flag
     assert _p67(study, "D.7", "r1")
     # a Document is NOT spatialized: no representation node was created
     assert not any(n.node_type.startswith("representation") for n in study.nodes)

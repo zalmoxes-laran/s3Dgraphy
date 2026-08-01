@@ -383,7 +383,7 @@ class GraphMLImporter:
         self._restore_property_metadata_from_side_channel(tree)
 
         # Arricchisci i master document con i valori delle PropertyNode collegate
-        self._enrich_master_documents()
+        self._enrich_canonical_documents()
 
         # Aggiungi qui la nuova funzionalità per collegare PropertyNode dai ParadataNodeGroup
         # Impostare verbose=True per avere output dettagliati durante il debug
@@ -1263,7 +1263,7 @@ class GraphMLImporter:
             border_width = result[6]
             doc_y_pos = result[7]
 
-            is_master = self._is_master_document(border_color, border_width)
+            is_canonical = self._is_canonical_document(border_color, border_width)
 
             # Pre-scan override: if Pass 0 determined a canonical EMID
             # for this nodename (Master EMID or first-instance EMID),
@@ -1286,9 +1286,9 @@ class GraphMLImporter:
                 existing_uuid = self.document_nodes_map[nodename]
                 existing_doc = self.graph.find_node_by_id(existing_uuid)
 
-                if is_master and existing_doc and not existing_doc.attributes.get('is_master', False):
-                    # Master incontrato dopo un'istanza: aggiorna il nodo esistente
-                    # con i dati del master (descrizione, attributi visivi, posizione).
+                if is_canonical and existing_doc and not existing_doc.attributes.get('is_canonical', False):
+                    # Canonico incontrato dopo un'istanza: aggiorna il nodo esistente
+                    # con i dati del canonico (descrizione, attributi visivi, posizione).
                     # The previous Instance state is preserved in the
                     # 'instances' list so the exporter can re-emit it.
                     prev_original_id = existing_doc.attributes.get('original_id')
@@ -1311,7 +1311,7 @@ class GraphMLImporter:
                         existing_doc.description = nodedescription
                     if nodeurl:
                         existing_doc.url = nodeurl
-                    existing_doc.attributes['is_master'] = True
+                    existing_doc.attributes['is_canonical'] = True
                     existing_doc.attributes['border_color'] = border_color
                     existing_doc.attributes['border_width'] = border_width
                     existing_doc.attributes['certainty_class'] = self._get_certainty_class(border_color)
@@ -1384,15 +1384,15 @@ class GraphMLImporter:
                 except Exception:
                     pass
 
-                # Attributi master document
-                document_node.attributes['is_master'] = is_master
-                # Record y_pos for ALL document nodes (not just Masters)
+                # Attributi canonical document
+                document_node.attributes['is_canonical'] = is_canonical
+                # Record y_pos for ALL document nodes (not just canonical ones)
                 # — needed to position instances on export.
                 try:
                     document_node.attributes['y_pos'] = float(doc_y_pos)
                 except (ValueError, TypeError):
                     document_node.attributes['y_pos'] = 0.0
-                if is_master:
+                if is_canonical:
                     document_node.attributes['border_color'] = border_color
                     document_node.attributes['border_width'] = border_width
                     document_node.attributes['certainty_class'] = self._get_certainty_class(border_color)
@@ -2037,21 +2037,21 @@ class GraphMLImporter:
 
 
 
-    def _enrich_master_documents(self):
+    def _enrich_canonical_documents(self):
         """
         Dopo il parsing degli edge, copia i valori delle PropertyNode collegate
-        ai master document nel loro dict 'data'.
-        Es: D.70 master connesso a PropertyNode 'absolute_time_start' con valore '1870'
+        ai canonical document nel loro dict 'data'.
+        Es: D.70 canonical connesso a PropertyNode 'absolute_time_start' con valore '1870'
         -> document_node.data['absolute_time_start'] = '1870'
         """
-        master_count = 0
+        canonical_count = 0
         enriched_count = 0
         for node in self.graph.nodes:
             if not isinstance(node, DocumentNode):
                 continue
-            if not node.attributes.get('is_master', False):
+            if not node.attributes.get('is_canonical', False):
                 continue
-            master_count += 1
+            canonical_count += 1
 
             # Cerca edge uscenti da questo documento verso PropertyNode
             for edge in self.graph.edges:
@@ -2064,8 +2064,8 @@ class GraphMLImporter:
                             node.data[prop_name] = prop_value
                             enriched_count += 1
 
-        if master_count > 0:
-            print(f"[GraphML Parser] Found {master_count} master document(s), enriched with {enriched_count} property value(s)")
+        if canonical_count > 0:
+            print(f"[GraphML Parser] Found {canonical_count} master document(s), enriched with {enriched_count} property value(s)")
 
     def connect_nodes_to_epochs(self):
         """
@@ -2315,7 +2315,7 @@ class GraphMLImporter:
     # in one place only; this importer no longer hardcodes it (curation of
     # 12 July 2026). Values are the variant keys themselves
     # (reality_based / observable / asserted / em_based); a thick black
-    # border (master_unknown) and unrecognised colours map to "unknown".
+    # border (canonical_unknown) and unrecognised colours map to "unknown".
     # NOTE: legacy values direct/reconstructed/hypothetical are superseded.
     _variant_by_color = None
 
@@ -2334,12 +2334,12 @@ class GraphMLImporter:
                 except (TypeError, ValueError):
                     width = 0.0
                 color = str(st.get("border_color", "")).upper()
-                if width >= 3.0 and color and key != "master_unknown":
+                if width >= 3.0 and color and key != "canonical_unknown":
                     out[color] = key
             cls._variant_by_color = out
         return cls._variant_by_color
 
-    def _is_master_document(self, border_color, border_width):
+    def _is_canonical_document(self, border_color, border_width):
         """A master document has a thick border (width >= 3.0).
 
         The previous rule additionally required the border to be
@@ -2459,7 +2459,7 @@ class GraphMLImporter:
             if not is_doc or not nodename:
                 continue
 
-            is_master = self._is_master_document(border_color, border_width)
+            is_canonical = self._is_canonical_document(border_color, border_width)
 
             if nodename in master_locked:
                 # Master EMID already fixed; nothing to do.
@@ -2470,7 +2470,7 @@ class GraphMLImporter:
             if emid_on_file:
                 emid_on_file = emid_on_file.strip() or None
 
-            if is_master:
+            if is_canonical:
                 if emid_on_file:
                     canonical[nodename] = emid_on_file
                     master_locked.add(nodename)

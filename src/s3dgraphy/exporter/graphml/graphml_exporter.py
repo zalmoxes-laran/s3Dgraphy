@@ -899,7 +899,7 @@ class GraphMLExporter:
                 # Skip the bookkeeping the GraphML importer rebuilds on
                 # its own (original_id / y_pos / EMID etc.).
                 drop = {"original_id", "y_pos", "x_pos", "EMID", "URI",
-                        "epoch_id", "epoch_name", "is_master_doc",
+                        "epoch_id", "epoch_name", "is_canonical_doc",
                         "graph_id"}
                 semantic_attrs = {k: v for k, v in attrs.items()
                                    if k not in drop}

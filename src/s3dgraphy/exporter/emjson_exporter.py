@@ -35,6 +35,25 @@ from ..graph import Graph
 FORMAT_NAME = "em.json"
 FORMAT_VERSION = "1.0"
 
+#: **Single source of truth for the em.json SCHEMA version.**
+#:
+#: Distinct from ``FORMAT_VERSION`` on purpose, and the two answer different
+#: questions. ``FORMAT_VERSION`` ("1.0") is the frozen shape of the document —
+#: header / graph / layout, flat node and edge lists — and its MAJOR gates
+#: whether the importer will read the file at all. ``SCHEMA_VERSION`` is a plain
+#: integer that increments whenever the *content* of that shape evolves in a way
+#: a migration may need to key off, without breaking the format.
+#:
+#: History:
+#:   0 — implicit: every file written before this field existed (legacy)
+#:   1 — edges may carry an ``attributes`` dict (S2a)
+#:   2 — the canonical-document flags are spelled ``is_canonical`` /
+#:       ``em_canonical_document`` and the style key ``canonical_unknown``;
+#:       the ``master`` spelling is legacy-read only (S2b)
+#:
+#: Bump it in ONE place, here, and record the reason above.
+SCHEMA_VERSION = 2
+
 # Node attributes lifted into data{} when present on the instance and not
 # already carried by node.data. Keeps the flat format lossless for the
 # type-specific fields the classes store as plain attributes.
@@ -71,7 +90,7 @@ def _node_payload(node: Any) -> Dict[str, Any]:
     if isinstance(node_data, dict):
         data.update({k: v for k, v in node_data.items() if _json_safe(v)})
     # generic per-node attribute store (the GraphML importer writes Master/
-    # Instance document metadata here: is_master, certainty_class,
+    # Instance document metadata here: is_canonical, certainty_class,
     # border_color, instances) — lossless lift, node.data wins on clashes
     node_attrs = getattr(node, "attributes", None)
     if isinstance(node_attrs, dict):
@@ -128,6 +147,28 @@ def _ontology_versions() -> Dict[str, str]:
     }
 
 
+def _edge_payload(edge: Any) -> Dict[str, Any]:
+    """One edge as em.json.
+
+    ``attributes`` is emitted ONLY when the edge actually carries some, so a
+    graph without them serializes exactly as before this field existed (additive,
+    byte-stable for existing documents). It is what makes the ``derived`` /
+    ``derived_from`` marks of the paradata propagation survive a save/load
+    instead of being recomputed-only."""
+    payload: Dict[str, Any] = {
+        "id": edge.edge_id,
+        "edge_type": edge.edge_type,
+        "source": edge.edge_source,
+        "target": edge.edge_target,
+    }
+    attrs = getattr(edge, "attributes", None)
+    if isinstance(attrs, dict) and attrs:
+        safe = {k: v for k, v in attrs.items() if _json_safe(v)}
+        if safe:
+            payload["attributes"] = safe
+    return payload
+
+
 def build_emjson(graph: Graph, layout: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Build the .em.json v1 document for an in-memory graph."""
     try:
@@ -136,15 +177,7 @@ def build_emjson(graph: Graph, layout: Optional[Dict[str, Any]] = None) -> Dict[
         _s3d_version = "unknown"
 
     nodes: List[Dict[str, Any]] = [_node_payload(n) for n in graph.nodes]
-    edges: List[Dict[str, Any]] = [
-        {
-            "id": e.edge_id,
-            "edge_type": e.edge_type,
-            "source": e.edge_source,
-            "target": e.edge_target,
-        }
-        for e in graph.edges
-    ]
+    edges: List[Dict[str, Any]] = [_edge_payload(e) for e in graph.edges]
 
     graph_section: Dict[str, Any] = {
         "graph_id": graph.graph_id,
@@ -165,6 +198,7 @@ def build_emjson(graph: Graph, layout: Optional[Dict[str, Any]] = None) -> Dict[
         "header": {
             "format": FORMAT_NAME,
             "version": FORMAT_VERSION,
+            "schema_version": SCHEMA_VERSION,
             "generator": {"tool": "s3dgraphy", "version": str(_s3d_version)},
             "datamodel_versions": _datamodel_versions(),
             "ontology_versions": _ontology_versions(),
