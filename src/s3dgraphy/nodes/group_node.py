@@ -125,3 +125,80 @@ class LocationNodeGroup(GroupNode):
         # can switch behaviour per-instance without touching this class.
         self.propagation = propagation
         self.attributes['propagation'] = propagation
+
+
+class FunctionalUnitNodeGroup(GroupNode):
+    """Typed aggregation of the stratigraphic units that make up one
+    recognisable functional / architectural component — the *column* made
+    of its US, the *wall* made of its US (DP-72).
+
+    Scope note
+    ----------
+    A Functional Unit answers *what a set of stratigraphic units is, as a
+    building component*. It is built **bottom-up** from the stratigraphic
+    reading: the units it aggregates stay intact and fully stratigraphic
+    underneath, each keeping its own epochs, paradata and provenance. The
+    Functional Unit adds a handle for the component as a whole — to name
+    it, filter by it, and project it to architectural-component
+    vocabularies.
+
+    Membership is a **tag**, not a nesting: a member carries an
+    ``is_in_functional_unit`` edge towards the Functional Unit. The relation
+    is the same mereological P46i that ``is_part_of`` projects to — what
+    differs is the ROLE in the EM language. ``is_part_of`` is the nesting
+    axis (one primary drawing parent, a box around its members, propagates
+    the epoch lane); a Functional Unit legitimately **spans epochs** — a
+    wall built across four of them still carries the roof as one body — and
+    a swimlane box cannot. So membership stays m:n and additive, does not
+    claim the member's primary parent, and every view opts into drawing it:
+    the functional reading lives beside pure stratigraphy without either
+    constraining the other.
+
+    What it is NOT
+    --------------
+    - Not an **ActivityNodeGroup** (DP-43), which clusters *actions /
+      processes* ("construction of the portico"). A Functional Unit is
+      what the units *are*, not what was done to them or when.
+    - Not a generic **container** (DP-36). A US / USD / VSF acting as a
+      container is still a stratigraphic unit, with its own formation
+      event and its own place in the sequence; a Functional Unit is a
+      typed aggregation with no formation event of its own.
+    - Not a **LocationNodeGroup** of kind ``functional``, which is a named
+      *place* ("Room 12") and answers *where*. A Functional Unit is a
+      *component* and answers *what*.
+    - Not a geometric construction grammar. The component's geometry type
+      travels **by reference** to an external taxonomy
+      (``geometry_type_ref`` — bSDD / Getty AAT / an HBIM shape-grammar
+      vocabulary); nothing of that vocabulary is internalized or
+      validated here.
+
+    Attach rules
+    ------------
+    - members: ``StratigraphicNode ─is_in_functional_unit→ FunctionalUnit``
+    - nesting: a Functional Unit may itself be
+      ``is_in_functional_unit`` another one (the capital inside the column).
+    - ``FunctionalUnit ─is_part_of→ US`` stays legal and means something
+      else: the whole component **physically embedded** in a stratigraphic
+      unit (a column engaged in a later wall). That one IS containment.
+    - the orthogonal axes stay orthogonal: a member keeps its own
+      ``has_first_epoch`` (time), ``is_in_activity`` (intention) and
+      ``is_in_location`` (place); the Functional Unit does not override
+      them and has no epoch of its own — its temporal extent is DERIVED
+      from its members, and may cover several epochs.
+
+    EM manual: *Stratigraphic Nodes* → "SU / USD / VSF as Container" and
+    *Connectors* → ``is_part_of`` ("Containment is a relationship (edge),
+    not a change in node type").
+    """
+
+    node_type = "FunctionalUnitNodeGroup"
+
+    def __init__(self, node_id, name, description="", y_pos=0.0,
+                 geometry_type_ref=None):
+        super().__init__(node_id, name, description=description, y_pos=y_pos)
+        # Geometry type BY REFERENCE only (DP-72): an opaque pointer into an
+        # external taxonomy (bSDD / Getty AAT / HBIM shape grammar). Free-form
+        # on purpose — no vocabulary is internalized or validated here, and the
+        # binding to a target ontology (CRMvr V5) is separate work.
+        if geometry_type_ref is not None:
+            self.attributes['geometry_type_ref'] = geometry_type_ref

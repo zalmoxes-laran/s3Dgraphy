@@ -713,6 +713,41 @@
        }
       }
      }
+    },
+    "FunctionalUnitNodeGroup": {
+     "class": "FunctionalUnitNodeGroup",
+     "parent": "GroupNode",
+     "abbreviation": "FU",
+     "label": "Functional Unit",
+     "description": "Typed aggregation of the stratigraphic units that make up one recognisable functional/architectural component — the column made of its US, the wall made of its US (DP-72). Answers what a set of units IS, as a building component. Built BOTTOM-UP from the stratigraphic reading: the member units stay intact and fully stratigraphic underneath, each keeping its own epochs, paradata and provenance. Membership is a TAG axis, 'is_in_functional_unit' (m:n, additive), NOT the nesting axis 'is_part_of': the relation is the same mereological P46i, but a Functional Unit legitimately SPANS EPOCHS (a wall built across four of them still carries the roof as one body) and a swimlane box cannot, so the functional reading lives in its own view beside pure stratigraphy without either constraining the other. NOT an ActivityNodeGroup (DP-43: a cluster of actions/processes — what was DONE, not what the units ARE); NOT a generic container (DP-36: a US/USD/VSF acting as container is still a stratigraphic unit with its own formation event, while a Functional Unit has none of its own); NOT a LocationNodeGroup of kind 'functional' (a named PLACE answering 'where', not a COMPONENT answering 'what'); NOT a geometric construction grammar (the geometry type travels BY REFERENCE via 'geometry_type_ref', nothing internalized). Attach rules: members StratigraphicNode --is_in_functional_unit--> FunctionalUnit; nesting FunctionalUnit --is_in_functional_unit--> FunctionalUnit (the capital inside the column); FunctionalUnit --is_part_of--> US stays legal and means the whole component PHYSICALLY EMBEDDED in a stratigraphic unit (a column engaged in a later wall). The orthogonal axes stay orthogonal: a member keeps its own has_first_epoch / is_in_activity / is_in_location, and the Functional Unit has NO epoch of its own — its temporal extent is DERIVED from its members and may cover several epochs. EM manual: 'SU / USD / VSF as Container' (Stratigraphic Nodes) and the is_part_of connector.",
+     "s3Dgraphy_file": "group_node.py",
+     "mapping": {
+      "cidoc": "E24 Physical Human-Made Thing",
+      "cidoc_s3d": null,
+      "alternative": "E24 Physical Human-Made Thing + P46_is_composed_of (its member units)",
+      "rationale": "A Functional Unit asserts a made THING composed of its parts, so it takes the physical class and the mereological P46, NOT the E78 Collection its GroupNode parent defaults to: E78 is a curatorial set (what someone gathered), while a component is a whole made of parts. It is likewise not E7 Activity (that is the ActivityNodeGroup axis: the act, not the thing) nor E53 Place (the LocationNodeGroup axis: where, not what). Same precedent as TimeBranchNodeGroup, which overrides the E78 default with E4 Period. E24 rather than E22/E25 keeps both movable components and immobile features in scope without over-committing. The target mapping to CRMvr V5 Component Element is separate work (DP-72)."
+     },
+     "em_extension": {
+      "uri": "em:FunctionalUnit",
+      "rdf_type": "owl:Class",
+      "subclass_of": [
+       "crm:E24_Physical_Human-Made_Thing"
+      ],
+      "extension_status": "proposed"
+     },
+     "properties": {
+      "name": "P1_is_identified_by",
+      "description": "P3_has_note",
+      "geometry_type_ref": {
+       "type": "reference",
+       "required": false,
+       "description": "Opaque pointer into an EXTERNAL geometry-type taxonomy (bSDD / Getty AAT / an HBIM shape-grammar vocabulary). Free-form by design: no vocabulary is internalized or validated by s3Dgraphy, and the geometric construction grammar stays with the modeller / OpenBIM at export time (DP-72).",
+       "mapping": {
+        "cidoc": "P2_has_type → E55 Type",
+        "rationale": "A typological classification of the component, carried by reference to an external authority rather than by an internal enumeration. The concrete field shape (scheme + id, or a plain URI) is not fixed yet — see DP-72."
+       }
+      }
+     }
     }
    }
   }

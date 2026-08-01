@@ -32,6 +32,7 @@ from .group_node import (
     ParadataNodeGroup,
     TimeBranchNodeGroup,
     LocationNodeGroup,
+    FunctionalUnitNodeGroup,
 )
 from .paradata_node import ParadataNode
 from .geo_position_node import GeoPositionNode
@@ -88,6 +89,7 @@ __all__ = [
     "ParadataNodeGroup",
     "TimeBranchNodeGroup",
     "LocationNodeGroup",
+    "FunctionalUnitNodeGroup",
     "ParadataNode",
     "GeoPositionNode",
     "RepresentationModelNode",

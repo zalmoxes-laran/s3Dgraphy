@@ -67,6 +67,11 @@
    "node_type": "extractor",
    "description": "Nodo che rappresenta l'estrazione di informazioni da una fonte."
   },
+  "FunctionalUnitNodeGroup": {
+   "parent": "GroupNode",
+   "node_type": "FunctionalUnitNodeGroup",
+   "description": "Typed aggregation of the stratigraphic units that make up one"
+  },
   "GeoPositionNode": {
    "parent": "Node",
    "node_type": "geo_position",

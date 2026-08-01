@@ -1001,6 +1001,98 @@ class Graph:
         return connected_nodes
 
 
+    # ── containment (DP-36) and functional membership (DP-72) ────────────────
+    # Two axes, deliberately distinct even though both project to P46i:
+    #   `is_part_of`             NESTING — physical containment, one primary
+    #                            parent, drawn as a box, propagates the epoch
+    #                            lane. Per the manual, "containment is a
+    #                            relationship (edge), not a change in node type:
+    #                            the presence of is_part_of edges is the only
+    #                            discriminant".
+    #   `is_in_functional_unit`  TAG — m:n membership in a Functional Unit,
+    #                            which legitimately spans epochs and therefore
+    #                            cannot be a swimlane box.
+    CONTAINMENT_EDGE = "is_part_of"
+    FUNCTIONAL_UNIT_EDGE = "is_in_functional_unit"
+
+    def _edges_by(self, node_id, edge_type, incoming):
+        """The `edge_type` edges where `node_id` is the target (incoming) or the
+        source (outgoing). Uses the composite index when it is warm."""
+        if not self._indices_dirty and self._indices is not None:
+            index = (self._indices.edges_by_target_type if incoming
+                     else self._indices.edges_by_source_type)
+            return list(index.get((node_id, edge_type), []))
+        return [e for e in self.edges if e.edge_type == edge_type
+                and (e.edge_target if incoming else e.edge_source) == node_id]
+
+    def get_contained_nodes(self, container_id, node_type=None):
+        """The members of `container_id` — the nodes pointing at it with
+        `is_part_of`. Optionally filtered by `node_type`. Works the same for a
+        stratigraphic container (DP-36) and a Functional Unit (DP-72)."""
+        out = []
+        for edge in self._edges_by(container_id, self.CONTAINMENT_EDGE, incoming=True):
+            node = self.find_node_by_id(edge.edge_source)
+            if node is not None and (node_type is None or node.node_type == node_type):
+                out.append(node)
+        return out
+
+    def get_containers_of(self, node_id, node_type=None):
+        """The container(s) `node_id` is `is_part_of`. Multi-membership is legal
+        (a US inside a container AND part of a Functional Unit), hence a list;
+        pass `node_type` to keep only one kind of container."""
+        out = []
+        for edge in self._edges_by(node_id, self.CONTAINMENT_EDGE, incoming=False):
+            node = self.find_node_by_id(edge.edge_target)
+            if node is not None and (node_type is None or node.node_type == node_type):
+                out.append(node)
+        return out
+
+    def is_container(self, node_id):
+        """True if anything is `is_part_of` this node — the manual's discriminant."""
+        return bool(self._edges_by(node_id, self.CONTAINMENT_EDGE, incoming=True))
+
+    def get_functional_units(self):
+        """Every FunctionalUnitNodeGroup in the graph (DP-72)."""
+        from .nodes.group_node import FunctionalUnitNodeGroup
+        return self.get_nodes_by_type(FunctionalUnitNodeGroup.node_type)
+
+    def get_functional_unit_members(self, fu_id, node_type=None):
+        """The members of a Functional Unit — the nodes tagged into it with
+        `is_in_functional_unit`. Optionally filtered by `node_type`."""
+        out = []
+        for edge in self._edges_by(fu_id, self.FUNCTIONAL_UNIT_EDGE, incoming=True):
+            node = self.find_node_by_id(edge.edge_source)
+            if node is not None and (node_type is None or node.node_type == node_type):
+                out.append(node)
+        return out
+
+    def get_functional_units_of(self, node_id):
+        """The Functional Unit(s) a node belongs to. Membership is a TAG: m:n and
+        additive, so a unit may serve several components at once."""
+        out = []
+        for edge in self._edges_by(node_id, self.FUNCTIONAL_UNIT_EDGE, incoming=False):
+            node = self.find_node_by_id(edge.edge_target)
+            if node is not None:
+                out.append(node)
+        return out
+
+    def get_functional_unit_epochs(self, fu_id):
+        """The epochs a Functional Unit spans — DERIVED from its members, since a
+        Functional Unit has no formation event and no epoch of its own. Returns
+        the EpochNodes reached by the members' `has_first_epoch` /
+        `survive_in_epoch`, in graph order, deduplicated."""
+        seen, out = set(), []
+        for member in self.get_functional_unit_members(fu_id):
+            for edge_type in ("has_first_epoch", "survive_in_epoch"):
+                for edge in self._edges_by(member.node_id, edge_type, incoming=False):
+                    if edge.edge_target in seen:
+                        continue
+                    epoch = self.find_node_by_id(edge.edge_target)
+                    if epoch is not None:
+                        seen.add(edge.edge_target)
+                        out.append(epoch)
+        return out
+
     def get_connected_nodes_by_edge_type(self, node_id, edge_type):
         """
         Ottiene tutti i nodi connessi a un nodo specifico tramite un tipo di edge.
