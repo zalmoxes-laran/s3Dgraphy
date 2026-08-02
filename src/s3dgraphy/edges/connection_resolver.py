@@ -520,6 +520,14 @@ def recompute_warnings(graph: Any) -> List[str]:
     records = state_warning_records(graph)
     fresh = [r["message"] for r in records]
     previous = set(getattr(graph, _STATE_WARNINGS_ATTR, ()) or ())
+    # Whoever produced a state warning, recomputing owns the family: drop the
+    # messages of the existing records too. The GraphML importer emits its own
+    # (richer, because it saw the drawing) via `Graph.add_state_warning`; without
+    # this, a recompute would leave those in place and append a second, neutral
+    # sentence about the very same node.
+    previous |= {r.get("message") for r in
+                 (getattr(graph, "warning_records", None) or [])
+                 if isinstance(r, dict)}
     kept = [w for w in (getattr(graph, "warnings", None) or [])
             if w not in previous and _ADD_EDGE_DEGRADATION_MARK not in w]
     graph.warnings = kept + fresh

@@ -1614,7 +1614,8 @@ class GraphMLImporter:
             # `D38.1`) but reading a type out of a label would be guessing: the
             # author is told instead. Every edge touching it stays untyped too —
             # an edge cannot be resolved when one endpoint has no type.
-            self.graph.add_warning(
+            self.graph.add_state_warning(
+                "untyped_node", uuid_id,
                 f"Node '{node_name or uuid_id}' has no recognised EM type (its "
                 f"yEd shape/colour matches no node type): it and its connections "
                 f"stay untyped. Classify it in the source graph.")
@@ -1744,7 +1745,8 @@ class GraphMLImporter:
             # author is told, and can classify it (or leave it organisational).
             # Its members keep their membership edges; see the report's
             # "author warnings" column.
-            self.graph.add_warning(
+            self.graph.add_state_warning(
+                "unclassified_group", uuid_id,
                 f"Group '{group_name}' has no EM role (not a ParadataNodeGroup / "
                 f"ActivityNodeGroup / TimeBranch / US-USD-VSF container): it is "
                 f"kept as an organisational box. Classify it with a palette "

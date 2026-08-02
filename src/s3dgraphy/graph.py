@@ -149,6 +149,22 @@ class Graph:
         return connection_allowed_by_type(source_node_type, target_node_type,
                                           edge_type)
 
+    def add_state_warning(self, kind, node_id, message, **extra):
+        """Append a warning that KNOWS what it is about.
+
+        The plain :meth:`add_warning` takes a sentence and nothing else, so a UI
+        can show it but not act on it. A producer that has the element in hand —
+        the GraphML importer, mid-parse — should say so: the record is what lets
+        a panel offer "go and look at it" (click-to-node), and it costs one
+        argument. ``kind`` comes from
+        ``edges.connection_resolver.WARNING_KINDS``.
+        """
+        self.warnings.append(message)
+        record = {"kind": kind, "node_id": node_id, "message": message}
+        record.update({k: v for k, v in extra.items() if v is not None})
+        self.warning_records.append(record)
+        return record
+
     def add_warning(self, message):
         """Adds a warning message to the warnings list."""
         self.warnings.append(message)
