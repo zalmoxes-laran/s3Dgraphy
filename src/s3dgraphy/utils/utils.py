@@ -186,40 +186,28 @@ def get_stratigraphic_node_class(stratigraphic_type):
     # Usa StratigraphicUnit come fallback se il tipo non è nella mappa
     return STRATIGRAPHIC_CLASS_MAP.get(stratigraphic_type, StratigraphicNode)
 
-#: The two spellings `em_visual_rules.json` uses for the same thing, in
-#: precedence order.
+#: The key the datamodel uses for the material colour, plus the legacy one.
 #:
-#: `color` first because it is the DOCUMENTED one: the 1.6.1 changelog states
-#: the rule of the whole file in its terms — "material.color = LINEAR,
-#: border_color = sRGB(material)" — and it is the key the thirteen stratigraphic
-#: types carry, i.e. the ones that actually become Blender materials in EMtools.
-#: `rgba_color` is the more numerous (21 entries) but it is the later, undeclared
-#: variant.
+#: S8 unified the file on **`rgba_color`**: it was already the majority (21 of
+#: 34 entries) and now it is all of them. `color` stays in the list as pure
+#: tolerance — for a graph or a hand-edited rules file written before the
+#: rename — and is no longer produced by anything we ship.
 #:
-#: Today the order is documentation rather than behaviour: **no entry carries
-#: both**, so nothing can be shadowed. `test_material_key_precedence_is_pinned`
-#: fixes the precedence anyway, so that the day someone adds both keys to a node
-#: the winner is a decision and not an accident.
-_MATERIAL_COLOR_KEYS = ("color", "rgba_color")
+#: Order matters only if an entry ever carries both, which none does;
+#: `test_material_key_precedence_is_pinned` fixes the winner anyway, so the day
+#: one does the outcome is a decision and not whichever key the loop saw first.
+_MATERIAL_COLOR_KEYS = ("rgba_color", "color")
 
-# TODO (E.D., decisione rimandata) — normalizzare il datamodel su UNA chiave.
-# Leggere entrambe è una difesa, non una cura: due nomi per la stessa cosa
-# invitano a scriverne un terzo. Le 21 voci su `rgba_color` sono:
+# Storico, perché non si ricaschi nel dubbio: fino a S8 il file usava DUE nomi
+# per la stessa cosa — `color` sui 13 tipi stratigrafici, `rgba_color` sugli
+# altri. Leggere entrambe (S1) era una difesa contro un bug reale
+# (get_material_color restituiva None per 21 tipi su 38); unificare (S8) è la
+# cura. Il fallback qui sotto resta solo per non rompere un file vecchio.
 #
-#   BR, SE, PROP, COMB, EXT, DOC, EP, ANG, AUTH, AUTH_AI, LIC, EMB, GRAPH,
-#   NARR, LINK, GEO, RM, RMDoc, RMSF, SS, unknown
-#
-# (le altre 13 — US, USVn, USVs, VSF, SF, RSF, USD, serSU, serUSD, serUSVn,
-# serUSVs, TSU, USN — usano `color`; 4 gruppi non hanno material affatto e
-# devono continuare a restituire None). Per rigenerare l'elenco senza fidarsi
-# di questo commento:
-#
-#   python -c "import json;ns=json.load(open('src/s3dgraphy/JSON_config/\
-#   em_visual_rules.json'))['node_styles'];print([k for k,v in ns.items() \
-#   if 'rgba_color' in ((v.get('style') or {}).get('material') or {})])"
-#
-# Normalizzare tocca il datamodel e va ri-vendorato ai consumer: non è una
-# modifica da fare di straforo dentro un fix difensivo.
+# Da non confondere con la qualia `color` di em_qualia_types.json, che è il
+# colore PERCEPITO Munsell/AAT di una superficie reale: un dato archeologico,
+# non un parametro di rendering. Vedi `_note_material_vs_qualia_color` in
+# em_visual_rules.json.
 
 
 def _material_rgba(style):
@@ -244,10 +232,8 @@ def get_material_color(matname, rules_path=None):
     """
     Ottiene i valori RGB per un dato tipo di materiale dal file di configurazione.
 
-    Legge il colore da **entrambe** le chiavi usate nel datamodel
-    (`material.color` e `material.rgba_color`): fino a S1 leggeva solo la prima
-    e restituiva None per 21 tipi su 38 — fra cui DOC, EXT, AUTH e GRAPH — che
-    un colore ce l'hanno eccome.
+    La chiave autoritativa è `material.rgba_color` (unificata in S8); `color`
+    è letta solo come tolleranza verso file scritti prima della rinomina.
 
     Args:
         matname (str): Nome del materiale/tipo di unità stratigrafica

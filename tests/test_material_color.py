@@ -1,14 +1,16 @@
-"""S1 — `get_material_color` reads both spellings the datamodel uses.
+"""The material colour: one key, and everything that declares one gets one.
 
-The file says the same thing two ways: thirteen entries carry
-`style.material.color`, twenty-one carry `style.material.rgba_color`. The
-lookup read only the first, so DOC, EXT, AUTH, GRAPH and seventeen others — all
-of which declare a colour — came back as None. Nothing crashed; the colour was
-simply absent, which is the kind of failure that survives for months.
+History in two lines, because it explains what these tests are guarding.
+`em_visual_rules.json` used to say the same thing two ways — `material.color`
+on the thirteen stratigraphic types, `material.rgba_color` on the rest — and
+the lookup read only the first, so twenty-one types that declare a colour came
+back as None. Nothing crashed; the colour was simply absent, which is the kind
+of failure that survives for months. **S1** made the read defensive over both
+spellings; **S8** unified the file on `rgba_color` and left `color` as
+tolerance for older files.
 
-These tests pin the fix in terms of the datamodel rather than a hardcoded list:
-they walk `em_visual_rules.json` itself, so a type added tomorrow is covered
-without touching this file.
+The tests walk `em_visual_rules.json` itself rather than a hardcoded list, so a
+type added tomorrow is covered without touching this file.
 """
 
 import json
@@ -41,15 +43,16 @@ def test_every_type_that_declares_a_colour_gets_one():
     assert missing == []
 
 
-def test_both_spellings_resolve():
-    """Neither group is served at the expense of the other."""
+def test_the_authoritative_key_serves_every_entry_that_uses_it():
+    """Since S8 the datamodel speaks `rgba_color` only, so this is the whole
+    population. (Its ancestor asserted that BOTH spellings had users — a true
+    statement about the two-key world that S8 made obsolete; what survives is
+    the part that still means something.)"""
     styles = _styles()
-    by_key = {k: [n for n, e in styles.items() if k in _material(e)]
-              for k in _MATERIAL_COLOR_KEYS}
-    for key, names in by_key.items():
-        assert names, f"no entry uses {key} — this test has gone stale"
-        for name in names:
-            assert get_material_color(name) is not None, f"{name} via {key}"
+    users = [n for n, e in styles.items() if "rgba_color" in _material(e)]
+    assert users, "no entry uses rgba_color — this test has gone stale"
+    for name in users:
+        assert get_material_color(name) is not None, name
 
 
 def test_the_values_are_the_declared_ones():
@@ -107,15 +110,31 @@ def test_alpha_defaults_to_opaque():
 # ── precedence ───────────────────────────────────────────────────────────────
 
 def test_material_key_precedence_is_pinned():
-    """No entry currently carries both spellings, so precedence changes nothing
-    today. It is pinned so that the day one does, the winner is a decision
-    somebody made and not whichever key the loop happened to see first."""
-    assert _MATERIAL_COLOR_KEYS == ("color", "rgba_color")
+    """`rgba_color` is authoritative since S8; `color` is read only as
+    tolerance for a file written before the rename. No entry carries both, so
+    precedence changes nothing today — it is pinned so that the day one does,
+    the winner is a decision and not whichever key the loop saw first."""
+    assert _MATERIAL_COLOR_KEYS == ("rgba_color", "color")
     both = {"material": {
         "color": {"r": 1.0, "g": 0.0, "b": 0.0},
         "rgba_color": {"r": 0.0, "g": 1.0, "b": 0.0},
     }}
-    assert _material_rgba(both) == (1.0, 0.0, 0.0, 1.0)
+    assert _material_rgba(both) == (0.0, 1.0, 0.0, 1.0)
+
+
+def test_the_datamodel_speaks_one_key_now():
+    """S8: the file is unified on `rgba_color`. The legacy `color` must not
+    reappear — a new entry copy-pasted from an old one would resurrect the very
+    split that made 21 types colourless."""
+    legacy = [name for name, entry in _styles().items()
+              if "color" in _material(entry)]
+    assert legacy == [], f"still on the legacy key: {legacy}"
+
+
+def test_the_legacy_key_is_still_tolerated():
+    """An em_visual_rules written before S8 must keep working."""
+    assert _material_rgba({"material": {"color": {"r": 0.5, "g": 0.5, "b": 0.5}}}) \
+        == (0.5, 0.5, 0.5, 1.0)
 
 
 def test_no_datamodel_entry_carries_both_keys():

@@ -1,7 +1,17 @@
 {
   "formal_language": "EM",
-  "version": "1.6.3",
+  "version": "1.6.6",
+  "_note_material_vs_qualia_color": [
+    "DUE COSE DIVERSE CHE SI CHIAMANO ENTRAMBE color. Non confonderle: e gia successo.",
+    "1) QUI, in node_styles.<tipo>.style.material.rgba_color — il COLORE DEL MATERIALE BLENDER del proxy 3D, in float LINEARI. UNA sola chiave: `rgba_color`. Fino a S8 il file ne usava due (`color` sui 13 tipi stratigrafici, `rgba_color` sugli altri) e get_material_color() ne leggeva una sola, restituendo None per 21 tipi su 38; ora sono unificate e la vecchia `color` e letta solo come tolleranza verso file scritti prima. Un tipo che non diventa mai una mesh NON ha material affatto (i contenitori di gruppo, e da S7 i dieci nodi che rendono per icona): per loro get_material_color() torna None, ed e corretto.",
+    "1-bis) SEMPRE QUI ma diverso: `border_color` e `fill_color` sono gli HEX sRGB del disegno 2D (canvas EMStudio, GraphML yEd). Stessa idea di colore, altro spazio e altro consumatore — EMStudio legge questi e non tocca mai `material`. Convivono di proposito: material = LINEARE per Blender, hex = sRGB per lo schermo.",
+    "2) ALTROVE, in em_qualia_types.json, la qualia `color` (getty_aat 300080438, data_type controlled_vocabulary, vocabulary_source munsell_or_aat) — il COLORE PERCEPITO della superficie o del materiale reale, rilevato in scavo e classificato Munsell/AAT. E un dato archeologico sul mondo, non un parametro di rendering: non ha niente a che vedere con questo file e non va tenuto in sincronia con esso.",
+    "In breve: qui si decide di che colore DISEGNARE una US; li si registra di che colore ERA."
+  ],
   "_changelog": {
+    "1.6.6": "S8 — unificata la chiave del colore-materiale su `rgba_color`. Rinominate le 14 voci che usavano `style.material.color` (i 13 tipi stratigrafici piu UL): valori invariati, nessun altro campo toccato. Ora tutte le 24 voci con un material parlano la stessa chiave. get_material_color() legge `rgba_color` come autoritativa e mantiene `color` solo come tolleranza per file scritti prima della rinomina. Gli hex 2D border_color/fill_color NON sono stati toccati: sono un'altra cosa (sRGB per il canvas) e hanno un altro consumatore (EMStudio). Verificato che i 14 materiali Blender di EMtools producono rgb identici a prima.",
+    "1.6.5": "S7 — applicate le decisioni E.D. sull'inventario dei material segnaposto. TOLTO il blocco `material` a 10 tipi che non diventano mai una mesh e rendono per icona o forma (PROP, COMB, EXT, DOC, EP, AUTH, LINK, GEO, SS, unknown): il loro colore 2D resta in border_color/fill_color, e get_material_color ora restituisce None come per i 4 contenitori di gruppo. RIMOSSA del tutto la voce `ANG`, duplicato legacy di ActivityNodeGroup senza alcun consumatore in s3Dgraphy, EM-blender-tools o EMStudio (GRAPH, citato nella stessa nota della 1.6.0, resta perche e usato). AGGIUNTO `UL` (Working Unit), unico tipo stratigrafico che ne era privo: 2D dal simbolo del datamodel (rettangolo bianco, bordo arancio #D86400), material 3D uguale al rosso US per decisione E.D. RM/RMDoc/RMSF e SE lasciati invariati per decisione E.D. Nessuno dei 13 colori stratigrafici esistenti e stato modificato.",
+    "1.6.4": "Sola documentazione: aggiunta _note_material_vs_qualia_color per fissare la distinzione fra il colore di display di questo file (node_styles.*.style.material, chiavi legacy color/rgba_color, stesso concetto) e la qualia `color` di em_qualia_types.json (colore percepito Munsell/AAT). Nessuno stile modificato. Inventario dei 15 material segnaposto in .claude/wip/colori-15-proposta.md, in attesa di decisione E.D.",
     "1.6.3": "N7 — added NARR (NarrativeNode, DP-79), the only node type with no entry here: it fell through to `unknown` and rendered as a red dotted question mark on every canvas. Neutral grey like GRAPH because a narrative is a meta-level object over the graph, not a claim about the site; solid border rather than GRAPH's dashed because it is a real authored object, not an anchor for metadata. Raster src/2D/narrative.png (128px); the .svg does not exist yet and the renderer takes the raster.",
     "1.6.2": "Q-C — the geometry axis is the scale of METRIC AUTHORITY OF PLACEMENT, and it is authoritative on the RMDoc (the spatial instance), not on the Document. Added the `symbolic` rung (#8C8C8C neutral grey, border_width 4.0) as the LOWEST step of the ladder: a base that is not metric at all (not-to-scale map, schematic plan, sketch). Full ladder: reality_based -> observable -> asserted -> symbolic; `em_based` is unchanged and is NOT a rung of it but a provenance statement. Grey is deliberately distinct from the BLACK of canonical_unknown ('not classified yet' vs 'classified as making no metric claim'). Position (X,Y,Z + rotation) lives on the RMDoc and nowhere else; a Document may mirror the value on its yEd border for diagram convenience but carries no position. NOTE: the reference node for `symbolic` is not yet in templates/em_palette_template.graphml — that file must be edited in yEd, not by hand.",
     "1.6.1": "Fix border_color to the correct sRGB display hex against the EM 1.3 standard colour table. ROOT CAUSE: border_color was generated by writing the LINEAR material.color straight to hex (0.328 -> 0x54 -> #540909) instead of converting linear->sRGB (0.328 -> 0.608 -> 0x9B -> #9B3333). material.color stays LINEAR (Blender convention); border_color is the sRGB display value = the EM 1.3 standard Hex column. Corrected borders: US/serSU/TSU #540909->#9B3333, SF #AF8208->#D8BD30, VSF #70581E->#B19F61, USVs/serUSVs #0546CC->#248FE7, USVn/serUSVn #083107->#31792D, USN #8C8C8C->#C4C4C4 (sRGB of its 0.55 grey). US/USVs/USVn/SF/VSF now match the EM 1.3 table exactly; TSU (US-red material) and USN follow the same rule. Also reverted USVs/USVn/serUSVs/serUSVn material.color, which an earlier dev8 pass had wrongly overwritten with sRGB values, back to the canonical LINEAR values (USVs/serUSVs 0.018,0.275,0.799; USVn/serUSVn 0.031,0.191,0.026). fill_color unchanged (US/SF white, USVs/USVn black per the 2D icons). Then completed full coherence (EM 1.5 table for USD + 'RSF is red like US'): recomputed the last linear-as-hex materials to true LINEAR so sRGB(material)==border_color for EVERY type (and Blender 3D now matches the 2D display) — RSF material (0.608,0.2,0.2)->(0.328,0.033,0.033)=US red (border #9B3333); USD/serUSD material (0.847,0.392,0)->(0.687,0.127,0)=sRGB^-1(#D86400) (border #D86400 unchanged). Net rule for the whole file: material.color = LINEAR, border_color = sRGB(material) = the EM standard Hex.",
@@ -17,7 +27,7 @@
       "file_2d": "src/2D/US.png",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.328,
             "g": 0.033,
             "b": 0.033,
@@ -38,7 +48,7 @@
       "2d_file_vect": "src/2D/US.svg",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.031,
             "g": 0.191,
             "b": 0.026,
@@ -59,7 +69,7 @@
       "2d_file_vect": "src/2D/USVs.svg",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.018,
             "g": 0.275,
             "b": 0.799,
@@ -80,7 +90,7 @@
       "2d_file_vect": "src/2D/VSF.svg",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.439,
             "g": 0.346,
             "b": 0.119,
@@ -101,7 +111,7 @@
       "2d_file_vect": "src/2D/SF.svg",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.686,
             "g": 0.508,
             "b": 0.029,
@@ -122,7 +132,7 @@
       "_comment": "Reused Special Find (RSF / spolia): a physical object observed in situ but originally produced for a different context. Octagon (sibling of SF/VSF) with the EM red border (#9B3333). Originating DP: DP-26.",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.328,
             "g": 0.033,
             "b": 0.033,
@@ -143,7 +153,7 @@
       "2d_file_vect": "src/2D/USD.svg",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.687,
             "g": 0.127,
             "b": 0.0,
@@ -164,7 +174,7 @@
       "2d_file_vect": "src/2D/serSU.svg",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.328,
             "g": 0.033,
             "b": 0.033,
@@ -185,7 +195,7 @@
       "2d_file_vect": "src/2D/serUSD.svg",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.687,
             "g": 0.127,
             "b": 0.0,
@@ -206,7 +216,7 @@
       "2d_file_vect": "src/2D/serUSV.svg",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.031,
             "g": 0.191,
             "b": 0.026,
@@ -227,7 +237,7 @@
       "2d_file_vect": "src/2D/serUSV.svg",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.018,
             "g": 0.275,
             "b": 0.799,
@@ -248,7 +258,7 @@
       "2d_file_vect": "src/2D/TSU.svg",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.328,
             "g": 0.033,
             "b": 0.033,
@@ -310,14 +320,6 @@
       "2d_file_rast": "src/2D/property.png",
       "2d_file_vect": "src/2D/property.svg",
       "style": {
-        "material": {
-          "rgba_color": {
-            "r": 0.5,
-            "g": 0.0,
-            "b": 0.0,
-            "a": 1.0
-          }
-        },
         "border_color": "#000000",
         "fill_color": "#FFFFFF",
         "border_style": "dashed",
@@ -330,14 +332,6 @@
       "2d_file_rast": "src/2D/combiner.png",
       "2d_file_vect": "src/2D/combiner.svg",
       "style": {
-        "material": {
-          "rgba_color": {
-            "r": 0.5,
-            "g": 0.0,
-            "b": 0.0,
-            "a": 1.0
-          }
-        },
         "border_color": "#FFCC00",
         "fill_color": "#FFFFFF",
         "border_style": "dashed",
@@ -350,14 +344,6 @@
       "2d_file_rast": "src/2D/extractor.png",
       "2d_file_vect": "src/2D/extractor.svg",
       "style": {
-        "material": {
-          "rgba_color": {
-            "r": 0.5,
-            "g": 0.0,
-            "b": 0.0,
-            "a": 1.0
-          }
-        },
         "border_color": "#0033CC",
         "fill_color": "#F0F0F0",
         "border_style": "solid",
@@ -370,14 +356,6 @@
       "2d_file_rast": "src/2D/document.png",
       "2d_file_vect": "src/2D/document.svg",
       "style": {
-        "material": {
-          "rgba_color": {
-            "r": 0.5,
-            "g": 0.0,
-            "b": 0.0,
-            "a": 1.0
-          }
-        },
         "border_color": "#000000",
         "fill_color": "#E0E0E0",
         "border_style": "solid",
@@ -390,38 +368,10 @@
       "2d_file_rast": "src/2D/epoch.png",
       "2d_file_vect": "src/2D/epoch.svg",
       "style": {
-        "material": {
-          "rgba_color": {
-            "r": 0.5,
-            "g": 0.0,
-            "b": 0.0,
-            "a": 1.0
-          }
-        },
         "border_color": "#009933",
         "fill_color": "#FFFFFF",
         "border_style": "solid",
         "shape": "rectangle"
-      },
-      "label_position": "over"
-    },
-    "ANG": {
-      "file_3d": "src/3D/activity.glb",
-      "2d_file_rast": "src/2D/activity.png",
-      "2d_file_vect": "src/2D/activity.svg",
-      "style": {
-        "material": {
-          "rgba_color": {
-            "r": 0.5,
-            "g": 0.0,
-            "b": 0.0,
-            "a": 1.0
-          }
-        },
-        "border_color": "#9966CC",
-        "fill_color": "#FFFFFF",
-        "border_style": "dashed",
-        "shape": "ellipse"
       },
       "label_position": "over"
     },
@@ -430,14 +380,6 @@
       "2d_file_rast": "src/2D/author.png",
       "2d_file_vect": "src/2D/author.svg",
       "style": {
-        "material": {
-          "rgba_color": {
-            "r": 0.5,
-            "g": 0.0,
-            "b": 0.0,
-            "a": 1.0
-          }
-        },
         "border_color": "#FF6600",
         "fill_color": "#FFFFFF",
         "border_style": "solid",
@@ -555,14 +497,6 @@
       "2d_file_rast": "src/2D/link.png",
       "2d_file_vect": "src/2D/link.svg",
       "style": {
-        "material": {
-          "rgba_color": {
-            "r": 0.5,
-            "g": 0.0,
-            "b": 0.0,
-            "a": 1.0
-          }
-        },
         "border_color": "#FF6600",
         "fill_color": "#FFFFFF",
         "border_style": "solid",
@@ -575,14 +509,6 @@
       "2d_file_rast": "src/2D/geo.png",
       "2d_file_vect": "src/2D/geo.svg",
       "style": {
-        "material": {
-          "rgba_color": {
-            "r": 0.5,
-            "g": 0.0,
-            "b": 0.0,
-            "a": 1.0
-          }
-        },
         "border_color": "#FF6600",
         "fill_color": "#FFFFFF",
         "border_style": "solid",
@@ -655,14 +581,6 @@
       "2d_file_rast": "src/2D/ss.png",
       "2d_file_vect": "src/2D/ss.svg",
       "style": {
-        "material": {
-          "rgba_color": {
-            "r": 0.5,
-            "g": 0.0,
-            "b": 0.0,
-            "a": 1.0
-          }
-        },
         "border_color": "#FF6600",
         "fill_color": "#FFFFFF",
         "border_style": "solid",
@@ -674,14 +592,6 @@
       "file_3d": "src/3D/unknown.glb",
       "file_2d": "src/2D/unknown.png",
       "style": {
-        "material": {
-          "rgba_color": {
-            "r": 0.5,
-            "g": 0.0,
-            "b": 0.0,
-            "a": 1.0
-          }
-        },
         "border_color": "#FF0000",
         "fill_color": "#FFFFFF",
         "border_style": "dotted",
@@ -689,12 +599,33 @@
       },
       "label_position": "center"
     },
+    "UL": {
+      "_comment": "Working Unit (E25 Human-Made Feature): le tracce di lavorazione della pietra su una superficie architettonica — subbia, gradina, iccozza, colpi di mazzuolo. UL e la TRACCIA, non l'atto che l'ha prodotta (quello e una E12 Production a parte, via P108i). Il 2D segue il simbolo dichiarato nel node datamodel — rettangolo bianco con bordo arancio — e resta distinguibile sia dalla US (stesso rettangolo, bordo rosso) sia dalla USD (stesso arancio, ma rounded_rectangle). Il material 3D e invece il ROSSO della US (decisione E.D. 2026-08-02: le UL restano rosse per ora); le sotto-colorazioni per tipologia di lavorazione sono un follow-up.",
+      "file_3d": "src/3D/US.glb",
+      "file_2d": "src/2D/US.png",
+      "style": {
+        "material": {
+          "rgba_color": {
+            "r": 0.328,
+            "g": 0.033,
+            "b": 0.033,
+            "a": 1.0
+          }
+        },
+        "border_color": "#D86400",
+        "fill_color": "#FFFFFF",
+        "border_style": "solid",
+        "shape": "rectangle",
+        "border_width": 4
+      },
+      "label_position": "over"
+    },
     "USN": {
       "file_3d": "src/3D/US.glb",
       "file_2d": "src/2D/US.png",
       "style": {
         "material": {
-          "color": {
+          "rgba_color": {
             "r": 0.55,
             "g": 0.55,
             "b": 0.55,
