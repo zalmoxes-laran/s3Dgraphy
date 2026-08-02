@@ -18,11 +18,51 @@ class ActivityNodeGroup(GroupNode):
     """
     Nodo gruppo per attività. Una attività è un gruppo logico di azioni che vengono tenute insieme per un fine narrativo e di ordine delle informazioni (es: costruzione di una stanza di un edificio nell'anno x, attività di restauro di varie parti di quella stanza 20 anni dopo)
 
+    EM Narrative (N4). The activity IS the thing that happened — «costruzione
+    della torre» — and its ACTIONS are the units it contains (the wall, the
+    foundation), reached through `is_in_activity`. No separate "event" type was
+    introduced, because the language already has the right node: adding one
+    would have split a concept that is whole.
+
+    That makes this the natural place to hang the narrative of what was done.
+    Two additive fields, both empty by default so nothing changes for a graph
+    that ignores them:
+
+    ``narrative`` — the prose account of the activity, in the author's words.
+        Distinct from ``description``, which is the technical note the
+        stratigrapher writes for their own use; a reader of the story is a
+        different reader.
+    ``narrative_ref`` — the id of the narrative element (a NarrativeNode) that
+        tells this activity at length, when the short account is not enough.
     """
     node_type = "ActivityNodeGroup"
-    def __init__(self, node_id, name, description="", y_pos=0.0):
+
+    def __init__(self, node_id, name, description="", y_pos=0.0,
+                 narrative="", narrative_ref=None):
         super().__init__(node_id, name, description=description, y_pos=y_pos)
-        #self.node_type = "ActivityNodeGroup"
+        self.data = {}
+        if narrative:
+            self.data["narrative"] = narrative
+        if narrative_ref:
+            self.data["narrative_ref"] = narrative_ref
+
+    @property
+    def narrative(self) -> str:
+        """The prose account of this activity, or "" when nobody wrote one."""
+        return (self.data or {}).get("narrative", "") or ""
+
+    @narrative.setter
+    def narrative(self, text: str) -> None:
+        if self.data is None:
+            self.data = {}
+        if text:
+            self.data["narrative"] = text
+        else:
+            self.data.pop("narrative", None)
+
+    @property
+    def narrative_ref(self):
+        return (self.data or {}).get("narrative_ref")
 
 class ParadataNodeGroup(GroupNode):
     """

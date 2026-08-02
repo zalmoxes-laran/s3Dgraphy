@@ -78,10 +78,11 @@ def test_a_template_is_just_a_registered_function():
 def test_the_shape_is_the_one_the_spec_describes(portamarina):
     n = build_narrative(portamarina, "site_story")
     assert [c.title for c in n.chapters] == [
-        "Presentazione", "Dove si trova", "Età imperiale"]
-    # intro and geo are settled by construction; the lane chapter is a draft
-    assert [c.canonical for c in n.chapters] == [True, True, False]
-    assert n.chapters[2].anchor == "EP.imperiale"
+        "Presentazione", "Dove si trova", "Età imperiale", "Cantiere imperiale"]
+    # intro and geo are settled by construction; the lane chapters are drafts
+    assert [c.canonical for c in n.chapters] == [True, True, False, False]
+    assert n.chapters[2].anchor == "EP.imperiale"     # an epoch lane
+    assert n.chapters[3].anchor == "ACT.cantiere"     # an activity lane
     assert n.data["template_id"] == "site_story"
 
 
@@ -92,6 +93,15 @@ def test_every_source_gets_its_own_embed(portamarina):
     n = build_narrative(portamarina, "site_story")
     refs = [b.ref for b in _embeds(n.chapters[0], "source")]
     assert refs == ["D.1", "D.2"]
+
+
+def test_a_prompt_is_not_listed_among_the_site_sources(portamarina):
+    """A prompt is a source OF THE NARRATIVE, not of the reconstruction. Putting
+    the machine's instructions next to Maiuri's survey would be a category
+    error — and the list would grow with every generation."""
+    n = build_narrative(portamarina, "site_story")
+    refs = [b.ref for b in _embeds(n.chapters[0], "source")]
+    assert "D.prompt.cantiere" not in refs
 
 
 def test_the_units_are_ordered_by_stratigraphy(portamarina):
@@ -235,24 +245,73 @@ def test_regeneration_does_not_duplicate_the_canonical_chapters(portamarina):
     assert titles.count("Dove si trova") == 1
 
 
-# ── the activities TODO ───────────────────────────────────────────────────────
+# ── activities: the actions performed in antiquity ────────────────────────────
 
-def test_activities_are_listed_but_not_classified():
-    """EM has no node that says 'this is an ACTION' rather than 'this is a
-    grouping'. The template lists the activities and lets the author decide;
-    it does not invent a type on the way past."""
+def test_each_activity_gets_its_own_anchored_chapter():
+    """E.D., 2 Aug 2026: the ActivityNodeGroup IS the activity, and its actions
+    are the units it contains. So an activity is a lane like an epoch is, and
+    gets a chapter anchored to it — that is what makes the multitemporal reading
+    work: epochs say WHEN, activities say WHAT WAS DONE."""
     from s3dgraphy.nodes.group_node import ActivityNodeGroup
 
     g = Graph(graph_id="g")
     g.add_node(EpochNode("EP.1", "Epoca", -100, 100))
-    unit = StratigraphicUnit("US.1", "US1")
-    g.add_node(unit)
-    g.add_edge("e1", "US.1", "EP.1", "has_first_epoch")
+    for uid in ("US.1", "US.2"):
+        g.add_node(StratigraphicUnit(uid, uid))
+        g.add_edge(f"e_{uid}", uid, "EP.1", "has_first_epoch")
+    g.add_edge("seq", "US.1", "US.2", "is_after")
     g.add_node(ActivityNodeGroup("ACT.1", "Costruzione della torre"))
-    g.add_edge("e2", "US.1", "ACT.1", "is_in_activity")
+    g.add_edge("m1", "US.1", "ACT.1", "is_in_activity")
+    g.add_edge("m2", "US.2", "ACT.1", "is_in_activity")
 
     n = build_narrative(g, "site_story")
-    cantiere = next(c for c in n.chapters if c.title == "Il cantiere")
-    assert [b.ref for b in _embeds(cantiere, "us")] == ["US.1"]
-    assert any("Costruzione della torre" in b.text
-               for b in cantiere.blocks if b.block_type == "prose")
+    chapter = n.chapter_by_anchor("ACT.1")
+    assert chapter is not None
+    assert chapter.title == "Costruzione della torre"
+    # the actions, in stratigraphic order — oldest first, as in an epoch chapter
+    assert [b.ref for b in _embeds(chapter, "us")] == ["US.2", "US.1"]
+
+
+def test_an_activity_with_a_narrative_account_uses_it():
+    """`ActivityNodeGroup.narrative` is the prose the author wrote about what
+    was done. When it exists, the chapter opens with it rather than with a
+    placeholder — the template never overwrites writing."""
+    from s3dgraphy.nodes.group_node import ActivityNodeGroup
+
+    g = Graph(graph_id="g")
+    g.add_node(ActivityNodeGroup("ACT.1", "Costruzione",
+                                 narrative="Nel I secolo si alza la torre."))
+    n = build_narrative(g, "site_story")
+    chapter = n.chapter_by_anchor("ACT.1")
+    assert chapter.blocks[0].text == "Nel I secolo si alza la torre."
+
+
+def test_an_activity_without_an_account_gets_a_placeholder():
+    from s3dgraphy.nodes.group_node import ActivityNodeGroup
+
+    g = Graph(graph_id="g")
+    g.add_node(ActivityNodeGroup("ACT.1", "Costruzione"))
+    n = build_narrative(g, "site_story")
+    text = n.chapter_by_anchor("ACT.1").blocks[0].text
+    assert text.startswith("[da scrivere:") and "Costruzione" in text
+
+
+def test_regenerating_preserves_an_edited_activity_chapter():
+    """Activity chapters are lanes, so they merge by anchor like epoch ones:
+    new actions appear, the prose the author wrote stays."""
+    from s3dgraphy.nodes.group_node import ActivityNodeGroup
+
+    g = Graph(graph_id="g")
+    g.add_node(ActivityNodeGroup("ACT.1", "Costruzione"))
+    g.add_node(StratigraphicUnit("US.1", "US1"))
+    g.add_edge("m1", "US.1", "ACT.1", "is_in_activity")
+    n = build_narrative(g, "site_story")
+    n.chapter_by_anchor("ACT.1").blocks[0].text = "Scritto a mano."
+
+    g.add_node(StratigraphicUnit("US.2", "US2"))
+    g.add_edge("m2", "US.2", "ACT.1", "is_in_activity")
+    build_narrative(g, "site_story", existing=n)
+
+    chapter = n.chapter_by_anchor("ACT.1")
+    assert chapter.blocks[0].text == "Scritto a mano."
+    assert {b.ref for b in _embeds(chapter, "us")} == {"US.1", "US.2"}

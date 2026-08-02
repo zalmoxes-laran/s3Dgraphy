@@ -343,6 +343,43 @@ class _Datamodel:
         return None
 
 
+def _narrative_authors_from_data(data: Dict[str, Any]) -> List[str]:
+    """Author ids read out of a serialised narrative payload (chapters and
+    blocks), for the case where the node degraded to a base ``Node``."""
+    seen, out = set(), []
+    for chapter in data.get("chapters") or []:
+        for key in ("authored_by",):
+            value = (chapter or {}).get(key)
+            if value and value not in seen:
+                seen.add(value)
+                out.append(value)
+        for block in (chapter or {}).get("blocks") or []:
+            for key in ("authored_by", "validated_by"):
+                value = (block or {}).get(key)
+                if value and value not in seen:
+                    seen.add(value)
+                    out.append(value)
+    return out
+
+
+def _narrative_validators(node: Any, data: Dict[str, Any]) -> List[str]:
+    """The humans who have endorsed content in this narrative."""
+    seen, out = set(), []
+    blocks = ([b for _c, b in node.blocks_iter()]
+              if hasattr(node, "blocks_iter") else [])
+    if blocks:
+        values = [getattr(b, "validated_by", None) for b in blocks]
+    else:
+        values = [(b or {}).get("validated_by")
+                  for c in (data.get("chapters") or [])
+                  for b in ((c or {}).get("blocks") or [])]
+    for value in values:
+        if value and value not in seen:
+            seen.add(value)
+            out.append(value)
+    return out
+
+
 def _narrative_refs_from_data(data: Dict[str, Any]) -> List[str]:
     """Referenced ids read straight out of a serialised narrative payload.
 
@@ -811,6 +848,36 @@ class RDFExporter:
                 value = data.get(key)
                 if value:
                     ctx.add((node_iri, prop, Literal(f"{key}: {value}")))
+            # Authorship and endorsement (N4). Both are projected because both
+            # are claims ABOUT the text that a reader is entitled to check:
+            # who wrote it, and whether a person has vouched for it. The
+            # per-block state is not reified — a block is not a resource — but
+            # the agents are, so "which narratives has this person endorsed"
+            # and "what did this model write" are answerable.
+            for author_id in (node.author_refs()
+                              if hasattr(node, "author_refs")
+                              else _narrative_authors_from_data(data)):
+                if graph_id is None:
+                    break
+                ctx.add((node_iri, PROV.wasAttributedTo,
+                         self._node_iri(graph_id, author_id)))
+            for validator_id in (_narrative_validators(node, data)):
+                if graph_id is None:
+                    break
+                ctx.add((node_iri, PROV.wasInfluencedBy,
+                         self._node_iri(graph_id, validator_id)))
+                self.stats["narrative_endorsements"] = self.stats.get(
+                    "narrative_endorsements", 0) + 1
+            # An unendorsed AI draft says so, in the graph as on the page: the
+            # absence of a validator is the state, and stating it means a
+            # consumer cannot mistake a draft for something someone stands
+            # behind.
+            pending = (len(node.pending_validation())
+                       if hasattr(node, "pending_validation")
+                       else 0)
+            if pending:
+                ctx.add((node_iri, EM.pendingValidation, Literal(pending)))
+
             refs = node.referenced_ids() if hasattr(node, "referenced_ids") \
                 else _narrative_refs_from_data(data)
             for ref in refs:

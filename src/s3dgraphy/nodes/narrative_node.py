@@ -60,6 +60,17 @@ BLOCK_PROSE = "prose"
 BLOCK_EMBED = "embed"
 NARRATIVE_BLOCK_TYPES = (BLOCK_PROSE, BLOCK_EMBED)
 
+#: Who stands behind a piece of content, and whether a person has said so (N4).
+#:
+#: This is the model of "Who Made This?": a machine may draft, but only a human
+#: endorses, and until one does the text says out loud that nobody has. The
+#: state is DERIVED from two facts — who authored it, and whether a human
+#: validated it — rather than stored, so the label can never contradict them.
+STATUS_HUMAN = "human"            # written by a person; nothing to endorse
+STATUS_AI_DRAFT = "ai_draft"      # machine-written, NOT yet endorsed
+STATUS_AI_ENDORSED = "ai_endorsed"  # machine-written, a person has vouched for it
+NARRATIVE_STATUSES = (STATUS_HUMAN, STATUS_AI_DRAFT, STATUS_AI_ENDORSED)
+
 
 class NarrativeError(ValueError):
     """A narrative structure was given something the model does not admit."""
@@ -80,6 +91,18 @@ class Block:
     ref: Optional[str] = None
     view_type: Optional[str] = None
     options: Dict[str, Any] = field(default_factory=dict)
+    #: id of the AuthorNode / AuthorAINode this content is attributed to (N4).
+    authored_by: Optional[str] = None
+    #: id of the DocumentNode holding the PROMPT, when an AI wrote this. The
+    #: prompt is a source like any other: "how do I know this" applies just as
+    #: much to "how did the machine come to write it".
+    prompt_ref: Optional[str] = None
+    #: id of the HUMAN AuthorNode who endorsed it. Only a person can.
+    validated_by: Optional[str] = None
+    #: True when `authored_by` names an AI author. Kept on the block because the
+    #: block is what travels: a reader must be able to tell, from the text
+    #: alone, without resolving the author node first.
+    ai_generated: bool = False
 
     def __post_init__(self) -> None:
         if self.block_type not in NARRATIVE_BLOCK_TYPES:
@@ -94,10 +117,36 @@ class Block:
                     f"view_type must be one of {NARRATIVE_VIEW_TYPES}, "
                     f"got {self.view_type!r}")
 
+    @property
+    def status(self) -> str:
+        """Derived, never stored: a stored status could disagree with the facts.
+
+        Machine-written and unendorsed is a DRAFT and says so; a human has to
+        put their name to it before it reads as anything else.
+        """
+        if not self.ai_generated:
+            return STATUS_HUMAN
+        return STATUS_AI_ENDORSED if self.validated_by else STATUS_AI_DRAFT
+
+    def endorse(self, human_author_id: str) -> None:
+        """A person vouches for this content. Only meaningful on AI content —
+        human text needs no endorsement, it already has an author."""
+        if not human_author_id:
+            raise NarrativeError("an endorsement needs the id of the human "
+                                 "author making it")
+        self.validated_by = human_author_id
+
     # — helpers ————————————————————————————————————————————————————————
     @classmethod
     def prose(cls, text: str) -> "Block":
         return cls(block_type=BLOCK_PROSE, text=text)
+
+    @classmethod
+    def ai_prose(cls, text: str, *, author_id: str,
+                 prompt_ref: Optional[str] = None) -> "Block":
+        """Prose written by a model. Born unendorsed, on purpose."""
+        return cls(block_type=BLOCK_PROSE, text=text, authored_by=author_id,
+                   prompt_ref=prompt_ref, ai_generated=True)
 
     @classmethod
     def embed(cls, ref: str, view_type: str, **options: Any) -> "Block":
@@ -113,8 +162,19 @@ class Block:
         else:
             out["ref"] = self.ref
             out["view_type"] = self.view_type
-            if self.options:
-                out["options"] = self.options
+        # `options` belongs to BOTH kinds: an embed carries render options, and a
+        # generated paragraph carries when it was written and by which model
+        # version. Serialising it only for embeds silently dropped that.
+        if self.options:
+            out["options"] = self.options
+        # provenance, written only when there is something to say
+        for key, value in (("authored_by", self.authored_by),
+                           ("prompt_ref", self.prompt_ref),
+                           ("validated_by", self.validated_by)):
+            if value:
+                out[key] = value
+        if self.ai_generated:
+            out["ai_generated"] = True
         return out
 
     @classmethod
@@ -125,6 +185,10 @@ class Block:
             ref=payload.get("ref"),
             view_type=payload.get("view_type"),
             options=dict(payload.get("options") or {}),
+            authored_by=payload.get("authored_by"),
+            prompt_ref=payload.get("prompt_ref"),
+            validated_by=payload.get("validated_by"),
+            ai_generated=bool(payload.get("ai_generated", False)),
         )
 
 
@@ -146,6 +210,10 @@ class Chapter:
     anchor: Optional[str] = None
     canonical: bool = False
     blocks: List[Block] = field(default_factory=list)
+    #: id of the AuthorNode credited with this chapter. A chapter is data, not a
+    #: node, so it cannot carry a `has_author` edge of its own — the attribution
+    #: rides here, and the NarrativeNode carries the edge for the whole work.
+    authored_by: Optional[str] = None
 
     def add_prose(self, text: str) -> Block:
         block = Block.prose(text)
@@ -157,11 +225,19 @@ class Chapter:
         self.blocks.append(block)
         return block
 
+    def add_ai_prose(self, text: str, *, author_id: str,
+                     prompt_ref: Optional[str] = None) -> Block:
+        block = Block.ai_prose(text, author_id=author_id, prompt_ref=prompt_ref)
+        self.blocks.append(block)
+        return block
+
     def to_dict(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {"title": self.title, "canonical": self.canonical,
                                "blocks": [b.to_dict() for b in self.blocks]}
         if self.anchor:
             out["anchor"] = self.anchor
+        if self.authored_by:
+            out["authored_by"] = self.authored_by
         return out
 
     @classmethod
@@ -171,6 +247,7 @@ class Chapter:
             anchor=payload.get("anchor"),
             canonical=bool(payload.get("canonical", False)),
             blocks=[Block.from_dict(b) for b in (payload.get("blocks") or [])],
+            authored_by=payload.get("authored_by"),
         )
 
 
@@ -247,6 +324,51 @@ class NarrativeNode(Node):
                     out.append(block.ref)
         return out
 
+    # — authorship and endorsement (N4) ————————————————————————————————
+
+    def blocks_iter(self):
+        """Every block, with the chapter it belongs to."""
+        for chapter in self.chapters:
+            for block in chapter.blocks:
+                yield chapter, block
+
+    def ai_blocks(self) -> List[Block]:
+        """Everything a machine wrote in this narrative."""
+        return [b for _c, b in self.blocks_iter() if b.ai_generated]
+
+    def pending_validation(self) -> List[Block]:
+        """AI content nobody has vouched for yet.
+
+        This is the list a reviewer works through, and the reason the state is
+        derived rather than stored: it can never drift from the facts.
+        """
+        return [b for b in self.ai_blocks() if not b.validated_by]
+
+    def prompt_refs(self) -> List[str]:
+        """The prompts behind the generated content, in order, without repeats.
+        They are DocumentNodes: the prompt is a source, and is cited like one."""
+        seen, out = set(), []
+        for _c, block in self.blocks_iter():
+            if block.prompt_ref and block.prompt_ref not in seen:
+                seen.add(block.prompt_ref)
+                out.append(block.prompt_ref)
+        return out
+
+    def author_refs(self) -> List[str]:
+        """Every author credited anywhere in this narrative — chapters and
+        blocks, plus the endorsers. In order, without repeats."""
+        seen, out = [], []
+        def add(value):
+            if value and value not in seen:
+                seen.append(value)
+                out.append(value)
+        for chapter in self.chapters:
+            add(chapter.authored_by)
+            for block in chapter.blocks:
+                add(block.authored_by)
+                add(block.validated_by)
+        return out
+
     def unresolved_refs(self, graph) -> List[str]:
         """The referenced ids that no node in ``graph`` answers to.
 
@@ -256,6 +378,17 @@ class NarrativeNode(Node):
         """
         return [ref for ref in self.referenced_ids()
                 if graph.find_node_by_id(ref) is None]
+
+    def endorse_all(self, human_author_id: str) -> int:
+        """Vouch for every pending AI block. Returns how many were endorsed.
+
+        Deliberately explicit and deliberately not automatic: nothing in this
+        module ever sets `validated_by` on its own.
+        """
+        pending = self.pending_validation()
+        for block in pending:
+            block.endorse(human_author_id)
+        return len(pending)
 
     # — serialisation ——————————————————————————————————————————————————————
     #
@@ -282,3 +415,68 @@ class NarrativeNode(Node):
                    data=payload)
         node.chapters = chapters
         return node
+
+
+# ── endorsement, checked against the graph ────────────────────────────────────
+#
+# The connections datamodel declares `validated_by` with target `AuthorNode`,
+# and the resolver is subclass-aware — which means `AuthorAINode`, being a
+# subclass of AuthorNode, SATISFIES it. The datamodel has no way to say "this
+# class but not its subclasses", so the rule that only a person can endorse
+# cannot be expressed there. It is enforced here instead, and the gap is
+# recorded rather than hidden: an edge added by hand will still pass validation.
+
+
+def resolve_human_author(graph, author_id: str):
+    """Return the AuthorNode for ``author_id``, or raise.
+
+    Rejects an AI author explicitly. A model endorsing a model would be a
+    signature with nobody behind it — the whole point of the act is that a
+    person can be asked about it afterwards.
+    """
+    from .author_node import AuthorAINode, AuthorNode
+
+    if not author_id:
+        raise NarrativeError("an endorsement needs an author id")
+    node = graph.find_node_by_id(author_id) if graph is not None else None
+    if node is None:
+        raise NarrativeError(
+            f"no node '{author_id}' in this graph: an endorsement must name "
+            f"someone the graph knows")
+    if isinstance(node, AuthorAINode):
+        raise NarrativeError(
+            f"'{author_id}' is an AI author: only a human author can endorse "
+            f"content. A model vouching for a model is not a validation.")
+    if not isinstance(node, AuthorNode):
+        raise NarrativeError(
+            f"'{author_id}' is a {type(node).__name__}, not an author")
+    return node
+
+
+def endorse_block(graph, block: Block, human_author_id: str) -> Block:
+    """A named person vouches for one AI-written block, checked against the graph.
+
+    This is the call an API or a UI should make; :meth:`Block.endorse` is the
+    unchecked primitive underneath it.
+    """
+    resolve_human_author(graph, human_author_id)
+    if not block.ai_generated:
+        raise NarrativeError(
+            "only AI-written content needs endorsing; human text already has "
+            "an author")
+    block.endorse(human_author_id)
+    return block
+
+
+def endorse_narrative(graph, narrative: "NarrativeNode",
+                      human_author_id: str) -> int:
+    """Endorse every pending AI block of ``narrative``. Returns how many.
+
+    Nothing here happens on its own: endorsement is always an explicit act by a
+    named person, never a side effect of generating or saving.
+    """
+    resolve_human_author(graph, human_author_id)
+    pending = narrative.pending_validation()
+    for block in pending:
+        block.endorse(human_author_id)
+    return len(pending)

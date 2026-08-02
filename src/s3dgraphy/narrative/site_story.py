@@ -6,8 +6,8 @@ Structure (narrative-vision-spec §3):
     2. Dove si trova        canonical   the geographic placement
     3. one chapter per epoch            the units of that lane, each with
                                         "how I know it" beside it
-    4. Il cantiere                      the activities: what was DONE, and the
-                                        units it was done to
+    4. one chapter per activity         what was DONE, and the units it was
+                                        done to, each with its evidence
 
 The chapters that carry the argument are 3 and 4. A chapter is a lane; inside
 it, each unit sits next to its evidence chain — the paradata **in** the story,
@@ -185,7 +185,15 @@ def _presentation_chapter(graph, narrative, graph_name) -> None:
     # SHOWS each one, with its criticism, which is what a reader of a
     # reconstruction needs — and it keeps every source individually
     # referenced, so "which narratives rest on this source" stays answerable.
-    sources = _nodes(graph, _SourceClass)
+    # A prompt is a source OF THE NARRATIVE, not of the reconstruction. Listing
+    # it among "the sources this account rests on" would put the machine's
+    # instructions next to Maiuri's survey, which is a category error — and it
+    # would grow with every generation. Which documents are prompts is DERIVED
+    # from the narratives that cite them, so no new flag was needed.
+    prompts = {ref for n in _nodes(graph, NarrativeNode)
+               for ref in n.prompt_refs()}
+    sources = [s for s in _nodes(graph, _SourceClass)
+               if s.node_id not in prompts]
     if sources:
         chapter.add_prose(PLACEHOLDER.format(
             what="come si legge questo racconto e su quali fonti si appoggia"))
@@ -233,30 +241,42 @@ def _epoch_chapters(graph, narrative) -> None:
 # ── 4. Il cantiere ───────────────────────────────────────────────────────────
 
 def _activity_chapter(graph, narrative) -> None:
-    """The actions performed in antiquity — building, collapsing, robbing out.
+    """The actions performed in antiquity, one chapter per activity.
 
-    TODO (E.D.): EM has no node that says "this is an ACTION" as opposed to
-    "this is a grouping". `ActivityNodeGroup` is the closest thing and is what
-    this uses, but it is a container of intention, not a typed event: nothing
-    distinguishes «costruzione della torre» from «materiale di scavo 2019».
-    Until the language does, this chapter can only list the activities and let
-    the author say which are actions — it does not classify them, and it does
-    not invent an `action` type on the way past. If the multitemporal reading of
-    §5 of the spec is to work properly, that distinction probably needs a DP of
-    its own.
+    E.D., 2 Aug 2026: the **ActivityNodeGroup IS the activity** — «costruzione
+    della torre» — and its **actions** are the units it contains. No new "event"
+    type: the language already has the right node, and adding one would have
+    split a concept that is whole.
+
+    So each activity gets its own chapter, anchored to it exactly as an epoch
+    chapter is anchored to its lane. That is what makes the multitemporal
+    reading work: the epochs tell you WHEN, the activities tell you WHAT WAS
+    DONE, and both are lanes of the same graph.
+
+    If the activity carries a narrative account of its own
+    (`ActivityNodeGroup.narrative`), that prose opens the chapter; otherwise a
+    placeholder does. Nothing is invented either way.
     """
     activities = _nodes(graph, _ActivityClass)
     if not activities:
         return
-    chapter = narrative.add_chapter("Il cantiere", anchor=None)
-    chapter.add_prose(PLACEHOLDER.format(
-        what="le azioni compiute in antico, epoca per epoca"))
     for activity in activities:
-        chapter.add_prose(PLACEHOLDER.format(what=f"l'attività «{activity.name}»"))
-        for member in _in(graph, activity.node_id, "is_in_activity"):
-            node = graph.find_node_by_id(member)
-            if node is not None and _is_stratigraphic(node):
-                chapter.add_embed(member, "us")
+        chapter = narrative.add_chapter(str(activity.name),
+                                        anchor=activity.node_id)
+        account = getattr(activity, "narrative", "") or ""
+        if account.strip():
+            chapter.add_prose(account)
+        else:
+            chapter.add_prose(PLACEHOLDER.format(
+                what=f"l'attività «{activity.name}»: che cosa è stato fatto"))
+        # the actions: the units this activity contains, in stratigraphic order
+        members = [graph.find_node_by_id(mid)
+                   for mid in _in(graph, activity.node_id, "is_in_activity")]
+        units = [m for m in members if m is not None and _is_stratigraphic(m)]
+        for unit in _topological_by_is_after(graph, units):
+            chapter.add_embed(unit.node_id, "us")
+            for prop_id in _evidence_for(graph, unit.node_id):
+                chapter.add_embed(prop_id, "paradata")
 
 
 def _text(value) -> Optional[str]:

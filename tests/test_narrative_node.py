@@ -224,13 +224,17 @@ def test_the_fixture_loads_and_is_shaped_as_the_spec_describes():
     graph, _warnings = load_emjson_file(str(FIXTURE))
     n = _narrative(graph)
     titles = [c.title for c in n.chapters]
-    assert titles == ["Presentazione", "Dove si trova", "Età imperiale"]
-    # the two canonical chapters (intro + geo) and one epoch chapter
-    assert [c.canonical for c in n.chapters] == [True, True, False]
+    assert titles == ["Presentazione", "Dove si trova", "Età imperiale",
+                      "Cantiere imperiale"]
+    # the two canonical chapters (intro + geo), then the two lane chapters:
+    # an epoch (WHEN) and an activity (WHAT WAS DONE)
+    assert [c.canonical for c in n.chapters] == [True, True, False, False]
     assert n.chapters[2].anchor == "EP.imperiale"
+    assert n.chapters[3].anchor == "ACT.cantiere"
     kinds = [b.view_type for c in n.chapters for b in c.blocks
              if b.block_type == BLOCK_EMBED]
-    assert kinds == ["source", "source", "map", "us", "us", "paradata"]
+    assert kinds == ["source", "source", "map", "us", "us", "paradata",
+                     "us", "us"]
 
 
 def test_every_reference_in_the_fixture_resolves():

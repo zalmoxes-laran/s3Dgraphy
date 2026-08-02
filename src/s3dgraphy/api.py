@@ -369,6 +369,43 @@ def format_conversion_report(report: Dict[str, Any], *,
     return "\n".join(lines)
 
 
+# ── EM Narrative — generation seam (N5) ───────────────────────────────────────
+#
+# s3Dgraphy stays PURE: these two build the briefing and write the result back,
+# and neither touches the network. The model call itself lives in em-bridge,
+# behind a provider interface — the same split that keeps this package free of
+# web frameworks.
+
+
+def build_narrative_generation_context(graph: Graph, activity_id: str = None, *,
+                                       chapter_ref: str = None,
+                                       template_id: str = "site_story"
+                                       ) -> Dict[str, Any]:
+    """Everything a model needs to write about one activity, as a plain dict.
+
+    The activity, its actions in stratigraphic order, their epochs, the evidence
+    chain behind each, the sources that chain rests on, and the style contract.
+    Deliberately a briefing and not a dump: what is not in it cannot leak.
+    """
+    from .narrative.generation import build_narrative_generation_context as _b
+    return _b(graph, activity_id, chapter_ref=chapter_ref,
+              template_id=template_id)
+
+
+def write_ai_draft(graph: Graph, target: str, text: str, *, model: str,
+                   version: str = "", date: Optional[str] = None,
+                   prompt: str = "", narrative_id: Optional[str] = None,
+                   chapter_title: Optional[str] = None) -> Dict[str, Any]:
+    """Write generated prose into the narrative: attributed to the AI author,
+    with the prompt registered as a source, and **unendorsed**.
+
+    Nothing here validates anything — validation is an act by a person (N4)."""
+    from .narrative.generation import write_ai_draft as _w
+    return _w(graph, target, text, model=model, version=version, date=date,
+              prompt=prompt, narrative_id=narrative_id,
+              chapter_title=chapter_title)
+
+
 # ── XLSX mapping ──────────────────────────────────────────────────────────────
 def xlsx_to_graph(path: str, *, mapping_name: Optional[str] = None,
                   id_column: Optional[str] = None, graph_id: str = "imported_graph"

@@ -629,6 +629,31 @@
         ]
       }
     },
+    "validated_by": {
+      "name": "validated_by",
+      "label": "Validated by",
+      "description": "A HUMAN author endorses a piece of content: they have read it and put their name to it. Introduced for EM Narrative (N4) to carry the act at the heart of 'Who Made This?': a machine may draft, but only a person can vouch. Until this edge exists, AI-authored content is a draft and says so — the absence of the edge IS the unendorsed state, so nothing can claim endorsement it has not received.",
+      "scope_note": "Distinct from has_author, and the distinction is the point. has_author says who WROTE it (human or AI, prov:wasAttributedTo). validated_by says who ACCEPTED RESPONSIBILITY for it, and the target is deliberately AuthorNode only — never AuthorAINode: a model endorsing a model would be a signature with nobody behind it. It is also NOT a quality judgement or a peer review: it records that a named person stands behind this content, nothing more and nothing less.",
+      "reverse": {
+        "name": "validated",
+        "label": "Validated"
+      },
+      "mapping": {
+        "cidoc": "prov:wasInfluencedBy",
+        "cidoc_extension": "PROV-O",
+        "extension_mapping": "em:validatedBy",
+        "extension_name": "EM",
+        "_comment": "NEEDS AN ONTOLOGY DECISION (E.D.). Endorsement has no exact term in CIDOC-CRM or PROV-O: crm:P14_carried_out_by would require reifying an E7 Activity we do not author, and crminf's belief machinery (I2/J4) models what someone holds TRUE, not what they take responsibility for. prov:wasInfluencedBy is used as the domain-neutral anchor because it is true (the content was influenced by the validator's act) and claims nothing more; the precise meaning lives in the em: extension. If a validation ACT is later reified as an E13 Attribute Assignment, this mapping is where it changes."
+      },
+      "allowed_connections": {
+        "source": [
+          "NarrativeNode"
+        ],
+        "target": [
+          "AuthorNode"
+        ]
+      }
+    },
     "has_author": {
       "name": "has_author",
       "label": "Has author",
@@ -655,7 +680,8 @@
           "CombinerNode",
           "PropertyNode",
           "EpochNode",
-          "DTCProcessNode"
+          "DTCProcessNode",
+          "NarrativeNode"
         ],
         "target": [
           "AuthorNode",

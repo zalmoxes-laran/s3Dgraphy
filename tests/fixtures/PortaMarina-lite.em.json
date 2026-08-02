@@ -36,6 +36,36 @@
         "id": "EX1_from_D1",
         "source": "EX.1",
         "target": "D.1"
+      },
+      {
+        "edge_type": "has_author",
+        "id": "nar_author",
+        "source": "NARR.portamarina",
+        "target": "A.demetrescu"
+      },
+      {
+        "edge_type": "has_author",
+        "id": "nar_ai_author",
+        "source": "NARR.portamarina",
+        "target": "AI.claude"
+      },
+      {
+        "edge_type": "is_in_activity",
+        "id": "US.101_in_act",
+        "source": "US.101",
+        "target": "ACT.cantiere"
+      },
+      {
+        "edge_type": "is_in_activity",
+        "id": "US.102_in_act",
+        "source": "US.102",
+        "target": "ACT.cantiere"
+      },
+      {
+        "edge_type": "validated_by",
+        "id": "nar_validated",
+        "source": "NARR.portamarina",
+        "target": "A.demetrescu"
       }
     ],
     "graph_id": "portamarina_lite",
@@ -183,6 +213,39 @@
               ],
               "canonical": false,
               "title": "Età imperiale"
+            },
+            {
+              "anchor": "ACT.cantiere",
+              "authored_by": "A.demetrescu",
+              "blocks": [
+                {
+                  "ai_generated": true,
+                  "authored_by": "AI.claude",
+                  "block_type": "prose",
+                  "prompt_ref": "D.prompt.cantiere",
+                  "text": "Nel corso del I secolo il fronte occidentale viene rifatto: il paramento in opera incerta e la soglia in travertino appartengono a un unico cantiere.",
+                  "validated_by": "A.demetrescu"
+                },
+                {
+                  "block_type": "embed",
+                  "ref": "US.102",
+                  "view_type": "us"
+                },
+                {
+                  "block_type": "embed",
+                  "ref": "US.101",
+                  "view_type": "us"
+                },
+                {
+                  "ai_generated": true,
+                  "authored_by": "AI.claude",
+                  "block_type": "prose",
+                  "prompt_ref": "D.prompt.cantiere",
+                  "text": "[bozza non avallata] La cronologia puntuale dell'intervento resta aperta."
+                }
+              ],
+              "canonical": false,
+              "title": "Cantiere imperiale"
             }
           ],
           "lang": "it",
@@ -194,6 +257,47 @@
         "id": "NARR.portamarina",
         "name": "Porta Marina — la storia del sito",
         "node_type": "narrative"
+      },
+      {
+        "data": {
+          "name": "Emanuel",
+          "orcid": "0000-0002-0805-4364",
+          "surname": "Demetrescu"
+        },
+        "id": "A.demetrescu",
+        "name": "Emanuel",
+        "node_type": "author"
+      },
+      {
+        "data": {
+          "model": "claude-opus-5",
+          "name": "Claude",
+          "orcid": "noorcid",
+          "prompt_reference": "D.prompt.cantiere",
+          "surname": "Anthropic"
+        },
+        "id": "AI.claude",
+        "name": "Claude",
+        "node_type": "author_ai"
+      },
+      {
+        "data": {
+          "content_nature": "2d_object",
+          "role": "analytical"
+        },
+        "description": "Racconta l'attività «Cantiere imperiale» a partire dalle sue azioni (US101 paramento, US102 soglia) e dalle fonti collegate. Non aggiungere fatti non presenti nel grafo.",
+        "id": "D.prompt.cantiere",
+        "name": "Prompt · cantiere imperiale",
+        "node_type": "document"
+      },
+      {
+        "data": {
+          "y_pos": 0.0
+        },
+        "description": "Interventi edilizi di età imperiale.",
+        "id": "ACT.cantiere",
+        "name": "Cantiere imperiale",
+        "node_type": "ActivityNodeGroup"
       }
     ]
   },
