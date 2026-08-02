@@ -1,6 +1,6 @@
 {
   "formal_language": "EM",
-  "version": "1.6.6",
+  "version": "1.6.7",
   "_note_material_vs_qualia_color": [
     "DUE COSE DIVERSE CHE SI CHIAMANO ENTRAMBE color. Non confonderle: e gia successo.",
     "1) QUI, in node_styles.<tipo>.style.material.rgba_color — il COLORE DEL MATERIALE BLENDER del proxy 3D, in float LINEARI. UNA sola chiave: `rgba_color`. Fino a S8 il file ne usava due (`color` sui 13 tipi stratigrafici, `rgba_color` sugli altri) e get_material_color() ne leggeva una sola, restituendo None per 21 tipi su 38; ora sono unificate e la vecchia `color` e letta solo come tolleranza verso file scritti prima. Un tipo che non diventa mai una mesh NON ha material affatto (i contenitori di gruppo, e da S7 i dieci nodi che rendono per icona): per loro get_material_color() torna None, ed e corretto.",
@@ -9,6 +9,7 @@
     "In breve: qui si decide di che colore DISEGNARE una US; li si registra di che colore ERA."
   ],
   "_changelog": {
+    "1.6.7": "S10 — curato il colore di SE (StratigraphicEventNode), l'ultimo segnaposto rimasto fra i tipi che qualcuno disegna davvero. Era #BC0000, un rosso mai scelto che contraddiceva il proprio border_color nero, e il node datamodel dichiarava il simbolo 'to be defined': non c'era una decisione da rispettare, c'era un buco. Ora TEAL #2A8C8C, material lineare (0.023, 0.262, 0.262), con border_color coerente — la famiglia cromatica delle attivita, l'unica del linguaggio che significa 'e successo qualcosa' invece di 'qualcosa c'e'. Aggiornato di conseguenza il campo symbol nel node datamodel.",
     "1.6.6": "S8 — unificata la chiave del colore-materiale su `rgba_color`. Rinominate le 14 voci che usavano `style.material.color` (i 13 tipi stratigrafici piu UL): valori invariati, nessun altro campo toccato. Ora tutte le 24 voci con un material parlano la stessa chiave. get_material_color() legge `rgba_color` come autoritativa e mantiene `color` solo come tolleranza per file scritti prima della rinomina. Gli hex 2D border_color/fill_color NON sono stati toccati: sono un'altra cosa (sRGB per il canvas) e hanno un altro consumatore (EMStudio). Verificato che i 14 materiali Blender di EMtools producono rgb identici a prima.",
     "1.6.5": "S7 — applicate le decisioni E.D. sull'inventario dei material segnaposto. TOLTO il blocco `material` a 10 tipi che non diventano mai una mesh e rendono per icona o forma (PROP, COMB, EXT, DOC, EP, AUTH, LINK, GEO, SS, unknown): il loro colore 2D resta in border_color/fill_color, e get_material_color ora restituisce None come per i 4 contenitori di gruppo. RIMOSSA del tutto la voce `ANG`, duplicato legacy di ActivityNodeGroup senza alcun consumatore in s3Dgraphy, EM-blender-tools o EMStudio (GRAPH, citato nella stessa nota della 1.6.0, resta perche e usato). AGGIUNTO `UL` (Working Unit), unico tipo stratigrafico che ne era privo: 2D dal simbolo del datamodel (rettangolo bianco, bordo arancio #D86400), material 3D uguale al rosso US per decisione E.D. RM/RMDoc/RMSF e SE lasciati invariati per decisione E.D. Nessuno dei 13 colori stratigrafici esistenti e stato modificato.",
     "1.6.4": "Sola documentazione: aggiunta _note_material_vs_qualia_color per fissare la distinzione fra il colore di display di questo file (node_styles.*.style.material, chiavi legacy color/rgba_color, stesso concetto) e la qualia `color` di em_qualia_types.json (colore percepito Munsell/AAT). Nessuno stile modificato. Inventario dei 15 material segnaposto in .claude/wip/colori-15-proposta.md, in attesa di decisione E.D.",
@@ -295,19 +296,20 @@
       "label_position": "center"
     },
     "SE": {
+      "_comment": "Stratigraphic Event: l'ATTO che crea, modifica o distrugge un'unita — un terremoto che fa cadere l'intonaco, una demolizione, l'inizio di un cantiere. Non e materia, e un processo, e per questo non appartiene a nessuna delle famiglie cromatiche della materia (rosso reale, verde/blu virtuale, arancio documentario, giallo special find, grigio negativo). Prende il TEAL della famiglia attivita: un ActivityNodeGroup e un fascio di atti e porta gia la linguetta ciano #CCFFFF, quindi il ciano e l'unico colore del linguaggio che dice gia 'e successo qualcosa' invece di 'qualcosa c'e'. Curato in S10 (2026-08-02): fino ad allora SE portava il segnaposto #BC0000 mai scelto, che per giunta contraddiceva il proprio bordo nero, e il node datamodel dichiarava il simbolo 'to be defined'. Il nero di BR e stato scartato di proposito: un material nero rende un proxy illeggibile in viewport, e i proxy SE si vedono (Heriverse li disegna fra i suoi stratigraphicTypes).",
       "3d_file": "src/3D/SE.glb",
       "2d_file_rast": "src/3D/SE.png",
       "2d_file_vect": "src/3D/SE.svg",
       "style": {
         "material": {
           "rgba_color": {
-            "r": 0.5,
-            "g": 0.0,
-            "b": 0.0,
+            "r": 0.023,
+            "g": 0.262,
+            "b": 0.262,
             "a": 1.0
           }
         },
-        "border_color": "#000000",
+        "border_color": "#2A8C8C",
         "fill_color": "#FFFFFF",
         "border_style": "dashed",
         "shape": "triangle",

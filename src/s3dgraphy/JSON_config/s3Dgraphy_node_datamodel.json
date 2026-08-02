@@ -489,7 +489,7 @@
      "parent": "StratigraphicNode",
      "abbreviation": "SE",
      "label": "stratigraphic event node",
-     "symbol": "to be defined",
+     "symbol": "white triangle with teal border (#2A8C8C) — famiglia cromatica delle attivita: un SE e un atto, non materia. Deciso in S10 (2026-08-02); prima era 'to be defined'.",
      "description": "An event that creates, modifies, or destroys a stratigraphic unit (e.g. an earthquake causing a plaster collapse, an act of demolition, the start of construction). Distinct from the resulting unit itself: an SE is the PROCESS, the SU is the result. Can be enriched by a 3D simulation (em:RepresentationModel) of the event. May be paired with its resulting unit to provide a temporal range bracketing the action.",
      "s3Dgraphy_file": "stratigraphic_node.py",
      "mapping": {
