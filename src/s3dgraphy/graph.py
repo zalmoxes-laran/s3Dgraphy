@@ -46,6 +46,14 @@ class Graph:
         self.nodes = []
         self.edges = []
         self.warnings = []
+        #: Structured counterpart of the state warnings —
+        #: ``{kind, node_id, message}`` records, filled by
+        #: ``edges.connection_resolver.recompute_warnings`` at load. Empty until
+        #: then: warnings are a function of the graph's state, derived on
+        #: demand, never persisted. Only the state families have records; a
+        #: free-form warning appended via :meth:`add_warning` lives in
+        #: ``warnings`` alone, because nothing here knows what it points at.
+        self.warning_records = []
         self.attributes = {}
 
         # Initialize graph indices

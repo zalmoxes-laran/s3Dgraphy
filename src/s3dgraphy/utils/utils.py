@@ -250,6 +250,22 @@ def _load_visual_rules():
     return _VISUAL_RULES_CACHE
 
 
+#: Keys of ``document_variant_styles`` that are STYLES, not values of the
+#: ``geometry`` axis. Both describe a border rather than a degree of metric
+#: authority, and neither is a legal ``geometry``:
+#:
+#:   * ``default``           — thin black: a use-instance, i.e. not canonical.
+#:   * ``canonical_unknown`` — thick black: canonical, geometry NOT yet
+#:     classified. "Not classified" is the absence of a value on the axis, so
+#:     admitting it as one would let a document declare that it has not
+#:     declared anything.
+#:
+#: ``canonical_unknown`` used to leak into ``DOCUMENT_GEOMETRIES`` because the
+#: filter only excluded ``default`` (cleanup E). The importer's colour→variant
+#: map already special-cased it, which is the tell.
+_STYLE_ONLY_VARIANT_KEYS = ("default", "canonical_unknown")
+
+
 def get_document_vocabularies():
     """Derive the three canonical Master-Document vocabularies from
     ``em_visual_rules.json``.
@@ -259,9 +275,9 @@ def get_document_vocabularies():
 
     - ``document_roles`` → keys (e.g. ``analytical``, ``comparative``)
     - ``document_content_natures`` → keys (e.g. ``2d_object``)
-    - ``document_variant_styles`` → keys *excluding* ``default`` and
-      any ``_comment`` entry (e.g. ``reality_based``, ``observable``,
-      ``asserted``)
+    - ``document_variant_styles`` → keys *excluding* ``_comment`` and the
+      **style-only** entries (e.g. ``reality_based``, ``observable``,
+      ``asserted``, ``symbolic``, ``em_based``)
 
     The JSON is the single source of truth for the Master-Document
     classification vocabulary; adding a new value there flows through
@@ -276,14 +292,14 @@ def get_document_vocabularies():
                        "em_based")
     rules = _load_visual_rules()
 
-    def _keys(section_name):
+    def _keys(section_name, drop=()):
         section = rules.get(section_name, {}) or {}
         return {k for k in section
-                if k and not k.startswith("_") and k != "default"}
+                if k and not k.startswith("_") and k not in drop}
 
-    roles = _keys("document_roles")
-    natures = _keys("document_content_natures")
-    geoms = _keys("document_variant_styles")
+    roles = _keys("document_roles", _STYLE_ONLY_VARIANT_KEYS)
+    natures = _keys("document_content_natures", _STYLE_ONLY_VARIANT_KEYS)
+    geoms = _keys("document_variant_styles", _STYLE_ONLY_VARIANT_KEYS)
 
     def _ordered(values, preferred):
         return tuple(v for v in preferred if v in values) + tuple(

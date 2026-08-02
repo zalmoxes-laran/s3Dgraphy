@@ -168,3 +168,42 @@ def test_the_old_keyword_argument_is_gone():
     api.hat_as_document(study, "r1", shelf=shelf, doc_id="D.9",
                         mark_as_canonical=False)
     assert study.find_node_by_id("D.9").is_canonical() is False
+
+
+# ── E: canonical_unknown is a STYLE, never a geometry ─────────────────────────
+
+def test_canonical_unknown_is_not_a_geometry_value():
+    """``canonical_unknown`` describes a BORDER (thick black: canonical, not yet
+    classified), not a degree of metric authority. It used to leak into
+    ``DOCUMENT_GEOMETRIES`` because the filter only excluded ``default`` — which
+    would have let a document declare, as its geometry, that it has no geometry.
+    """
+    from s3dgraphy.nodes.document_node import DOCUMENT_GEOMETRIES
+
+    assert "canonical_unknown" not in DOCUMENT_GEOMETRIES
+    assert "default" not in DOCUMENT_GEOMETRIES
+    # the real axis, unaffected
+    assert DOCUMENT_GEOMETRIES == ("reality_based", "observable", "asserted",
+                                   "symbolic", "em_based")
+
+
+def test_it_is_refused_as_a_geometry():
+    from s3dgraphy.nodes.document_node import DocumentNode
+
+    with pytest.raises(ValueError):
+        DocumentNode(node_id="D.1", name="D.1", geometry="canonical_unknown")
+
+
+def test_it_still_works_as_a_style_key():
+    """Removing it from the vocabulary must not remove it from the palette: the
+    thick black border is how a canonical-but-unclassified document is drawn."""
+    from s3dgraphy.utils.utils import get_document_variant_style
+
+    style = get_document_variant_style("canonical_unknown")
+    assert style["border_color"] == "#000000"
+    assert style["border_width"] >= 3.0          # thick = canonical
+    assert get_document_variant_style("default")["border_width"] < 3.0
+
+
+def test_a_canonical_document_without_geometry_still_styles_as_unknown():
+    assert _doc(is_canonical=True).variant_style_key() == "canonical_unknown"

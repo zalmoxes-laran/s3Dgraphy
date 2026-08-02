@@ -339,3 +339,190 @@ def format_connection_report(report: Dict[str, Any]) -> str:
         if diag.get("cases_truncated"):
             lines.append("  … (truncated)")
     return "\n".join(lines)
+
+
+# ── state warnings (F) ────────────────────────────────────────────────────────
+#
+# The warnings an author acts on are a FUNCTION OF THE GRAPH'S STATE, not an
+# event log of how it was loaded. They are therefore not persisted (decision
+# E.D., 2 Aug 2026): an em.json carries no `warnings` section, and instead every
+# load recomputes them from what the graph actually says.
+#
+# Until now they only existed on the GraphML path, produced as side effects
+# while the drawing was being read. An em.json loaded straight from disk had
+# none of them — the same graph, silent. That also meant the two paths said
+# different things about the same file.
+#
+# The three families below are the state ones: a node with no type, a group with
+# no role, an edge that came out generic. They are exactly what the S6 panels
+# aggregate, and exactly what `connection_report` measures — so the measuring is
+# reused here rather than written twice.
+
+#: Set on the graph to remember which warnings this function contributed, so a
+#: second call replaces them instead of appending a duplicate set.
+_STATE_WARNINGS_ATTR = "_s3d_state_warnings"
+
+#: `Graph.add_edge` appends its own line every time it degrades a connection.
+#: On an em.json load that line is noise twice over: the edge is ALREADY
+#: `generic_connection` in the document, so the message reads "Connection
+#: 'generic_connection' not allowed … Using 'generic_connection' instead", and
+#: it restates a fact this function derives properly. Recomputing owns the
+#: degraded-edge family, so it takes ownership of those lines too.
+_ADD_EDGE_DEGRADATION_MARK = "Using 'generic_connection' instead."
+
+
+def _name_of(node: Any) -> str:
+    name = getattr(node, "name", None)
+    if isinstance(name, dict):
+        name = name.get("default") or next(iter(name.values()), None)
+    name = (name or "").strip() if isinstance(name, str) else ""
+    return name or str(getattr(node, "node_id", "") or "?")
+
+
+#: The vocabulary of state-warning kinds. ONE spelling, shared by every
+#: consumer — s3Dgraphy, the EMTools panel, the EMStudio Log tab. Before this
+#: existed each UI re-derived the families by matching substrings of the English
+#: message, which is fragile in the worst way: reword a sentence and a family
+#: silently empties instead of failing.
+KIND_UNTYPED_NODE = "untyped_node"
+KIND_UNCLASSIFIED_GROUP = "unclassified_group"
+KIND_DEGRADED_EDGE = "degraded_edge"
+KIND_DANGLING_EDGE = "dangling_edge"
+
+WARNING_KINDS = (
+    KIND_UNTYPED_NODE,
+    KIND_UNCLASSIFIED_GROUP,
+    KIND_DEGRADED_EDGE,
+    KIND_DANGLING_EDGE,
+)
+
+
+def state_warning_records(graph: Any) -> List[Dict[str, Any]]:
+    """The warnings implied by ``graph``'s current state, as records. Pure.
+
+    Each record is ``{kind, node_id, message}`` plus whatever else its kind can
+    say:
+
+    ``kind``     one of :data:`WARNING_KINDS`.
+    ``node_id``  the element a UI should reveal when the reader clicks the
+                 warning. For a node warning it is that node; for an edge
+                 warning it is the edge's SOURCE — an edge is not selectable on
+                 its own in most views, and the source is where the reader needs
+                 to look first. Never ``None``, so the triple always means
+                 something.
+    ``message``  the human sentence, the one the panels have always shown.
+
+    Edge kinds additionally carry ``edge_id``, ``target_id`` and, for
+    ``degraded_edge``, the ``candidates`` the datamodel would allow — so a UI can
+    offer "re-draw as X" without re-deriving anything.
+
+    Wording is deliberately source-neutral: the GraphML importer can say "its yEd
+    shape/colour matches no node type" because it saw the drawing; here there is
+    only the graph, and claiming to know why would be inventing.
+    """
+    out: List[Dict[str, Any]] = []
+
+    untyped, roleless = [], []
+    for node in getattr(graph, "nodes", []) or []:
+        node_type = _node_type(node)
+        if node_type == "Node":
+            untyped.append(node)
+        elif node_type == "Group":
+            roleless.append(node)
+
+    for node in untyped:
+        out.append({
+            "kind": KIND_UNTYPED_NODE,
+            "node_id": getattr(node, "node_id", None),
+            "message": (f"Node '{_name_of(node)}' has no recognised EM type: it "
+                        f"and its connections stay untyped. Classify it in the "
+                        f"source graph."),
+        })
+    for node in roleless:
+        out.append({
+            "kind": KIND_UNCLASSIFIED_GROUP,
+            "node_id": getattr(node, "node_id", None),
+            "message": (f"Group '{_name_of(node)}' has no EM role: it is kept "
+                        f"as an organisational box. Classify it if it should "
+                        f"carry meaning."),
+        })
+
+    untypable = {getattr(n, "node_id", None) for n in untyped + roleless}
+    for edge in getattr(graph, "edges", []) or []:
+        if (getattr(edge, "edge_type", "") or "") != GENERIC_CONNECTION:
+            continue
+        edge_id = getattr(edge, "edge_id", None)
+        src = graph.find_node_by_id(edge.edge_source)
+        tgt = graph.find_node_by_id(edge.edge_target)
+        if src is None or tgt is None:
+            out.append({
+                "kind": KIND_DANGLING_EDGE,
+                "node_id": edge.edge_source,
+                "edge_id": edge_id,
+                "target_id": edge.edge_target,
+                "message": (f"Connection '{edge_id or '?'}' has a missing "
+                            f"endpoint: it cannot be typed."),
+            })
+            continue
+        if edge.edge_source in untypable or edge.edge_target in untypable:
+            # Not an edge problem: the endpoint is. The author has already been
+            # told about the node, and repeating it per edge buries the real
+            # relation errors under a hundred consequences.
+            continue
+        candidates = candidate_edge_types(src, tgt)
+        head = (f"Connection {_name_of(src)} → {_name_of(tgt)} is "
+                f"'{GENERIC_CONNECTION}'")
+        if len(candidates) == 1:
+            message = (f"{head}: the datamodel allows exactly "
+                       f"'{candidates[0]}' between these two — re-draw it with "
+                       f"that relation.")
+        elif candidates:
+            message = (f"{head}: the datamodel allows "
+                       f"{', '.join(candidates)} between these two; the "
+                       f"endpoints alone cannot decide which. Choose one.")
+        else:
+            message = (f"{head}: the datamodel allows no relation between a "
+                       f"'{_node_type(src)}' and a '{_node_type(tgt)}'. This "
+                       f"connection is outside the EM language.")
+        out.append({
+            "kind": KIND_DEGRADED_EDGE,
+            "node_id": edge.edge_source,
+            "edge_id": edge_id,
+            "target_id": edge.edge_target,
+            "candidates": candidates,
+            "message": message,
+        })
+    return out
+
+
+def state_warnings(graph: Any) -> List[str]:
+    """The state warnings as plain sentences — the string projection of
+    :func:`state_warning_records`, kept for every caller that only shows text."""
+    return [r["message"] for r in state_warning_records(graph)]
+
+
+def recompute_warnings(graph: Any) -> List[str]:
+    """Refresh ``graph.warnings`` from the graph's state. Returns what it added.
+
+    Two shapes are published, because two kinds of caller need them:
+
+    * ``graph.warnings`` — the flat list of sentences, unchanged, for everything
+      that just prints them;
+    * ``graph.warning_records`` — the ``{kind, node_id, message}`` records, for a
+      UI that wants to group them exactly and select the offending element.
+
+    Idempotent: the block contributed by a previous call is dropped before the
+    new one is appended, so calling this twice leaves the same list. Warnings
+    this function does not own — a deserialisation note, a stratigraphic cycle —
+    are preserved untouched; they have no records, which is honest: this
+    function did not derive them and cannot say what they point at.
+    """
+    records = state_warning_records(graph)
+    fresh = [r["message"] for r in records]
+    previous = set(getattr(graph, _STATE_WARNINGS_ATTR, ()) or ())
+    kept = [w for w in (getattr(graph, "warnings", None) or [])
+            if w not in previous and _ADD_EDGE_DEGRADATION_MARK not in w]
+    graph.warnings = kept + fresh
+    graph.warning_records = records
+    setattr(graph, _STATE_WARNINGS_ATTR, list(fresh))
+    return fresh

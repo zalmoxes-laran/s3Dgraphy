@@ -61,10 +61,17 @@ def _instantiate(node_type: str, payload: Dict[str, Any],
                  warnings: List[str]):
     cls = Node.node_type_map.get(node_type)
     if cls is None:
-        warnings.append(
-            f"unknown node_type '{node_type}' for node "
-            f"'{payload.get('id')}': degraded to base Node"
-        )
+        # ``Node`` is not in the map because it is the base class, not a type:
+        # a node serialised with it is one the source could not type, which is
+        # a real problem but NOT an unknown-type one — calling it "unknown"
+        # was factually wrong, and it double-reported what `recompute_warnings`
+        # now states properly as an untyped node (F). A genuinely unrecognised
+        # type still warns: that is a version gap and the reader must say so.
+        if node_type != "Node":
+            warnings.append(
+                f"unknown node_type '{node_type}' for node "
+                f"'{payload.get('id')}': degraded to base Node"
+            )
         cls = Node
 
     data = dict(payload.get("data") or {})

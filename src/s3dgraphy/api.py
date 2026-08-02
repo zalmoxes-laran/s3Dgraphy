@@ -36,19 +36,70 @@ class MissingDependency(ImportError):
 
 
 # ── load / parse ──────────────────────────────────────────────────────────────
+def _with_state_warnings(graph: Graph, warnings: List[str]) -> Tuple[Graph, List[str]]:
+    """Refresh the graph's state warnings and fold them into the returned list.
+
+    The em.json format carries no ``warnings`` section on purpose: warnings are
+    a function of the graph's state, not a log of how it was loaded, so they are
+    recomputed at every load instead of being persisted (F). Without this, an
+    em.json opened from disk was silent about exactly the problems the GraphML
+    path shouted about — the same graph, two different stories.
+
+    Both channels are fed: ``graph.warnings`` for callers holding the graph, and
+    the returned list for callers that only take the tuple (EMTools' import
+    panel is one). The structured records land on ``graph.warning_records`` —
+    see :func:`graph_warnings`.
+    """
+    from .edges.connection_resolver import recompute_warnings
+    fresh = recompute_warnings(graph)
+    merged = list(warnings)
+    merged.extend(w for w in fresh if w not in warnings)
+    return graph, merged
+
+
+def graph_warnings(graph: Graph, *, recompute: bool = False
+                   ) -> List[Dict[str, Any]]:
+    """The graph's warnings as ``{kind, node_id, message}`` records.
+
+    The load path already fills these, so the default is to read them; pass
+    ``recompute=True`` after mutating the graph — the point of not persisting
+    warnings is that they follow the state, so a UI can refresh them whenever it
+    wants without an import round-trip.
+
+    ``kind`` is one of ``connection_resolver.WARNING_KINDS``, the single spelling
+    every consumer shares. ``node_id`` names the element to reveal when the
+    reader clicks the warning (for an edge, its source). Edge records also carry
+    ``edge_id``, ``target_id`` and the ``candidates`` the datamodel would allow.
+
+    Warnings that are not state warnings — a stratigraphic cycle, a
+    deserialisation note — have no record: this surface does not pretend to know
+    what they point at. They remain in ``graph.warnings``.
+    """
+    from .edges.connection_resolver import (recompute_warnings,
+                                            state_warning_records)
+    if recompute:
+        recompute_warnings(graph)
+        return list(getattr(graph, "warning_records", []) or [])
+    existing = getattr(graph, "warning_records", None)
+    return list(existing) if existing else state_warning_records(graph)
+
+
 def load_emjson(doc: EmJson) -> Tuple[Graph, List[str]]:
     """Parse an in-memory .em.json v1 document into a Graph.
 
     Returns ``(graph, warnings)``; unknown node types degrade to base nodes with
-    a warning (forward-compatible) rather than failing."""
+    a warning (forward-compatible) rather than failing. The state warnings
+    (untyped nodes, role-less groups, degraded connections) are recomputed here
+    — see :func:`_with_state_warnings`."""
     from .importer.emjson_importer import parse_emjson
-    return parse_emjson(doc)
+    return _with_state_warnings(*parse_emjson(doc))
 
 
 def load_emjson_file(path: str) -> Tuple[Graph, List[str]]:
-    """Load a .em.json v1 file. Returns ``(graph, warnings)``."""
+    """Load a .em.json v1 file. Returns ``(graph, warnings)``, state warnings
+    recomputed (F)."""
     from .importer.emjson_importer import import_emjson
-    return import_emjson(path)
+    return _with_state_warnings(*import_emjson(path))
 
 
 def graph_to_emjson(graph: Graph, layout: Optional[Dict[str, Any]] = None) -> EmJson:
