@@ -22,9 +22,12 @@ from s3dgraphy.api import (build_narrative_generation_context, graph_to_emjson,
 from s3dgraphy.graph import Graph
 from s3dgraphy.narrative.generation import (GENERATION_CONSTRAINTS,
                                             ensure_ai_author,
+                                            register_prompt_extractor,
                                             register_prompt_source)
 from s3dgraphy.nodes.author_node import AuthorAINode, AuthorNode
 from s3dgraphy.nodes.document_node import DocumentNode
+from s3dgraphy.nodes.epoch_node import EpochNode
+from s3dgraphy.nodes.extractor_node import ExtractorNode
 from s3dgraphy.nodes.group_node import ActivityNodeGroup
 from s3dgraphy.nodes.narrative_node import (STATUS_AI_DRAFT, NarrativeError,
                                             NarrativeNode)
@@ -147,13 +150,57 @@ def test_a_draft_is_attributed_and_unendorsed(portamarina):
     assert block.authored_by == out["author_id"]
 
 
-def test_the_prompt_is_filed_as_a_source(portamarina):
+def test_the_prompt_is_filed_as_an_extractor(portamarina):
+    """N7 — a prompt is an OPERATION, not a document you consult. Filing it as
+    an Extractor puts it in the chain EM already has, so an AI paragraph is
+    justified the same way a reading off a survey is."""
     out = write_ai_draft(portamarina, "ACT.cantiere", "Prosa.",
                          model="claude-opus-5", prompt="Racconta il cantiere.")
-    doc = portamarina.find_node_by_id(out["prompt_id"])
-    assert isinstance(doc, DocumentNode)
+    ext = portamarina.find_node_by_id(out["prompt_id"])
+    assert isinstance(ext, ExtractorNode)
+    assert not isinstance(ext, DocumentNode)
     # the prompt TEXT is kept, not just the fact that there was one
-    assert doc.description == "Racconta il cantiere."
+    assert ext.description == "Racconta il cantiere."
+
+
+def test_the_prompt_extractor_is_wired_to_the_sources_it_read(portamarina):
+    """An extractor with no `extracted_from` is an operation with nothing to
+    operate on — the inertness that made the DocumentNode wrong."""
+    out = write_ai_draft(portamarina, "ACT.cantiere", "Prosa.",
+                         model="m", prompt="Racconta.")
+    read = {e.edge_target for e in portamarina.edges
+            if e.edge_source == out["prompt_id"]
+            and e.edge_type == "extracted_from"}
+    assert read == {"D.1"}            # the source behind US101's evidence
+    for doc_id in read:
+        assert isinstance(portamarina.find_node_by_id(doc_id), DocumentNode)
+
+
+def test_the_prompt_extractor_never_invents_a_source():
+    """Ids that are not documents are skipped, not fabricated."""
+    g = Graph(graph_id="g")
+    g.add_node(StratigraphicUnit("US.1", "US1"))
+    ext = register_prompt_extractor(g, "Racconta.", sources=["US.1", "nope"])
+    assert not [e for e in g.edges if e.edge_source == ext.node_id]
+
+
+def test_a_prompt_that_is_not_about_an_activity_is_still_filed():
+    """Graceful degradation: no briefing to derive sources from is a reason to
+    file the prompt bare, not a reason to lose it."""
+    g = Graph(graph_id="g")
+    g.add_node(EpochNode("EP.1", "Età", start_time=0, end_time=1))
+    n = NarrativeNode("N1", "Storia")
+    g.add_node(n)
+    out = write_ai_draft(g, "EP.1", "Prosa.", model="m", prompt="Racconta.")
+    assert isinstance(g.find_node_by_id(out["prompt_id"]), ExtractorNode)
+
+
+def test_the_extractor_records_what_it_was_applied_to(portamarina):
+    """`source` is what the RDF exporter projects as
+    crminf:J7_is_based_on_evidence_from."""
+    out = write_ai_draft(portamarina, "ACT.cantiere", "Prosa.",
+                         model="m", prompt="Racconta.")
+    assert portamarina.find_node_by_id(out["prompt_id"]).source == "ACT.cantiere"
 
 
 def test_the_ai_author_is_created_once_and_reused(portamarina):
@@ -262,10 +309,16 @@ def test_a_prompt_must_not_be_empty():
 
 def test_the_same_prompt_is_registered_once():
     g = Graph(graph_id="g")
-    a = register_prompt_source(g, "Racconta il cantiere.")
-    b = register_prompt_source(g, "Racconta il cantiere.")
+    a = register_prompt_extractor(g, "Racconta il cantiere.")
+    b = register_prompt_extractor(g, "Racconta il cantiere.")
     assert a.node_id == b.node_id
-    assert len([n for n in g.nodes if isinstance(n, DocumentNode)]) == 1
+    assert len([n for n in g.nodes if isinstance(n, ExtractorNode)]) == 1
+
+
+def test_the_old_name_still_works_and_now_returns_an_extractor():
+    """A caller written against N5 keeps working — and gets the better model."""
+    g = Graph(graph_id="g")
+    assert isinstance(register_prompt_source(g, "Racconta."), ExtractorNode)
 
 
 def test_the_prompt_id_is_the_same_in_every_process():
@@ -276,8 +329,8 @@ def test_the_prompt_id_is_the_same_in_every_process():
 
     code = ("import sys; sys.path.insert(0, 'src');"
             "from s3dgraphy.graph import Graph;"
-            "from s3dgraphy.narrative.generation import register_prompt_source;"
-            "print(register_prompt_source(Graph(graph_id='g'), 'Racconta.').node_id)")
+            "from s3dgraphy.narrative.generation import register_prompt_extractor;"
+            "print(register_prompt_extractor(Graph(graph_id='g'), 'Racconta.').node_id)")
     runs = {subprocess.run([sys.executable, "-c", code], capture_output=True,
                            text=True, cwd=str(pathlib.Path(__file__).parent.parent)
                            ).stdout.strip() for _ in range(3)}
@@ -295,3 +348,54 @@ def test_s3dgraphy_imports_no_network_client():
     for forbidden in ("import requests", "import httpx", "urllib.request",
                       "anthropic", "openai"):
         assert forbidden not in source, f"{forbidden} must not appear here"
+
+
+# ── the RDF projection of the AI chain (N7) ───────────────────────────────────
+
+def test_the_ai_provenance_chain_projects_as_crminf(portamarina):
+    """The reason to model a prompt as an Extractor rather than a Document.
+
+    An extractor already projects as a CRMinf belief adoption: the exporter
+    emits `J7_is_based_on_evidence_from` and the I2 belief skeleton. So the
+    machine's contribution comes out as *a belief adopted from stated evidence*,
+    which is what it is — where a DocumentNode came out as a thing somebody
+    consulted, which it never was.
+    """
+    pytest.importorskip("rdflib")
+    import rdflib
+
+    from s3dgraphy.api import project_ttl
+
+    out = write_ai_draft(portamarina, "ACT.cantiere", "Prosa.",
+                         model="m", prompt="Racconta.")
+    # the namespace from the exporter itself, not retyped here: a test that
+    # hardcodes a URI passes or fails on the typo, not on the projection
+    from s3dgraphy.exporter.rdf_exporter import CRMINF
+
+    parsed = rdflib.Graph().parse(data=project_ttl(portamarina), format="turtle")
+
+    iri = next(s for s in parsed.subjects()
+               if str(s).endswith("/" + out["prompt_id"]))
+    # applied to the activity…
+    assert str(next(parsed.objects(iri, CRMINF.J7_is_based_on_evidence_from))) \
+        == "ACT.cantiere"
+    # …and it concluded something, like any argumentation node
+    belief = next(parsed.objects(iri, CRMINF.J2_concluded_that))
+    assert (belief, rdflib.RDF.type, CRMINF.I2_Belief) in parsed
+
+
+def test_the_prompt_is_no_longer_projected_as_a_document(portamarina):
+    pytest.importorskip("rdflib")
+    import rdflib
+
+    from s3dgraphy.api import project_ttl
+
+    out = write_ai_draft(portamarina, "ACT.cantiere", "Prosa.",
+                         model="m", prompt="Racconta.")
+    from s3dgraphy.exporter.rdf_exporter import CRM
+
+    parsed = rdflib.Graph().parse(data=project_ttl(portamarina), format="turtle")
+    iri = next(s for s in parsed.subjects()
+               if str(s).endswith("/" + out["prompt_id"]))
+    types = set(parsed.objects(iri, rdflib.RDF.type))
+    assert CRM.E31_Document not in types

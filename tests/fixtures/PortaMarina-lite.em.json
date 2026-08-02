@@ -66,6 +66,12 @@
         "id": "nar_validated",
         "source": "NARR.portamarina",
         "target": "A.demetrescu"
+      },
+      {
+        "id": "EXT.prompt.cantiere_extracted_from_D.1",
+        "source": "EXT.prompt.cantiere",
+        "target": "D.1",
+        "edge_type": "extracted_from"
       }
     ],
     "graph_id": "portamarina_lite",
@@ -222,7 +228,7 @@
                   "ai_generated": true,
                   "authored_by": "AI.claude",
                   "block_type": "prose",
-                  "prompt_ref": "D.prompt.cantiere",
+                  "prompt_ref": "EXT.prompt.cantiere",
                   "text": "Nel corso del I secolo il fronte occidentale viene rifatto: il paramento in opera incerta e la soglia in travertino appartengono a un unico cantiere.",
                   "validated_by": "A.demetrescu"
                 },
@@ -240,7 +246,7 @@
                   "ai_generated": true,
                   "authored_by": "AI.claude",
                   "block_type": "prose",
-                  "prompt_ref": "D.prompt.cantiere",
+                  "prompt_ref": "EXT.prompt.cantiere",
                   "text": "[bozza non avallata] La cronologia puntuale dell'intervento resta aperta."
                 }
               ],
@@ -273,7 +279,7 @@
           "model": "claude-opus-5",
           "name": "Claude",
           "orcid": "noorcid",
-          "prompt_reference": "D.prompt.cantiere",
+          "prompt_reference": "EXT.prompt.cantiere",
           "surname": "Anthropic"
         },
         "id": "AI.claude",
@@ -282,13 +288,12 @@
       },
       {
         "data": {
-          "content_nature": "2d_object",
-          "role": "analytical"
+          "source": "ACT.cantiere"
         },
         "description": "Racconta l'attività «Cantiere imperiale» a partire dalle sue azioni (US101 paramento, US102 soglia) e dalle fonti collegate. Non aggiungere fatti non presenti nel grafo.",
-        "id": "D.prompt.cantiere",
+        "id": "EXT.prompt.cantiere",
         "name": "Prompt · cantiere imperiale",
-        "node_type": "document"
+        "node_type": "extractor"
       },
       {
         "data": {

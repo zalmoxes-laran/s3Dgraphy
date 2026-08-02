@@ -248,7 +248,7 @@ def test_the_fixture_carries_the_whole_author_layer():
     graph, _w = load_emjson_file(str(FIXTURE))
     n = _narrative(graph)
     assert n.author_refs() == ["A.demetrescu", "AI.claude"]
-    assert n.prompt_refs() == ["D.prompt.cantiere"]
+    assert n.prompt_refs() == ["EXT.prompt.cantiere"]
     assert len(n.ai_blocks()) == 2
     # one endorsed, one deliberately left pending: both states are exercised
     assert [b.status for b in n.ai_blocks()] == [STATUS_AI_ENDORSED,

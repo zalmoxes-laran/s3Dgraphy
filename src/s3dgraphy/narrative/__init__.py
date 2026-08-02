@@ -14,6 +14,7 @@ the author's name.
 
 from .generation import (GENERATION_CONSTRAINTS,
                          build_narrative_generation_context, ensure_ai_author,
+                         register_prompt_extractor,
                          register_prompt_source, write_ai_draft)
 from .registry import (NarrativeTemplate, build_narrative, get_template,
                        list_templates, register_template)
@@ -29,6 +30,7 @@ __all__ = [
     "GENERATION_CONSTRAINTS",
     "build_narrative_generation_context",
     "ensure_ai_author",
+    "register_prompt_extractor",
     "register_prompt_source",
     "write_ai_draft",
 ]

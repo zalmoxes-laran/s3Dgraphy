@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional
 
 from ..nodes.document_node import DocumentNode
 from ..nodes.epoch_node import EpochNode
+from ..nodes.extractor_node import ExtractorNode
 from ..nodes.group_node import ActivityNodeGroup
 from ..nodes.narrative_node import (Block, Chapter, NarrativeError,
                                     NarrativeNode)
@@ -231,36 +232,76 @@ def ensure_ai_author(graph, *, model: str, version: str = "",
     return author
 
 
-def register_prompt_source(graph, prompt: str, *, node_id: Optional[str] = None,
-                           name: Optional[str] = None):
-    """Record a prompt as a DocumentNode — a source, cited like any other.
+def register_prompt_extractor(graph, prompt: str, *,
+                              node_id: Optional[str] = None,
+                              name: Optional[str] = None,
+                              sources: Optional[List[str]] = None,
+                              based_on: str = ""):
+    """Record a prompt as an **ExtractorNode**, wired to the sources it read.
 
-    "How do I know this" applies just as much to "how did the machine come to
-    write it". The prompt text lives in the node's description, so the record is
-    self-contained: a reader can see what was asked, not merely that something
-    was asked.
+    Not a DocumentNode. A document is a thing you consult; a prompt is an
+    *operation* — applied to a context, it yields an assertion — and that is
+    precisely what an Extractor is in EM. Filing it as a document was the least
+    wrong box among the ones that existed, not a right one (E.D., 2026-08-02).
+
+    Modelling it correctly is not tidiness. The extractor slots into the chain
+    the language already has —
+
+        PropertyNode --has_data_provenance--> ExtractorNode --extracted_from--> DocumentNode
+
+    — so an AI paragraph is justified the same way a reading off a survey is,
+    and the RDF projection follows for free: the exporter's `extractor` branch
+    emits `crminf:J7_is_based_on_evidence_from` and the I7 Belief-Adoption
+    skeleton. The machine's contribution becomes a belief adopted from stated
+    evidence, which is exactly what it is.
+
+    ``sources`` are the documents the briefing rested on; each becomes an
+    `extracted_from` edge. Without them the extractor would be inert — an
+    operation with nothing to operate on — which is the failing the DocumentNode
+    had. Ids that are not documents are skipped rather than fabricated.
+
+    The prompt TEXT lives in the description, so the record is self-contained: a
+    reader sees what was asked, not merely that something was asked.
     """
     if not (prompt or "").strip():
         raise NarrativeError("an AI draft must record the prompt that produced it")
     # A CONTENT hash, not `hash()`: Python randomises string hashing per
     # process, so the same prompt would get a different node id after every
-    # restart of the bridge — one source silently forking into many.
+    # restart of the bridge — one operation silently forking into many.
     digest = hashlib.sha1(prompt.strip().encode("utf-8")).hexdigest()[:12]
-    doc_id = node_id or f"D.prompt.{digest}"
-    existing = graph.find_node_by_id(doc_id)
-    if isinstance(existing, DocumentNode):
+    ext_id = node_id or f"EXT.prompt.{digest}"
+    existing = graph.find_node_by_id(ext_id)
+    if isinstance(existing, ExtractorNode):
         return existing
-    doc = DocumentNode(node_id=doc_id, name=name or "Prompt",
-                       description=prompt, role="analytical",
-                       content_nature="2d_object")
-    graph.add_node(doc)
-    return doc
+    if existing is not None:
+        raise NarrativeError(
+            f"'{ext_id}' already exists and is not an extractor")
+
+    extractor = ExtractorNode(node_id=ext_id, name=name or "Prompt",
+                              description=prompt,
+                              source=based_on or None)
+    graph.add_node(extractor)
+
+    for doc_id in sources or []:
+        doc = graph.find_node_by_id(doc_id)
+        if not isinstance(doc, DocumentNode):
+            continue          # never invent a source that is not one
+        edge_id = f"{ext_id}_extracted_from_{doc_id}"
+        if not graph.find_edge_by_id(edge_id):
+            graph.add_edge(edge_id, ext_id, doc_id, "extracted_from")
+    return extractor
+
+
+#: The pre-N7 name. Kept so a caller written against N5 keeps working; it now
+#: returns an ExtractorNode, which is the point of the change.
+register_prompt_source = register_prompt_extractor
 
 
 def write_ai_draft(graph, target: str, text: str, *, model: str,
                    version: str = "", date: Optional[str] = None,
                    prompt: str = "", narrative_id: Optional[str] = None,
-                   chapter_title: Optional[str] = None) -> Dict[str, Any]:
+                   chapter_title: Optional[str] = None,
+                   sources: Optional[List[str]] = None) -> Dict[str, Any]:
     """Put generated prose into a narrative, attributed and unendorsed.
 
     ``target`` is the activity the prose is about; the block lands in the
@@ -269,7 +310,8 @@ def write_ai_draft(graph, target: str, text: str, *, model: str,
     Three things happen together, and none of them is optional:
 
     * the text is attributed to the **AI author** for that model;
-    * the **prompt is registered as a source** and the block points at it;
+    * the **prompt is registered as an Extractor** — wired to the documents the
+      briefing rested on — and the block points at it;
     * the block is left **unendorsed** — `write_ai_draft` never validates
       anything, because validation is an act by a person and this is not one.
 
@@ -295,7 +337,18 @@ def write_ai_draft(graph, target: str, text: str, *, model: str,
             f"say which one")
 
     author = ensure_ai_author(graph, model=model, version=version)
-    prompt_doc = register_prompt_source(graph, prompt) if prompt else None
+    # The sources the briefing actually used. A caller that already built the
+    # context (em-bridge does) passes them in; otherwise rebuild, because an
+    # extractor with no `extracted_from` is an operation with nothing to
+    # operate on — the very inertness that made the DocumentNode wrong.
+    if prompt and sources is None:
+        try:
+            sources = [s["id"] for s in
+                       build_narrative_generation_context(graph, target)["sources"]]
+        except NarrativeError:
+            sources = []      # not an activity: file the prompt anyway
+    prompt_doc = register_prompt_extractor(
+        graph, prompt, sources=sources, based_on=target) if prompt else None
 
     chapter = narrative.chapter_by_anchor(target)
     if chapter is None:

@@ -101,7 +101,7 @@ def test_a_prompt_is_not_listed_among_the_site_sources(portamarina):
     error — and the list would grow with every generation."""
     n = build_narrative(portamarina, "site_story")
     refs = [b.ref for b in _embeds(n.chapters[0], "source")]
-    assert "D.prompt.cantiere" not in refs
+    assert "EXT.prompt.cantiere" not in refs
 
 
 def test_the_units_are_ordered_by_stratigraphy(portamarina):

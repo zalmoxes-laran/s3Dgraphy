@@ -185,11 +185,11 @@ def _presentation_chapter(graph, narrative, graph_name) -> None:
     # SHOWS each one, with its criticism, which is what a reader of a
     # reconstruction needs — and it keeps every source individually
     # referenced, so "which narratives rest on this source" stays answerable.
-    # A prompt is a source OF THE NARRATIVE, not of the reconstruction. Listing
-    # it among "the sources this account rests on" would put the machine's
-    # instructions next to Maiuri's survey, which is a category error — and it
-    # would grow with every generation. Which documents are prompts is DERIVED
-    # from the narratives that cite them, so no new flag was needed.
+    # A prompt is a source OF THE NARRATIVE, not of the reconstruction: listing
+    # it beside Maiuri's survey would be a category error. Since N7 a prompt is
+    # an ExtractorNode, so it cannot reach this list at all — but graphs written
+    # before N7 still hold prompts as documents, and dropping the guard would
+    # make the machine's instructions reappear among the sources on reload.
     prompts = {ref for n in _nodes(graph, NarrativeNode)
                for ref in n.prompt_refs()}
     sources = [s for s in _nodes(graph, _SourceClass)
