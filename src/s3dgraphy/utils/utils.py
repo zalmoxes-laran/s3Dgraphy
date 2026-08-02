@@ -186,15 +186,74 @@ def get_stratigraphic_node_class(stratigraphic_type):
     # Usa StratigraphicUnit come fallback se il tipo non è nella mappa
     return STRATIGRAPHIC_CLASS_MAP.get(stratigraphic_type, StratigraphicNode)
 
+#: The two spellings `em_visual_rules.json` uses for the same thing, in
+#: precedence order.
+#:
+#: `color` first because it is the DOCUMENTED one: the 1.6.1 changelog states
+#: the rule of the whole file in its terms — "material.color = LINEAR,
+#: border_color = sRGB(material)" — and it is the key the thirteen stratigraphic
+#: types carry, i.e. the ones that actually become Blender materials in EMtools.
+#: `rgba_color` is the more numerous (21 entries) but it is the later, undeclared
+#: variant.
+#:
+#: Today the order is documentation rather than behaviour: **no entry carries
+#: both**, so nothing can be shadowed. `test_material_key_precedence_is_pinned`
+#: fixes the precedence anyway, so that the day someone adds both keys to a node
+#: the winner is a decision and not an accident.
+_MATERIAL_COLOR_KEYS = ("color", "rgba_color")
+
+# TODO (E.D., decisione rimandata) — normalizzare il datamodel su UNA chiave.
+# Leggere entrambe è una difesa, non una cura: due nomi per la stessa cosa
+# invitano a scriverne un terzo. Le 21 voci su `rgba_color` sono:
+#
+#   BR, SE, PROP, COMB, EXT, DOC, EP, ANG, AUTH, AUTH_AI, LIC, EMB, GRAPH,
+#   NARR, LINK, GEO, RM, RMDoc, RMSF, SS, unknown
+#
+# (le altre 13 — US, USVn, USVs, VSF, SF, RSF, USD, serSU, serUSD, serUSVn,
+# serUSVs, TSU, USN — usano `color`; 4 gruppi non hanno material affatto e
+# devono continuare a restituire None). Per rigenerare l'elenco senza fidarsi
+# di questo commento:
+#
+#   python -c "import json;ns=json.load(open('src/s3dgraphy/JSON_config/\
+#   em_visual_rules.json'))['node_styles'];print([k for k,v in ns.items() \
+#   if 'rgba_color' in ((v.get('style') or {}).get('material') or {})])"
+#
+# Normalizzare tocca il datamodel e va ri-vendorato ai consumer: non è una
+# modifica da fare di straforo dentro un fix difensivo.
+
+
+def _material_rgba(style):
+    """(R, G, B, A) from a node style's material, or None.
+
+    Reads BOTH spellings — see :data:`_MATERIAL_COLOR_KEYS`. A style with no
+    `material` at all legitimately has no colour (the four group containers are
+    drawn as boxes, not materials) and returns None; so does a `material` whose
+    payload is not a mapping, rather than raising into the caller.
+    """
+    material = (style or {}).get("material")
+    if not isinstance(material, dict):
+        return None
+    for key in _MATERIAL_COLOR_KEYS:
+        color = material.get(key)
+        if isinstance(color, dict) and {"r", "g", "b"} <= set(color):
+            return (color["r"], color["g"], color["b"], color.get("a", 1.0))
+    return None
+
+
 def get_material_color(matname, rules_path=None):
     """
     Ottiene i valori RGB per un dato tipo di materiale dal file di configurazione.
-    
+
+    Legge il colore da **entrambe** le chiavi usate nel datamodel
+    (`material.color` e `material.rgba_color`): fino a S1 leggeva solo la prima
+    e restituiva None per 21 tipi su 38 — fra cui DOC, EXT, AUTH e GRAPH — che
+    un colore ce l'hanno eccome.
+
     Args:
         matname (str): Nome del materiale/tipo di unità stratigrafica
         rules_path (str, optional): Percorso al file JSON delle regole. Se None,
             usa il path di default.
-            
+
     Returns:
         tuple: (R, G, B, A) con valori tra 0 e 1 o None se il nodo non prevede
         un materiale
@@ -211,14 +270,7 @@ def get_material_color(matname, rules_path=None):
                 rules = json.load(f)
 
         node_style = rules["node_styles"].get(matname, {})
-        style = node_style.get("style", {})
-
-        # Se non c'è la sezione material, restituisce None
-        if "material" not in style:
-            return None
-
-        color = style["material"]["color"]
-        return (color["r"], color["g"], color["b"], color.get("a", 1.0))
+        return _material_rgba(node_style.get("style", {}))
 
     except (KeyError, FileNotFoundError, json.JSONDecodeError, ModuleNotFoundError) as e:
         print(f"[s3dgraphy] get_material_color('{matname}') fallback: {type(e).__name__}: {e}")
