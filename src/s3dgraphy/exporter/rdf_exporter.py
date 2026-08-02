@@ -343,6 +343,24 @@ class _Datamodel:
         return None
 
 
+def _narrative_refs_from_data(data: Dict[str, Any]) -> List[str]:
+    """Referenced ids read straight out of a serialised narrative payload.
+
+    Used when the node arrives as a plain ``Node`` — a reader older than the
+    NarrativeNode class still carries the chapters in ``data``, and the
+    projection should not lose the references just because the class was not
+    recognised.
+    """
+    seen, out = set(), []
+    for chapter in data.get("chapters") or []:
+        for block in (chapter or {}).get("blocks") or []:
+            ref = (block or {}).get("ref")
+            if ref and ref not in seen:
+                seen.add(ref)
+                out.append(ref)
+    return out
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Main exporter
 # ─────────────────────────────────────────────────────────────────────────────
@@ -694,7 +712,8 @@ class RDFExporter:
         self._serialize_authority_refs(node, node_iri, ctx)
 
         # Type-specific (node_type already computed above for primary IRI logic)
-        self._serialize_type_specific(node, node_type, node_iri, ctx)
+        self._serialize_type_specific(node, node_type, node_iri, ctx,
+                                      graph_id=g.graph_id)
 
         self.stats["nodes"] += 1
 
@@ -768,8 +787,40 @@ class RDFExporter:
         return self.datamodel.get_node_primary_iri(cls_name)
 
     def _serialize_type_specific(self, node: Any, node_type: Optional[str],
-                                 node_iri: URIRef, ctx) -> None:
+                                 node_iri: URIRef, ctx,
+                                 graph_id: Optional[str] = None) -> None:
         data = getattr(node, "data", {}) or {}
+
+        if node_type == "narrative":
+            # EM Narrative (DP-79) — the PROJECTION side of the two-tier model.
+            # Authoring happens on the property graph; here we only restate what
+            # it already says, in RDF terms.
+            #
+            # The chapters are NOT projected as a structure: their order and
+            # nesting are an authoring concern, and reifying every block as a
+            # resource would put a document tree into a knowledge graph for no
+            # query anyone wants to run. What IS projected is the thing worth
+            # asking about — WHICH resources this narrative cites — as
+            # P67_refers_to, the same reference hinge used everywhere else in
+            # EM. That makes "which narratives cite this US" a one-line SPARQL
+            # query instead of a text search.
+            lang = data.get("lang")
+            if lang:
+                ctx.add((node_iri, CRM.P72_has_language, Literal(lang)))
+            for key, prop in (("version", CRM.P3_has_note),):
+                value = data.get(key)
+                if value:
+                    ctx.add((node_iri, prop, Literal(f"{key}: {value}")))
+            refs = node.referenced_ids() if hasattr(node, "referenced_ids") \
+                else _narrative_refs_from_data(data)
+            for ref in refs:
+                if graph_id is None:
+                    break
+                ctx.add((node_iri, CRM.P67_refers_to,
+                         self._node_iri(graph_id, ref)))
+                self.stats["narrative_references"] = self.stats.get(
+                    "narrative_references", 0) + 1
+            return
 
         if node_type == "property":
             # rdf:type already emitted by _compute_primary_iri (qualia-specific

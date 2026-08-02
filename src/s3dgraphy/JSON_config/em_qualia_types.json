@@ -1008,6 +1008,13 @@
         "subcategories": {
           "administrative": {
             "name": "Administrative Qualia",
+            "description": "TODO E.D. — proposal 1, to confirm or replace: Legal, inventory and curatorial record of the element",
+            "_description_proposals": [
+              "Legal, inventory and curatorial record of the element",
+              "Legal status, inventory identity and curatorial history of the element. The record a holding institution keeps, as distinct from ownership, which is the chain of who has held it.",
+              "Legal and inventory record keeping"
+            ],
+            "_description_todo": "This subcategory shipped with no description, so its tooltip was empty in the EMStudio vocabulary picker (the only one of 17). The three proposals above match the register of the sibling subcategories — short noun phrase; the longer one mirrors `ownership`, which already defines itself AGAINST this one ('distinct from administrative qualia which cover legal/inventory aspects'). Pick one, move it into `description`, and delete these two keys.",
             "qualia": [
               {
                 "id": "inventory_number",

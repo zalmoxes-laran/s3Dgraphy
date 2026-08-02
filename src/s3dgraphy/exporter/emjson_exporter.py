@@ -86,7 +86,11 @@ def _json_safe(value: Any) -> bool:
 
 def _node_payload(node: Any) -> Dict[str, Any]:
     data: Dict[str, Any] = {}
-    node_data = getattr(node, "data", None)
+    # A node whose content is richer than a flat dict — a NarrativeNode, whose
+    # chapters are ordered structures — renders its own `data{}`. Everything
+    # else keeps using the plain attribute; this is a hook, not a new contract.
+    to_data = getattr(node, "to_data", None)
+    node_data = to_data() if callable(to_data) else getattr(node, "data", None)
     if isinstance(node_data, dict):
         data.update({k: v for k, v in node_data.items() if _json_safe(v)})
     # generic per-node attribute store (the GraphML importer writes Master/

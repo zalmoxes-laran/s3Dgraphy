@@ -1444,6 +1444,51 @@
    }
   }
  },
+ "narrative_nodes": {
+  "_section_note": "EM Narrative (DP-79, draft). A narrative is the story told OVER a graph: chapters anchored to the graph's lanes (epochs, activities), each carrying prose and embeds. It is a first-class node so it can be queried ('which narratives cite this US', 'which rest on a withdrawn source'), versioned and carried through the DTC. Chapters and blocks are NOT nodes: they are ordered structures inside node.data — EM has no ordered-edge primitive, and a chapter has no existence apart from its narrative. An embed holds only the stable id of the resource it shows, never a copy of it, so a narrative always says what the graph currently says.",
+  "NarrativeNode": {
+   "class": "NarrativeNode",
+   "parent": "Node",
+   "abbreviation": "NARR",
+   "label": "Narrative",
+   "description": "A narrative over the EM graph: an ordered sequence of chapters, each anchored to a lane (epoch, activity, area) or standing outside the stratigraphy (introduction, geographic placement), and each composed of prose blocks and embed blocks. An embed references an EM resource by its stable id and declares a view_type (matrix, epoch3d, us, rm, document, source, paradata, map, timeline, table, un_scene) saying how it should be shown. Metadata follows the existing conventions: author / license / embargo (DP-32), lang (DP-63), version, and template_id recording which scaffolder produced the first draft.",
+   "scope_note": "Authored on the property graph (em.json) and PROJECTED to RDF — never triple-first. The narrative is a distinct thing from its renderings: one NarrativeNode can drive a live web viewer, a LaTeX print, a docx snapshot or a Jupyter notebook, and adding a target means adding a resolver, not re-authoring. Chapters marked canonical are the ones the author has settled: a template regeneration must leave them untouched. NOT a substitute for the paradata chain — a narrative CITES evidence (embed view_type=paradata), it does not restate it.",
+   "s3Dgraphy_file": "narrative_node.py",
+   "mapping": {
+    "cidoc": "E33 Linguistic Object",
+    "cidoc_s3d": null,
+    "alternative": "E33 Linguistic Object + E73 Information Object",
+    "rationale": "E33 is the CIDOC class for a text: the narrative IS linguistic content about the heritage entity. It is multi-typed E73 because it is also an identifiable information object that can be versioned, licensed and embargoed like the graph itself (GraphNode uses E73 for the same reason). The embeds are not content: they are references, projected as P67_refers_to towards the referenced node IRIs, which is what makes 'which narratives cite this US' answerable in SPARQL without parsing prose."
+   },
+   "em_extension": {
+    "uri": "em:Narrative",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "crm:E33_Linguistic_Object"
+    ],
+    "extension_status": "proposed"
+   },
+   "properties": {
+    "name": "P1_is_identified_by",
+    "description": "P3_has_note",
+    "author": "P94i_was_created_by",
+    "lang": "P72_has_language"
+   },
+   "valid_view_types": {
+    "matrix": "The matrix, or a slice of one epoch",
+    "epoch3d": "The 3D scene of an epoch (Heriverse / ATON)",
+    "us": "A stratigraphic unit with its certainty qualia",
+    "rm": "A representation model (RM / RMDoc)",
+    "document": "A document or image (Shelf / IIIF)",
+    "source": "A source together with its criticism",
+    "paradata": "The evidence chain: source -> extractor -> property",
+    "map": "Geographic placement (OSM)",
+    "timeline": "A temporal axis of the narrated epochs",
+    "table": "A query over the em.json",
+    "un_scene": "A composable scene (DP-29)"
+   }
+  }
+ },
  "fallback_nodes": {
   "UnknownNode": {
    "class": "UnknownNode",

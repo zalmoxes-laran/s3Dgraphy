@@ -57,10 +57,26 @@ from .semantic_shape_node import SemanticShapeNode
 from .dtc_node import DTCNode
 from .dtc_process_node import DTCProcessNode
 from .dtc_acquisition_node import DTCAcquisitionNode
+# EM Narrative (DP-79): the story told over the graph. Chapters and blocks are
+# ordered STRUCTURES carried by the node, not nodes themselves — see the module
+# docstring for why.
+from .narrative_node import (
+    NarrativeNode, Chapter, Block, NarrativeError,
+    NARRATIVE_VIEW_TYPES, NARRATIVE_BLOCK_TYPES,
+    BLOCK_PROSE, BLOCK_EMBED,
+)
 
 # Define what is available for import when using 'from nodes import *'
 __all__ = [
     "Node",
+    "NarrativeNode",
+    "Chapter",
+    "Block",
+    "NarrativeError",
+    "NARRATIVE_VIEW_TYPES",
+    "NARRATIVE_BLOCK_TYPES",
+    "BLOCK_PROSE",
+    "BLOCK_EMBED",
     "StratigraphicNode",
     "WorkingUnit",
     "StratigraphicUnit",

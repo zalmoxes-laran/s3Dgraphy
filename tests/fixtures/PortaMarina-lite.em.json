@@ -1,0 +1,225 @@
+{
+  "graph": {
+    "edges": [
+      {
+        "edge_type": "has_first_epoch",
+        "id": "US.101_epoch",
+        "source": "US.101",
+        "target": "EP.imperiale"
+      },
+      {
+        "edge_type": "has_first_epoch",
+        "id": "US.102_epoch",
+        "source": "US.102",
+        "target": "EP.imperiale"
+      },
+      {
+        "edge_type": "is_after",
+        "id": "US101_after_US102",
+        "source": "US.101",
+        "target": "US.102"
+      },
+      {
+        "edge_type": "has_property",
+        "id": "US101_has_material",
+        "source": "US.101",
+        "target": "PR.101.material"
+      },
+      {
+        "edge_type": "has_data_provenance",
+        "id": "material_prov",
+        "source": "PR.101.material",
+        "target": "EX.1"
+      },
+      {
+        "edge_type": "extracted_from",
+        "id": "EX1_from_D1",
+        "source": "EX.1",
+        "target": "D.1"
+      }
+    ],
+    "graph_id": "portamarina_lite",
+    "name": "Porta Marina (lite)",
+    "nodes": [
+      {
+        "data": {
+          "epsg": 4326,
+          "shift_x": 0.0,
+          "shift_y": 0.0,
+          "shift_z": 0.0
+        },
+        "id": "geo_portamarina_lite",
+        "name": "geo_position",
+        "node_type": "geo_position"
+      },
+      {
+        "data": {
+          "color": "#FFFFFF",
+          "end_time": 476,
+          "start_time": -27
+        },
+        "id": "EP.imperiale",
+        "name": "Età imperiale",
+        "node_type": "EpochNode"
+      },
+      {
+        "data": {
+          "epsg": 4326,
+          "shift_x": 14.4823,
+          "shift_y": 40.7497,
+          "shift_z": 0.0
+        },
+        "id": "geo_portamarina",
+        "name": "geo_position",
+        "node_type": "geo_position"
+      },
+      {
+        "description": "Rilievo di scavo della porta, A. Maiuri.",
+        "id": "D.1",
+        "name": "D.1 Rilievo Maiuri 1931",
+        "node_type": "document"
+      },
+      {
+        "description": "Fototeca, negativo su lastra.",
+        "id": "D.2",
+        "name": "D.2 Fotografia storica",
+        "node_type": "document"
+      },
+      {
+        "data": {
+          "label": "US (or SU)",
+          "symbol": "white rectangle"
+        },
+        "description": "Paramento in opera incerta.",
+        "id": "US.101",
+        "name": "US101",
+        "node_type": "US"
+      },
+      {
+        "data": {
+          "label": "US (or SU)",
+          "symbol": "white rectangle"
+        },
+        "description": "Soglia in travertino.",
+        "id": "US.102",
+        "name": "US102",
+        "node_type": "US"
+      },
+      {
+        "data": {
+          "property_type": "material",
+          "value": "opera incerta"
+        },
+        "id": "PR.101.material",
+        "name": "material",
+        "node_type": "property"
+      },
+      {
+        "description": "Lettura del paramento dal rilievo Maiuri.",
+        "id": "EX.1",
+        "name": "D.1.1",
+        "node_type": "extractor"
+      },
+      {
+        "data": {
+          "author": "Emanuel Demetrescu",
+          "chapters": [
+            {
+              "blocks": [
+                {
+                  "block_type": "prose",
+                  "text": "Porta Marina è l'accesso occidentale della città. Questo racconto si appoggia alle fonti elencate qui sotto."
+                },
+                {
+                  "block_type": "embed",
+                  "ref": "D.1",
+                  "view_type": "source"
+                },
+                {
+                  "block_type": "embed",
+                  "ref": "D.2",
+                  "view_type": "source"
+                }
+              ],
+              "canonical": true,
+              "title": "Presentazione"
+            },
+            {
+              "blocks": [
+                {
+                  "block_type": "embed",
+                  "options": {
+                    "zoom": 17
+                  },
+                  "ref": "geo_portamarina",
+                  "view_type": "map"
+                }
+              ],
+              "canonical": true,
+              "title": "Dove si trova"
+            },
+            {
+              "anchor": "EP.imperiale",
+              "blocks": [
+                {
+                  "block_type": "prose",
+                  "text": "[racconto dell'epoca — da scrivere]"
+                },
+                {
+                  "block_type": "embed",
+                  "ref": "US.101",
+                  "view_type": "us"
+                },
+                {
+                  "block_type": "embed",
+                  "ref": "US.102",
+                  "view_type": "us"
+                },
+                {
+                  "block_type": "embed",
+                  "ref": "PR.101.material",
+                  "view_type": "paradata"
+                }
+              ],
+              "canonical": false,
+              "title": "Età imperiale"
+            }
+          ],
+          "lang": "it",
+          "license": "CC-BY",
+          "template_id": "site_story",
+          "version": "0.1"
+        },
+        "description": "Bozza di racconto del sito, template site_story.",
+        "id": "NARR.portamarina",
+        "name": "Porta Marina — la storia del sito",
+        "node_type": "narrative"
+      }
+    ]
+  },
+  "header": {
+    "datamodel_versions": {
+      "connections": "1.6.2",
+      "nodes": "1.6.0",
+      "qualia": "1.6.0"
+    },
+    "format": "em.json",
+    "generator": {
+      "tool": "s3dgraphy",
+      "version": "1.6.0.dev11"
+    },
+    "ontology_versions": {
+      "CIDOC-CRM": "7.1.3",
+      "CRMarchaeo": "2.1.1",
+      "CRMdig": "5.0",
+      "CRMgeo": "1.2",
+      "CRMinf": "1.2.1",
+      "CRMs3D": "1.6.0",
+      "CRMsci": "3.1",
+      "HDT-O": "1.0",
+      "PROV-O": "W3C Recommendation 2013-04-30"
+    },
+    "schema_version": 2,
+    "version": "1.0"
+  }
+}

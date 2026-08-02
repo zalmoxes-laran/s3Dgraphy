@@ -112,6 +112,11 @@
    "node_type": "LocationNodeGroup",
    "description": "Group node for spatial / locational membership of stratigraphic units"
   },
+  "NarrativeNode": {
+   "parent": "Node",
+   "node_type": "narrative",
+   "description": "A story told over the graph — a first-class node, not a document beside it."
+  },
   "NegativeStratigraphicUnit": {
    "parent": "StratigraphicNode",
    "node_type": "USN",
