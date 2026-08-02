@@ -269,7 +269,11 @@ def get_document_vocabularies():
     """
     _role_order = ("analytical", "comparative")
     _nature_order = ("2d_object", "3d_object")
-    _geometry_order = ("reality_based", "observable", "asserted", "em_based")
+    # Metric-authority ladder, most to least (Q-C). `em_based` trails it: it is
+    # a provenance statement, not a rung — the asset IS an EM-derived
+    # reconstruction, which says nothing about how well it is placed.
+    _geometry_order = ("reality_based", "observable", "asserted", "symbolic",
+                       "em_based")
     rules = _load_visual_rules()
 
     def _keys(section_name):

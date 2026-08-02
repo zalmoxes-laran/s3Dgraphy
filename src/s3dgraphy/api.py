@@ -154,6 +154,170 @@ def graphml_to_emjson(graphml: "str | bytes") -> EmJson:
     return graph_to_emjson(graph)
 
 
+# ── GraphML → em.json conversion (Se5) ────────────────────────────────────────
+#: Fill colours that betray a graph drawn before the EM 1.4 palette. ``#CCCCFF``
+#: is yEd's own default node colour: a node still wearing it was never given an
+#: EM type by its author, and no amount of inference here can recover one. Used
+#: ONLY to raise a hint — never to assign a type.
+_LEGACY_EM_FILL_COLOURS = ("#CCCCFF",)
+
+
+def _conversion_report(graph: Graph, warnings: List[str],
+                       graphml: bytes) -> Dict[str, Any]:
+    """Summarise what a GraphML → em.json conversion left unresolved.
+
+    The counts are read off the GRAPH, not off the warning strings: a bare
+    ``Node`` is what the importer produces when a yEd shape matches no EM type,
+    a bare ``GroupNode`` when a box carries no palette colour, and
+    ``generic_connection`` is the degraded edge. The raw warnings are carried
+    along verbatim for display — they are the author-facing text (S6).
+    """
+    from .nodes.group_node import GroupNode
+    from .nodes.stratigraphic_node import Node
+
+    untyped = [n for n in graph.nodes if type(n) is Node]
+    unclassified = [n for n in graph.nodes if type(n) is GroupNode]
+    untyped_nodes = [getattr(n, "name", "") or n.node_id for n in untyped]
+    unclassified_groups = [getattr(n, "name", "") or n.node_id
+                           for n in unclassified]
+
+    # A degraded edge is not automatically an authorial error. When one of its
+    # endpoints has no type or no role, the edge COULD NOT have been resolved —
+    # `handle_group_node` even writes `generic_connection` on purpose for a
+    # role-less box. Those belong to the "author warning" bucket: fix the NODE
+    # and the edge follows. What is left — both endpoints properly typed, yet
+    # no relation the datamodel allows — is the real anomaly worth chasing.
+    untypable_ids = {n.node_id for n in untyped} | {n.node_id for n in unclassified}
+    degraded_edges = 0
+    degraded_author_warning = 0
+    for e in graph.edges:
+        if getattr(e, "edge_type", "") != "generic_connection":
+            continue
+        degraded_edges += 1
+        if (getattr(e, "edge_source", None) in untypable_ids
+                or getattr(e, "edge_target", None) in untypable_ids):
+            degraded_author_warning += 1
+    degraded_real = degraded_edges - degraded_author_warning
+
+    # Legacy-EM hint. Two signals must agree: the file still uses a pre-1.4
+    # fill colour AND the importer could not type some nodes. Either alone is
+    # too weak — a modern graph may reuse the colour decoratively, and an
+    # untyped node may just be one bad shape.
+    try:
+        text = graphml.decode("utf-8", errors="replace")
+    except Exception:  # pragma: no cover - defensive
+        text = ""
+    legacy_colours = [c for c in _LEGACY_EM_FILL_COLOURS if c in text]
+    legacy = {
+        "suspected": bool(legacy_colours and untyped_nodes),
+        "evidence": ([f"fill colour {c} present" for c in legacy_colours]
+                     + ([f"{len(untyped_nodes)} node(s) with no recognised EM type"]
+                        if untyped_nodes else [])),
+    }
+
+    from .exporter.emjson_exporter import SCHEMA_VERSION
+    return {
+        "nodes": len(graph.nodes),
+        "edges": len(graph.edges),
+        "schema_version": SCHEMA_VERSION,
+        "untyped_nodes": sorted(untyped_nodes),
+        "unclassified_groups": sorted(unclassified_groups),
+        "degraded_edges": degraded_edges,
+        "degraded_edges_author_warning": degraded_author_warning,
+        "degraded_edges_real": degraded_real,
+        "legacy_em": legacy,
+        "warnings": list(warnings),
+    }
+
+
+def convert_graphml_to_emjson(graphml: "str | bytes"
+                              ) -> Tuple[EmJson, Dict[str, Any]]:
+    """GraphML → ``(em.json document, conversion report)``.
+
+    The 1.7 migration path. The GraphML is deprecated: 1.6 still imports it at
+    runtime, but from 1.7 this one-shot conversion is the only way in. Because
+    the importer mints deterministic ids (E2), the same GraphML always yields
+    the same em.json — the conversion can therefore be treated as a persistent
+    identity, not a throwaway.
+
+    The report says what the conversion could NOT resolve (untyped nodes,
+    unclassified groups, degraded edges) so the author can fix the SOURCE graph
+    and convert again. Nothing is guessed here.
+    """
+    data = graphml.encode("utf-8") if isinstance(graphml, str) else graphml
+    graph, warnings = graphml_to_graph(data)
+    return graph_to_emjson(graph), _conversion_report(graph, warnings, data)
+
+
+def format_conversion_report(report: Dict[str, Any], *,
+                             max_warnings: int = 0,
+                             list_warnings: bool = False) -> str:
+    """Human-readable rendering of :func:`convert_graphml_to_emjson`'s report.
+
+    ``max_warnings`` truncates the warning list (0 = all); ``list_warnings``
+    prints the individual warning lines rather than just the aggregate counts.
+    """
+    lines = [
+        f"converted: {report['nodes']} nodes, {report['edges']} edges "
+        f"(em.json schema_version {report['schema_version']})",
+    ]
+
+    untyped = report["untyped_nodes"]
+    groups = report["unclassified_groups"]
+    degraded = report["degraded_edges"]
+
+    if not (untyped or groups or degraded):
+        lines.append("nothing left unresolved.")
+    else:
+        lines.append("")
+        lines.append("left unresolved — fix these in the SOURCE graph, not here:")
+        if untyped:
+            lines.append(f"  {len(untyped)} node(s) with no recognised EM type "
+                         f"(yEd shape/colour matches nothing): "
+                         f"{', '.join(untyped[:10])}"
+                         + (" …" if len(untyped) > 10 else ""))
+        if groups:
+            lines.append(f"  {len(groups)} group(s) with no EM role "
+                         f"(no palette colour): {', '.join(groups[:10])}"
+                         + (" …" if len(groups) > 10 else ""))
+        if degraded:
+            real = report.get("degraded_edges_real", degraded)
+            follow = report.get("degraded_edges_author_warning", 0)
+            lines.append(f"  {degraded} edge(s) degraded to generic_connection")
+            if follow:
+                lines.append(f"      {follow} of them touch an untyped node or "
+                             f"a role-less group — fix the NODE and the edge "
+                             f"follows")
+            if real:
+                lines.append(f"      {real} with both endpoints typed: real "
+                             f"authorial anomalies, worth chasing one by one")
+
+    if report["legacy_em"]["suspected"]:
+        lines.append("")
+        lines.append("⚠ this looks like a pre-1.4 EM graph:")
+        for e in report["legacy_em"]["evidence"]:
+            lines.append(f"    - {e}")
+        lines.append("  Run the EMTools operator «convert EM 1.x → 1.4» on the "
+                     "GraphML FIRST, then convert again. The types are not "
+                     "guessed here: an ambiguous colour has no single reading.")
+
+    warnings = report["warnings"]
+    if warnings:
+        lines.append("")
+        lines.append(f"{len(warnings)} importer warning(s).")
+        if list_warnings:
+            shown = warnings if max_warnings <= 0 else warnings[:max_warnings]
+            for w in shown:
+                lines.append(f"  - {w}")
+            if len(shown) < len(warnings):
+                lines.append(f"  … {len(warnings) - len(shown)} more "
+                             f"(raise --max-warnings, or 0 for all)")
+        else:
+            lines.append("  (re-run with --list-warnings to see them)")
+
+    return "\n".join(lines)
+
+
 # ── XLSX mapping ──────────────────────────────────────────────────────────────
 def xlsx_to_graph(path: str, *, mapping_name: Optional[str] = None,
                   id_column: Optional[str] = None, graph_id: str = "imported_graph"
@@ -531,15 +695,17 @@ def hat_as_rmsf(target_graph: Graph, resource_id: str, *,
 def hat_as_rmdoc(target_graph: Graph, resource_id: str, *,
                  shelf: Optional[Graph] = None, rmdoc_id: Optional[str] = None,
                  name: Optional[str] = None, attach_to: Optional[str] = None,
-                 free_placement: bool = True) -> Dict[str, Any]:
+                 geometry: Optional[str] = None) -> Dict[str, Any]:
     """Hat a shelf resource as a RepresentationModelDoc — a Document instantiated in
     the 3D scene (e.g. a historical photo in place). RMDoc ─P67→ Resource plus
     ``Document ─has_representation_model_doc→ RMDoc`` (P138i) when ``attach_to``
-    names a Document. Placement is free/manual (no epoch, no stratigraphy).
-    Returns ``{rmdoc_id, resource_id, created, attached, placement}``."""
+    names a Document. No epoch, no stratigraphy: what grades an RMDoc is
+    ``geometry``, the metric authority of its placement (Q-C) —
+    ``reality_based → observable → asserted → symbolic``, ``em_based`` aside.
+    Returns ``{rmdoc_id, resource_id, created, attached, geometry}``."""
     from .shelf import hat_as_rmdoc as _h
     return _h(target_graph, resource_id, shelf=shelf, rmdoc_id=rmdoc_id, name=name,
-              attach_to=attach_to, free_placement=free_placement)
+              attach_to=attach_to, geometry=geometry)
 
 
 def hat_as_document(target_graph: Graph, resource_id: str, *,
@@ -657,6 +823,21 @@ def main(argv: Optional[List[str]] = None) -> int:
     sub.add_parser("project-ttl", help=".em.json → Turtle (stdout)").add_argument("path")
     sub.add_parser("graphml", help=".em.json → GraphML (stdout)").add_argument("path")
     sub.add_parser("import-graphml", help="GraphML → .em.json (stdout)").add_argument("path")
+    cv = sub.add_parser("convert",
+                        help="GraphML → .em.json FILE + conversion report "
+                             "(the 1.7 migration path; deterministic)")
+    cv.add_argument("path", help="input .graphml")
+    cv.add_argument("-o", "--output", default=None,
+                    help="output .em.json (default: alongside the input, "
+                         "same stem; '-' writes the document to stdout)")
+    cv.add_argument("--json", action="store_true",
+                    help="machine-readable report on stdout")
+    cv.add_argument("--list-warnings", action="store_true",
+                    help="print the individual importer warnings, not just counts")
+    cv.add_argument("--max-warnings", type=int, default=20,
+                    help="truncate the warning list (0 = all; default 20)")
+    cv.add_argument("--force", action="store_true",
+                    help="overwrite the output file if it already exists")
     r = sub.add_parser("resolve", help="resolve an authority term")
     r.add_argument("term")
     r.add_argument("facet")
@@ -729,6 +910,38 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(graph_to_graphml(graph))
     elif args.op == "import-graphml":
         print(json.dumps(graphml_to_emjson(Path(args.path).read_bytes())))
+    elif args.op == "convert":
+        src = Path(args.path)
+        doc, report = convert_graphml_to_emjson(src.read_bytes())
+        if args.output == "-":
+            # Document on stdout, report on stderr, so the two can be piped
+            # apart. Same serialisation as the file branch — a conversion must
+            # be byte-identical whichever way it leaves the process.
+            print(json.dumps(doc, ensure_ascii=False, indent=2, sort_keys=True))
+            out_path = None
+        else:
+            out_path = Path(args.output) if args.output else src.with_suffix(".em.json")
+            if out_path.exists() and not args.force:
+                print(f"error: {out_path} already exists (use --force to overwrite)",
+                      file=sys.stderr)
+                return 1
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump(doc, f, ensure_ascii=False, indent=2, sort_keys=True)
+                f.write("\n")
+        stream = sys.stderr if args.output == "-" else sys.stdout
+        if args.json:
+            print(json.dumps({**report,
+                              "input": str(src),
+                              "output": str(out_path) if out_path else None},
+                             indent=2), file=stream)
+        else:
+            if out_path:
+                print(f"wrote {out_path}", file=stream)
+            print(format_conversion_report(report,
+                                           max_warnings=args.max_warnings,
+                                           list_warnings=args.list_warnings),
+                  file=stream)
     elif args.op == "resolve":
         print(json.dumps(resolve_authority(args.term, args.facet), indent=2))
     elif args.op in ("list-resources", "resolve-resource"):

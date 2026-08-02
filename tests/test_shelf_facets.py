@@ -120,32 +120,57 @@ def test_rmsf_refuses_a_non_sf_target():
     assert not any(e.edge_type == "generic_connection" for e in study.edges)
 
 
-# ── RMDoc: binds to a Document, free / manual placement ───────────────────────
-def test_rmdoc_binds_to_document_with_free_placement():
+# ── RMDoc: binds to a Document; graded by the geometry axis (Q-C) ─────────────
+def test_rmdoc_binds_to_document_and_is_not_anchored():
     shelf = _shelf_with_resource()
     study = Graph(graph_id="study")
     study.add_node(DocumentNode(node_id="D1", name="D.1"))
     out = api.hat_as_rmdoc(study, "r1", shelf=shelf, rmdoc_id="D1_rm_doc",
                            attach_to="D1")
-    assert out["attached"] is True and out["placement"] == "manual"
+    assert out["attached"] is True
     rmdoc = study.find_node_by_id("D1_rm_doc")
     assert isinstance(rmdoc, RepresentationModelDocNode)
-    assert rmdoc.data.get("placement") == "manual"
     assert _p67(study, "D1_rm_doc", "r1")
     assert _has(study, "D1", "D1_rm_doc", "has_representation_model_doc")
-    # free placement: NOT anchored to an epoch or a stratigraphic unit
+    # An RMDoc is NOT anchored to an epoch or a stratigraphic unit.
     assert not any(e.edge_source == "D1_rm_doc"
                    and e.edge_type in ("has_first_epoch", "survive_in_epoch")
                    for e in study.edges)
+    # No geometry asked for → none asserted. Silence is not a grade.
+    assert out["geometry"] is None
+    assert "geometry" not in rmdoc.data
 
 
-def test_rmdoc_anchored_placement_flag():
+def test_rmdoc_records_the_placement_qualia_on_the_geometry_axis():
+    """Q-C: the metric authority of the placement lives on the RMDoc — the
+    spatial instance — not on the Document."""
     shelf = _shelf_with_resource()
     study = Graph(graph_id="study")
     study.add_node(DocumentNode(node_id="D1", name="D.1"))
-    out = api.hat_as_rmdoc(study, "r1", shelf=shelf, attach_to="D1",
-                           free_placement=False)
-    assert out["placement"] == "anchored"
+    out = api.hat_as_rmdoc(study, "r1", shelf=shelf, rmdoc_id="D1_rm_doc",
+                           attach_to="D1", geometry="symbolic")
+    assert out["geometry"] == "symbolic"
+    assert study.find_node_by_id("D1_rm_doc").data["geometry"] == "symbolic"
+    # …and the Document is left alone: it carries no position.
+    assert "geometry" not in study.find_node_by_id("D1").data
+
+
+def test_rmdoc_geometry_is_validated_against_the_datamodel():
+    """The vocabulary comes from em_visual_rules.json, not from a literal."""
+    from s3dgraphy.nodes.document_node import DOCUMENT_GEOMETRIES
+
+    assert "symbolic" in DOCUMENT_GEOMETRIES
+    # The full metric-authority ladder, in order, ahead of em_based.
+    ladder = ("reality_based", "observable", "asserted", "symbolic")
+    assert DOCUMENT_GEOMETRIES[:4] == ladder
+    assert DOCUMENT_GEOMETRIES.index("em_based") > DOCUMENT_GEOMETRIES.index("symbolic")
+
+    shelf = _shelf_with_resource()
+    study = Graph(graph_id="study")
+    study.add_node(DocumentNode(node_id="D1", name="D.1"))
+    with pytest.raises(ValueError):
+        api.hat_as_rmdoc(study, "r1", shelf=shelf, attach_to="D1",
+                         geometry="manual")   # the retired C3 literal
 
 
 # ── Document: a SOURCE, no placement — the paradata entry ─────────────────────

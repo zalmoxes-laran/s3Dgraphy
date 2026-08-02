@@ -434,7 +434,7 @@ def hat_as_rmsf(target_graph: Any, resource_id: str, *, shelf: Any = None,
 def hat_as_rmdoc(target_graph: Any, resource_id: str, *, shelf: Any = None,
                  rmdoc_id: Optional[str] = None, name: Optional[str] = None,
                  attach_to: Optional[str] = None,
-                 free_placement: bool = True) -> Dict[str, Any]:
+                 geometry: Optional[str] = None) -> Dict[str, Any]:
     """Hat a shelf resource as a **RepresentationModelDoc** (RMDoc).
 
     An RMDoc instantiates a **Document** (or an Extractor / Combiner) in the 3D
@@ -442,13 +442,24 @@ def hat_as_rmdoc(target_graph: Any, resource_id: str, *, shelf: Any = None,
     taken. ``attach_to`` is the Document node:
     ``Document ─has_representation_model_doc→ RMDoc`` (P138i).
 
-    Unlike an RM, an RMDoc is NOT bound to an epoch or to a stratigraphic unit:
-    its placement is free / manual. ``free_placement`` records that on the node
-    (``data["placement"] = "manual" | "anchored"``) — a data literal, no
-    datamodel change — so the 3D side knows the transform is operator-asserted.
-    Reuse-not-duplicate + idempotent. Returns
-    ``{rmdoc_id, resource_id, created, attached, placement}``."""
+    Unlike an RM, an RMDoc is NOT bound to an epoch or to a stratigraphic unit.
+    What grades it is ``geometry`` — the **metric authority of its placement**
+    (Q-C), on the RMDoc because the RMDoc *is* the spatial instance:
+    ``reality_based → observable → asserted → symbolic``, with ``em_based``
+    outside the ladder as a provenance statement. ``None`` leaves the placement
+    unclassified rather than asserting a grade.
+
+    This replaces the C3 ``data["placement"] = "manual"|"anchored"`` literal,
+    which stated a workflow fact instead of a qualia and had no vocabulary
+    behind it. Reuse-not-duplicate + idempotent. Returns
+    ``{rmdoc_id, resource_id, created, attached, geometry}``."""
+    from ..nodes.document_node import DOCUMENT_GEOMETRIES
     from ..nodes.representation_node import RepresentationModelDocNode
+
+    if geometry is not None and geometry not in DOCUMENT_GEOMETRIES:
+        raise ValueError(
+            f"RMDoc geometry must be one of {DOCUMENT_GEOMETRIES} or None, "
+            f"got {geometry!r}")
 
     rmdoc, created, res = _hat_facet(
         target_graph, resource_id, shelf=shelf, node_type=_RMDOC_TYPE,
@@ -456,13 +467,14 @@ def hat_as_rmdoc(target_graph: Any, resource_id: str, *, shelf: Any = None,
         factory=lambda nid, r: RepresentationModelDocNode(
             node_id=nid, name=name or f"RM Doc for {_res_name(r, resource_id)}",
             type="RM"))
-    placement = "manual" if free_placement else "anchored"
-    _data(rmdoc)["placement"] = placement
+    if geometry is not None:
+        _data(rmdoc)["geometry"] = geometry
 
     attached = bool(attach_to) and _attach(target_graph, attach_to, rmdoc.node_id,
                                            _EDGE_HAS_RM_DOC)
     return {"rmdoc_id": rmdoc.node_id, "resource_id": resource_id,
-            "created": created, "attached": attached, "placement": placement}
+            "created": created, "attached": attached,
+            "geometry": _data(rmdoc).get("geometry")}
 
 
 def hat_as_document(target_graph: Any, resource_id: str, *, shelf: Any = None,

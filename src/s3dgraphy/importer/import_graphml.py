@@ -27,6 +27,32 @@ import json
 # Yworks XML namespace (used when scanning y:ImageNode elements)
 _Y_NS = '{http://www.yworks.com/xml/graphml}'
 
+# --- Deterministic ids for elements without an EMID (E2) --------------------
+# A GraphML element that carries an ``EMID`` keeps it: that is the authored
+# identity and nothing here touches it. Everything else used to get a fresh
+# ``uuid4()`` on every import, so the SAME file produced DIFFERENT ids run
+# after run — the re-import was not reproducible and any `positions` entry or
+# external reference minted against a previous run went orphan.
+#
+# Instead we mint a **uuid5** over a key built from the file's own content, so
+# the same GraphML always yields the same ids:
+#
+#     node / group / swimlane   kind | name | x | y
+#     epoch row                 kind | swimlane id | row original id | index
+#     edge                      kind | original edge id | source | target
+#
+# The (x, y) geometry is what disambiguates homonyms — two boxes both labelled
+# ``USV138_PD`` are different nodes precisely because they sit in different
+# places (the case that forced a manual re-pairing in F2). When even that is
+# not enough (same kind, same name, same point), the duplicates are numbered
+# by their order of appearance in the document, which is itself deterministic
+# for a given file. Collisions are therefore resolved, never left to chance.
+#
+# Frozen namespace — uuid5(NAMESPACE_DNS,
+# 's3dgraphy.graphml.deterministic-id.extendedmatrix.org'). NEVER change this
+# value: it would re-mint every id in every graph imported so far.
+DETERMINISTIC_ID_NAMESPACE = uuid.UUID("c6735a81-b2e2-5fbc-b972-a8a3f71d7a84")
+
 # --- Paradata image node prefix registry (DP-51) ----------------------------
 # Hash-based detection was dropped: palette PNGs may be redrawn or
 # re-exported between versions. Label prefixes are instead the stable
@@ -120,6 +146,45 @@ class GraphMLImporter:
         # serialization order, so the same logical SVG can be id=1 in one
         # file and id=3 in another — never hardcode the number.
         self.svg_resource_map = {}
+        # E2 — occurrence counter per deterministic-id key, so homonyms at the
+        # same coordinates are numbered by document order instead of colliding.
+        self._det_id_counts = {}
+
+    # --- Deterministic ids (E2) --------------------------------------------
+
+    def _node_xy(self, node_element):
+        """Return the yEd ``(x, y)`` of ``node_element`` as a rounded string
+        pair, or ``("", "")`` when the element has no geometry.
+
+        ``find('.//…Geometry')`` returns the FIRST geometry in document order,
+        which for a group node is the group's own realizer (the nested
+        ``<graph>`` with the children comes after ``<data>``). This mirrors
+        what the swimlane parser already does.
+        """
+        try:
+            geom = node_element.find(f'.//{_Y_NS}Geometry')
+            if geom is None:
+                return ("", "")
+            return (f"{float(geom.attrib.get('x', 0.0)):.2f}",
+                    f"{float(geom.attrib.get('y', 0.0)):.2f}")
+        except (ValueError, TypeError, AttributeError):
+            return ("", "")
+
+    def _deterministic_id(self, kind, *parts):
+        """Mint a stable uuid5 for an element without an EMID.
+
+        ``kind`` is the element family ('node', 'group', 'swimlane',
+        'epoch_row', 'edge', 'node_dup_emid') and ``parts`` the identifying
+        key. Repeated keys get an ``#n`` occurrence suffix (n = 1, 2, …) in
+        document order, so duplicates are separated deterministically rather
+        than overwriting one another.
+        """
+        key = "|".join([kind] + [str(p) for p in parts])
+        seen = self._det_id_counts.get(key, 0)
+        self._det_id_counts[key] = seen + 1
+        if seen:
+            key = f"{key}#{seen}"
+        return str(uuid.uuid5(DETERMINISTIC_ID_NAMESPACE, key))
 
     def build_key_mapping(self, tree):
         """
@@ -282,11 +347,17 @@ class GraphMLImporter:
             graph_code = "MISSINGCODE"
             #print(f"Using fallback graph code: {graph_code}")
         
-        # If we don't have a graph_id, generate a UUID
+        # If we don't have a graph_id, derive a DETERMINISTIC one (E2). The
+        # GraphNode created in parse() takes ``graph.graph_id`` as its own
+        # node_id, so a random value here would make the node set irreproducible
+        # too. Key = graph code + graph label, i.e. the identity the header
+        # itself declares.
         if not graph_id:
-            graph_id = str(uuid.uuid4())
-            #print(f"Generated graph ID from UUID: {graph_id}")
-        
+            graph_id = self._deterministic_id(
+                'graph', graph_code,
+                self.graph.attributes.get('graph_label', ''))
+            #print(f"Derived deterministic graph ID: {graph_id}")
+
         return graph_id, graph_code
 
     def parse(self):
@@ -299,6 +370,10 @@ class GraphMLImporter:
         import uuid
 
         tree = ET.parse(self.filepath)
+
+        # E2 — azzera i contatori degli id deterministici PRIMA di qualunque
+        # conio, così ri-usare lo stesso importer non sposta le occorrenze.
+        self._det_id_counts = {}
 
         # Salva il tree per lo slipback
         self.graphml_tree = tree
@@ -326,8 +401,10 @@ class GraphMLImporter:
             
         # Genera un ID univoco per il grafo se non esiste
         if not graph_id:
-            graph_id = str(uuid.uuid4())
-        
+            # E2 — ramo ormai irraggiungibile (extract_graph_id_and_code
+            # restituisce sempre un id), tenuto deterministico per coerenza.
+            graph_id = self._deterministic_id('graph', graph_code or '')
+
         # Imposta l'ID univoco nel grafo
         self.graph.graph_id = graph_id
         
@@ -732,8 +809,11 @@ class GraphMLImporter:
                         edge_uuid = edge_custom_fields['EMID']
                         print(f"[GraphML Parser] Reusing existing EMID as edge ID: {edge_uuid} for edge {original_edge_id}")
                     else:
-                        # Genera un nuovo UUID per l'edge
-                        edge_uuid = str(uuid.uuid4())
+                        # E2 — id d'arco deterministico: l'id yEd dell'arco più
+                        # i due estremi già risolti. Senza questo l'em.json
+                        # cambierebbe a ogni import anche a nodi stabili.
+                        edge_uuid = self._deterministic_id(
+                            'edge', original_edge_id, source_uuid, target_uuid)
 
                     # Get the source and target nodes for edge type enhancement
                     source_node = self.graph.find_node_by_id(source_uuid)
@@ -908,9 +988,13 @@ class GraphMLImporter:
             # Resolve edge_id, avoiding collisions with already-present
             # edges (e.g. a non-physical edge that happens to share the
             # same edge_id was kept by the filter above).
-            edge_id = rel.get("edge_id") or str(uuid.uuid4())
+            # E2 — deterministico anche qui, così il restore degli archi
+            # fisici non re-conia id a ogni import.
+            edge_id = rel.get("edge_id") or self._deterministic_id(
+                'edge_physical', source, edge_type, target)
             if edge_id in seen_edge_ids:
-                edge_id = str(uuid.uuid4())
+                edge_id = self._deterministic_id(
+                    'edge_physical_collision', edge_id, source, edge_type, target)
 
             try:
                 edge = self.graph.add_edge(edge_id, source, target,
@@ -1190,16 +1274,17 @@ class GraphMLImporter:
             return
 
         # Salta nodi commento/nota di yEd (sfondo giallo, non sono nodi EM)
-        _, _, _, _, _, fillcolor, _, _ = self.EM_extract_node_name(node_element)
+        _nodename_for_id, _, _, _, _, fillcolor, _, _ = self.EM_extract_node_name(node_element)
         if fillcolor and fillcolor.upper() in ('#FFCC00', '#FFFF00', '#FFFF99'):
-            nodename_check, _, _, _, _, _, _, _ = self.EM_extract_node_name(node_element)
-            print(f"[GraphML Parser] Skipping comment/note node: '{nodename_check}' (fill={fillcolor})")
+            print(f"[GraphML Parser] Skipping comment/note node: '{_nodename_for_id}' (fill={fillcolor})")
             return
 
         # Estrai campi custom EMID e URI
         custom_fields = self.extract_custom_fields(node_element, 'node')
 
-        # FASE 3: Se esiste EMID, riutilizzalo come UUID, altrimenti generane uno nuovo
+        # FASE 3: Se esiste EMID, riutilizzalo come UUID, altrimenti generane uno
+        # DETERMINISTICO (E2) — mai casuale, o il re-import non è riproducibile.
+        _x, _y = self._node_xy(node_element)
         if 'EMID' in custom_fields and custom_fields['EMID']:
             uuid_id = custom_fields['EMID']
 
@@ -1208,13 +1293,16 @@ class GraphMLImporter:
                 print(f"⚠️  WARNING: Duplicate EMID detected! EMID {uuid_id[:20]}... is already used by another node.")
                 print(f"   This usually happens when duplicating nodes in yEd (Ctrl+D).")
                 print(f"   Generating NEW UUID for node {original_id} to avoid conflicts.")
-                uuid_id = str(uuid.uuid4())
+                uuid_id = self._deterministic_id(
+                    'node_dup_emid', custom_fields['EMID'],
+                    _nodename_for_id, _x, _y)
             else:
                 print(f"[GraphML Parser] Reusing existing EMID as node ID: {uuid_id} for node {original_id}")
         else:
-            # Genera un nuovo UUID per questo nodo
-            uuid_id = str(uuid.uuid4())
-            print(f"[GraphML Parser] Generated new UUID: {uuid_id} for node {original_id}")
+            # Nessun EMID: id derivato dal contenuto (tipo|nome|x|y), stabile
+            # fra import successivi dello stesso file. Vedi E2.
+            uuid_id = self._deterministic_id('node', _nodename_for_id, _x, _y)
+            print(f"[GraphML Parser] Generated deterministic UUID: {uuid_id} for node {original_id}")
 
         # Memorizza la mappatura per uso futuro
         self.id_mapping[original_id] = uuid_id
@@ -1594,8 +1682,11 @@ class GraphMLImporter:
             uuid_id = custom_fields['EMID']
             print(f"[GraphML Parser] Reusing existing EMID as group node ID: {uuid_id} for node {original_id}")
         else:
-            uuid_id = str(uuid.uuid4())
-            print(f"[GraphML Parser] Generated new UUID for group node: {uuid_id} for node {original_id}")
+            # E2 — deterministico: nome del gruppo + geometria del suo realizer.
+            _gx, _gy = self._node_xy(node_element)
+            uuid_id = self._deterministic_id(
+                'group', self.EM_extract_group_node_name(node_element), _gx, _gy)
+            print(f"[GraphML Parser] Generated deterministic UUID for group node: {uuid_id} for node {original_id}")
 
         self.id_mapping[original_id] = uuid_id
 
@@ -1820,8 +1911,12 @@ class GraphMLImporter:
             swimlane_uuid = custom_fields['EMID']
             print(f"[GraphML Parser] Reusing existing EMID for swimlane node: {swimlane_uuid} for node {swimlane_original_id}")
         else:
-            swimlane_uuid = str(uuid.uuid4())
-            print(f"[GraphML Parser] Generated new UUID for swimlane node: {swimlane_uuid} for node {swimlane_original_id}")
+            # E2 — deterministico. Lo swimlane è unico nel file: la sua
+            # geometria basta come chiave (il nome non è esposto qui).
+            _sx, _sy = self._node_xy(node_element)
+            swimlane_uuid = self._deterministic_id(
+                'swimlane', swimlane_original_id, _sx, _sy)
+            print(f"[GraphML Parser] Generated deterministic UUID for swimlane node: {swimlane_uuid} for node {swimlane_original_id}")
 
         # Aggiungi alla mappatura
         self.id_mapping[swimlane_original_id] = swimlane_uuid
@@ -1841,7 +1936,10 @@ class GraphMLImporter:
         rows = node_element.findall('./{http://graphml.graphdrawing.org/xmlns}data/{http://www.yworks.com/xml/graphml}TableNode/{http://www.yworks.com/xml/graphml}Table/{http://www.yworks.com/xml/graphml}Rows/{http://www.yworks.com/xml/graphml}Row')
         for i, row in enumerate(rows):
             original_id = row.attrib['id']
-            uuid_id = str(uuid.uuid4())
+            # E2 — le righe della tabella non hanno geometria propria: la
+            # chiave è swimlane + id di riga + indice, tutti stabili nel file.
+            uuid_id = self._deterministic_id(
+                'epoch_row', swimlane_uuid, original_id, i)
             self.id_mapping[original_id] = uuid_id
             row_id_to_index[original_id] = i
             
@@ -2583,6 +2681,45 @@ class GraphMLImporter:
 
         return nodename, node_id, node_description, nodeurl, subnode_is_property
 
+    def _explicit_node_type(self, node_element):
+        """Return the class name declared by an explicit ``_s3d_node_type:``
+        marker in this node's URL or description, or ``None``.
+
+        The marker is the ecosystem's escape hatch for "the drawing cannot say
+        what this is, so I am telling you outright". It was already read for
+        paradata image nodes (see :meth:`_detect_paradata_image_type`, signal 1)
+        and is written by the s3Dgraphy GraphML exporter; C1 extends the same
+        channel to extractors, combiners and continuity nodes, which until now
+        could ONLY be recognised by their ``D.`` / ``C.`` label prefix.
+
+        That prefix is a naming convention, not a type. An old EM graph whose
+        author named an extractor after the unit it reads from (``SF04.2``)
+        drew a perfectly unambiguous extractor icon and still came out
+        untyped. The EMTools converter now writes the marker for those nodes,
+        reading the type off the SVG resource — the type the FILE records —
+        and this is where that lands.
+
+        Being an explicit declaration, the marker takes precedence over every
+        shape/label heuristic; it is only consulted when the heuristics have
+        already failed, so nothing that used to resolve can change.
+        """
+        url_key = self.key_map.get('node', {}).get('url')
+        description_key = self.key_map.get('node', {}).get('description')
+        for subnode in node_element.findall(
+                './/{http://graphml.graphdrawing.org/xmlns}data'):
+            if not subnode.text:
+                continue
+            if subnode.attrib.get('key') not in (url_key, description_key):
+                continue
+            idx = subnode.text.find(_S3D_NODE_TYPE_MARKER)
+            if idx < 0:
+                continue
+            tail = subnode.text[idx + len(_S3D_NODE_TYPE_MARKER):]
+            match = re.match(r"([A-Za-z_][A-Za-z0-9_]*)", tail)
+            if match:
+                return match.group(1)
+        return None
+
     def EM_check_node_extractor(self, node_element):
         try:
             _, _, _, _, subnode_is_extractor = self.EM_extract_extractor_node(node_element)
@@ -2620,6 +2757,13 @@ class GraphMLImporter:
                             f"Please rename one of the '{nodename}' nodes in yEd."
                         )
 
+        # C1 — the label convention did not match, but the node may declare its
+        # type outright. Consulted only here, after the prefix test, so nothing
+        # that already resolved can change.
+        if not subnode_is_extractor and \
+                self._explicit_node_type(node_element) == "ExtractorNode":
+            subnode_is_extractor = True
+
         if subnode_is_extractor:
             for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
                 key = subnode.attrib.get('key')
@@ -2628,6 +2772,9 @@ class GraphMLImporter:
                         nodeurl = self._check_if_empty(subnode.text)
                 if description_key and key == description_key:
                     node_description = self.clean_comments(self._check_if_empty(subnode.text)) if subnode.text else ''
+        # The `_s3d_node_type:` marker is machinery, not prose: keep it out of
+        # the description the author reads.
+        node_description = self._strip_s3d_marker(node_description)
 
         return nodename, node_id, node_description, nodeurl, subnode_is_extractor
 
@@ -2659,6 +2806,12 @@ class GraphMLImporter:
                 if nodename.startswith("C."):
                     subnode_is_combiner = True
 
+        # C1 — same escape hatch as the extractor: an explicit declaration wins
+        # where the label convention was never followed.
+        if not subnode_is_combiner and \
+                self._explicit_node_type(node_element) == "CombinerNode":
+            subnode_is_combiner = True
+
         if subnode_is_combiner:
             for subnode in node_element.findall('.//{http://graphml.graphdrawing.org/xmlns}data'):
                 key = subnode.attrib.get('key')
@@ -2667,6 +2820,7 @@ class GraphMLImporter:
                         nodeurl = self._check_if_empty(subnode.text)
                 if description_key and key == description_key:
                     node_description = self.clean_comments(self._check_if_empty(subnode.text)) if subnode.text else ''
+        node_description = self._strip_s3d_marker(node_description)
 
         return nodename, node_id, node_description, nodeurl, subnode_is_combiner
 
@@ -2681,6 +2835,7 @@ class GraphMLImporter:
            ``continuity.svg`` (refid risolto dinamicamente, vedi
            build_svg_resource_map — yEd numera le Resource per ordine
            di serializzazione, non c'è un id fisso)
+        D) marcatore esplicito ``_s3d_node_type:ContinuityNode`` (C1)
 
         Args:
             node_element: Elemento XML del nodo
@@ -2713,6 +2868,11 @@ class GraphMLImporter:
                     refid = svg_content.attrib.get('refid')
                     if refid and self.svg_resource_map.get(refid) == 'continuity':
                         return True
+
+        # Signal D: explicit `_s3d_node_type:ContinuityNode` marker (C1) — for
+        # a graph whose continuity SVG carries no recognisable docname.
+        if self._explicit_node_type(node_element) == "ContinuityNode":
+            return True
 
         return False
 

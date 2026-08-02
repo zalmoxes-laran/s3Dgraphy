@@ -142,10 +142,34 @@ class RepresentationModelNode(RepresentationNode):
 class RepresentationModelDocNode(RepresentationNode):
     """
     Node representing a 3D model or spatialized image for documents.
-    
+
     This class is used to instantiate documents, extractors or combiner nodes
     within the scene. An example is a historical photo positioned in its original position.
-    
+
+    Scope (Q-C, EM 1.6). The RMDoc is the RM of an asset that cannot sit in 3D
+    without a transformation matrix — (0,0,0) is an improbable place for it —
+    and that normally involves a POV / camera sighting the document (a section,
+    an elevation, an image); typically a georeferenced 2D document used as a
+    base. It is NOT the RMDoc case when a photogrammetric model is used as a
+    SOURCE: that is an RM bound to its epoch, plus a Document. An asset already
+    3D and already an RM does not generate an RMDoc. The family is a parallel of
+    spatial instances of conceptual nodes::
+
+        proxy : US  ::  RMSF : SF  ::  RM : state  ::  RMDoc : Document
+
+    What has degrees here is the **spatialisation**, not the existence: the
+    document certainly exists. Its metric authority of placement is graded on
+    the ``geometry`` axis (``data["geometry"]``), whose vocabulary lives in
+    ``em_visual_rules.json → document_variant_styles``::
+
+        reality_based → observable → asserted → symbolic     (+ em_based, aside)
+
+    That axis is authoritative HERE, on the spatial instance, not on the
+    Document — which may mirror the value on its yEd border for diagram
+    convenience but carries no position. Temporality is a separate matter: an
+    attribution, certain or argued through a paradata chain, never a grade on
+    this axis.
+
     Attributes:
         node_type (str): Type of node, set to "representation_model_doc"
     """

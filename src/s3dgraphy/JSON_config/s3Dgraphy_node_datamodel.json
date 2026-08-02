@@ -1005,6 +1005,36 @@
    "abbreviation": "RMDoc",
    "label": "Representation Model Document",
    "description": "3D representation of a documentary node — e.g. a historical photo georeferenced and positioned in 3D space at the location it depicts. Linked via crm:P138_represents to a DocumentNode (or ExtractorNode/CombinerNode that uses the document). Specialization of em:RepresentationModel.",
+   "scope_note": "RM of an asset that CANNOT sit in 3D without a transformation matrix — (0,0,0) is an improbable place for it — and that normally involves a POV / camera sighting the document (a section, an elevation, an image); typically a georeferenced 2D document used as a base. It is NOT the RMDoc case when a photogrammetric model is used as a SOURCE: that is an RM bound to its epoch, plus a Document. An asset that is already 3D and already an RM does NOT generate an RMDoc. The family reads as a parallel of spatial instances of conceptual nodes: proxy:US :: RMSF:SF :: RM:state :: RMDoc:Document. What has degrees on an RMDoc is the SPATIALISATION, not the existence: the document certainly exists, and its temporality is an attribution (certain, or argued through a paradata chain) — never a grade on the geometry axis. The position itself (X,Y,Z + rotation) lives here and nowhere else; the Document may mirror the geometry value on its yEd border for diagram convenience but carries no position.",
+   "placement_qualia": {
+    "axis": "geometry",
+    "authoritative_on": "RepresentationModelDocNode",
+    "vocabulary_source": "em_visual_rules.json → document_variant_styles",
+    "ladder": [
+     "reality_based",
+     "observable",
+     "asserted",
+     "symbolic"
+    ],
+    "not_a_rung": [
+     "em_based"
+    ],
+    "note": "Scale of METRIC AUTHORITY OF PLACEMENT, most to least. 'symbolic' (EM 1.6, Q-C) is the lowest rung: the base is not metric at all (not-to-scale map, schematic plan, sketch). 'em_based' sits outside the ladder — it is a provenance statement (the asset IS an EM-derived reconstruction), which says nothing about how well it is placed."
+   },
+   "attach_rules": {
+    "from_document": {
+     "edge_type": "has_representation_model_doc",
+     "direction": "Document → RMDoc",
+     "cidoc": "P138i_has_representation",
+     "note": "The Document is the attach target. An RMDoc is NOT bound to an epoch nor to a stratigraphic unit — that is what separates it from an RM."
+    },
+    "to_resource": {
+     "edge_type": "has_linked_resource",
+     "direction": "RMDoc → LinkNode",
+     "cidoc": "P67_refers_to",
+     "note": "The P67 hinge to the file on disk goes through the LinkNode, as for every other representation facet."
+    }
+   },
    "s3Dgraphy_file": "representation_node.py",
    "mapping": {
     "cidoc": "D1 Digital Object",
