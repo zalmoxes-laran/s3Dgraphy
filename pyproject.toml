@@ -126,6 +126,33 @@ geo = [
     # the library imports, the graph loads, only the conversion is unavailable.
     "pyproj>=3.4",
 ]
+pdf = [
+    # Text extraction from PDF sources, for StratiMiner's Path A
+    # (api.source_text). Without it a PDF is listed by name and its text is not
+    # read — the honest degradation, not an error.
+    #
+    # pypdf and NOT PyMuPDF (E.D., 2026-08-03): PyMuPDF renders beautifully and
+    # weighs 21 MB, all of which the FROZEN em-bridge sidecar would carry in order
+    # to read some paragraphs. pypdf is ~350 KB, pure Python, no dependencies and
+    # no compiled extension — so it also installs next to Blender's interpreter
+    # without a build step. It reads the text LAYER; it does not do OCR, so a
+    # scanned PDF reports "no text layer" instead of returning an empty string
+    # that would read as an empty document.
+    "pypdf>=4.0",
+]
+docx = [
+    # .docx rendering of a baked narrative (BK1, api.export_narrative_docx).
+    # DocX is the format for the reader who will never see the graph — LaTeX
+    # serves the apparatus and Jupyter the analysis — so it is a first-class
+    # output, but not every consumer publishes: a Blender addon and the GraphML
+    # chain must not carry a Word writer.
+    #
+    # The PyPI package is `python-docx`; the import is `docx`. There is an
+    # unrelated `docx` on PyPI, which is why the MissingDependency message names
+    # both. Without the extra, api.bake_narrative still works — the bake is
+    # independent of every renderer — and only export_narrative_docx raises.
+    "python-docx>=1.1",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov",

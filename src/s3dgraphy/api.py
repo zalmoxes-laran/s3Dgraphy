@@ -435,6 +435,55 @@ def bib_key(node_id: str) -> str:
     return _k(node_id)
 
 
+def bake_narrative(graph: Graph, narrative_id: str, *,
+                   base_dir: Optional[str] = None) -> Any:
+    """Resolve a live narrative into a **static snapshot** (``BakedNarrative``).
+
+    A narrative's embeds mean "whatever this node says now" — which is what makes
+    it an editing surface and what a published text cannot be. The bake commits to
+    one reading, once: citations resolved, image bytes read, coordinates converted,
+    and a labelled placeholder wherever a static form needs a renderer this build
+    does not have (3D scene, matrix).
+
+    **Format-agnostic on purpose.** DocX, LaTeX, HTML and a notebook all render
+    the same bake, so they cannot disagree about what the narrative said — three
+    separate traversals of the graph could, and would.
+
+    Nothing raises over a missing file and nothing is dropped: an embed that will
+    not resolve becomes a block that says so, and is also listed in
+    ``baked.unresolved`` — the list to check before publishing. A snapshot may
+    record a hole; it may not hide one.
+
+    ``base_dir`` is what relative image locators resolve against (normally the
+    folder holding the em.json). Raises ``KeyError`` if ``narrative_id`` names no
+    narrative.
+    """
+    from .narrative.bake import bake_narrative as _b
+    return _b(graph, narrative_id, base_dir=base_dir)
+
+
+def export_narrative_docx(graph: Graph, narrative_id: str, *,
+                          base_dir: Optional[str] = None) -> bytes:
+    """Render a narrative to **.docx** bytes — the format for the normal reader.
+
+    Bakes first (:func:`bake_narrative`), then places the result: chapter
+    headings, prose, embedded images, citations as text plus a "Fonti" section,
+    and the byline that keeps people (responsible) apart from models (assisting).
+    Unendorsed machine drafts are flagged **in the text**, because a Word file gets
+    printed, copied and re-saved, and each of those loses anything that is not a
+    character.
+
+    Returns bytes rather than writing a file: the caller may be a CLI, an HTTP
+    response or a notebook.
+
+    Raises :class:`MissingDependency` if python-docx is not installed — the bake
+    itself does not need it, so ``bake_narrative`` keeps working and only the
+    rendering is unavailable.
+    """
+    from .exporter.docx_exporter import render_docx
+    return render_docx(bake_narrative(graph, narrative_id, base_dir=base_dir))
+
+
 # ── XLSX mapping ──────────────────────────────────────────────────────────────
 def xlsx_to_graph(path: str, *, mapping_name: Optional[str] = None,
                   id_column: Optional[str] = None, graph_id: str = "imported_graph"
@@ -456,6 +505,231 @@ def xlsx_to_emjson(path: str, **kwargs) -> EmJson:
     """Convenience: map an Excel workbook → em.json document."""
     graph, _warnings = xlsx_to_graph(path, **kwargs)
     return graph_to_emjson(graph)
+
+
+# ── StratiMiner — assisted graph creation from unstructured sources ──────────
+#
+# The pipeline is deliberately in two halves, and the seam between them is a
+# FILE a human can open:
+#
+#     a folder of documents  --(AI)-->  em_data.xlsx  --(deterministic)-->  em.json
+#
+# The AI writes ONLY the middle artefact. It never writes the graph. That is
+# the whole point of having an intermediate table rather than asking a model
+# for em.json directly: canonisation stays reviewable *before* it becomes
+# structure, and the second arrow is a plain importer that anyone can re-run
+# and get the same bytes. A model that emitted em.json would put an unreviewed
+# guess straight into the language's own format, where a wrong node type reads
+# exactly like a right one.
+#
+# Both halves live here, in the pure library, so neither depends on Blender or
+# on a UI: EMtools, EMStudio (via em-bridge) and a bare script call the same
+# two functions.
+
+
+def em_data_to_graph(path: str, *, graph_id: Optional[str] = None
+                     ) -> Tuple[Graph, List[str], Dict[str, int]]:
+    """Read a canonical ``em_data.xlsx`` (5 typed sheets) into a Graph.
+
+    Returns ``(graph, warnings, stats)``. Needs pandas/openpyxl, imported
+    lazily by the importer.
+
+    **Not the same thing as :func:`xlsx_to_graph`.** That one maps an arbitrary
+    workbook through a *named mapping* (pyArchInit and friends); this one reads
+    the ONE canonical shape StratiMiner produces — sheets ``Units``, ``Epochs``,
+    ``Claims``, ``Authors``, ``Documents``. Folding them into a single entry
+    point would mean sniffing the file to decide which contract applies, and a
+    wrong guess there fails deep inside a parser instead of at the door.
+
+    **Why ``stats`` rides along** (the one place this deviates from
+    ``xlsx_to_graph``'s two-tuple): the intermediate table exists in order to be
+    checked, so the caller has to be able to say "5 units, 2 epochs, 7 claims
+    read → 14 nodes, 9 edges" *before* anybody trusts the graph. Recomputing
+    that from the finished graph cannot distinguish a row that was skipped from
+    a row that never existed, and re-opening the workbook to count again is a
+    second parse free to disagree with the first.
+    """
+    from .importer.unified_xlsx_importer import UnifiedXLSXImporter
+    importer = UnifiedXLSXImporter(path, graph_id=graph_id)
+    graph = importer.parse()
+    return (graph,
+            list(getattr(graph, "warnings", []) or []),
+            dict(importer.stats))
+
+
+def import_em_data(path: str, *, graph_id: Optional[str] = None) -> EmJson:
+    """``em_data.xlsx`` → em.json document. The deterministic half of
+    StratiMiner: same workbook in, same document out, no model involved.
+
+    Use :func:`em_data_to_graph` when you also want the warnings and the row
+    counts (a UI does).
+    """
+    graph, _warnings, _stats = em_data_to_graph(path, graph_id=graph_id)
+    return graph_to_emjson(graph)
+
+
+def stratiminer_prompt(*, language: Optional[str] = None,
+                       documents_folder: Optional[str] = None,
+                       document_list: Optional[List[Any]] = None,
+                       include_validation: bool = True,
+                       include_checklist: bool = True,
+                       include_stratigraphy_only: bool = False,
+                       dosco_in_place: bool = True,
+                       ai_has_filesystem_access: bool = True) -> str:
+    """Build the StratiMiner extraction prompt for a folder of sources.
+
+    A pure string builder: it reads the prompt template bundled in the package
+    and substitutes the caller's options. No model is called here — the result
+    is what you either hand to a Cowork session (the user runs it) or send
+    through a provider seam (the host application does).
+
+    Re-exported on ``api`` although the implementation lives in ``utils``,
+    because ``api`` is the consumption surface (ADR-001): a caller outside
+    Blender should not have to know which module the template loader sits in,
+    and the name should say what the prompt is *for*.
+
+    The contract of the returned prompt is the invariant above: it asks the
+    model for **em_data.xlsx**, never for a graph.
+    """
+    from .utils.utils import get_ai_prompt
+    return get_ai_prompt(
+        language=language,
+        include_validation=include_validation,
+        include_checklist=include_checklist,
+        include_stratigraphy_only=include_stratigraphy_only,
+        documents_folder=documents_folder,
+        document_list=document_list,
+        dosco_in_place=dosco_in_place,
+        ai_has_filesystem_access=ai_has_filesystem_access,
+    )
+
+
+def source_text(path: str, *, max_chars: Optional[int] = None
+                ) -> Dict[str, Any]:
+    """What a source document says, for Path A's prompt — or why it cannot be read.
+
+    ``{"text": str | None, "kind": "text"|"pdf"|"unsupported", "note": str}``.
+    Never raises: a caller cataloguing a folder must not lose nineteen documents to
+    one bad twentieth. When ``text`` is ``None`` the ``note`` says why, and that
+    note is what the prompt shows the model so it does not invent the contents of a
+    file nobody read.
+
+    PDFs need the ``[pdf]`` extra (pypdf, ~350 KB, pure Python — **not** PyMuPDF's
+    21 MB). Without it a PDF reports that its text was not read and StratiMiner
+    degrades to filenames, which is a valid request this build cannot serve, not an
+    error.
+    """
+    from .importer.source_text import DEFAULT_MAX_CHARS, source_text as _st
+    return _st(path, max_chars=DEFAULT_MAX_CHARS if max_chars is None
+               else max_chars)
+
+
+def pdf_text_available() -> bool:
+    """True when this build can read a PDF's text layer. Ask ONCE, before the work,
+    so a folder of scans produces one honest sentence instead of twenty notes."""
+    from .importer.source_text import pdf_text_available as _a
+    return _a()
+
+
+def source_text_extractor() -> Optional[str]:
+    """The PDF extractor in use, with its version, or ``None``. Recorded because
+    two extractors disagree about hyphenation and column order: a canonisation that
+    came out oddly should be traceable to whatever read the page."""
+    from .importer.source_text import extractor_name as _n
+    return _n()
+
+
+def em_data_sheets() -> Tuple[str, ...]:
+    """The sheet names a canonical ``em_data.xlsx`` must carry, in the order the
+    importer reads them. Exposed so a UI or a writer (the Path-A materialiser in
+    em-bridge) enumerates them from here instead of hardcoding five strings that
+    then drift from the importer."""
+    from .importer.unified_xlsx_importer import UnifiedXLSXImporter
+    return tuple(UnifiedXLSXImporter._SHEETS)
+
+
+def em_data_columns() -> Dict[str, Tuple[str, ...]]:
+    """The column layout of each sheet, for a caller that has to WRITE the
+    table. Same source as :func:`em_data_sheets`."""
+    from .importer.unified_xlsx_importer import UnifiedXLSXImporter
+    return {k: tuple(v) for k, v in UnifiedXLSXImporter._COLUMNS.items()}
+
+
+def write_em_data(sheets: Dict[str, List[Dict[str, Any]]], path: str
+                  ) -> Dict[str, Any]:
+    """Write a canonical ``em_data.xlsx`` from row dicts. Returns a report:
+    ``{"path", "rows": {sheet: n}, "warnings": [...]}``.
+
+    This is the **materialiser** of StratiMiner's first arrow. A language model
+    cannot hand back a binary workbook — it returns rows — so somebody has to
+    turn rows into the file, and that somebody belongs here rather than in the
+    caller: the header layout lives next to the importer that reads it, and
+    EMtools, em-bridge and a bare script then produce byte-comparable tables
+    instead of three nearly-identical writers.
+
+    **Unknown column names are dropped, with a warning, not written.** This is
+    the guard that keeps the seam honest: what arrives here came from a model,
+    and a model that invents a column would otherwise get it silently carried
+    into the workbook, where the importer ignores it — so the information would
+    appear to have been captured while being nowhere. A named warning turns that
+    into something the user can see and fix in the table, which is exactly what
+    the table is for.
+
+    Needs openpyxl (imported lazily).
+    """
+    from openpyxl import Workbook
+    from .importer.unified_xlsx_importer import UnifiedXLSXImporter
+
+    columns = UnifiedXLSXImporter._COLUMNS
+    warnings: List[str] = []
+    rows_written: Dict[str, int] = {}
+
+    unknown_sheets = [s for s in sheets if s not in columns]
+    for s in sorted(unknown_sheets):
+        warnings.append(
+            f"sheet '{s}' is not part of em_data.xlsx "
+            f"({', '.join(UnifiedXLSXImporter._SHEETS)}); not written")
+
+    wb = Workbook()
+    wb.remove(wb.active)
+    for name in UnifiedXLSXImporter._WRITE_ORDER:
+        header = columns[name]
+        ws = wb.create_sheet(name)
+        ws.append(list(header))
+        for index, row in enumerate(sheets.get(name) or [], start=2):
+            if not isinstance(row, dict):
+                warnings.append(
+                    f"{name} row {index}: expected an object of "
+                    f"column->value, got {type(row).__name__}; skipped")
+                continue
+            for key in row:
+                if key not in header:
+                    warnings.append(
+                        f"{name} row {index}: unknown column '{key}' "
+                        f"dropped (columns: {', '.join(header)})")
+            ws.append([_cell(row.get(col)) for col in header])
+        rows_written[name] = max(ws.max_row - 1, 0)
+
+    wb.save(path)
+    return {"path": path, "rows": rows_written, "warnings": warnings}
+
+
+def _cell(value: Any) -> Any:
+    """Flatten a JSON value into something a spreadsheet cell can hold.
+
+    openpyxl refuses lists and dicts, and a model does sometimes return
+    ``["A.01", "A.02"]`` where the schema says a comma-separated string. Joining
+    is the reading the importer already expects for the multi-value columns
+    (``AUTHOR_IDS``), so accept it rather than failing the whole workbook over
+    a formatting habit.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(v) for v in value if v is not None)
+    return str(value)
 
 
 # ── authority resolution ────────────────────────────────────────────────────
@@ -1157,12 +1431,46 @@ def resolve_edge_type(source_node: Any, target_node: Any, declared_type: str) ->
     return _r(source_node, target_node, declared_type)
 
 
+def _pick_narrative(graph: Graph, requested: Optional[str]) -> Optional[str]:
+    """Which narrative a CLI command should act on, or ``None`` after explaining.
+
+    One narrative needs no argument; several must be NAMED, and the error lists
+    them rather than picking one — silently exporting the wrong text is the
+    failure this refuses. Shared by every narrative command so they cannot answer
+    the same question differently.
+    """
+    import sys
+
+    if requested is not None:
+        return requested
+    narratives = [n for n in (getattr(graph, "nodes", []) or [])
+                  if getattr(n, "node_type", None) == "narrative"]
+    if len(narratives) == 1:
+        return narratives[0].node_id
+    if not narratives:
+        print("error: this document contains no narrative", file=sys.stderr)
+        return None
+    print("error: several narratives — name one:", file=sys.stderr)
+    for node in narratives:
+        print(f"  {node.node_id}  {getattr(node, 'name', '')}", file=sys.stderr)
+    return None
+
+
 # ── thin CLI (part of the surface; no web deps) ────────────────────────────────
 def main(argv: Optional[List[str]] = None) -> int:
     """`python -m s3dgraphy.api <op> ...` — a thin CLI over the ops above."""
     import argparse
     import json
     import sys
+
+    # The exception classes, fetched through the PACKAGE path rather than used as
+    # locals. Run as `python -m s3dgraphy.api`, this module is `__main__`, and a
+    # submodule that does `from ..api import MissingDependency` imports a SECOND
+    # copy of it under its real name: two distinct class objects for one name, so
+    # `except MissingDependency` here would not catch what the exporter raised —
+    # a traceback instead of the intended exit code. Importing it the same way the
+    # raiser does makes the two identities the same object under both entry points.
+    from .api import MissingDependency as _MissingDependency
 
     ap = argparse.ArgumentParser(prog="s3dgraphy.api", description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="op", required=True)
@@ -1198,6 +1506,19 @@ def main(argv: Optional[List[str]] = None) -> int:
                          "apart)")
     nl.add_argument("--force", action="store_true",
                     help="overwrite the output files if they already exist")
+    nd = sub.add_parser("export-narrative-docx",
+                        help="narrative → .docx (needs the [docx] extra)")
+    nd.add_argument("path", help="input .em.json")
+    nd.add_argument("narrative_id", nargs="?", default=None,
+                    help="which narrative (default: the only one, or list them)")
+    # A FLAG and not a second positional, like export-narrative-latex: with two
+    # optional positionals, `... doc.em.json out.docx` silently reads the output
+    # path as the narrative id and fails with a baffling "no narrative node with
+    # id '/path/out.docx'".
+    nd.add_argument("-o", "--output", default=None,
+                    help="output .docx (default: alongside the input)")
+    nd.add_argument("--force", action="store_true",
+                    help="overwrite the output file if it already exists")
     r = sub.add_parser("resolve", help="resolve an authority term")
     r.add_argument("term")
     r.add_argument("facet")
@@ -1274,23 +1595,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         graph, warnings = load_emjson(doc)
         for w in warnings:
             print(f"warning: {w}", file=sys.stderr)
-        narratives = [n for n in graph.nodes
-                      if getattr(n, "node_type", None) == "narrative"]
-        target_id = args.narrative_id
+        target_id = _pick_narrative(graph, args.narrative_id)
         if target_id is None:
-            # One narrative needs no argument; several must be named, and the
-            # error lists them rather than picking one — choosing for the user
-            # here would silently export the wrong text.
-            if len(narratives) == 1:
-                target_id = narratives[0].node_id
-            elif not narratives:
-                print("error: this document contains no narrative", file=sys.stderr)
-                return 1
-            else:
-                print("error: several narratives — name one:", file=sys.stderr)
-                for n in narratives:
-                    print(f"  {n.node_id}  {getattr(n, 'name', '')}", file=sys.stderr)
-                return 1
+            return 1
         try:
             out = export_narrative_latex(graph, target_id)
         except KeyError as exc:
@@ -1313,6 +1620,44 @@ def main(argv: Optional[List[str]] = None) -> int:
             tex_path.write_text(out["tex"], encoding="utf-8")
             bib_path.write_text(out["bib"], encoding="utf-8")
             print(f"{tex_path}\n{bib_path}")
+    elif args.op == "export-narrative-docx":
+        with open(args.path, encoding="utf-8") as f:
+            doc = json.load(f)
+        graph, warnings = load_emjson(doc)
+        for w in warnings:
+            print(f"warning: {w}", file=sys.stderr)
+        target_id = _pick_narrative(graph, args.narrative_id)
+        if target_id is None:
+            return 1
+        out_path = (Path(args.output) if args.output
+                    else Path(args.path).with_suffix(".docx"))
+        if out_path.exists() and not args.force:
+            print(f"error: {out_path} exists (use --force)", file=sys.stderr)
+            return 1
+        # Baked ONCE and rendered from that: baking again for the warning list
+        # would double the file reads and leave two snapshots free to disagree
+        # about what was resolved. Relative image locators are relative to the
+        # em.json, not to the directory the command ran from.
+        try:
+            baked = bake_narrative(graph, target_id,
+                                   base_dir=str(Path(args.path).parent))
+        except KeyError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        # Said before the write, so it is visible even when the render then fails.
+        for ref in baked.unresolved:
+            print(f"warning: unresolved embed {ref}", file=sys.stderr)
+        try:
+            from .exporter.docx_exporter import render_docx
+            blob = render_docx(baked)
+        except _MissingDependency as exc:
+            # Distinct exit code: "this build cannot" is not the same failure as
+            # "your input is wrong", and a script driving the CLI should be able
+            # to tell them apart without parsing the message.
+            print(f"error: {exc}", file=sys.stderr)
+            return 3
+        out_path.write_bytes(blob)
+        print(out_path)
     elif args.op == "import-graphml":
         print(json.dumps(graphml_to_emjson(Path(args.path).read_bytes())))
     elif args.op == "convert":

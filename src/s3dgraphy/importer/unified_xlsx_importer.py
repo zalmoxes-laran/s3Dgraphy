@@ -111,6 +111,13 @@ _RELATION_TYPES = frozenset({
 # Property types that mean "temporal seed for chronology resolver"
 _TEMPORAL_PROPERTIES = frozenset({"absolute_time_start", "absolute_time_end"})
 
+# Namespace for the derived node/edge ids (see UnifiedXLSXImporter._mint).
+# A fixed, arbitrary UUID: its only job is to keep these uuid5 values from
+# colliding with uuid5 values some other producer derives from the same
+# strings. It must NEVER change — every id this importer has ever written
+# depends on it.
+_ID_NAMESPACE = uuid.UUID("6f1a2c94-0b8e-5d3a-9c47-a1b2c3d4e5f6")
+
 
 class UnifiedXLSXImporter:
     """Import a unified ``em_data.xlsx`` file into a fresh s3dgraphy Graph.
@@ -133,6 +140,36 @@ class UnifiedXLSXImporter:
     # Expected sheet names. The importer fails fast if any is missing.
     _SHEETS = ("Units", "Epochs", "Claims", "Authors", "Documents")
 
+    #: The columns each sheet carries, in the order the extraction prompt
+    #: describes them (``data/StratiMiner_Extraction_Prompt.md``, Sheets 1-5).
+    #:
+    #: The importer itself reads cells BY NAME and does not need this; it exists
+    #: for the other direction — a *writer* materialising the table from
+    #: extracted rows (the Path-A materialiser, or a hand-built fixture) has to
+    #: put the header row somewhere, and the only defensible somewhere is next
+    #: to the code that consumes it. The alternative, parsing the markdown
+    #: tables out of the prompt template at runtime, makes prose load-bearing.
+    #:
+    #: ``test_stratiminer_api.py`` asserts every name here appears in the
+    #: template, so the two descriptions cannot drift apart in silence.
+    _COLUMNS = {
+        "Units": ("ID", "TYPE", "NAME"),
+        "Epochs": ("ID", "NAME", "START", "END", "COLOR"),
+        "Authors": ("ID", "KIND", "DISPLAY_NAME", "ORCID", "AFFILIATION"),
+        "Documents": ("ID", "FILENAME", "TITLE", "YEAR", "AUTHOR_IDS",
+                      "ROLE", "CONTENT_NATURE", "GEOMETRY"),
+        "Claims": ("TARGET_ID", "TARGET2_ID", "PROPERTY_TYPE", "VALUE",
+                   "UNITS", "COMBINER_REASONING",
+                   "EXTRACTOR_1", "DOCUMENT_1", "AUTHOR_1", "AUTHOR_KIND_1",
+                   "EXTRACTOR_2", "DOCUMENT_2", "AUTHOR_2", "AUTHOR_KIND_2"),
+    }
+
+    #: Sheet order for a written workbook: catalogs before the long table, as
+    #: the prompt presents them, so a human opening the file reads it in the
+    #: order it was explained. Reading order is ``_SHEETS`` and is a different
+    #: concern (dependencies first).
+    _WRITE_ORDER = ("Units", "Epochs", "Authors", "Documents", "Claims")
+
     def __init__(self, filepath: str, graph_id: Optional[str] = None):
         self.filepath = filepath
         self.graph_id = graph_id or os.path.splitext(
@@ -151,6 +188,37 @@ class UnifiedXLSXImporter:
         # extractor / combiner short codes).
         self._extractor_counters: Dict[str, int] = {}
         self._combiner_counter = 0
+
+    # ------------------------------------------------------------------
+    # Identity
+    # ------------------------------------------------------------------
+
+    def _mint(self, kind: str, key: str) -> str:
+        """A node/edge id DERIVED from the row's own identifier, not minted at
+        random.
+
+        The whole point of ``em_data.xlsx`` as an intermediate is that the step
+        from table to graph is reproducible: edit one cell, re-import, and get
+        the same document apart from what you changed. With ``uuid4`` that was
+        false in the way that is hardest to notice — the graph looked right, but
+        every id was new, so two generations of the same table could not be
+        diffed or merged, and anything keyed on ``node_id`` (a saved layout, an
+        annotation, an EMStudio ``from-sketch`` arrangement) silently detached
+        on every re-run.
+
+        The sheets already carry the stable key this needs: ``U1``, ``E1``,
+        ``A.01``, ``D.01``, and for synthesised paradata the short code the
+        parser assigns in reading order (``C.01``, ``D.01.02``).
+
+        ``graph_id`` is part of the key on purpose. Without it two different
+        sites that both number a unit ``U1`` would mint the SAME uuid, and
+        merging their graphs would collapse two distinct units into one — a
+        quiet data loss, far worse than the cost paid here: renaming the
+        workbook (``graph_id`` defaults to its basename) re-mints the ids, so
+        pass an explicit ``graph_id`` when the file name is not stable.
+        """
+        return str(uuid.uuid5(_ID_NAMESPACE,
+                              f"{self.graph_id}|{kind}|{key}"))
 
     # ------------------------------------------------------------------
     # Public entry point
@@ -305,7 +373,7 @@ class UnifiedXLSXImporter:
                 desc_parts.append(affil)
             description = " | ".join(desc_parts) if desc_parts else ""
 
-            node = cls(node_id=str(uuid.uuid4()), name=aid,
+            node = cls(node_id=self._mint("author", aid), name=aid,
                        description=description)
             self.graph.add_node(node)
             self._author_by_id[aid] = node
@@ -354,7 +422,7 @@ class UnifiedXLSXImporter:
 
             desc_parts = [p for p in (filename, title, year) if p]
             doc = DocumentNode(
-                node_id=str(uuid.uuid4()), name=did,
+                node_id=self._mint("document", did), name=did,
                 description=" | ".join(desc_parts),
                 role=role,
                 content_nature=content_nature,
@@ -390,7 +458,7 @@ class UnifiedXLSXImporter:
             color = _str(row.get("COLOR"))
 
             epoch = EpochNode(
-                node_id=str(uuid.uuid4()),
+                node_id=self._mint("epoch", eid),
                 name=name,
                 start_time=start if start is not None else 0,
                 end_time=end if end is not None else 0,
@@ -412,12 +480,13 @@ class UnifiedXLSXImporter:
             name = _str(row.get("NAME")) or uid
 
             cls = get_stratigraphic_node_class(type_str)
+            unit_id = self._mint("unit", uid)
             # Robust instantiation: try with (node_id, name, description)
             try:
-                node = cls(node_id=str(uuid.uuid4()), name=uid,
+                node = cls(node_id=unit_id, name=uid,
                            description=name if name != uid else "")
             except TypeError:
-                node = cls(node_id=str(uuid.uuid4()), name=uid)
+                node = cls(node_id=unit_id, name=uid)
             self.graph.add_node(node)
             self._unit_by_id[uid] = node
 
@@ -508,7 +577,8 @@ class UnifiedXLSXImporter:
                 f"cannot create '{rel_type}' edge."
             )
             return
-        edge_id = str(uuid.uuid4())
+        edge_id = self._mint(
+            "rel", f"{source_node.node_id}|{rel_type}|{target_node.node_id}")
         self.graph.add_edge(
             edge_id=edge_id,
             edge_source=source_node.node_id,
@@ -526,7 +596,13 @@ class UnifiedXLSXImporter:
         # dedicated attribute so consumers can render "14.5 m" or just
         # "14.5" depending on context.
         pn = PropertyNode(
-            node_id=str(uuid.uuid4()),
+            # The row's line number is part of the key: a target may legitimately
+            # carry two claims of the same property_type (two measurements, two
+            # readings), and keying on target+type alone would mint one id for
+            # both — the second would overwrite the first instead of standing
+            # beside it.
+            node_id=self._mint(
+                "property", f"{target_node.node_id}|{prop_type}|{line}"),
             name=prop_type,
             property_type=prop_type,
             value=value_str or "",
@@ -570,7 +646,9 @@ class UnifiedXLSXImporter:
         # Combiner: one CombinerNode fronting the two extractors.
         self._combiner_counter += 1
         comb = CombinerNode(
-            node_id=str(uuid.uuid4()),
+            # Keyed on the short code, which the parser assigns in reading
+            # order — stable for a given workbook, which is the contract here.
+            node_id=self._mint("combiner", f"C.{self._combiner_counter:02d}"),
             name=f"C.{self._combiner_counter:02d}",
             description=combiner_text,
         )
@@ -650,7 +728,7 @@ class UnifiedXLSXImporter:
         ext_short = f"{doc_short}.{counter:02d}"
 
         ext = ExtractorNode(
-            node_id=str(uuid.uuid4()),
+            node_id=self._mint("extractor", ext_short),
             name=ext_short,
             description=triple["extractor_text"],
         )
