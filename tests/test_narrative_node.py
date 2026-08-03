@@ -89,6 +89,34 @@ def test_the_enum_matches_the_datamodel():
     assert set(declared) == set(NARRATIVE_VIEW_TYPES)
 
 
+# ── the epoch3d → scene3d rename (G1) ─────────────────────────────────────────
+#
+# Renaming a term in a format people have SAVED is only safe if the old spelling
+# keeps working. These pin both halves of that: it still loads, and it comes back
+# under the new name — so a file is upgraded by being opened, and no block ever
+# carries two names for one thing.
+
+def test_a_narrative_saved_with_the_old_spelling_still_loads():
+    b = Block.from_dict({"block_type": "embed", "ref": "EP.1",
+                         "view_type": "epoch3d"})
+    assert b.view_type == "scene3d"
+    assert b.to_dict()["view_type"] == "scene3d"
+
+
+def test_the_old_spelling_is_not_in_the_vocabulary_any_more():
+    """Accepted on read is not the same as valid: the enum has one name."""
+    assert "scene3d" in NARRATIVE_VIEW_TYPES
+    assert "epoch3d" not in NARRATIVE_VIEW_TYPES
+
+
+def test_canonical_view_type_leaves_alone_what_it_does_not_know():
+    from s3dgraphy.nodes.narrative_node import canonical_view_type
+    assert canonical_view_type(None) is None
+    assert canonical_view_type("us") == "us"
+    # An unknown name is NOT silently mapped to something: the caller refuses it.
+    assert canonical_view_type("hologram") == "hologram"
+
+
 # ── chapters ──────────────────────────────────────────────────────────────────
 
 def test_chapters_keep_the_order_they_were_added_in():

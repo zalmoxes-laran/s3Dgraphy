@@ -1,5 +1,5 @@
 {
- "s3Dgraphy_data_model_version": "1.6.0",
+ "s3Dgraphy_data_model_version": "1.6.1",
  "description": "s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings. v1.6.0 inaugurates a systematic CIDOC-CRM mapping revision: complete audit of all node types against CIDOC-CRM, CRMarchaeo, CRMinf, CRMdig, CRMsci, CRMgeo; replacement of legacy 'cidoc_s3d' pseudo-class names (invented strings without IRI or superclass declaration) with formal em:/s3d: IRIs declared as proper subclasses of CRM classes; introduction of CRMinf as primary (not alternative) for the paradata chain (ParadataNode, PropertyNode interpretive case, ExtractorNode, CombinerNode); introduction of PROV-O for AuthorNode to cover both human and AI agents; alignment with the Heritage Digital Twin Ontology (HDT-O) for containment / granularity properties; LocationNodeGroup (v1.5.3) adopted as the reference pattern (CIDOC-native composition via P2_has_type → E55 Type instances, with explicit extension_status and rationale). Companion deliverables: em.ttl (formal EM extension ontology, dereferenceable via w3id.org/em/) and hdto_extension.ttl (HDT-O granularity properties: contains_HDT, contains_SU, isPrimary). v1.5.4 added RSF (Reused Special Find — spolia) as a stratigraphic subtype, octagon with red border, family=real, is_series=false. Originating DP: DP-26 (spolia project, last DP before the EM 1.5 cut). v1.5.3 added LocationNodeGroup (E53 Place + E55 Type) for spatial / locational membership orthogonal to ActivityNodeGroup (intention) and EpochNode (time). v1.5.2 added family + is_series classification metadata on stratigraphic subtypes.",
  "components": [
   "CIDOC-CRM",
@@ -889,6 +889,7 @@
    "abbreviation": "GEO",
    "label": "Geo Position",
    "description": "Class to represent a GeoPosition node in the graph. Attributes: type (str): Node type, set to 'geo_position'. data (dict): Data related to geographic position.",
+   "node_usage": "ONE PER GRAPH, not per epoch: georeferencing is a property of the GRAPH (like its name, author, licence, HR id — the graph-level metadata), so Graph.__init__ auto-creates a single node with id 'geo_<graph_id>' and the em.json importer drops that synthetic one when the document carries its own. The SHIFT IS THE ANCHOR, NOT THE POSITION: shift_x/y/z are the origin of the scene-local system expressed in the CRS named by epsg — the point that is (0,0,0) in the scene — and may legitimately sit OUTSIDE the geometry (a round grid vertex hundreds of metres from the monument). It is therefore NOT where a map marker belongs: the marker goes on the CENTROID of the geometry (api.georeference_scene). 'rotation' is the scene azimuth in degrees, clockwise from geographic north, 0 = north up (the default and the normal case). The scene-local → geo transform is: rotate by rotation, add the shift, reproject epsg → 4326 (api.reproject). Graph-side twin of EMTools' scene.em_georef (georef_manager), which propagates the same values to BlenderGIS and 3DSC.",
    "s3Dgraphy_file": "geo_position_node.py",
    "mapping": {
     "cidoc": "E53 Place",
@@ -900,7 +901,8 @@
     "epsg": "P168_place_is_located_at",
     "shift_x": "Q9_is_expressed_in_terms_of",
     "shift_y": "Q9_is_expressed_in_terms_of",
-    "shift_z": "Q9_is_expressed_in_terms_of"
+    "shift_z": "Q9_is_expressed_in_terms_of",
+    "rotation": "Q9_is_expressed_in_terms_of"
    }
   },
   "LinkNode": {
@@ -1451,7 +1453,7 @@
    "parent": "Node",
    "abbreviation": "NARR",
    "label": "Narrative",
-   "description": "A narrative over the EM graph: an ordered sequence of chapters, each anchored to a lane (epoch, activity, area) or standing outside the stratigraphy (introduction, geographic placement), and each composed of prose blocks and embed blocks. An embed references an EM resource by its stable id and declares a view_type (matrix, epoch3d, us, rm, document, source, paradata, map, timeline, table, un_scene) saying how it should be shown. Metadata follows the existing conventions: author / license / embargo (DP-32), lang (DP-63), version, and template_id recording which scaffolder produced the first draft.",
+   "description": "A narrative over the EM graph: an ordered sequence of chapters, each anchored to a lane (epoch, activity, area) or standing outside the stratigraphy (introduction, geographic placement), and each composed of prose blocks and embed blocks. An embed references an EM resource by its stable id and declares a view_type (matrix, scene3d, us, rm, document, source, paradata, map, timeline, table, un_scene; 'epoch3d' is the retired spelling of 'scene3d' and is still accepted on read) saying how it should be shown. Metadata follows the existing conventions: author / license / embargo (DP-32), lang (DP-63), version, and template_id recording which scaffolder produced the first draft.",
    "scope_note": "Authored on the property graph (em.json) and PROJECTED to RDF — never triple-first. The narrative is a distinct thing from its renderings: one NarrativeNode can drive a live web viewer, a LaTeX print, a docx snapshot or a Jupyter notebook, and adding a target means adding a resolver, not re-authoring. Chapters marked canonical are the ones the author has settled: a template regeneration must leave them untouched. NOT a substitute for the paradata chain — a narrative CITES evidence (embed view_type=paradata), it does not restate it.",
    "s3Dgraphy_file": "narrative_node.py",
    "mapping": {
@@ -1476,7 +1478,7 @@
    },
    "valid_view_types": {
     "matrix": "The matrix, or a slice of one epoch",
-    "epoch3d": "The 3D scene of an epoch (Heriverse / ATON)",
+    "scene3d": "A 3D scene (Heriverse / ATON). The embed points at the graph's published scene id or at a RepresentationModel — the scene is a GRAPH-level thing, not an epoch's: has_linked_resource does not admit an EpochNode as source, so an epoch has no EM-legal way to hold geometry.",
     "us": "A stratigraphic unit with its certainty qualia",
     "rm": "A representation model (RM / RMDoc)",
     "document": "A document or image (Shelf / IIIF)",

@@ -988,7 +988,11 @@ class RDFExporter:
             epsg = data.get("epsg")
             if epsg:
                 ctx.add((node_iri, CRM.P2_has_type, Literal(f"EPSG:{epsg}")))
-            for axis in ("shift_x", "shift_y", "shift_z"):
+            # The shift is the anchor of the scene-local frame, and `rotation`
+            # (G1) is its azimuth — clockwise degrees from north, 0 = north up.
+            # Projecting the shift without the rotation would describe an
+            # orientation the scene does not have, so it travels with it.
+            for axis in ("shift_x", "shift_y", "shift_z", "rotation"):
                 v = data.get(axis)
                 if v is not None:
                     ctx.add((node_iri, EM[axis], Literal(v)))

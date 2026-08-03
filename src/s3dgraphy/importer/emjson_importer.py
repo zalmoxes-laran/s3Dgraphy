@@ -177,12 +177,18 @@ def parse_emjson(doc: Dict[str, Any]) -> Tuple[Graph, List[str]]:
     # Graph.__init__ auto-creates a default geo_position node. When the
     # document carries its own geo_position node(s), drop the synthetic one
     # so the round-trip is count-stable (no phantom +1 node).
+    #
+    # Dropped UNCONDITIONALLY, and that is a fix (G1). The previous version kept
+    # the synthetic node whenever the document's own geo node had the SAME id —
+    # `geo_<graph_id>`, which is exactly the id the exporter and EMTools write, so
+    # the normal case. `add_node` without `overwrite` returns the existing node
+    # and discards the incoming one, so the document's epsg/shift were silently
+    # replaced by the defaults (4326, 0, 0, 0) on every load: the georeferencing
+    # anchor did not survive a round trip at all. Verified before and after.
     incoming_types = {n.get("node_type") for n in gsec.get("nodes", [])}
     if "geo_position" in incoming_types:
         auto_geo_id = f"geo_{gsec['graph_id']}"
-        incoming_ids = {n.get("id") for n in gsec.get("nodes", [])}
-        if auto_geo_id not in incoming_ids:
-            graph.nodes = [n for n in graph.nodes if n.node_id != auto_geo_id]
+        graph.nodes = [n for n in graph.nodes if n.node_id != auto_geo_id]
 
     for payload in gsec.get("nodes", []):
         if not payload.get("id") or not payload.get("node_type"):

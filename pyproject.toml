@@ -114,6 +114,18 @@ minio = [
     # resolve()/manifest work dep-free on an already-populated index.
     "minio>=7.0",
 ]
+geo = [
+    # Coordinate reprojection for api.reproject / api.georeference_scene (G1).
+    # Excavation coordinates are normally PROJECTED (UTM, national grids) with
+    # an EPSG code, and a map needs WGS84: that conversion needs PROJ.
+    #
+    # pyproj and not GDAL on purpose: the pyproj wheels BUNDLE PROJ, so this
+    # extra installs with pip alone — no system binaries, no GDAL build. That
+    # is exactly the fragile pipe this avoids. Without the extra, reprojection
+    # raises MissingDependency (like rdflib for TTL) and every caller degrades:
+    # the library imports, the graph loads, only the conversion is unavailable.
+    "pyproj>=3.4",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov",
@@ -133,7 +145,7 @@ docs = [
 # without the dev/docs tooling. The dev/docs/test stacks stay separate
 # so CI-style installs don't pull editor/QA deps.
 full = [
-    "s3dgraphy[rdf-embedded,visualization,sync,minio]",
+    "s3dgraphy[rdf-embedded,visualization,sync,minio,geo]",
 ]
 all = [
     "s3dgraphy[full,dev,docs,postgres]",

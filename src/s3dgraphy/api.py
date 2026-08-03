@@ -20,6 +20,7 @@ library (ADR-001 invariant 2).
 
 from __future__ import annotations
 
+import math
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -447,6 +448,237 @@ def authority_facets() -> List[str]:
         return list(FACET_ORDER)
     except Exception:
         return []
+
+
+# ── coordinate reprojection (G1) ──────────────────────────────────────────────
+# Excavation coordinates are normally PROJECTED — a UTM zone, a national grid —
+# with the EPSG code recorded next to them on the graph's GeoPositionNode. A web
+# map wants WGS84 degrees. Converting between the two is not arithmetic anyone
+# should improvise: it needs PROJ, and it belongs here, once, rather than in
+# every consumer (and emphatically not in TypeScript, where a wrong guess would
+# put a site in the Gulf of Guinea and look authoritative doing it).
+#
+# pyproj is the dependency and it is OPTIONAL and LAZY, exactly like rdflib for
+# TTL: importing s3dgraphy stays free, and a build without the [geo] extra raises
+# MissingDependency at the one op that needs it. pyproj rather than GDAL because
+# its wheels bundle PROJ — pip installs it, no system libraries.
+def reproject(x: float, y: float, epsg_source: int,
+              epsg_target: int = 4326) -> Tuple[float, float]:
+    """Convert one coordinate pair between two EPSG frames.
+
+    Returns ``(lon, lat)`` in degrees when ``epsg_target`` is 4326 (the default),
+    otherwise ``(x, y)`` in the target frame's own units. Axis order is always
+    **easting/northing → lon/lat**: pyproj is asked for ``always_xy=True``, so
+    callers never have to know that EPSG:4326 formally declares lat before lon —
+    the classic way to end up with the coordinates swapped.
+
+    Identity is short-circuited: ``epsg_source == epsg_target`` returns the input
+    untouched and needs no pyproj at all, so a graph already in WGS84 works in a
+    build without the [geo] extra.
+
+    Raises :class:`MissingDependency` if pyproj is not installed, and
+    ``ValueError`` for an unusable EPSG or a non-finite result (PROJ signals a
+    point outside the source frame's domain with infinities — a silent ``inf``
+    would travel all the way to a marker somewhere absurd).
+    """
+    xs, ys = reproject_many([(x, y)], epsg_source, epsg_target)[0]
+    return xs, ys
+
+
+def reproject_many(points: List[Tuple[float, float]], epsg_source: int,
+                   epsg_target: int = 4326) -> List[Tuple[float, float]]:
+    """:func:`reproject` for many points, building the transformer ONCE.
+
+    A footprint is four corners plus a centroid; five transformer constructions
+    to convert five points would be five PROJ pipeline lookups for one answer.
+    """
+    try:
+        src = int(epsg_source)
+        dst = int(epsg_target)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"EPSG codes must be integers: {exc}") from exc
+    pts = [(float(px), float(py)) for px, py in points]
+    if src == dst:
+        return pts
+    try:
+        from pyproj import Transformer
+    except ImportError as exc:  # pyproj missing
+        raise MissingDependency(
+            f"coordinate reprojection needs pyproj — install the [geo] extra "
+            f"({exc})") from exc
+    try:
+        transformer = Transformer.from_crs(
+            f"EPSG:{src}", f"EPSG:{dst}", always_xy=True)
+    except Exception as exc:  # unknown/unsupported EPSG
+        raise ValueError(
+            f"cannot build a transformer EPSG:{src} → EPSG:{dst}: {exc}") from exc
+    out: List[Tuple[float, float]] = []
+    for px, py in pts:
+        rx, ry = transformer.transform(px, py)
+        if not (math.isfinite(rx) and math.isfinite(ry)):
+            raise ValueError(
+                f"({px}, {py}) is outside the domain of EPSG:{src} "
+                f"(PROJ returned a non-finite result)")
+        out.append((rx, ry))
+    return out
+
+
+# ── georeferencing a whole scene (G3) ─────────────────────────────────────────
+# G1 answers "where is this point, in degrees". G3 answers the question a reader
+# actually asks of a map: **how does the scene sit on the ground** — where it is
+# AND which way it faces.
+#
+# The transform is the graph's own statement, in three steps and one order:
+#
+#     rotate by the azimuth  →  add the origin (shift)  →  reproject epsg → 4326
+#
+# and the order is not negotiable: rotating after translating would swing the
+# scene around the grid origin instead of around itself, which for a shift a few
+# hundred metres away puts the building in the next field. The azimuth is
+# `rotation` on the graph-level GeoPositionNode (G1), clockwise from north, and 0
+# — north up — must be the identity.
+def _geo_anchor(graph: Graph) -> Dict[str, Any]:
+    """The graph's georeferencing anchor as a plain dict, defaults included.
+
+    One per graph by construction (``Graph.__init__``); if a document carries
+    several, the one with the canonical id ``geo_<graph_id>`` wins and otherwise
+    the first found — a graph with two anchors is a data problem, not something to
+    average.
+    """
+    nodes = [n for n in (getattr(graph, "nodes", []) or [])
+             if getattr(n, "node_type", None) == "geo_position"]
+    if not nodes:
+        return {"epsg": 4326, "shift_x": 0.0, "shift_y": 0.0, "shift_z": 0.0,
+                "rotation": 0.0}
+    canonical = f"geo_{getattr(graph, 'graph_id', '')}"
+    node = next((n for n in nodes if getattr(n, "node_id", None) == canonical),
+                nodes[0])
+    data = dict(getattr(node, "data", {}) or {})
+    return {
+        "epsg": int(data.get("epsg") or 4326),
+        "shift_x": float(data.get("shift_x") or 0.0),
+        "shift_y": float(data.get("shift_y") or 0.0),
+        "shift_z": float(data.get("shift_z") or 0.0),
+        "rotation": float(data.get("rotation") or 0.0),
+    }
+
+
+#: EPSG codes that are GEOGRAPHIC (degrees), used when pyproj cannot be asked.
+#: Short on purpose: it only has to cover what an EM graph realistically declares
+#: as its anchor, and with pyproj installed the authoritative answer is used.
+_GEOGRAPHIC_EPSG = {4326, 4979, 4258, 4269, 4230, 4267}
+
+
+def _is_geographic(epsg: int) -> bool:
+    """True when the frame's units are DEGREES rather than metres."""
+    try:
+        from pyproj import CRS
+        return bool(CRS.from_epsg(int(epsg)).is_geographic)
+    except Exception:
+        return int(epsg) in _GEOGRAPHIC_EPSG
+
+
+def georeference_scene(graph: Graph, points_local: List[Tuple[float, float]], *,
+                       epsg_target: int = 4326) -> Dict[str, Any]:
+    """Place scene-local points on the earth: rotate → shift → reproject.
+
+    ``points_local`` are XY in the scene's own frame (metres, origin at the
+    scene's 0,0) — typically the four corners of a bounding box and its centroid.
+    Returns::
+
+        {"epsg_source": int, "epsg_target": int, "rotation": float,
+         "shift": [x, y, z], "points": [[lon, lat], …], "reprojected": bool}
+
+    ``reprojected`` says whether PROJ was actually needed: with an anchor already
+    in the target frame the points are exact without pyproj, and a caller can
+    report that honestly rather than implying a conversion that did not happen.
+
+    Raises :class:`MissingDependency` when the anchor's frame needs pyproj and it
+    is not installed, and ``ValueError`` for an unusable EPSG — the same contract
+    as :func:`reproject`, because this IS that op with the scene's pose applied
+    first. Nothing here invents geometry: if you have no points, you get none.
+    """
+    anchor = _geo_anchor(graph)
+    # A scene-local extent is METRES. Adding metres to an anchor expressed in
+    # DEGREES is not a small inaccuracy, it is a category error: 30 m would become
+    # 30 degrees and the footprint would span a continent. Refuse, and say what
+    # the graph would need — a projected CRS on its GeoPositionNode.
+    if any(px or py for px, py in points_local) and _is_geographic(anchor["epsg"]):
+        raise ValueError(
+            f"the graph's georeferencing anchor is in EPSG:{anchor['epsg']}, "
+            f"which is in degrees: a scene extent in metres cannot be composed "
+            f"with it. Give the GeoPositionNode a projected CRS (a UTM zone, a "
+            f"national grid) — that is what an excavation records anyway.")
+    theta = math.radians(anchor["rotation"])
+    cos_t, sin_t = math.cos(theta), math.sin(theta)
+    placed: List[Tuple[float, float]] = []
+    for px, py in points_local:
+        x, y = float(px), float(py)
+        # Clockwise from north: a scene rotated +90° has its local +Y pointing
+        # east. With rotation 0 this is exactly the identity (cos 0 = 1, sin 0 = 0),
+        # which is the property the test pins.
+        rx = x * cos_t + y * sin_t
+        ry = -x * sin_t + y * cos_t
+        placed.append((rx + anchor["shift_x"], ry + anchor["shift_y"]))
+    src = anchor["epsg"]
+    out = reproject_many(placed, src, epsg_target) if placed else []
+    return {
+        "epsg_source": src,
+        "epsg_target": int(epsg_target),
+        "rotation": anchor["rotation"],
+        "shift": [anchor["shift_x"], anchor["shift_y"], anchor["shift_z"]],
+        "points": [[x, y] for x, y in out],
+        "reprojected": src != int(epsg_target),
+    }
+
+
+def scene_extent(graph: Graph) -> Optional[Dict[str, Any]]:
+    """The scene's local XY extent, DERIVED from geometry the graph already has.
+
+    The only geometry an EM graph holds is the spatial proxies:
+    :class:`~s3dgraphy.nodes.semantic_shape_node.SemanticShapeNode` carries
+    ``convexshapes`` (flat ``[x,y,z, x,y,z, …]`` vertex lists) and ``spheres``
+    (``[x,y,z,r]``). Where those exist, an extent is a fact and this returns it::
+
+        {"min_x": …, "min_y": …, "max_x": …, "max_y": …,
+         "centroid": [x, y], "corners": [[x,y] × 4], "source": "semantic_shape"}
+
+    Where they do not, this returns ``None`` — and a caller must then be given the
+    extent explicitly or draw nothing. **A bounding box nobody measured is not a
+    default, it is a fabrication**, and a fabricated footprint on a map is exactly
+    the kind of confident wrong answer this codebase refuses elsewhere.
+    """
+    min_x = min_y = float("inf")
+    max_x = max_y = float("-inf")
+    seen = False
+    for node in getattr(graph, "nodes", []) or []:
+        if getattr(node, "node_type", None) != "semantic_shape":
+            continue
+        data = getattr(node, "data", {}) or {}
+        for verts in (data.get("convexshapes") or []):
+            for i in range(0, len(verts) - 2, 3):
+                x, y = float(verts[i]), float(verts[i + 1])
+                min_x, max_x = min(min_x, x), max(max_x, x)
+                min_y, max_y = min(min_y, y), max(max_y, y)
+                seen = True
+        for sphere in (data.get("spheres") or []):
+            if len(sphere) < 4:
+                continue
+            x, y, _z, r = (float(sphere[0]), float(sphere[1]),
+                           float(sphere[2]), abs(float(sphere[3])))
+            min_x, max_x = min(min_x, x - r), max(max_x, x + r)
+            min_y, max_y = min(min_y, y - r), max(max_y, y + r)
+            seen = True
+    if not seen:
+        return None
+    return {
+        "min_x": min_x, "min_y": min_y, "max_x": max_x, "max_y": max_y,
+        "centroid": [(min_x + max_x) / 2.0, (min_y + max_y) / 2.0],
+        # Corner order is fixed and documented: SW, SE, NE, NW in the scene's own
+        # frame, so a consumer can draw a closed ring without guessing a winding.
+        "corners": [[min_x, min_y], [max_x, min_y], [max_x, max_y], [min_x, max_y]],
+        "source": "semantic_shape",
+    }
 
 
 # ── resource layer (R0: stable-ID resolver seam) ──────────────────────────────

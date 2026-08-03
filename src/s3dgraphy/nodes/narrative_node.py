@@ -42,7 +42,7 @@ from .base_node import Node
 #: than trail them (spec §4).
 NARRATIVE_VIEW_TYPES = (
     "matrix",     # the matrix, or a slice of one epoch
-    "epoch3d",    # the 3D scene of an epoch (Heriverse / ATON)
+    "scene3d",    # a 3D scene (Heriverse / ATON) — see the rename note below
     "us",         # a stratigraphic unit with its certainty qualia
     "rm",         # a representation model (RM / RMDoc)
     "document",   # a document or image (Shelf / IIIF)
@@ -53,6 +53,35 @@ NARRATIVE_VIEW_TYPES = (
     "table",      # a query over the em.json
     "un_scene",   # a composable scene (DP-29)
 )
+
+#: View types that were once spelled differently → their current name.
+#:
+#: ``epoch3d`` → ``scene3d`` (G1). The old name said the scene belonged to an
+#: EPOCH, and it does not: georeferencing and the scene are properties of the
+#: GRAPH, and what an embed points at is either the graph's published scene or a
+#: RepresentationModel — which is also the only EM-legal shape, since
+#: ``has_linked_resource`` does not admit an EpochNode as its source. A name that
+#: mislabels the level it works at teaches the wrong model.
+#:
+#: Renaming a vocabulary term in a format people have already saved needs the old
+#: term to keep WORKING, not just to be tolerated at the door: this map is
+#: applied on read (:func:`canonical_view_type`), so a narrative saved with
+#: ``epoch3d`` loads, validates and renders — and is written back as ``scene3d``.
+NARRATIVE_VIEW_TYPE_ALIASES = {
+    "epoch3d": "scene3d",
+}
+
+
+def canonical_view_type(view_type: Optional[str]) -> Optional[str]:
+    """The current name of a view type, translating retired spellings.
+
+    ``None`` passes through (a prose block has no view type), and an unknown name
+    passes through unchanged so the caller — not this function — decides whether
+    to refuse it.
+    """
+    if view_type is None:
+        return None
+    return NARRATIVE_VIEW_TYPE_ALIASES.get(view_type, view_type)
 
 #: The two kinds of block. `prose` carries text the author wrote; `embed`
 #: carries a reference to something the graph already knows.
@@ -112,6 +141,10 @@ class Block:
         if self.block_type == BLOCK_EMBED:
             if not self.ref:
                 raise NarrativeError("an embed block needs a ref")
+            # A retired spelling is normalised HERE, at construction, so a
+            # narrative saved before the rename loads and is written back under
+            # the current name — the block never carries two names for one thing.
+            self.view_type = canonical_view_type(self.view_type)
             if self.view_type not in NARRATIVE_VIEW_TYPES:
                 raise NarrativeError(
                     f"view_type must be one of {NARRATIVE_VIEW_TYPES}, "

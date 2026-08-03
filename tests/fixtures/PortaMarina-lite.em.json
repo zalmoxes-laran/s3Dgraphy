@@ -68,10 +68,10 @@
         "target": "A.demetrescu"
       },
       {
+        "edge_type": "extracted_from",
         "id": "EXT.prompt.cantiere_extracted_from_D.1",
         "source": "EXT.prompt.cantiere",
-        "target": "D.1",
-        "edge_type": "extracted_from"
+        "target": "D.1"
       }
     ],
     "graph_id": "portamarina_lite",
@@ -80,6 +80,7 @@
       {
         "data": {
           "epsg": 4326,
+          "rotation": 0.0,
           "shift_x": 0.0,
           "shift_y": 0.0,
           "shift_z": 0.0
@@ -101,6 +102,7 @@
       {
         "data": {
           "epsg": 4326,
+          "rotation": 0.0,
           "shift_x": 14.4823,
           "shift_y": 40.7497,
           "shift_z": 0.0
@@ -309,7 +311,7 @@
   "header": {
     "datamodel_versions": {
       "connections": "1.6.2",
-      "nodes": "1.6.0",
+      "nodes": "1.6.1",
       "qualia": "1.6.0"
     },
     "format": "em.json",
