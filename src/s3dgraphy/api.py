@@ -407,6 +407,34 @@ def write_ai_draft(graph: Graph, target: str, text: str, *, model: str,
               chapter_title=chapter_title)
 
 
+# ── EM Narrative — print projection (L1) ──────────────────────────────────────
+def export_narrative_latex(graph: Graph, narrative_id: str) -> Dict[str, str]:
+    """Project a NarrativeNode to LaTeX + BibTeX: ``{"tex": …, "bib": …}``.
+
+    An **exporter, not a renderer**: it returns two strings and needs no LaTeX
+    engine. ``tex`` is a body to ``\\input{}`` into your own preamble (chapters →
+    ``\\section``/``\\subsection``, prose → prose, embeds → figures or
+    ``\\cite``), ``bib`` one entry per cited source with keys derived
+    deterministically from the node ids (:func:`bib_key`), so citations and
+    entries cannot drift and a re-export is stable.
+
+    Which embeds become citations rather than figures is decided by their
+    ``view_type``: `source` and `document` are things a reader could go and read;
+    everything else is something they look at. Nothing is invented — a source
+    without metadata becomes a minimal ``@misc`` with the title it has.
+
+    Raises ``KeyError`` if ``narrative_id`` names no narrative in the graph."""
+    from .exporter.latex_exporter import export_narrative_latex as _e
+    return _e(graph, narrative_id)
+
+
+def bib_key(node_id: str) -> str:
+    """The stable BibTeX key for a node id (``em:<slug>``) — exposed so a caller
+    can cite an EM source from its own document without re-deriving the rule."""
+    from .exporter.latex_exporter import bib_key as _k
+    return _k(node_id)
+
+
 # ── XLSX mapping ──────────────────────────────────────────────────────────────
 def xlsx_to_graph(path: str, *, mapping_name: Optional[str] = None,
                   id_column: Optional[str] = None, graph_id: str = "imported_graph"
@@ -1158,6 +1186,18 @@ def main(argv: Optional[List[str]] = None) -> int:
                     help="truncate the warning list (0 = all; default 20)")
     cv.add_argument("--force", action="store_true",
                     help="overwrite the output file if it already exists")
+    nl = sub.add_parser("export-narrative-latex",
+                        help="narrative → .tex + .bib (sources become bib entries)")
+    nl.add_argument("path", help="input .em.json")
+    nl.add_argument("narrative_id", nargs="?", default=None,
+                    help="which narrative (default: the only one, or list them)")
+    nl.add_argument("-o", "--output", default=None,
+                    help="output stem: writes <stem>.tex and <stem>.bib "
+                         "(default: alongside the input; '-' writes the tex to "
+                         "stdout and the bib to stderr, so the two can be piped "
+                         "apart)")
+    nl.add_argument("--force", action="store_true",
+                    help="overwrite the output files if they already exist")
     r = sub.add_parser("resolve", help="resolve an authority term")
     r.add_argument("term")
     r.add_argument("facet")
@@ -1228,6 +1268,51 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(project_ttl(graph))
         elif args.op == "graphml":
             print(graph_to_graphml(graph))
+    elif args.op == "export-narrative-latex":
+        with open(args.path, encoding="utf-8") as f:
+            doc = json.load(f)
+        graph, warnings = load_emjson(doc)
+        for w in warnings:
+            print(f"warning: {w}", file=sys.stderr)
+        narratives = [n for n in graph.nodes
+                      if getattr(n, "node_type", None) == "narrative"]
+        target_id = args.narrative_id
+        if target_id is None:
+            # One narrative needs no argument; several must be named, and the
+            # error lists them rather than picking one — choosing for the user
+            # here would silently export the wrong text.
+            if len(narratives) == 1:
+                target_id = narratives[0].node_id
+            elif not narratives:
+                print("error: this document contains no narrative", file=sys.stderr)
+                return 1
+            else:
+                print("error: several narratives — name one:", file=sys.stderr)
+                for n in narratives:
+                    print(f"  {n.node_id}  {getattr(n, 'name', '')}", file=sys.stderr)
+                return 1
+        try:
+            out = export_narrative_latex(graph, target_id)
+        except KeyError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        if args.output == "-":
+            # tex on stdout, bib on stderr: two artefacts, one process, pipeable
+            # apart — the same convention `convert` uses for doc/report.
+            print(out["tex"], end="")
+            print(out["bib"], end="", file=sys.stderr)
+        else:
+            stem = Path(args.output) if args.output else Path(args.path).with_suffix("")
+            tex_path = stem.with_suffix(".tex")
+            bib_path = stem.with_suffix(".bib")
+            existing = [p for p in (tex_path, bib_path) if p.exists()]
+            if existing and not args.force:
+                for p in existing:
+                    print(f"error: {p} exists (use --force)", file=sys.stderr)
+                return 1
+            tex_path.write_text(out["tex"], encoding="utf-8")
+            bib_path.write_text(out["bib"], encoding="utf-8")
+            print(f"{tex_path}\n{bib_path}")
     elif args.op == "import-graphml":
         print(json.dumps(graphml_to_emjson(Path(args.path).read_bytes())))
     elif args.op == "convert":
