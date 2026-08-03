@@ -317,7 +317,7 @@
     "format": "em.json",
     "generator": {
       "tool": "s3dgraphy",
-      "version": "1.6.0.dev11"
+      "version": "1.6.0.dev12"
     },
     "ontology_versions": {
       "CIDOC-CRM": "7.1.3",
