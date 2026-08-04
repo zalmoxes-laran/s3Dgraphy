@@ -214,7 +214,7 @@
     "serUSVn": {
       "3d_file": "src/3D/serUSV.glb",
       "2d_file_rast": "src/2D/serUSV.png",
-      "2d_file_vect": "src/2D/serUSV.svg",
+      "2d_file_vect": "src/2D/serUSVn.svg",
       "style": {
         "material": {
           "rgba_color": {
@@ -234,8 +234,8 @@
     },
     "serUSVs": {
       "file_3d": "src/3D/serUSVs.glb",
-      "2d_file_rast": "src/2D/serUSVs.png",
-      "2d_file_vect": "src/2D/serUSV.svg",
+      "2d_file_rast": "src/2D/serUSVs.svg",
+      "2d_file_vect": "src/2D/serUSVs.svg",
       "style": {
         "material": {
           "rgba_color": {
@@ -298,8 +298,8 @@
     "SE": {
       "_comment": "Stratigraphic Event: l'ATTO che crea, modifica o distrugge un'unita — un terremoto che fa cadere l'intonaco, una demolizione, l'inizio di un cantiere. Non e materia, e un processo, e per questo non appartiene a nessuna delle famiglie cromatiche della materia (rosso reale, verde/blu virtuale, arancio documentario, giallo special find, grigio negativo). Prende il TEAL della famiglia attivita: un ActivityNodeGroup e un fascio di atti e porta gia la linguetta ciano #CCFFFF, quindi il ciano e l'unico colore del linguaggio che dice gia 'e successo qualcosa' invece di 'qualcosa c'e'. Curato in S10 (2026-08-02): fino ad allora SE portava il segnaposto #BC0000 mai scelto, che per giunta contraddiceva il proprio bordo nero, e il node datamodel dichiarava il simbolo 'to be defined'. Il nero di BR e stato scartato di proposito: un material nero rende un proxy illeggibile in viewport, e i proxy SE si vedono (Heriverse li disegna fra i suoi stratigraphicTypes).",
       "3d_file": "src/3D/SE.glb",
-      "2d_file_rast": "src/3D/SE.png",
-      "2d_file_vect": "src/3D/SE.svg",
+      "2d_file_rast": "src/2D/SE.png",
+      "2d_file_vect": "src/2D/SE.svg",
       "style": {
         "material": {
           "rgba_color": {
@@ -367,8 +367,8 @@
     },
     "EP": {
       "3d_file": "src/3D/epoch.glb",
-      "2d_file_rast": "src/2D/epoch.png",
-      "2d_file_vect": "src/2D/epoch.svg",
+      "2d_file_rast": "src/2D/EpochNode.svg",
+      "2d_file_vect": "src/2D/EpochNode.svg",
       "style": {
         "border_color": "#009933",
         "fill_color": "#FFFFFF",
@@ -393,7 +393,7 @@
       "_comment": "AI-assisted author. Same star shape as AUTH for visual family unity, but cyan/blue tones to distinguish at a glance from human author (red/orange). The graphml palette identifies it via the 'AI.' label prefix (em_palette_icons).",
       "file_3d": "src/3D/author_ai.glb",
       "2d_file_rast": "src/2D/author_ai.png",
-      "2d_file_vect": "src/2D/author_ai.svg",
+      "2d_file_vect": "src/2D/author_ai.png",
       "style": {
         "material": {
           "rgba_color": {
@@ -414,7 +414,7 @@
       "_comment": "License node. Shield shape carrying a gold border to read clearly as a rights / legal artifact. Connected via has_license to any Node or to the GraphNode for graph-wide licensing. Graphml palette prefix: 'LI.'.",
       "file_3d": "src/3D/license.glb",
       "2d_file_rast": "src/2D/license.png",
-      "2d_file_vect": "src/2D/license.svg",
+      "2d_file_vect": "src/2D/license.png",
       "style": {
         "material": {
           "rgba_color": {
@@ -435,7 +435,7 @@
       "_comment": "Embargo node. Octagon with red dashed border to read as a temporal restriction (the dashed border encodes 'temporary'). Connected via has_embargo to a Node, LicenseNode or GraphNode. Graphml palette prefix: 'EB.'.",
       "file_3d": "src/3D/embargo.glb",
       "2d_file_rast": "src/2D/embargo.png",
-      "2d_file_vect": "src/2D/embargo.svg",
+      "2d_file_vect": "src/2D/embargo.png",
       "style": {
         "material": {
           "rgba_color": {
@@ -477,7 +477,7 @@
       "_comment": "EM Narrative (DP-79). A NarrativeNode is a crm:E33 Linguistic Object over the graph — chapters of prose and embeds — not an assertion about the site, which is why it stays neutral grey and must not read as stratigraphy or paradata. Solid border, unlike GRAPH's dashed: a narrative is a real authored object, not an anchor for metadata propagation. The .svg does not exist yet; the renderer takes the raster (see step I).",
       "file_3d": "src/3D/narrative.glb",
       "2d_file_rast": "src/2D/narrative.png",
-      "2d_file_vect": "src/2D/narrative.svg",
+      "2d_file_vect": "src/2D/narrative.png",
       "style": {
         "material": {
           "rgba_color": {
@@ -496,7 +496,7 @@
     },
     "LINK": {
       "file_3d": "src/3D/link.glb",
-      "2d_file_rast": "src/2D/link.png",
+      "2d_file_rast": "src/2D/link.svg",
       "2d_file_vect": "src/2D/link.svg",
       "style": {
         "border_color": "#FF6600",
@@ -508,8 +508,8 @@
     },
     "GEO": {
       "file_3d": "src/3D/geo.glb",
-      "2d_file_rast": "src/2D/geo.png",
-      "2d_file_vect": "src/2D/geo.svg",
+      "2d_file_rast": "src/2D/geo_position.svg",
+      "2d_file_vect": "src/2D/geo_position.svg",
       "style": {
         "border_color": "#FF6600",
         "fill_color": "#FFFFFF",
@@ -520,8 +520,8 @@
     },
     "RM": {
       "file_3d": "src/3D/rm.glb",
-      "2d_file_rast": "src/2D/rm.png",
-      "2d_file_vect": "src/2D/rm.svg",
+      "2d_file_rast": "src/2D/representation_model.svg",
+      "2d_file_vect": "src/2D/representation_model.svg",
       "style": {
         "material": {
           "rgba_color": {
@@ -540,8 +540,8 @@
     },
     "RMDoc": {
       "file_3d": "src/3D/rmdoc.glb",
-      "2d_file_rast": "src/2D/rmdoc.png",
-      "2d_file_vect": "src/2D/rmdoc.svg",
+      "2d_file_rast": "src/2D/representation_model_doc.svg",
+      "2d_file_vect": "src/2D/representation_model_doc.svg",
       "style": {
         "material": {
           "rgba_color": {
@@ -560,8 +560,8 @@
     },
     "RMSF": {
       "file_3d": "src/3D/rmsf.glb",
-      "2d_file_rast": "src/2D/rmsf.png",
-      "2d_file_vect": "src/2D/rmsf.svg",
+      "2d_file_rast": "src/2D/representation_model_sf.svg",
+      "2d_file_vect": "src/2D/representation_model_sf.svg",
       "style": {
         "material": {
           "rgba_color": {
@@ -580,8 +580,8 @@
     },
     "SS": {
       "file_3d": "src/3D/ss.glb",
-      "2d_file_rast": "src/2D/ss.png",
-      "2d_file_vect": "src/2D/ss.svg",
+      "2d_file_rast": "src/2D/semantic_shape.svg",
+      "2d_file_vect": "src/2D/semantic_shape.svg",
       "style": {
         "border_color": "#FF6600",
         "fill_color": "#FFFFFF",
