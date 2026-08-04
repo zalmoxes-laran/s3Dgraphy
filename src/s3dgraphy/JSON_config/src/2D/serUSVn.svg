@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25.53 11.69">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #0f0f0f;
+      }
+
+      .cls-1, .cls-2 {
+        stroke-width: 0px;
+      }
+
+      .cls-3 {
+        fill: #fff;
+        font-family: MyriadPro-Regular, 'Myriad Pro';
+        font-size: 4px;
+      }
+
+      .cls-2 {
+        fill: #31792d;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g>
+      <g>
+        <path class="cls-1" d="M12.76,11.19C6.12,11.19.5,8.75.5,5.85S6.12.5,12.76.5s12.26,2.45,12.26,5.35-5.62,5.35-12.26,5.35Z"/>
+        <path class="cls-2" d="M12.76,1c6.93,0,11.76,2.55,11.76,4.85s-4.83,4.85-11.76,4.85S1,8.14,1,5.85,5.83,1,12.76,1M12.76,0C5.71,0,0,2.62,0,5.85s5.71,5.85,12.76,5.85,12.76-2.62,12.76-5.85S19.81,0,12.76,0h0Z"/>
+      </g>
+    </g>
+  </g>
+</svg>

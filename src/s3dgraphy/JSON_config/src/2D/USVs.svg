@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 23.81 10.43">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #248fe7;
+      }
+
+      .cls-1, .cls-2 {
+        stroke-width: 0px;
+      }
+
+      .cls-2 {
+        fill: #0f0f0f;
+      }
+
+      .cls-3 {
+        fill: #fff;
+        font-family: MyriadPro-Regular, 'Myriad Pro';
+        font-size: 4px;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g>
+      <g>
+        <polygon class="cls-2" points=".66 9.93 3.26 .5 23.15 .5 20.55 9.93 .66 9.93"/>
+        <path class="cls-1" d="M22.5,1l-2.32,8.43H1.31L3.64,1h18.86M23.81,0H2.88L0,10.43h20.94L23.81,0h0Z"/>
+      </g>
+    </g>
+  </g>
+</svg>

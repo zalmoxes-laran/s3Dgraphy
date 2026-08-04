@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">generic_node</title>
+  <desc id="desc">Icona vettoriale per un nodo generico o sconosciuto in un grafo.</desc>
+  <!-- Collegamenti del grafo -->
+  <g fill="none" stroke="#000000" stroke-width="20" stroke-linecap="butt" stroke-linejoin="round">
+    <line x1="291.9" y1="313.4" x2="389.0" y2="391.8"/>
+    <line x1="723.4" y1="305.9" x2="630.9" y2="386.9"/>
+    <line x1="282.6" y1="593.6" x2="367.8" y2="555.5"/>
+    <line x1="665.6" y1="527.9" x2="746.4" y2="547.3"/>
+    <line x1="581.4" y1="632.9" x2="604.0" y2="679.1"/>
+  </g>
+
+  <!-- Nodi secondari -->
+  <g fill="none" stroke="#000000" stroke-width="18">
+    <circle cx="253" cy="282" r="41"/>
+    <circle cx="761" cy="273" r="41"/>
+    <circle cx="237" cy="614" r="41"/>
+    <circle cx="795" cy="559" r="41"/>
+    <circle cx="626" cy="724" r="41"/>
+  </g>
+
+  <!-- Nodo centrale: bordo esterno e anello interno trasparente -->
+  <path fill="#000000" fill-rule="evenodd" d="
+    M 512 333
+    a 158 158 0 1 1 0 316
+    a 158 158 0 1 1 0 -316
+    M 512 353
+    a 138 138 0 1 0 0 276
+    a 138 138 0 1 0 0 -276
+  "/>
+
+  <!-- Disco centrale -->
+  <circle cx="512" cy="491" r="121" fill="#000000"/>
+
+  <!-- Punto interrogativo -->
+  <text x="512" y="557" text-anchor="middle"
+        font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="172" fill="#FFFFFF">?</text>
+</svg>
