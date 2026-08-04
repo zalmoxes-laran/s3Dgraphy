@@ -518,8 +518,8 @@
      "class": "NegativeStratigraphicUnit",
      "parent": "StratigraphicNode",
      "abbreviation": "USN",
-     "label": "Negative SU",
-     "symbol": "white dashed rectangle",
+     "label": "US-",
+     "symbol": "grey outline at the four corners only (no continuous border)",
      "description": "Negative Stratigraphic Unit — a lacuna, removal, or interface that marks the absence of matter rather than its presence (e.g., a pit cut, an erosion surface, a demolition void). Distinct from a plain StratigraphicUnit (which is positive by default), but equally observable on the ground — hence classified in the `real` family.",
      "s3Dgraphy_file": "stratigraphic_node.py",
      "mapping": {

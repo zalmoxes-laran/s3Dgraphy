@@ -1,6 +1,6 @@
 {
   "formal_language": "EM",
-  "version": "1.6.7",
+  "version": "1.6.8",
   "_note_material_vs_qualia_color": [
     "DUE COSE DIVERSE CHE SI CHIAMANO ENTRAMBE color. Non confonderle: e gia successo.",
     "1) QUI, in node_styles.<tipo>.style.material.rgba_color — il COLORE DEL MATERIALE BLENDER del proxy 3D, in float LINEARI. UNA sola chiave: `rgba_color`. Fino a S8 il file ne usava due (`color` sui 13 tipi stratigrafici, `rgba_color` sugli altri) e get_material_color() ne leggeva una sola, restituendo None per 21 tipi su 38; ora sono unificate e la vecchia `color` e letta solo come tolleranza verso file scritti prima. Un tipo che non diventa mai una mesh NON ha material affatto (i contenitori di gruppo, e da S7 i dieci nodi che rendono per icona): per loro get_material_color() torna None, ed e corretto.",
@@ -9,6 +9,7 @@
     "In breve: qui si decide di che colore DISEGNARE una US; li si registra di che colore ERA."
   ],
   "_changelog": {
+    "1.6.8": "POL4 — tre forme e un'icona, tutte decise da E.D. (1) BR passa da diamante bianco a QUADRATO NERO al 70% dell'altezza di una US: nuovo token di forma `square` piu il nuovo campo `style.shape_scale`, che rimpicciolisce il DISEGNO dentro il box senza toccare il box (le dimensioni per tipo stanno in em-core, invariante 7 di EMStudio). Coerentemente src/2D/continuity.svg perde la rotazione di 45 gradi: era lo stesso quadrato, ruotato. (2) USN passa da rettangolo tratteggiato a `corner_brackets`, contorno ai soli quattro angoli — un bordo continuo afferma un margine che lo scavo non osserva. (3) NARR punta finalmente alle EMNarrative.svg/.png di E.D. al posto del segnaposto narrative.png. Nessun colore cambiato tranne il fill di BR (#FFFFFF -> #000000). NB i due nuovi token di forma richiedono un consumatore che li conosca: chi non li conosce cade sul proprio default (in EMStudio il rounded_rectangle), quindi il peggio che accade e una forma generica, non un errore.",
     "1.6.7": "S10 — curato il colore di SE (StratigraphicEventNode), l'ultimo segnaposto rimasto fra i tipi che qualcuno disegna davvero. Era #BC0000, un rosso mai scelto che contraddiceva il proprio border_color nero, e il node datamodel dichiarava il simbolo 'to be defined': non c'era una decisione da rispettare, c'era un buco. Ora TEAL #2A8C8C, material lineare (0.023, 0.262, 0.262), con border_color coerente — la famiglia cromatica delle attivita, l'unica del linguaggio che significa 'e successo qualcosa' invece di 'qualcosa c'e'. Aggiornato di conseguenza il campo symbol nel node datamodel.",
     "1.6.6": "S8 — unificata la chiave del colore-materiale su `rgba_color`. Rinominate le 14 voci che usavano `style.material.color` (i 13 tipi stratigrafici piu UL): valori invariati, nessun altro campo toccato. Ora tutte le 24 voci con un material parlano la stessa chiave. get_material_color() legge `rgba_color` come autoritativa e mantiene `color` solo come tolleranza per file scritti prima della rinomina. Gli hex 2D border_color/fill_color NON sono stati toccati: sono un'altra cosa (sRGB per il canvas) e hanno un altro consumatore (EMStudio). Verificato che i 14 materiali Blender di EMtools producono rgb identici a prima.",
     "1.6.5": "S7 — applicate le decisioni E.D. sull'inventario dei material segnaposto. TOLTO il blocco `material` a 10 tipi che non diventano mai una mesh e rendono per icona o forma (PROP, COMB, EXT, DOC, EP, AUTH, LINK, GEO, SS, unknown): il loro colore 2D resta in border_color/fill_color, e get_material_color ora restituisce None come per i 4 contenitori di gruppo. RIMOSSA del tutto la voce `ANG`, duplicato legacy di ActivityNodeGroup senza alcun consumatore in s3Dgraphy, EM-blender-tools o EMStudio (GRAPH, citato nella stessa nota della 1.6.0, resta perche e usato). AGGIUNTO `UL` (Working Unit), unico tipo stratigrafico che ne era privo: 2D dal simbolo del datamodel (rettangolo bianco, bordo arancio #D86400), material 3D uguale al rosso US per decisione E.D. RM/RMDoc/RMSF e SE lasciati invariati per decisione E.D. Nessuno dei 13 colori stratigrafici esistenti e stato modificato.",
@@ -275,6 +276,7 @@
       "label_position": "over"
     },
     "BR": {
+      "_comment": "Continuity node (BR): the marker that BOUNDS a life span — 'this unit stops surviving here'. POL4 (2026-08-04): a SMALL BLACK SQUARE, filled and bordered black, 0.7x the height of a stratigraphic unit. It was a white diamond, which read as a claim about matter like every other diamond-ish glyph in the language; a solid black square of less than full height reads as punctuation, which is what a boundary marker is. The 0.7 lives in `shape_scale` and not in the renderer because it is a rule of the language's look, and a number hardcoded in one consumer would be a second source. NB `shape_scale` shrinks the DRAWING only: the node's box still comes from em-core (invariant 7), so hit-testing and edge routing still use the full 90x32 until per-type sizes land there.",
       "3d_file": "src/3D/BR.glb",
       "2d_file_rast": "src/2D/continuity.png",
       "2d_file_vect": "src/2D/continuity.svg",
@@ -288,9 +290,10 @@
           }
         },
         "border_color": "#000000",
-        "fill_color": "#FFFFFF",
+        "fill_color": "#000000",
         "border_style": "solid",
-        "shape": "diamond",
+        "shape": "square",
+        "shape_scale": 0.7,
         "border_width": 4
       },
       "label_position": "center"
@@ -474,10 +477,10 @@
       "label_position": "over"
     },
     "NARR": {
-      "_comment": "EM Narrative (DP-79). A NarrativeNode is a crm:E33 Linguistic Object over the graph — chapters of prose and embeds — not an assertion about the site, which is why it stays neutral grey and must not read as stratigraphy or paradata. Solid border, unlike GRAPH's dashed: a narrative is a real authored object, not an anchor for metadata propagation. The .svg does not exist yet; the renderer takes the raster (see step I).",
+      "_comment": "EM Narrative (DP-79). A NarrativeNode is a crm:E33 Linguistic Object over the graph — chapters of prose and embeds — not an assertion about the site, which is why it stays neutral grey and must not read as stratigraphy or paradata. Solid border, unlike GRAPH's dashed: a narrative is a real authored object, not an anchor for metadata propagation. POL4 (2026-08-04): the vector now EXISTS — EMNarrative.svg, E.D.'s hourglass-over-open-book — and the raster stays EMNarrative.png beside it; the old narrative.png was a placeholder for the same idea. NB it is an ILLUSTRATION, not a glyph: 8 paths but 114k coordinates of stipple trace, 617 KB after the precision pass. At 26x16 px in a palette the raster is indistinguishable from it and 20x lighter, so a consumer that inlines its assets (EMStudio's single-file bundle) pays a real price for the vector — see the POL4 end-of.",
       "file_3d": "src/3D/narrative.glb",
-      "2d_file_rast": "src/2D/narrative.png",
-      "2d_file_vect": "src/2D/narrative.png",
+      "2d_file_rast": "src/2D/EMNarrative.png",
+      "2d_file_vect": "src/2D/EMNarrative.svg",
       "style": {
         "material": {
           "rgba_color": {
@@ -623,6 +626,7 @@
       "label_position": "over"
     },
     "USN": {
+      "_comment": "Negative stratigraphic unit (A3 Stratigraphic Interface): the ABSENCE of matter — a cut, an erosion surface, a demolition void. POL4 (2026-08-04): drawn with the outline only at the FOUR CORNERS (`corner_brackets`) instead of a dashed rectangle. The reason is semantic, not decorative: a continuous border, even dashed, states an edge that the excavation does not observe — what is observed is where the removal reaches, not a surface of its own. Corner brackets say 'this extent, no surface' the way a crop mark does. The dashed rectangle is what it replaces, and the grey stays.",
       "file_3d": "src/3D/US.glb",
       "file_2d": "src/2D/US.png",
       "style": {
@@ -636,8 +640,8 @@
         },
         "border_color": "#C4C4C4",
         "fill_color": "#F0F0F0",
-        "border_style": "dashed",
-        "shape": "rectangle",
+        "border_style": "solid",
+        "shape": "corner_brackets",
         "border_width": 4
       },
       "label_position": "over"
