@@ -359,7 +359,11 @@ import re as _re
 _US_PREFIX_PATTERN = _re.compile(
     r"^(?P<prefix>"
     r"USVs|USVn|USVA|USVB|USVC|USV|"
-    r"USM|USD|USN|"
+    # USNeg before USN: the alternation is longest-match-first (see above), and
+    # POL5 gave the negative unit the node_type USNeg — without this a name like
+    # "USNeg 12" would have "USN" stripped and keep a stray "eg 12". Inert for
+    # every existing name, since no name could start with USNeg before POL5.
+    r"USNeg|USM|USD|USN|"
     r"VSF|SF|"
     r"CON|"
     r"WSU|MSE|TSU|SUS|UE|UM|UC|UL|"

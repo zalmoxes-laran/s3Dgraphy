@@ -13,6 +13,7 @@ from ..nodes.stratigraphic_node import (
     StratigraphicNode,
     StratigraphicUnit,
     NegativeStratigraphicUnit,
+    NeutralStratigraphicUnit,
     SeriesOfStratigraphicUnit,
     SeriesOfNonStructuralVirtualStratigraphicUnit,
     SeriesOfStructuralVirtualStratigraphicUnit,
@@ -156,7 +157,10 @@ def convert_shape2type(yedtype, border_style, border_type="line"):
 # ──────────────────────────────────────────────────────────────────
 STRATIGRAPHIC_CLASS_MAP = {
     "US":      StratigraphicUnit,
-    "USN":     NegativeStratigraphicUnit,
+    # POL5: "USN" is the NEUTRAL unit (a risparmio); the negative/destructive
+    # one is "USNeg" and displays as "US-". They were one type until 2026-08-04.
+    "USN":     NeutralStratigraphicUnit,
+    "USNeg":   NegativeStratigraphicUnit,
     "USVs":    StructuralVirtualStratigraphicUnit,
     "USVn":    NonStructuralVirtualStratigraphicUnit,
     "SF":      SpecialFindUnit,

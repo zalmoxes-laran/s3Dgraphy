@@ -164,26 +164,77 @@ class WorkingUnit(StratigraphicNode):
 
 
 class NegativeStratigraphicUnit(StratigraphicNode):
-    """Negative Stratigraphic Unit (US negativa / USN).
+    """Negative Stratigraphic Unit, displayed ``US-`` (US negativa).
 
-    Describes a *lacuna*, a removal, or an interface that marks the
-    absence of matter rather than its presence — e.g. a pit cut, an
-    erosion surface, a demolition void. Distinct from a plain
-    :class:`StratigraphicUnit` (which is positive by default), but
-    equally observable on the ground: it is a *real* stratigraphic
-    element, hence classified in the ``real`` family alongside
-    :class:`StratigraphicUnit` and :class:`DocumentaryStratigraphicUnit`.
+    Describes a *lacuna* produced by a REMOVAL: a pit cut, an erosion
+    surface, a demolition void. What defines it is the destructive act —
+    matter that was there and is not any more — which is what separates
+    it from :class:`NeutralStratigraphicUnit`, the void that was never
+    filled because it was never meant to be.
+
+    Equally observable on the ground as a positive unit, hence the
+    ``real`` family alongside :class:`StratigraphicUnit` and
+    :class:`DocumentaryStratigraphicUnit`.
+
+    .. note:: ``node_type`` is ``USNeg`` since POL5 (2026-08-04). It used
+       to be ``USN``, which E.D. reassigned to the NEUTRAL unit — the
+       abbreviation reads "Unità Stratigrafica Neutra". The move was safe
+       because nothing produced a ``USN`` node: ``convert_shape2type`` has
+       no yEd shape mapping to it, so no imported graph carries one. An
+       xlsx that typed ``USN`` meaning *negative* is the one case that
+       changes meaning, and it is called out in the POL5 end-of.
+    """
+    node_type = "USNeg"
+
+    def __init__(self, node_id, name, description=""):
+        super().__init__(node_id, name, description)
+        self.symbol = "grey rectangle, solid border"
+        self.label = "US-"
+        self.detailed_description = (
+            "Negative Stratigraphic Unit (US-) — a lacuna left by a "
+            "removal: a pit cut, an erosion surface, a demolition void.")
+
+
+class NeutralStratigraphicUnit(StratigraphicNode):
+    """Neutral Stratigraphic Unit (USN, Unità Stratigraphica Neutra).
+
+    A void that is part of the design, not the product of a destruction:
+    the *risparmi* of masonry — a window or door opening, the empty
+    volume of a room. The wall was built around it, so nothing was ever
+    removed and nothing is missing.
+
+    This is the distinction E.D. asked for in POL5, and it is a real one
+    on site: a demolition void (:class:`NegativeStratigraphicUnit`, shown
+    ``US-``) is evidence of an ACT, while a *risparmio* is evidence of an
+    INTENTION. Reading one as the other inverts the sequence — the void
+    would be dated to a removal that never happened.
+
+    ``real`` family: a risparmio is directly observable, and it is drawn
+    with the outline at the four corners only (see ``em_visual_rules``),
+    because the excavation observes its extent and not a surface.
+
+    .. warning:: STRATIGRAPHIC RELATIONS (E.D.): a neutral unit takes
+       ``is_after`` / ``is_before`` and **nothing else**. It is a void: it
+       cannot cut, fill, abut or be bonded to anything. The rule is data,
+       not code — ``s3Dgraphy_connections_datamodel.json`` →
+       ``node_type_restrictions.USN``.
+
+    .. todo:: CIDOC: mapping USN-neutra da definire — E.D. coordina con
+       Achille Felicetti / CRMarchaeo. CRMarchaeo has A2 (Stratigraphic
+       Volume Unit) and A3 (Stratigraphic Interface) but no term for a
+       void left deliberately, so the datamodel entry carries a
+       PROVISIONAL E24 placeholder rather than an invented A-class.
     """
     node_type = "USN"
 
     def __init__(self, node_id, name, description=""):
         super().__init__(node_id, name, description)
-        self.symbol = "white dashed rectangle"
-        self.label = "Negative SU"
+        self.symbol = "grey outline at the four corners only"
+        self.label = "USN"
         self.detailed_description = (
-            "Negative Stratigraphic Unit — a lacuna, removal, or "
-            "interface that marks absence rather than matter "
-            "(e.g., a pit cut, an erosion surface, a demolition void).")
+            "Neutral Stratigraphic Unit (USN) — a void by design, not by "
+            "removal: a window or door opening, the volume of a room. "
+            "Only is_after/is_before relations.")
 
 
 class ContinuityNode(StratigraphicNode):

@@ -119,8 +119,13 @@
   },
   "NegativeStratigraphicUnit": {
    "parent": "StratigraphicNode",
+   "node_type": "USNeg",
+   "description": "Negative Stratigraphic Unit, displayed ``US-`` (US negativa)."
+  },
+  "NeutralStratigraphicUnit": {
+   "parent": "StratigraphicNode",
    "node_type": "USN",
-   "description": "Negative Stratigraphic Unit (US negativa / USN)."
+   "description": "Neutral Stratigraphic Unit (USN, Unità Stratigraphica Neutra)."
   },
   "Node": {
    "parent": null,

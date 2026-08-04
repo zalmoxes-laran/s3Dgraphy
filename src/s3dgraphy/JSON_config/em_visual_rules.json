@@ -1,6 +1,6 @@
 {
   "formal_language": "EM",
-  "version": "1.6.8",
+  "version": "1.6.9",
   "_note_material_vs_qualia_color": [
     "DUE COSE DIVERSE CHE SI CHIAMANO ENTRAMBE color. Non confonderle: e gia successo.",
     "1) QUI, in node_styles.<tipo>.style.material.rgba_color — il COLORE DEL MATERIALE BLENDER del proxy 3D, in float LINEARI. UNA sola chiave: `rgba_color`. Fino a S8 il file ne usava due (`color` sui 13 tipi stratigrafici, `rgba_color` sugli altri) e get_material_color() ne leggeva una sola, restituendo None per 21 tipi su 38; ora sono unificate e la vecchia `color` e letta solo come tolleranza verso file scritti prima. Un tipo che non diventa mai una mesh NON ha material affatto (i contenitori di gruppo, e da S7 i dieci nodi che rendono per icona): per loro get_material_color() torna None, ed e corretto.",
@@ -9,6 +9,7 @@
     "In breve: qui si decide di che colore DISEGNARE una US; li si registra di che colore ERA."
   ],
   "_changelog": {
+    "1.6.9": "POL5 — correzioni di POL4 su indicazione di E.D. (1) BR torna ROMBO (era diventato quadrato): fill nero e altezza 0.7x restano, e il bounding box e quadrato via il nuovo `shape_bbox: square`, cosi il rombo e equilatero invece di essere schiacciato nel box 90x32. Il token di forma `square` non serve piu ed e stato ritirato: quadrato = `rectangle` + `shape_bbox: square`, un meccanismo solo. (2) DUE tipi dove ce n'era uno: `USN` e ora l'unita NEUTRA (i risparmi della muratura: finestre, porte, il volume di una stanza — vuoti VOLUTI) con i quattro angoli, e l'unita NEGATIVA/distruttiva e `USNeg`, etichetta di display `US-`, resa come una US grigia a contorno pieno. Il grigio di entrambe passa a #8C8C8C (grigio gia in uso nel linguaggio, la scala `symbolic`) perche #C4C4C4 su fill #F0F0F0 era illeggibile, tanto piu con soli quattro tick di inchiostro. (3) NARR e SE dichiarano il RASTER come icona (256 px, reso dall'SVG) tramite il nuovo flag `2d_icon_prefer: raster`: i vettori restano DICHIARATI perche esistono — questo file e dove un consumatore chiede cosa esiste — e il flag dice quale dei due disegnare. Sono illustrazioni da 617 e 284 KB per un glifo che nessun renderer disegna oltre i 30 px, e un consumatore che inlinea gli asset lo pagava tutto. NB il flag e anche cio che dice al vendor di EMStudio quale dei due file copiare: senza, la regola 'un raster oscurato dal proprio vettore e irraggiungibile' teneva il vettore e buttava il raster, cioe l'esatto contrario di questa decisione.",
     "1.6.8": "POL4 — tre forme e un'icona, tutte decise da E.D. (1) BR passa da diamante bianco a QUADRATO NERO al 70% dell'altezza di una US: nuovo token di forma `square` piu il nuovo campo `style.shape_scale`, che rimpicciolisce il DISEGNO dentro il box senza toccare il box (le dimensioni per tipo stanno in em-core, invariante 7 di EMStudio). Coerentemente src/2D/continuity.svg perde la rotazione di 45 gradi: era lo stesso quadrato, ruotato. (2) USN passa da rettangolo tratteggiato a `corner_brackets`, contorno ai soli quattro angoli — un bordo continuo afferma un margine che lo scavo non osserva. (3) NARR punta finalmente alle EMNarrative.svg/.png di E.D. al posto del segnaposto narrative.png. Nessun colore cambiato tranne il fill di BR (#FFFFFF -> #000000). NB i due nuovi token di forma richiedono un consumatore che li conosca: chi non li conosce cade sul proprio default (in EMStudio il rounded_rectangle), quindi il peggio che accade e una forma generica, non un errore.",
     "1.6.7": "S10 — curato il colore di SE (StratigraphicEventNode), l'ultimo segnaposto rimasto fra i tipi che qualcuno disegna davvero. Era #BC0000, un rosso mai scelto che contraddiceva il proprio border_color nero, e il node datamodel dichiarava il simbolo 'to be defined': non c'era una decisione da rispettare, c'era un buco. Ora TEAL #2A8C8C, material lineare (0.023, 0.262, 0.262), con border_color coerente — la famiglia cromatica delle attivita, l'unica del linguaggio che significa 'e successo qualcosa' invece di 'qualcosa c'e'. Aggiornato di conseguenza il campo symbol nel node datamodel.",
     "1.6.6": "S8 — unificata la chiave del colore-materiale su `rgba_color`. Rinominate le 14 voci che usavano `style.material.color` (i 13 tipi stratigrafici piu UL): valori invariati, nessun altro campo toccato. Ora tutte le 24 voci con un material parlano la stessa chiave. get_material_color() legge `rgba_color` come autoritativa e mantiene `color` solo come tolleranza per file scritti prima della rinomina. Gli hex 2D border_color/fill_color NON sono stati toccati: sono un'altra cosa (sRGB per il canvas) e hanno un altro consumatore (EMStudio). Verificato che i 14 materiali Blender di EMtools producono rgb identici a prima.",
@@ -276,7 +277,7 @@
       "label_position": "over"
     },
     "BR": {
-      "_comment": "Continuity node (BR): the marker that BOUNDS a life span — 'this unit stops surviving here'. POL4 (2026-08-04): a SMALL BLACK SQUARE, filled and bordered black, 0.7x the height of a stratigraphic unit. It was a white diamond, which read as a claim about matter like every other diamond-ish glyph in the language; a solid black square of less than full height reads as punctuation, which is what a boundary marker is. The 0.7 lives in `shape_scale` and not in the renderer because it is a rule of the language's look, and a number hardcoded in one consumer would be a second source. NB `shape_scale` shrinks the DRAWING only: the node's box still comes from em-core (invariant 7), so hit-testing and edge routing still use the full 90x32 until per-type sizes land there.",
+      "_comment": "Continuity node (BR): the marker that BOUNDS a life span — 'this unit stops surviving here'. POL5 (2026-08-04, correzione di POL4): a black RHOMBUS — a diamond, not a square — inscribed in a SQUARE bounding box (`shape_bbox: square`, so height = width) and 0.7x the height of a stratigraphic unit. POL4 had made it a square, which lost the diamond silhouette EM has always used for continuity (and which the GraphML exporter emits as `<Shape type=\"diamond\"/>`, so a square here would have contradicted the round-trip). What POL4 got right and stays: the FILL is black (it was white, and a white diamond read as a claim about matter like every other outlined glyph) and the height is 0.7x, because a boundary marker is punctuation, not a unit. Both numbers live here and not in a renderer: a constant hardcoded in one consumer would be a second source.",
       "3d_file": "src/3D/BR.glb",
       "2d_file_rast": "src/2D/continuity.png",
       "2d_file_vect": "src/2D/continuity.svg",
@@ -292,17 +293,19 @@
         "border_color": "#000000",
         "fill_color": "#000000",
         "border_style": "solid",
-        "shape": "square",
+        "shape": "diamond",
+        "shape_bbox": "square",
         "shape_scale": 0.7,
         "border_width": 4
       },
       "label_position": "center"
     },
     "SE": {
-      "_comment": "Stratigraphic Event: l'ATTO che crea, modifica o distrugge un'unita — un terremoto che fa cadere l'intonaco, una demolizione, l'inizio di un cantiere. Non e materia, e un processo, e per questo non appartiene a nessuna delle famiglie cromatiche della materia (rosso reale, verde/blu virtuale, arancio documentario, giallo special find, grigio negativo). Prende il TEAL della famiglia attivita: un ActivityNodeGroup e un fascio di atti e porta gia la linguetta ciano #CCFFFF, quindi il ciano e l'unico colore del linguaggio che dice gia 'e successo qualcosa' invece di 'qualcosa c'e'. Curato in S10 (2026-08-02): fino ad allora SE portava il segnaposto #BC0000 mai scelto, che per giunta contraddiceva il proprio bordo nero, e il node datamodel dichiarava il simbolo 'to be defined'. Il nero di BR e stato scartato di proposito: un material nero rende un proxy illeggibile in viewport, e i proxy SE si vedono (Heriverse li disegna fra i suoi stratigraphicTypes).",
+      "_comment": "Stratigraphic Event: l'ATTO che crea, modifica o distrugge un'unita — un terremoto che fa cadere l'intonaco, una demolizione, l'inizio di un cantiere. Non e materia, e un processo, e per questo non appartiene a nessuna delle famiglie cromatiche della materia (rosso reale, verde/blu virtuale, arancio documentario, giallo special find, grigio negativo). Prende il TEAL della famiglia attivita: un ActivityNodeGroup e un fascio di atti e porta gia la linguetta ciano #CCFFFF, quindi il ciano e l'unico colore del linguaggio che dice gia 'e successo qualcosa' invece di 'qualcosa c'e'. Curato in S10 (2026-08-02): fino ad allora SE portava il segnaposto #BC0000 mai scelto, che per giunta contraddiceva il proprio bordo nero, e il node datamodel dichiarava il simbolo 'to be defined'. Il nero di BR e stato scartato di proposito: un material nero rende un proxy illeggibile in viewport, e i proxy SE si vedono (Heriverse li disegna fra i suoi stratigraphicTypes). POL5 (2026-08-04): l'ICONA e il raster (`2d_icon_prefer: raster`), come per NARR e per la stessa ragione — SE.svg e un tratteggio vettorializzato da 284 KB per un glifo che nessun renderer disegna oltre i 30 px. Il vettore resta dichiarato perche esiste; il flag dice quale dei due DISEGNARE. Il PNG a 256 px e reso DA quell'SVG, quindi i due non possono divergere. Nel grafo SE resta comunque un TRIANGOLO disegnato (shape), non l'icona: il raster serve a palette ed elenchi.",
       "3d_file": "src/3D/SE.glb",
       "2d_file_rast": "src/2D/SE.png",
       "2d_file_vect": "src/2D/SE.svg",
+      "2d_icon_prefer": "raster",
       "style": {
         "material": {
           "rgba_color": {
@@ -477,10 +480,11 @@
       "label_position": "over"
     },
     "NARR": {
-      "_comment": "EM Narrative (DP-79). A NarrativeNode is a crm:E33 Linguistic Object over the graph — chapters of prose and embeds — not an assertion about the site, which is why it stays neutral grey and must not read as stratigraphy or paradata. Solid border, unlike GRAPH's dashed: a narrative is a real authored object, not an anchor for metadata propagation. POL4 (2026-08-04): the vector now EXISTS — EMNarrative.svg, E.D.'s hourglass-over-open-book — and the raster stays EMNarrative.png beside it; the old narrative.png was a placeholder for the same idea. NB it is an ILLUSTRATION, not a glyph: 8 paths but 114k coordinates of stipple trace, 617 KB after the precision pass. At 26x16 px in a palette the raster is indistinguishable from it and 20x lighter, so a consumer that inlines its assets (EMStudio's single-file bundle) pays a real price for the vector — see the POL4 end-of.",
+      "_comment": "EM Narrative (DP-79). A NarrativeNode is a crm:E33 Linguistic Object over the graph — chapters of prose and embeds — not an assertion about the site, which is why it stays neutral grey and must not read as stratigraphy or paradata. Solid border, unlike GRAPH's dashed: a narrative is a real authored object, not an anchor for metadata propagation. POL4 (2026-08-04): the drawing now EXISTS — E.D.'s hourglass-over-open-book — and replaces the old narrative.png placeholder. POL5 (E.D.'s decision): the ICON is the RASTER — `2d_icon_prefer: raster`. The vector is still declared, because it exists and this file is where a consumer asks what exists; the flag says which of the two to DRAW. It is an ILLUSTRATION, not a glyph (8 paths, 114k coordinates of stipple trace, 617 KB even after the precision pass), and a consumer that inlines its assets paid 604 KB of bundle for something no renderer draws taller than 30 px. The 256 px PNG is rendered FROM that SVG, so the two cannot drift.",
       "file_3d": "src/3D/narrative.glb",
       "2d_file_rast": "src/2D/EMNarrative.png",
       "2d_file_vect": "src/2D/EMNarrative.svg",
+      "2d_icon_prefer": "raster",
       "style": {
         "material": {
           "rgba_color": {
@@ -626,7 +630,7 @@
       "label_position": "over"
     },
     "USN": {
-      "_comment": "Negative stratigraphic unit (A3 Stratigraphic Interface): the ABSENCE of matter — a cut, an erosion surface, a demolition void. POL4 (2026-08-04): drawn with the outline only at the FOUR CORNERS (`corner_brackets`) instead of a dashed rectangle. The reason is semantic, not decorative: a continuous border, even dashed, states an edge that the excavation does not observe — what is observed is where the removal reaches, not a surface of its own. Corner brackets say 'this extent, no surface' the way a crop mark does. The dashed rectangle is what it replaces, and the grey stays.",
+      "_comment": "NEUTRAL stratigraphic unit (POL5, 2026-08-04): a void that is part of the DESIGN — the `risparmi` of masonry, a window or door opening, the volume of a room. NOT the negative unit, which is US-/USNeg below: nothing was removed here, so there is no interface. Drawn with the outline only at the FOUR CORNERS (`corner_brackets`), and the reason is semantic: a continuous border states a surface, and a risparmio has none — what is observed is the EXTENT of the void, which is what a crop mark says. Grey #8C8C8C, one of the language's existing greys (it is the `symbolic` rung of document_variant_styles): the #C4C4C4 this entry carried before POL4 was already faint against the #F0F0F0 fill, and with only four ticks of ink left there was nothing to see. Same grey as US- on purpose — the SHAPE tells the two voids apart, which is how EM distinguishes types everywhere else.",
       "file_3d": "src/3D/US.glb",
       "file_2d": "src/2D/US.png",
       "style": {
@@ -638,10 +642,31 @@
             "a": 1.0
           }
         },
-        "border_color": "#C4C4C4",
+        "border_color": "#8C8C8C",
         "fill_color": "#F0F0F0",
         "border_style": "solid",
         "shape": "corner_brackets",
+        "border_width": 4
+      },
+      "label_position": "over"
+    },
+    "USNeg": {
+      "_comment": "NEGATIVE / destructive stratigraphic unit, displayed US- (POL5, 2026-08-04). A lacuna produced by a REMOVAL: a pit cut, an erosion surface, a demolition void. Rendered like a US — same rectangle, same thick frame — because it IS a unit of the sequence and behaves like one; only the colour changes, to the neutral grey of the absence family. E.D.: 'una US grigia a contorno pieno', explicitly NOT the orange roundrectangle of USD (which is the DOCUMENTARY unit and unrelated). Until POL5 this type answered to the node_type `USN`; that abbreviation now belongs to the neutral unit and this one is `USNeg`.",
+      "file_3d": "src/3D/US.glb",
+      "file_2d": "src/2D/US.png",
+      "style": {
+        "material": {
+          "rgba_color": {
+            "r": 0.55,
+            "g": 0.55,
+            "b": 0.55,
+            "a": 1.0
+          }
+        },
+        "border_color": "#8C8C8C",
+        "fill_color": "#F0F0F0",
+        "border_style": "solid",
+        "shape": "rectangle",
         "border_width": 4
       },
       "label_position": "over"

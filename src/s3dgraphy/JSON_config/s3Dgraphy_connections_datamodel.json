@@ -1,6 +1,6 @@
 {
-  "s3Dgraphy_connections_model_version": "1.6.2",
-  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. v1.6.1: has_paradata_nodegroup source extended to include EpochNode — an epoch can now own a ParadataNodeGroup holding its temporal-definition properties (e.g. absolute_time_start/end as PropertyNodes with paradata provenance), mirroring how a StratigraphicNode carries its paradata group. v1.6.0 (paired with node datamodel v1.6.0) introduces: bug fix on is_in_paradata_nodegroup (typo 'ProperrtyNOde' → 'PropertyNode'); semantic fix on has_documentation (P104_is_subject_to → P70i_is_documented_in — P104 means 'subject to a legal right', not 'has documentation'); deprecation of has_timebranch as duplicate of is_in_timebranch (the latter is the canonical one — used by import_graphml.py and graphml_patcher.py; the former exists only in config JSON); component list aligned with node datamodel (HDT-O, PROV-O added). HDT-O containment properties (hdto:contains_HDT, hdto:contains_SU, hdto:isPrimary) and physical-relation discriminator subproperties (em:abuts, em:cuts, em:fills, em:overlies, em:bonded_to, em:equals as rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation) to be added in v1.6.1. v1.5.3 introduced canonical/reverse directionality with verb-based labels for clear socket identification in node editors. v1.5.4 added 'has_visual_reference' edge type. v1.5.5 added 'is_in_location' edge type with context-sensitive CIDOC mapping (P53 for node→location, P89 for the recursive location→location hierarchy) and an optional 'is_primary' boolean attribute (s3d:isPrimary, proposed).",
+  "s3Dgraphy_connections_model_version": "1.6.3",
+  "description": "s3Dgraphy connections datamodel including edge types with CIDOC-CRM mappings. v1.6.1: has_paradata_nodegroup source extended to include EpochNode — an epoch can now own a ParadataNodeGroup holding its temporal-definition properties (e.g. absolute_time_start/end as PropertyNodes with paradata provenance), mirroring how a StratigraphicNode carries its paradata group. v1.6.0 (paired with node datamodel v1.6.0) introduces: bug fix on is_in_paradata_nodegroup (typo 'ProperrtyNOde' → 'PropertyNode'); semantic fix on has_documentation (P104_is_subject_to → P70i_is_documented_in — P104 means 'subject to a legal right', not 'has documentation'); deprecation of has_timebranch as duplicate of is_in_timebranch (the latter is the canonical one — used by import_graphml.py and graphml_patcher.py; the former exists only in config JSON); component list aligned with node datamodel (HDT-O, PROV-O added). HDT-O containment properties (hdto:contains_HDT, hdto:contains_SU, hdto:isPrimary) and physical-relation discriminator subproperties (em:abuts, em:cuts, em:fills, em:overlies, em:bonded_to, em:equals as rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation) to be added in v1.6.1. v1.5.3 introduced canonical/reverse directionality with verb-based labels for clear socket identification in node editors. v1.5.4 added 'has_visual_reference' edge type. v1.5.5 added 'is_in_location' edge type with context-sensitive CIDOC mapping (P53 for node→location, P89 for the recursive location→location hierarchy) and an optional 'is_primary' boolean attribute (s3d:isPrimary, proposed). v1.6.3: added node_type_restrictions — a per-node-type narrowing of the class-level edge rules (POL5): USN (the NEUTRAL stratigraphic unit, a risparmio) takes is_after/is_before and nothing else, because a void cannot cut, fill, abut or bond.",
   "components": [
     "CIDOC-CRM",
     "CRMarchaeo",
@@ -50,6 +50,16 @@
     "CRMs3D": {
       "version": "1.6.0",
       "source": "internal em.ttl / hdto_extension.ttl companion ontologies"
+    }
+  },
+  "node_type_restrictions": {
+    "_comment": "PER-NODE-TYPE narrowing of what the edge_types below already allow. The edge rules are stated by CLASS, so a subtype inherits everything its parent may connect; this block is how a subtype says LESS than its parent without leaving the class hierarchy. A consumer that ignores it simply offers more, so it degrades to today's behaviour instead of breaking. Added in v1.6.3 (POL5, 2026-08-04) for the neutral stratigraphic unit.",
+    "USN": {
+      "allowed_edges": [
+        "is_after"
+      ],
+      "scope": "stratigraphic",
+      "_comment": "E.D.: the ONLY stratigraphic relations of a NEUTRAL unit (a risparmio — a window or door opening, the volume of a room) are is_after / is_before, and `is_before` is not an edge type of its own: it is the declared `reverse` of is_after, so naming is_after covers both readings. The reason is physical, not editorial: a void cannot cut, fill, abut or be bonded to anything, so sequence is the only stratigraphic statement it can carry. `scope` says which family of edges this narrows: PARADATA and membership edges (has_property, has_data_provenance, is_in_paradata_nodegroup, has_first_epoch, survive_in_epoch, is_in_activity, is_part_of, ...) are NOT restricted — a risparmio is documented, measured and dated like any other unit."
     }
   },
   "edge_types": {
