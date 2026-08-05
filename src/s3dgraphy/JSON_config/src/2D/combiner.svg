@@ -1,7 +1,37 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26.87 26.87">
-  <defs>
-    <style>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   id="Layer_2"
+   data-name="Layer 2"
+   viewBox="0 0 26.87 26.87"
+   version="1.1"
+   sodipodi:docname="combiner.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview3"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="14.525466"
+     inkscape:cx="8.9153766"
+     inkscape:cy="12.736252"
+     inkscape:window-width="1400"
+     inkscape:window-height="951"
+     inkscape:window-x="202"
+     inkscape:window-y="33"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="Layer_2" />
+  <defs
+     id="defs1">
+    <style
+       id="style1">
       .cls-1 {
         fill: #000;
       }
@@ -15,17 +45,51 @@
       }
     </style>
   </defs>
-  <g id="Layer_1-2" data-name="Layer 1">
-    <g>
-      <g>
-        <polyline class="cls-2" points="1.63 8.08 14.23 4.84 14.23 11.03 .54 14.64"/>
-        <path class="cls-1" d="M.67,15.12l-.25-.97,13.31-3.51v-5.16L1.75,8.56l-.25-.97,12.6-3.24c.15-.04.31,0,.43.09.12.09.19.24.19.4v6.19c0,.23-.15.43-.37.48L.67,15.12Z"/>
+  <path
+     style="fill:#000000;fill-opacity:0.07115385;stroke:#000000;stroke-width:0;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;paint-order:markers fill stroke"
+     d="m 12.873942,0.41306764 c 0,0 12.709794,0.0126416 13.493543,13.28700936 0.412942,6.994002 -9.017751,12.847252 -12.736253,12.736252 C 4.4060549,26.160951 0.75729068,18.656889 0.75729068,14.801591 0.75729068,10.946293 3.511075,0.55075686 12.873942,0.41306764 Z"
+     id="path6"
+     sodipodi:nodetypes="csssc" />
+  <g
+     id="Layer_1-2"
+     data-name="Layer 1">
+    <g
+       id="g3">
+      <g
+         id="g1">
+        <polyline
+           class="cls-2"
+           points="1.63 8.08 14.23 4.84 14.23 11.03 .54 14.64"
+           id="polyline1" />
+        <path
+           class="cls-1"
+           d="M.67,15.12l-.25-.97,13.31-3.51v-5.16L1.75,8.56l-.25-.97,12.6-3.24c.15-.04.31,0,.43.09.12.09.19.24.19.4v6.19c0,.23-.15.43-.37.48L.67,15.12Z"
+           id="path1" />
       </g>
-      <g>
-        <polyline class="cls-2" points="25.66 17.87 11.57 21.67 11.57 15.48 26.02 11.49"/>
-        <path class="cls-1" d="M11.57,22.17c-.11,0-.22-.04-.3-.1-.12-.09-.2-.24-.2-.4v-6.19c0-.22.15-.42.37-.48l14.45-3.99.27.96-14.08,3.89v5.16l13.46-3.63.26.96-14.09,3.8s-.09.02-.13.02Z"/>
+      <g
+         id="g2">
+        <polyline
+           class="cls-2"
+           points="25.66 17.87 11.57 21.67 11.57 15.48 26.02 11.49"
+           id="polyline2" />
+        <path
+           class="cls-1"
+           d="M11.57,22.17c-.11,0-.22-.04-.3-.1-.12-.09-.2-.24-.2-.4v-6.19c0-.22.15-.42.37-.48l14.45-3.99.27.96-14.08,3.89v5.16l13.46-3.63.26.96-14.09,3.8s-.09.02-.13.02Z"
+           id="path2" />
       </g>
-      <path class="cls-1" d="M13.43,1c6.86,0,12.43,5.58,12.43,12.43s-5.58,12.43-12.43,12.43S1,20.29,1,13.43,6.58,1,13.43,1M13.43,0C6.01,0,0,6.01,0,13.43s6.01,13.43,13.43,13.43,13.43-6.01,13.43-13.43S20.85,0,13.43,0h0Z"/>
+      <path
+         class="cls-1"
+         d="M13.43,1c6.86,0,12.43,5.58,12.43,12.43s-5.58,12.43-12.43,12.43S1,20.29,1,13.43,6.58,1,13.43,1M13.43,0C6.01,0,0,6.01,0,13.43s6.01,13.43,13.43,13.43,13.43-6.01,13.43-13.43S20.85,0,13.43,0h0Z"
+         id="path3" />
+      <path
+         class="cls-1"
+         d="M13.43,1c6.86,0,12.43,5.58,12.43,12.43s-5.58,12.43-12.43,12.43S1,20.29,1,13.43,6.58,1,13.43,1M13.43,0C6.01,0,0,6.01,0,13.43s6.01,13.43,13.43,13.43,13.43-6.01,13.43-13.43S20.85,0,13.43,0h0Z"
+         id="path4" />
+      <path
+         class="cls-1"
+         d="m 13.43,1 c 6.86,0 12.43,5.58 12.43,12.43 0,6.85 -5.58,12.43 -12.43,12.43 C 6.58,25.86 1,20.29 1,13.43 1,6.57 6.58,1 13.43,1 m 0,-1 C 6.01,0 0,6.01 0,13.43 c 0,7.42 6.01,13.43 13.43,13.43 7.42,0 13.43,-6.01 13.43,-13.43 C 26.86,6.01 20.85,0 13.43,0 Z"
+         id="path5"
+         sodipodi:nodetypes="cssscsssss" />
     </g>
   </g>
 </svg>

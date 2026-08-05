@@ -1,6 +1,6 @@
 {
   "formal_language": "EM",
-  "version": "1.6.12",
+  "version": "1.6.14",
   "_note_material_vs_qualia_color": [
     "DUE COSE DIVERSE CHE SI CHIAMANO ENTRAMBE color. Non confonderle: e gia successo.",
     "1) QUI, in node_styles.<tipo>.style.material.rgba_color — il COLORE DEL MATERIALE BLENDER del proxy 3D, in float LINEARI. UNA sola chiave: `rgba_color`. Fino a S8 il file ne usava due (`color` sui 13 tipi stratigrafici, `rgba_color` sugli altri) e get_material_color() ne leggeva una sola, restituendo None per 21 tipi su 38; ora sono unificate e la vecchia `color` e letta solo come tolleranza verso file scritti prima. Un tipo che non diventa mai una mesh NON ha material affatto (i contenitori di gruppo, e da S7 i dieci nodi che rendono per icona): per loro get_material_color() torna None, ed e corretto.",
@@ -9,6 +9,8 @@
     "In breve: qui si decide di che colore DISEGNARE una US; li si registra di che colore ERA."
   ],
   "_changelog": {
+    "1.6.14": "BUGFIX-GLYPH follow-up (2026-08-05, E.D.): SE now renders its GLYPH in the scene (the new SE.svg, a stratigraphic-section box with a writable middle band) instead of a bare triangle, so a name can be written inside it. Added SE to 2d_render_glyph_types (aspect 1.331 from the SVG viewBox) and switched SE 2d_icon_prefer to vector (the raster SE.png is the stale stipple; the new symbol is the SVG). Dropped the interim shape_bbox=square. The shape:triangle stays declared for other consumers but the 2D scene draws the glyph. NOTE: verify the SVG carries a light background for dark-canvas legibility (like combiner.svg).",
+    "1.6.13": "BUGFIX-GLYPH (2026-08-05): SE (StratigraphicEvent) gains shape_bbox=\"square\" on its style, like BR. Its triangle was drawn in the wide default 90x32 box, leaving the connect handle far from the glyph; a square bbox (side = min(w,h)) makes the triangle sit in a ~32x32 box with the handle adjacent, matching BR (diamond, square) and the glyph types. No shape_scale: unlike BR (a 0.7 marker) the SE triangle stays full-size. The SCENE representation of SE remains the triangle shape, not the raster icon (S10/POL5 decision unchanged).",
     "1.6.12": "EM3 - `2d_render_glyph_types` guadagna una tabella `aspect`: la larghezza del box di un nodo-glifo e la sua ALTEZZA per l'aspect del disegno, quindi tutti i glifi hanno la stessa altezza e differiscono solo in larghezza (regola E.D.). Default 1.0 = quadrato, che e cio che sono gli undici glifi DTC dopo l'autocrop di POL4 ed extractor/combiner per costruzione; l'unico davvero non quadrato oggi e `author` (0.875 = 448/512). I numeri sono STATICI e misurati una volta dai file: un aspect letto da naturalWidth a runtime farebbe dipendere il layout da quando un bitmap finisce di decodificare (box che salta, due run diversi sullo stesso documento). Il prezzo di un numero statico e che puo diventare stantio se un asset viene ridisegnato: da questa versione sync-datamodels.sh ri-misura ogni file vendorato e AVVISA se una dichiarazione sbaglia di oltre il 2%.",
     "1.6.11": "EM2 — aggiunto `2d_render_glyph_types`: l'elenco dei node_type che il renderer 2D disegna come GLIFO quadrato centrato invece che come forma. Nessuno stile modificato: e un fatto che esisteva gia, ma scritto a mano dentro icons.ts di EMStudio (il set ICON_NODE_TYPES), e quindi invisibile al motore di layout. Serve al motore perche un glifo quadrato dentro un box 90x32 lascia margini vuoti ai lati, e la maniglia di connessione — ancorata al bordo destro del box — finisce lontana dal glifo: con questo elenco il box diventa quadrato e la maniglia lo tocca. Chiave = node_type di runtime e non l'abbreviazione di node_styles, cosi il motore Rust lo legge senza tabella di alias. Esclusi di proposito document e property (geometria custom non quadrata: foglio con angolo piegato, annotazione con parentesi) e i nodi DTC, il cui glifo si decide per NODO da data.dtc_kind.",
     "1.6.10": "POL6 — RINOMINA di due token, nessuna classe nuova e nessuno stile nuovo: gli stili si scambiano di chiave. `USN` torna a essere l'unita NEGATIVA (rettangolo grigio a contorno pieno, label di display US-) e la NEUTRA diventa `USNt` (contorno ai soli quattro angoli). POL5 aveva fatto il contrario per qualche ora: e una convenzione sbagliata, perche USN si legge 'US Negativa' — e cosi lo scrive la linea storica di s3dgraphy e cosi lo vendorizza pyArchInit, che con questo ritorno NON e piu in disaccordo con noi. Nessun colore, nessuna forma e nessun numero modificati: le chiavi sono scambiate e i due `_comment` aggiornati.",
@@ -36,7 +38,8 @@
       "author_ai",
       "license",
       "embargo",
-      "narrative"
+      "narrative",
+      "SE"
     ],
     "_aspect_comment": "EM3 - width of a glyph box = its HEIGHT x this aspect (natural width / natural height of the drawing). The height is the engine's node height, so every glyph keeps the same height and only the width differs (E.D.'s rule). Default 1.0 (square) when a type or kind is absent, which is what the eleven DTC glyphs are after the POL4 autocrop and what extractor/combiner are by construction. STATIC ON PURPOSE: these numbers are measured from the assets ONCE, here, and never read from the loaded image at runtime. An aspect taken from naturalWidth would make the layout depend on when a bitmap finishes decoding - the box would jump under the user and two runs of the same document could differ, which is the determinism contract (EMStudio invariant 7). The cost of a static number is that it can go stale if an asset is redrawn: frontend/scripts/sync-datamodels.sh re-measures every vendored file and WARNS when a declaration is more than 2% off, so the staleness is caught where the assets are copied. Values below measured 2026-08-05 from the files each type actually renders (SVG viewBox, PNG header; narrative uses EMNarrative.png because of its 2d_icon_prefer raster).",
     "aspect": {
@@ -46,7 +49,8 @@
       "author_ai": 0.984,
       "license": 0.977,
       "embargo": 0.992,
-      "narrative": 0.981
+      "narrative": 0.981,
+      "SE": 1.331
     }
   },
   "node_styles": {
@@ -330,7 +334,7 @@
       "3d_file": "src/3D/SE.glb",
       "2d_file_rast": "src/2D/SE.png",
       "2d_file_vect": "src/2D/SE.svg",
-      "2d_icon_prefer": "raster",
+      "2d_icon_prefer": "vector",
       "style": {
         "material": {
           "rgba_color": {
