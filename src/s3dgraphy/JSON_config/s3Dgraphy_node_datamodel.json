@@ -514,19 +514,20 @@
      "family": null,
      "is_series": false
     },
-    "USNeg": {
+    "USN": {
      "class": "NegativeStratigraphicUnit",
      "parent": "StratigraphicNode",
-     "abbreviation": "US-",
+     "abbreviation": "USN",
      "label": "US-",
      "symbol": "grey rectangle, solid border",
-     "description": "Negative Stratigraphic Unit (displayed 'US-') — a lacuna produced by a REMOVAL: a pit cut, an erosion surface, a demolition void. What defines it is the destructive act, which is what separates it from the NEUTRAL unit (USN), a void that was never filled because it was never meant to be. Equally observable on the ground as a positive unit, hence the `real` family. POL5 (2026-08-04): node_type moved from 'USN' to 'USNeg' because E.D. reassigned the abbreviation USN to the neutral unit; the move was safe because no yEd shape maps to USN in convert_shape2type, so no imported graph carried one.",
+     "description": "Negative Stratigraphic Unit (US negativa, displayed 'US-') — a lacuna produced by a SUBTRACTION of matter: a pit cut, an opening broken through a wall, an erosion surface, a levelling. What defines it is the destructive act, which is what separates it from the NEUTRAL unit (USNt), a void that was never filled because it was never meant to be. Equally observable on the ground as a positive unit, hence the `real` family. POL6 (2026-08-04): the token is USN again — the historical spelling of this library and of what pyArchInit vendors, and the one that reads as the Italian 'US Negativa'. POL5 had briefly moved it to 'USNeg' to free USN for the neutral unit; that made a token spell one thing and mean another, and put the two projects in disagreement about a three-letter word.",
+     "scope_note": "USE when matter that WAS there has been taken away, and you can name the act: a cut, a pit, an opening broken through masonry, an erosion surface, a levelling or shaving of a structure. The relation to the unit it removes is a stratigraphic one and all of them are available (`cuts`, `fills`, `abuts`, sequence, …) — this is a unit of the sequence and behaves like one. DO NOT USE for a void left deliberately by the act of building (a window opening, a niche, a room): that is USNt, the neutral unit, and calling it negative dates it to a removal that never happened.",
      "s3Dgraphy_file": "stratigraphic_node.py",
      "mapping": {
       "cidoc": "A3 Stratigraphic Interface",
       "cidoc_s3d": null,
       "alternative": "A3 Stratigraphic Interface + A5 Stratigraphic Modification (the producing removal event)",
-      "rationale": "A negative SU is an INTERFACE (A3) produced by removal of matter, not a positive volumetric SU (A2). The legacy 'A8 Stratigraphic Unit (Negative)' was not a real CRMarchaeo class. The removal action is a separate A5 event linked via P108i_was_produced_by."
+      "rationale": "A negative SU is an INTERFACE (A3) produced by removal of matter, not a positive volumetric SU (A2) — a REAL CRMarchaeo class, not a placeholder: the surface left by a cut is exactly what A3 models. The legacy 'A8 Stratigraphic Unit (Negative)' was not a real CRMarchaeo class. The removal action is a separate A5 event linked via P108i_was_produced_by."
      },
      "em_extension": {
       "uri": "em:NegativeSU",
@@ -543,34 +544,34 @@
      "family": "real",
      "is_series": false
     },
-    "USN": {
+    "USNt": {
      "class": "NeutralStratigraphicUnit",
      "parent": "StratigraphicNode",
-     "abbreviation": "USN",
-     "label": "USN",
+     "abbreviation": "USNt",
+     "label": "USNt",
      "symbol": "grey outline at the four corners only (no continuous border)",
-     "description": "Neutral Stratigraphic Unit (Unità Stratigrafica Neutra) — a void that is part of the DESIGN and not the product of a destruction: the `risparmi` of masonry, a window or door opening, the empty volume of a room. The wall was built around it, so nothing was ever removed. The distinction from the negative unit (US-) is stratigraphic and not cosmetic: a demolition void is evidence of an ACT, a risparmio is evidence of an INTENTION, and reading one as the other dates the void to a removal that never happened. Added in POL5 (2026-08-04) on E.D.'s explicit authorisation.",
-     "scope_note": "USE for a void produced BY the act of building: window and door openings, niches, the volume enclosed by walls, any gap left deliberately in a masonry face. DO NOT USE for a cut, an erosion surface or a demolition void — those are US- (USNeg), because matter was removed. DO NOT USE for a gap in the DOCUMENTATION (something not observed): that is not a stratigraphic unit at all. Test: if you can name the action that removed the matter, it is US-; if the matter was never there, it is USN.",
+     "description": "Neutral Stratigraphic Unit (Unità Stratigrafica Neutra, USNt) — a void that is part of the DESIGN and not the product of a destruction: the `risparmi` of masonry, a window or door opening, a niche, the empty volume of a room. The wall was built around it, so nothing was ever removed. The distinction from the negative unit (USN, displayed 'US-') is stratigraphic and not cosmetic: a demolition void is evidence of an ACT, a risparmio is evidence of an INTENTION, and reading one as the other dates the void to a removal that never happened. Added in POL5 (2026-08-04) on E.D.'s explicit authorisation; the token became USNt in POL6, when USN went back to the negativa.",
+     "scope_note": "USE for a void produced BY the act of building: window and door openings, niches, the volume enclosed by walls, any gap left deliberately in a masonry face — an absence that was WANTED. DO NOT USE for a cut, an opening broken through an existing wall, an erosion surface or a levelling: those are USN (US-), because matter was removed. DO NOT USE for a gap in the DOCUMENTATION (something not observed): that is not a stratigraphic unit at all. Test: if you can name the action that removed the matter, it is USN; if the matter was never there, it is USNt.",
      "attach_rules": {
       "allowed_stratigraphic_edges": [
        "is_after"
       ],
-      "_comment": "E.D.'s constraint, and the reason for it: a void cannot cut, fill, abut or be bonded to anything, so the only stratigraphic statement it can carry is sequence. `is_after` covers both directions (its declared `reverse` is is_before). The enforceable copy of this rule lives in s3Dgraphy_connections_datamodel.json -> node_type_restrictions.USN, which is what consumers read; this field is the same fact stated where a reader of the node type will look for it.",
+      "_comment": "E.D.'s constraint, and the reason for it: a risparmio cannot cut, fill, abut or be bonded to anything — nothing was removed and nothing touches it — so the only stratigraphic statement it can carry is sequence. `is_after` covers both directions (its declared `reverse` is is_before). NB the constraint belongs to the NEUTRAL unit only: the negative one (USN) is a unit of the sequence and keeps every relation. The enforceable copy lives in s3Dgraphy_connections_datamodel.json -> node_type_restrictions.USNt, which is what consumers read; this field is the same fact stated where a reader of the node type will look for it.",
       "paradata": "unrestricted — a risparmio is documented, measured and reasoned about like any other unit (has_property, has_data_provenance, is_in_paradata_nodegroup, epoch and group membership are all unaffected)."
      },
      "s3Dgraphy_file": "stratigraphic_node.py",
      "mapping": {
-      "cidoc": "E24 Physical Human-Made Thing",
+      "cidoc": "A3 Stratigraphic Interface",
       "cidoc_s3d": null,
-      "alternative": null,
+      "alternative": "A3 Stratigraphic Interface + A4 Stratigraphic Genesis (a CONSTRUCTIVE genesis, not the A5 destructive modification the negative unit gets)",
       "provisional": true,
-      "rationale": "PROVISIONAL PLACEHOLDER, deliberately not an A-class. TODO CIDOC: mapping USN-neutra da definire — E.D. coordina con Achille Felicetti / CRMarchaeo. CRMarchaeo models A2 Stratigraphic Volume Unit (matter) and A3 Stratigraphic Interface (a surface produced by removal); a void left deliberately by construction is neither, and inventing an A-class here would put a term into the language's mappings that no ontology committee has agreed to. E24 is used only as a defensible superclass of the built whole the void belongs to, and MUST be revisited before any RDF export claims to be CRMarchaeo-conformant."
+      "rationale": "TENTATIVE placeholder, better informed than POL5's E24 but still not a decision. TODO CIDOC: USNt (risparmio) — probabile A3_Stratigraphic_Interface con genesi COSTRUTTIVA (A4_Stratigraphic_Genesis), distinta dalla negativa che nasce da una A5 distruttiva. NON e detto sia una classe nuova: E.D. coordina con Achille Felicetti / CRMarchaeo. The reading behind the placeholder: what is observable is a SURFACE bounding an absence, which is what A3 models, and the difference from the negative unit is not the surface but its genesis — built, not cut. If that holds, the two share A3 and differ in the event that produced them, and no new class is needed; POL5's E24 said less and claimed more. MUST be confirmed before any RDF export claims to be CRMarchaeo-conformant."
      },
      "em_extension": {
       "uri": "em:NeutralSU",
       "rdf_type": "owl:Class",
       "subclass_of": [
-       "crm:E24_Physical_Human-Made_Thing"
+       "crmarchaeo:A3_Stratigraphic_Interface"
       ],
       "extension_status": "proposed_provisional"
      },

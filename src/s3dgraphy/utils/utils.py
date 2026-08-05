@@ -157,10 +157,13 @@ def convert_shape2type(yedtype, border_style, border_type="line"):
 # ──────────────────────────────────────────────────────────────────
 STRATIGRAPHIC_CLASS_MAP = {
     "US":      StratigraphicUnit,
-    # POL5: "USN" is the NEUTRAL unit (a risparmio); the negative/destructive
-    # one is "USNeg" and displays as "US-". They were one type until 2026-08-04.
-    "USN":     NeutralStratigraphicUnit,
-    "USNeg":   NegativeStratigraphicUnit,
+    # The two VOIDS, one token each (POL6): "USN" is the NEGATIVE unit — the
+    # historical spelling here and in pyArchInit, and it reads as the Italian
+    # "US Negativa" — while the NEUTRAL one (a risparmio: window, door, niche) is
+    # "USNt". POL5 had them the other way round for a few hours; a token that
+    # spells "negativa" cannot mean "neutra".
+    "USN":     NegativeStratigraphicUnit,
+    "USNt":    NeutralStratigraphicUnit,
     "USVs":    StructuralVirtualStratigraphicUnit,
     "USVn":    NonStructuralVirtualStratigraphicUnit,
     "SF":      SpecialFindUnit,

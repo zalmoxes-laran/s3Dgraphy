@@ -176,15 +176,16 @@ class NegativeStratigraphicUnit(StratigraphicNode):
     ``real`` family alongside :class:`StratigraphicUnit` and
     :class:`DocumentaryStratigraphicUnit`.
 
-    .. note:: ``node_type`` is ``USNeg`` since POL5 (2026-08-04). It used
-       to be ``USN``, which E.D. reassigned to the NEUTRAL unit — the
-       abbreviation reads "Unità Stratigrafica Neutra". The move was safe
-       because nothing produced a ``USN`` node: ``convert_shape2type`` has
-       no yEd shape mapping to it, so no imported graph carries one. An
-       xlsx that typed ``USN`` meaning *negative* is the one case that
-       changes meaning, and it is called out in the POL5 end-of.
+    .. note:: ``node_type`` is ``USN``, which is what it has always been in
+       this library and what pyArchInit vendors — and it reads as the
+       Italian *US Negativa*. POL5 briefly moved it to ``USNeg`` to give
+       ``USN`` to the neutral unit; POL6 undid that (E.D.), because a token
+       whose spelling says "negativa" cannot mean "neutra" without costing
+       every reader a translation table, and because it put s3dgraphy and
+       pyArchInit in disagreement about one three-letter word. The neutral
+       unit is ``USNt``.
     """
-    node_type = "USNeg"
+    node_type = "USN"
 
     def __init__(self, node_id, name, description=""):
         super().__init__(node_id, name, description)
@@ -196,7 +197,7 @@ class NegativeStratigraphicUnit(StratigraphicNode):
 
 
 class NeutralStratigraphicUnit(StratigraphicNode):
-    """Neutral Stratigraphic Unit (USN, Unità Stratigraphica Neutra).
+    """Neutral Stratigraphic Unit (``USNt``, Unità Stratigrafica Neutra).
 
     A void that is part of the design, not the product of a destruction:
     the *risparmi* of masonry — a window or door opening, the empty
@@ -204,37 +205,43 @@ class NeutralStratigraphicUnit(StratigraphicNode):
     removed and nothing is missing.
 
     This is the distinction E.D. asked for in POL5, and it is a real one
-    on site: a demolition void (:class:`NegativeStratigraphicUnit`, shown
-    ``US-``) is evidence of an ACT, while a *risparmio* is evidence of an
-    INTENTION. Reading one as the other inverts the sequence — the void
+    on site: a demolition void (:class:`NegativeStratigraphicUnit`, ``USN``,
+    shown ``US-``) is evidence of an ACT, while a *risparmio* is evidence of
+    an INTENTION. Reading one as the other inverts the sequence — the void
     would be dated to a removal that never happened.
 
     ``real`` family: a risparmio is directly observable, and it is drawn
     with the outline at the four corners only (see ``em_visual_rules``),
     because the excavation observes its extent and not a surface.
 
+    .. note:: The token is ``USNt`` since POL6 (2026-08-04). It was briefly
+       ``USN``, but that spelling belongs to the *negativa* here and in
+       pyArchInit; ``USNt`` is new, free of collisions, and still reads as
+       the abbreviation of "US Neutra".
+
     .. warning:: STRATIGRAPHIC RELATIONS (E.D.): a neutral unit takes
        ``is_after`` / ``is_before`` and **nothing else**. It is a void: it
        cannot cut, fill, abut or be bonded to anything. The rule is data,
        not code — ``s3Dgraphy_connections_datamodel.json`` →
-       ``node_type_restrictions.USN``.
+       ``node_type_restrictions.USNt``.
 
-    .. todo:: CIDOC: mapping USN-neutra da definire — E.D. coordina con
-       Achille Felicetti / CRMarchaeo. CRMarchaeo has A2 (Stratigraphic
-       Volume Unit) and A3 (Stratigraphic Interface) but no term for a
-       void left deliberately, so the datamodel entry carries a
-       PROVISIONAL E24 placeholder rather than an invented A-class.
+    .. todo:: CIDOC: ``USNt`` (risparmio) — probabile
+       ``A3_Stratigraphic_Interface`` con genesi COSTRUTTIVA
+       (``A4_Stratigraphic_Genesis``), distinta dalla negativa che nasce da
+       una A5 distruttiva. NON è detto sia una classe nuova: E.D. coordina
+       con Achille Felicetti / CRMarchaeo. Il datamodel porta un
+       placeholder A3 marcato TENTATIVO.
     """
-    node_type = "USN"
+    node_type = "USNt"
 
     def __init__(self, node_id, name, description=""):
         super().__init__(node_id, name, description)
         self.symbol = "grey outline at the four corners only"
-        self.label = "USN"
+        self.label = "USNt"
         self.detailed_description = (
-            "Neutral Stratigraphic Unit (USN) — a void by design, not by "
-            "removal: a window or door opening, the volume of a room. "
-            "Only is_after/is_before relations.")
+            "Neutral Stratigraphic Unit (USNt) — a void by design, not by "
+            "removal: a window or door opening, a niche, the volume of a "
+            "room. Only is_after/is_before relations.")
 
 
 class ContinuityNode(StratigraphicNode):

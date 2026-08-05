@@ -1,6 +1,6 @@
 {
   "formal_language": "EM",
-  "version": "1.6.9",
+  "version": "1.6.11",
   "_note_material_vs_qualia_color": [
     "DUE COSE DIVERSE CHE SI CHIAMANO ENTRAMBE color. Non confonderle: e gia successo.",
     "1) QUI, in node_styles.<tipo>.style.material.rgba_color — il COLORE DEL MATERIALE BLENDER del proxy 3D, in float LINEARI. UNA sola chiave: `rgba_color`. Fino a S8 il file ne usava due (`color` sui 13 tipi stratigrafici, `rgba_color` sugli altri) e get_material_color() ne leggeva una sola, restituendo None per 21 tipi su 38; ora sono unificate e la vecchia `color` e letta solo come tolleranza verso file scritti prima. Un tipo che non diventa mai una mesh NON ha material affatto (i contenitori di gruppo, e da S7 i dieci nodi che rendono per icona): per loro get_material_color() torna None, ed e corretto.",
@@ -9,6 +9,8 @@
     "In breve: qui si decide di che colore DISEGNARE una US; li si registra di che colore ERA."
   ],
   "_changelog": {
+    "1.6.11": "EM2 — aggiunto `2d_render_glyph_types`: l'elenco dei node_type che il renderer 2D disegna come GLIFO quadrato centrato invece che come forma. Nessuno stile modificato: e un fatto che esisteva gia, ma scritto a mano dentro icons.ts di EMStudio (il set ICON_NODE_TYPES), e quindi invisibile al motore di layout. Serve al motore perche un glifo quadrato dentro un box 90x32 lascia margini vuoti ai lati, e la maniglia di connessione — ancorata al bordo destro del box — finisce lontana dal glifo: con questo elenco il box diventa quadrato e la maniglia lo tocca. Chiave = node_type di runtime e non l'abbreviazione di node_styles, cosi il motore Rust lo legge senza tabella di alias. Esclusi di proposito document e property (geometria custom non quadrata: foglio con angolo piegato, annotazione con parentesi) e i nodi DTC, il cui glifo si decide per NODO da data.dtc_kind.",
+    "1.6.10": "POL6 — RINOMINA di due token, nessuna classe nuova e nessuno stile nuovo: gli stili si scambiano di chiave. `USN` torna a essere l'unita NEGATIVA (rettangolo grigio a contorno pieno, label di display US-) e la NEUTRA diventa `USNt` (contorno ai soli quattro angoli). POL5 aveva fatto il contrario per qualche ora: e una convenzione sbagliata, perche USN si legge 'US Negativa' — e cosi lo scrive la linea storica di s3dgraphy e cosi lo vendorizza pyArchInit, che con questo ritorno NON e piu in disaccordo con noi. Nessun colore, nessuna forma e nessun numero modificati: le chiavi sono scambiate e i due `_comment` aggiornati.",
     "1.6.9": "POL5 — correzioni di POL4 su indicazione di E.D. (1) BR torna ROMBO (era diventato quadrato): fill nero e altezza 0.7x restano, e il bounding box e quadrato via il nuovo `shape_bbox: square`, cosi il rombo e equilatero invece di essere schiacciato nel box 90x32. Il token di forma `square` non serve piu ed e stato ritirato: quadrato = `rectangle` + `shape_bbox: square`, un meccanismo solo. (2) DUE tipi dove ce n'era uno: `USN` e ora l'unita NEUTRA (i risparmi della muratura: finestre, porte, il volume di una stanza — vuoti VOLUTI) con i quattro angoli, e l'unita NEGATIVA/distruttiva e `USNeg`, etichetta di display `US-`, resa come una US grigia a contorno pieno. Il grigio di entrambe passa a #8C8C8C (grigio gia in uso nel linguaggio, la scala `symbolic`) perche #C4C4C4 su fill #F0F0F0 era illeggibile, tanto piu con soli quattro tick di inchiostro. (3) NARR e SE dichiarano il RASTER come icona (256 px, reso dall'SVG) tramite il nuovo flag `2d_icon_prefer: raster`: i vettori restano DICHIARATI perche esistono — questo file e dove un consumatore chiede cosa esiste — e il flag dice quale dei due disegnare. Sono illustrazioni da 617 e 284 KB per un glifo che nessun renderer disegna oltre i 30 px, e un consumatore che inlinea gli asset lo pagava tutto. NB il flag e anche cio che dice al vendor di EMStudio quale dei due file copiare: senza, la regola 'un raster oscurato dal proprio vettore e irraggiungibile' teneva il vettore e buttava il raster, cioe l'esatto contrario di questa decisione.",
     "1.6.8": "POL4 — tre forme e un'icona, tutte decise da E.D. (1) BR passa da diamante bianco a QUADRATO NERO al 70% dell'altezza di una US: nuovo token di forma `square` piu il nuovo campo `style.shape_scale`, che rimpicciolisce il DISEGNO dentro il box senza toccare il box (le dimensioni per tipo stanno in em-core, invariante 7 di EMStudio). Coerentemente src/2D/continuity.svg perde la rotazione di 45 gradi: era lo stesso quadrato, ruotato. (2) USN passa da rettangolo tratteggiato a `corner_brackets`, contorno ai soli quattro angoli — un bordo continuo afferma un margine che lo scavo non osserva. (3) NARR punta finalmente alle EMNarrative.svg/.png di E.D. al posto del segnaposto narrative.png. Nessun colore cambiato tranne il fill di BR (#FFFFFF -> #000000). NB i due nuovi token di forma richiedono un consumatore che li conosca: chi non li conosce cade sul proprio default (in EMStudio il rounded_rectangle), quindi il peggio che accade e una forma generica, non un errore.",
     "1.6.7": "S10 — curato il colore di SE (StratigraphicEventNode), l'ultimo segnaposto rimasto fra i tipi che qualcuno disegna davvero. Era #BC0000, un rosso mai scelto che contraddiceva il proprio border_color nero, e il node datamodel dichiarava il simbolo 'to be defined': non c'era una decisione da rispettare, c'era un buco. Ora TEAL #2A8C8C, material lineare (0.023, 0.262, 0.262), con border_color coerente — la famiglia cromatica delle attivita, l'unica del linguaggio che significa 'e successo qualcosa' invece di 'qualcosa c'e'. Aggiornato di conseguenza il campo symbol nel node datamodel.",
@@ -23,6 +25,18 @@
     "1.5.2": "Added RSF (Reused Special Find / spolia) node style — octagon, red border (#9B3333), white fill. Sibling of SF/VSF, distinguished by border colour. Originating DP: DP-26.",
     "1.5.1": "Added LocationNodeGroup node style (dashed roundrectangle, kind-based border colour) and is_in_location edge style with primary_modifier override.",
     "1.5.0": "Initial EM 1.5 visual rules."
+  },
+  "2d_render_glyph_types": {
+    "_comment": "Node types the 2D renderer draws as a CENTRED SQUARE GLYPH (their official icon) instead of a shape. Keyed by RUNTIME node_type, deliberately: this block is read both by EMStudio's icons.ts and by its Rust layout engine, and a list keyed by node_type needs no alias table on either side (`node_styles` is keyed by the short abbreviation, EXT/COMB/..., which the engine does not know). Added in 1.6.11 (EM2) because the fact had been living as a hand-written set inside icons.ts, and the layout engine needs the same fact to give those nodes a SQUARE box: a glyph drawn square inside a 90x32 box leaves empty margins, and the connect handle — anchored to the right edge of the box — ends up floating away from the glyph. NB two things this does NOT include. (1) `document` and `property`: they are drawn with custom geometry (a sheet with a folded corner, a bracketed text annotation) that is NOT square, and squaring their box would crush the text. (2) DTC nodes: their glyph is chosen per NODE from `data.dtc_kind` and not from the type, so a consumer decides that node by node — a plain `link` is not a glyph, a `link` with a dtc_kind is.",
+    "types": [
+      "extractor",
+      "combiner",
+      "author",
+      "author_ai",
+      "license",
+      "embargo",
+      "narrative"
+    ]
   },
   "node_styles": {
     "US": {
@@ -629,8 +643,8 @@
       },
       "label_position": "over"
     },
-    "USN": {
-      "_comment": "NEUTRAL stratigraphic unit (POL5, 2026-08-04): a void that is part of the DESIGN — the `risparmi` of masonry, a window or door opening, the volume of a room. NOT the negative unit, which is US-/USNeg below: nothing was removed here, so there is no interface. Drawn with the outline only at the FOUR CORNERS (`corner_brackets`), and the reason is semantic: a continuous border states a surface, and a risparmio has none — what is observed is the EXTENT of the void, which is what a crop mark says. Grey #8C8C8C, one of the language's existing greys (it is the `symbolic` rung of document_variant_styles): the #C4C4C4 this entry carried before POL4 was already faint against the #F0F0F0 fill, and with only four ticks of ink left there was nothing to see. Same grey as US- on purpose — the SHAPE tells the two voids apart, which is how EM distinguishes types everywhere else.",
+    "USNt": {
+      "_comment": "NEUTRAL stratigraphic unit (POL5, token USNt since POL6): a void that is part of the DESIGN — the `risparmi` of masonry, a window or door opening, the volume of a room. NOT the negative unit, which is USN (displayed US-) below: nothing was removed here, so there is no interface produced by a removal. Drawn with the outline only at the FOUR CORNERS (`corner_brackets`), and the reason is semantic: a continuous border states a surface, and a risparmio has none — what is observed is the EXTENT of the void, which is what a crop mark says. Grey #8C8C8C, one of the language's existing greys (it is the `symbolic` rung of document_variant_styles): the #C4C4C4 this entry carried before POL4 was already faint against the #F0F0F0 fill, and with only four ticks of ink left there was nothing to see. Same grey as USN on purpose — the SHAPE tells the two voids apart, which is how EM distinguishes types everywhere else.",
       "file_3d": "src/3D/US.glb",
       "file_2d": "src/2D/US.png",
       "style": {
@@ -650,8 +664,8 @@
       },
       "label_position": "over"
     },
-    "USNeg": {
-      "_comment": "NEGATIVE / destructive stratigraphic unit, displayed US- (POL5, 2026-08-04). A lacuna produced by a REMOVAL: a pit cut, an erosion surface, a demolition void. Rendered like a US — same rectangle, same thick frame — because it IS a unit of the sequence and behaves like one; only the colour changes, to the neutral grey of the absence family. E.D.: 'una US grigia a contorno pieno', explicitly NOT the orange roundrectangle of USD (which is the DOCUMENTARY unit and unrelated). Until POL5 this type answered to the node_type `USN`; that abbreviation now belongs to the neutral unit and this one is `USNeg`.",
+    "USN": {
+      "_comment": "NEGATIVE / destructive stratigraphic unit, displayed US- (POL5; token USN again since POL6). A lacuna produced by a REMOVAL: a pit cut, an erosion surface, a demolition void. Rendered like a US — same rectangle, same thick frame — because it IS a unit of the sequence and behaves like one; only the colour changes, to the neutral grey of the absence family. E.D.: 'una US grigia a contorno pieno', explicitly NOT the orange roundrectangle of USD (which is the DOCUMENTARY unit and unrelated). This type answers to the node_type `USN`, as it always did: POL5 moved it to `USNeg` for a few hours and POL6 put it back, because the spelling says negativa and because pyArchInit vendors the same token with the same meaning.",
       "file_3d": "src/3D/US.glb",
       "file_2d": "src/2D/US.png",
       "style": {

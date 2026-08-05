@@ -13,11 +13,12 @@ Validates invariants:
    so the JSON cannot drift from the naming convention.
 4. The ``classification.py`` accessors (``get_family``,
    ``is_real``, ``is_virtual``, ``is_series``) agree with the raw JSON.
-5. The two void types stay DISTINCT (POL5): :class:`NeutralStratigraphicUnit`
-   is ``USN`` (a risparmio — window, door, room) and
-   :class:`NegativeStratigraphicUnit` is ``USNeg``, displayed ``US-`` (a cut,
-   an erosion surface, a demolition void). Both ``real``, non-series, and USN
-   is restricted to ``is_after`` in the connections datamodel.
+5. The two void types stay DISTINCT (POL5) under their conventional tokens
+   (POL6): :class:`NegativeStratigraphicUnit` is ``USN`` — US negativa, a cut
+   or an erosion surface, displayed ``US-`` — and
+   :class:`NeutralStratigraphicUnit` is ``USNt``, the risparmio (window, door,
+   niche, room). Both ``real``, non-series, and ``USNt`` is the one restricted
+   to ``is_after`` in the connections datamodel.
 6. The pre-computed sets
    (``REAL_US_TYPES``/``VIRTUAL_US_TYPES``/``SERIES_US_TYPES``/``ALL_US_TYPES``)
    are consistent with the per-node accessors.
@@ -129,26 +130,30 @@ def test_classification_api_matches_json():
 
 
 def test_neutral_and_negative_are_two_distinct_types():
-    """The void-by-design and the void-by-removal are SEPARATE types (POL5).
+    """The void-by-design and the void-by-removal are SEPARATE types (POL5),
+    under the tokens the convention gives them (POL6).
 
-    Until 2026-08-04 there was one: ``USN`` = NegativeStratigraphicUnit. E.D.
-    reassigned the abbreviation ``USN`` to the NEUTRAL unit — the *risparmi* of
-    masonry, windows and doors — and the negative/destructive one became
-    ``USNeg``, displayed ``US-``.
+    Until 2026-08-04 there was one type: ``USN`` = NegativeStratigraphicUnit. POL5
+    split it in two and, briefly, swapped the tokens — ``USN`` to the neutral unit
+    and ``USNeg`` to the negative one. POL6 put them back: ``USN`` spells *US
+    Negativa*, it is what this library has always used and what pyArchInit
+    vendors, so the NEUTRAL one is ``USNt``.
 
-    The assertion that matters is that they do NOT collapse back into one: the
-    failure mode is a single type that means "a hole", which dates a window
-    opening to a demolition that never happened.
+    Two things are asserted, and the second is the one that would hurt: that the
+    types do not collapse back into one — a single type meaning "a hole" dates a
+    window opening to a demolition that never happened — and that each token
+    points at the class its spelling promises. A silent swap of these two is
+    indistinguishable from correct behaviour until someone reads a matrix.
     """
-    assert NeutralStratigraphicUnit.node_type == "USN", (
-        f"NeutralStratigraphicUnit.node_type = "
-        f"{NeutralStratigraphicUnit.node_type!r}, expected 'USN'")
-    assert NegativeStratigraphicUnit.node_type == "USNeg", (
+    assert NegativeStratigraphicUnit.node_type == "USN", (
         f"NegativeStratigraphicUnit.node_type = "
-        f"{NegativeStratigraphicUnit.node_type!r}, expected 'USNeg'")
+        f"{NegativeStratigraphicUnit.node_type!r}, expected 'USN'")
+    assert NeutralStratigraphicUnit.node_type == "USNt", (
+        f"NeutralStratigraphicUnit.node_type = "
+        f"{NeutralStratigraphicUnit.node_type!r}, expected 'USNt'")
     assert NeutralStratigraphicUnit is not NegativeStratigraphicUnit
-    for abbr, cls in (("USN", NeutralStratigraphicUnit),
-                      ("USNeg", NegativeStratigraphicUnit)):
+    for abbr, cls in (("USN", NegativeStratigraphicUnit),
+                      ("USNt", NeutralStratigraphicUnit)):
         assert abbr in STRATIGRAPHIC_CLASS_MAP, (
             f"{abbr!r} missing from STRATIGRAPHIC_CLASS_MAP")
         assert STRATIGRAPHIC_CLASS_MAP[abbr] is cls, (
@@ -160,22 +165,29 @@ def test_neutral_and_negative_are_two_distinct_types():
         assert info.get("is_series") is False, (
             f"{abbr} is_series is {info.get('is_series')!r}, expected False")
     # the display labels are the point of the split, so they are part of it
-    assert get_subtype_info("USNeg")["label"] == "US-"
-    assert get_subtype_info("USN")["label"] == "USN"
+    assert get_subtype_info("USN")["label"] == "US-", (
+        "the negativa displays as US- (E.D.), whatever its token spells")
+    assert get_subtype_info("USNt")["label"] == "USNt"
     # E.D.'s stratigraphic constraint: a void takes sequence and nothing else.
     # Enforceable copy in the connections datamodel; this checks the two agree.
     restrictions = json.loads(
         (REPO_ROOT / "src/s3dgraphy/JSON_config"
          / "s3Dgraphy_connections_datamodel.json").read_text()
     ).get("node_type_restrictions", {})
-    assert restrictions.get("USN", {}).get("allowed_edges") == ["is_after"], (
-        "USN must be restricted to is_after (+ its declared reverse is_before) "
-        "in s3Dgraphy_connections_datamodel.json -> node_type_restrictions")
-    assert (get_subtype_info("USN")["attach_rules"]["allowed_stratigraphic_edges"]
-            == restrictions["USN"]["allowed_edges"]), (
+    assert restrictions.get("USNt", {}).get("allowed_edges") == ["is_after"], (
+        "USNt (the NEUTRAL unit) must be restricted to is_after (+ its declared "
+        "reverse is_before) in s3Dgraphy_connections_datamodel.json -> "
+        "node_type_restrictions")
+    assert (get_subtype_info("USNt")["attach_rules"]["allowed_stratigraphic_edges"]
+            == restrictions["USNt"]["allowed_edges"]), (
         "the node datamodel's attach_rules and the connections datamodel's "
-        "node_type_restrictions disagree about USN's allowed edges")
-    print("  ✓ USN (neutral) and USNeg/US- (negative) are distinct and constrained")
+        "node_type_restrictions disagree about USNt's allowed edges")
+    # and the NEGATIVE unit must NOT be restricted: it cuts and is filled
+    assert "USN" not in restrictions, (
+        "USN is a unit of the sequence — restricting it would forbid `cuts`, "
+        "which is the relation a negative unit exists to carry")
+    assert "attach_rules" not in get_subtype_info("USN")
+    print("  ✓ USN/US- (negative, unrestricted) and USNt (neutral, sequence only)")
 
 
 def test_precomputed_sets_are_consistent():

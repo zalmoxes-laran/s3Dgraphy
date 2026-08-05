@@ -351,6 +351,13 @@ def _resolve_visual(unita_tipo: str):
 
 
 _VISUAL_BY_UNITA_TIPO = {
+    # Keyed by pyArchInit's `unita_tipo`, NOT by EM node_type — the two
+    # vocabularies overlap in spelling and are not the same list. `USN` here is
+    # pyArchInit's code for the *US negativa*, and since POL6 (2026-08-04) that is
+    # exactly what `USN` means on the EM side too, so no translation is needed for
+    # it. POL5 had briefly given EM's `USN` to the NEUTRAL unit, which would have
+    # made this table quietly mean the opposite of the graph it writes; that is the
+    # collision the rename undid, and the reason this comment exists.
     # Stratigraphic core (red border #9B3333, width 3.0 per legacy)
     "US":   {"fill": "#FFFFFF", "border": "#9B3333", "width": "3.0",
              "style": "line", "shape": "rectangle"},

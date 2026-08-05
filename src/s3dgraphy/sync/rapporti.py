@@ -359,11 +359,11 @@ import re as _re
 _US_PREFIX_PATTERN = _re.compile(
     r"^(?P<prefix>"
     r"USVs|USVn|USVA|USVB|USVC|USV|"
-    # USNeg before USN: the alternation is longest-match-first (see above), and
-    # POL5 gave the negative unit the node_type USNeg — without this a name like
-    # "USNeg 12" would have "USN" stripped and keep a stray "eg 12". Inert for
-    # every existing name, since no name could start with USNeg before POL5.
-    r"USNeg|USM|USD|USN|"
+    # USNt before USN: the alternation is longest-match-first (see above), so the
+    # NEUTRAL unit's token has to come first — otherwise a name like "USNt 12"
+    # gets "USN" stripped and keeps a stray "t 12". USN itself is unchanged and is
+    # pyArchInit's own code for the negativa, which is why it was already here.
+    r"USNt|USM|USD|USN|"
     r"VSF|SF|"
     r"CON|"
     r"WSU|MSE|TSU|SUS|UE|UM|UC|UL|"

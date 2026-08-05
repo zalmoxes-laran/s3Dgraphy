@@ -134,9 +134,9 @@ ALL_US_TYPES: frozenset = frozenset(_subtype_map().keys())
 #: Continuity/life-span default. Types here LIVE to the most recent epoch
 #: by default, so a *bounded* life must be marked with an explicit BR
 #: continuity diamond. Every other stratigraphic type — special finds
-#: (SF/RSF), documentary units (USD/serUSD), the two voids (USN neutral,
-#: USNeg/US- negative), transforms (TSU/UL) and all virtuals — is BIRTH-ONLY
-#: by default: it exists only
+#: (SF/RSF), documentary units (USD/serUSD), the two voids (USN = negativa,
+#: displayed US-, and USNt = neutra), transforms (TSU/UL) and all virtuals — is
+#: BIRTH-ONLY by default: it exists only
 #: in its birth epoch and needs a BR diamond only to EXTEND its life.
 #: This mirrors the GraphML importer's positional ``survive_in_epoch`` rule
 #: (``import_graphml.extract_epochs``: only US/serSU get positional survival
