@@ -1063,11 +1063,16 @@ class RDFExporter:
             self.stats["edges_emitted"] += 1
             return
 
-        # has_visual_reference co-typing: the target document is asserted to
-        # be an E36 Visual Item — required for the P138i_has_representation
-        # mapping to be range-consistent (an E31 Document that visually
-        # anchors a paradata node is also a visual item). See Appendix B.1
-        # of the WP3 coverage analysis (2026-07-10).
+        # has_visual_reference co-typing: the target is asserted to be an
+        # E36 Visual Item — required for the P138i_has_representation mapping
+        # to be range-consistent. Since BUGFIX-CONN2 (2026-08-05) the target
+        # is the resource-layer image node (LinkNode, E73 Information Object)
+        # rather than the former E31 Document; E36 is a subclass of E73, so
+        # co-typing a LinkNode as E36 is now clean (it was strained for E31).
+        # The co-typing is target-agnostic, so no logic change was needed —
+        # only the semantics of what the target IS. See Appendix B.1 of the
+        # WP3 coverage analysis and the CIDOC note for Felicetti (confirm E36
+        # as the target class, as for USNt).
         if edge_type == "has_visual_reference":
             ctx.add((target_iri, RDF.type, CRM.E36_Visual_Item))
 

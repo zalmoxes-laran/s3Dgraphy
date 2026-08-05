@@ -24,6 +24,7 @@ from s3dgraphy.nodes import (DocumentNode, RepresentationModelDocNode,
                              RepresentationModelSpecialFindNode)
 from s3dgraphy.nodes.epoch_node import EpochNode
 from s3dgraphy.nodes.extractor_node import ExtractorNode
+from s3dgraphy.nodes.property_node import PropertyNode
 from s3dgraphy.nodes.stratigraphic_node import SpecialFindUnit, StratigraphicUnit
 
 
@@ -233,6 +234,63 @@ def test_document_is_idempotent():
     assert a["doc_id"] == b["doc_id"] and b["created"] is False
     assert len([n for n in study.nodes if n.node_type == "document"]) == 1
     assert len([e for e in study.edges if e.edge_type == "has_linked_resource"]) == 1
+
+
+# ── BUGFIX-CONN3: visual reference is a LinkNode, not a Document ───────────────
+def test_document_attach_never_uses_visual_reference():
+    """A PropertyNode hatted onto a Document is DOCUMENTATION (P70i, CONN3
+    widening), never has_visual_reference — which now targets a LinkNode image,
+    not a source document."""
+    shelf = _shelf_with_resource()
+    study = Graph(graph_id="study")
+    study.add_node(PropertyNode(node_id="P1", name="height",
+                                property_type="dimension", value="3"))
+    out = api.hat_as_document(study, "r1", shelf=shelf, doc_id="D.7",
+                              attach_to="P1")
+    assert out["attach_edge"] == "has_documentation"
+    assert not _has(study, "P1", "D.7", "has_visual_reference")
+
+
+def test_visual_resource_attaches_linknode_to_property():
+    """hat_as_visual_resource: PropertyNode ─has_visual_reference→ LinkNode. No
+    facet node — the visual resource IS the Resource (LinkNode); only the P138i
+    edge is wired."""
+    shelf = _shelf_with_resource(rid="img1", url="/lib/plate.png")
+    study = Graph(graph_id="study")
+    study.add_node(PropertyNode(node_id="P1", name="colour",
+                                property_type="typology", value="red"))
+    out = api.hat_as_visual_resource(study, "img1", shelf=shelf, attach_to="P1")
+    assert out["attached"] is True
+    assert out["attach_edge"] == "has_visual_reference"
+    # the target is the LinkNode itself, not a new facet node
+    assert study.find_node_by_id("img1").node_type == "link"
+    assert _has(study, "P1", "img1", "has_visual_reference")
+    # no facet node created (unlike RM/Doc): only the resource + the edge
+    assert not any(n.node_type == "document" for n in study.nodes)
+
+
+def test_visual_resource_refuses_non_property_source():
+    """The datamodel gates the attach: a stratigraphic node cannot be the source
+    of a visual reference (source is PropertyNode only, CONN2), so it is refused
+    — never degraded to a generic edge."""
+    shelf = _shelf_with_resource(rid="img1", url="/lib/plate.png")
+    study = Graph(graph_id="study")
+    study.add_node(StratigraphicUnit(node_id="US1", name="US 1"))
+    out = api.hat_as_visual_resource(study, "img1", shelf=shelf, attach_to="US1")
+    assert out["attached"] is False and out["attach_edge"] == ""
+    assert not _has(study, "US1", "img1", "has_visual_reference")
+
+
+def test_visual_resource_is_idempotent():
+    shelf = _shelf_with_resource(rid="img1", url="/lib/plate.png")
+    study = Graph(graph_id="study")
+    study.add_node(PropertyNode(node_id="P1", name="colour",
+                                property_type="typology", value="red"))
+    a = api.hat_as_visual_resource(study, "img1", shelf=shelf, attach_to="P1")
+    b = api.hat_as_visual_resource(study, "img1", shelf=shelf, attach_to="P1")
+    assert a["created"] is True and b["created"] is False
+    assert len([e for e in study.edges
+                if e.edge_type == "has_visual_reference"]) == 1
 
 
 # ── facets are NOT exclusive ──────────────────────────────────────────────────

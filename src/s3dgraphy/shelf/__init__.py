@@ -31,6 +31,7 @@ from .core import (
     hat_as_representation_model,
     hat_as_rmdoc,
     hat_as_rmsf,
+    hat_as_visual_resource,
     instantiate_from_shelf,
     is_shelf,
     list_shelf,
@@ -57,6 +58,7 @@ __all__ = [
     "hat_as_rmsf",
     "hat_as_rmdoc",
     "hat_as_document",
+    "hat_as_visual_resource",
     "FACETS",
     "attach_candidates",
 ]

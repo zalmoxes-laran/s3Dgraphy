@@ -59,16 +59,33 @@ def test_the_legacy_stratigraphic_node_type_reaches_has_property(importer):
     assert got == "has_property"
 
 
-def test_paradata_node_to_document_is_a_visual_reference(importer):
-    """A PropertyNode pointing at a Document has exactly ONE relation the
-    datamodel admits, so the reading is not a guess."""
+def test_property_to_document_is_documentation(importer):
+    """BUGFIX-CONN3: a PropertyNode pointing at a Document reads as
+    `has_documentation` (P70i — the property is documented in this source). It is
+    NO LONGER `has_visual_reference`: CONN2 moved that to PropertyNode→LinkNode
+    (an image resource), so a legacy dashed property→document connector is
+    documentation, not a visual reference. has_documentation.source was widened
+    to include PropertyNode (v1.6.7) for exactly this reading."""
     assert importer.enhance_edge_type(
         "has_data_provenance", _prop(), DocumentNode("D1", "D.1")
-    ) == "has_visual_reference"
+    ) == "has_documentation"
     # the extraction case still wins for an Extractor source
     assert importer.enhance_edge_type(
         "has_data_provenance", ExtractorNode("EX1", "m"), DocumentNode("D1", "D.1")
     ) == "extracted_from"
+
+
+def test_combiner_to_document_is_left_generic_with_a_warning(importer):
+    """BUGFIX-CONN3: a CombinerNode/bare ParadataNode → Document has no honest
+    single relation (a combiner aggregates extractors; it cites no document, and
+    the DTC chain is not synthesised at import). It is left as `generic_connection`
+    with a warning rather than asserting a relation — and never the now-illegal
+    `has_visual_reference`."""
+    got = importer.enhance_edge_type(
+        "has_data_provenance", CombinerNode("C1", "C.01"), DocumentNode("D1", "D.1")
+    )
+    assert got == "generic_connection"
+    assert any("generic_connection" in w for w in importer.graph.warnings)
 
 
 # ── Se3: a mis-endpointed `is_after` is re-read from its endpoints ────────────

@@ -35,7 +35,8 @@ _ACQ_TYPE = "dtc_acquisition"
 #   Document ─has_representation_model_doc→ RMDoc (P138i_has_representation)
 #   Extractor ─extracted_from→ Document          (P67 / J7 — the paradata entry)
 #   strat    ─has_documentation→ Document        (P70i_is_documented_in)
-#   paradata ─has_visual_reference→ Document     (P138i)
+#   property ─has_documentation→ Document        (P70i — CONN3 widening)
+#   property ─has_visual_reference→ LinkNode     (P138i — CONN2; hat_as_visual_resource)
 _EDGE_HAS_LINKED = "has_linked_resource"
 _EDGE_HAS_RM_SF = "has_representation_model_sf"
 _EDGE_HAS_RM_DOC = "has_representation_model_doc"
@@ -46,11 +47,12 @@ _EDGE_HAS_DOCUMENTATION = "has_documentation"
 _EDGE_HAS_VISUAL_REF = "has_visual_reference"
 
 # Attach-edge candidates for the Document facet, most specific first. The
-# datamodel decides which one applies (validate_connection): an Extractor target
-# takes ``extracted_from`` (the paradata chain), a stratigraphic node takes
-# ``has_documentation``, any other paradata node takes ``has_visual_reference``.
-_DOC_ATTACH_EDGES = (_EDGE_EXTRACTED_FROM, _EDGE_HAS_DOCUMENTATION,
-                     _EDGE_HAS_VISUAL_REF)
+# datamodel decides which one applies (validate_connection): an Extractor takes
+# ``extracted_from`` (the paradata chain), a stratigraphic node OR a PropertyNode
+# takes ``has_documentation`` (P70i). BUGFIX-CONN3: ``has_visual_reference`` is
+# NO LONGER a Document-attach edge — after CONN2 it targets a LinkNode image, so
+# a visual reference has its own home in :func:`hat_as_visual_resource`, not here.
+_DOC_ATTACH_EDGES = (_EDGE_EXTRACTED_FROM, _EDGE_HAS_DOCUMENTATION)
 
 
 def _has_edge(graph: Any, src: str, tgt: str, edge_type: str) -> bool:
@@ -309,8 +311,9 @@ def attach_candidates(facet: str, graph: Any) -> List[Dict[str, Any]]:
     ``has_first_epoch``); ``rmsf`` yields Special Finds, ``rmdoc`` the nodes a
     RMDoc can be instantiated from (Document / Extractor / Combiner), and
     ``document`` the nodes that can point at a Document (Extractor → the
-    paradata chain, stratigraphic → documentation, other paradata → visual
-    reference)."""
+    paradata chain, stratigraphic node or PropertyNode → documentation). A
+    visual reference is NOT a Document attach (CONN2/CONN3): it targets a
+    LinkNode image, see :func:`hat_as_visual_resource`."""
     facet = (facet or "").lower()
     if facet not in _FACET_ATTACH_EDGES:
         raise ValueError(f"unknown facet {facet!r} (expected one of {FACETS})")
@@ -501,10 +504,11 @@ def hat_as_document(target_graph: Any, resource_id: str, *, shelf: Any = None,
     ``doc_id`` naming an EXISTING DocumentNode reuses it — that is how EMTools
     keeps ONE document shape (``create_master_document_node`` builds the node,
     this op wires the hinge). ``attach_to`` picks its edge from the datamodel:
-    an Extractor gets ``extracted_from``, a stratigraphic node
-    ``has_documentation`` (P70i), another paradata node
-    ``has_visual_reference``. Reuse-not-duplicate + idempotent. Returns
-    ``{doc_id, resource_id, created, attached, attach_edge}``."""
+    an Extractor gets ``extracted_from``, a stratigraphic node OR a PropertyNode
+    ``has_documentation`` (P70i). BUGFIX-CONN3: a Document is NOT attached via
+    ``has_visual_reference`` any more — a visual reference now targets a LinkNode
+    image (see :func:`hat_as_visual_resource`). Reuse-not-duplicate + idempotent.
+    Returns ``{doc_id, resource_id, created, attached, attach_edge}``."""
     from ..nodes.document_node import DocumentNode
 
     def _factory(nid: str, r: Any) -> Any:
@@ -531,6 +535,45 @@ def hat_as_document(target_graph: Any, resource_id: str, *, shelf: Any = None,
 
     return {"doc_id": doc.node_id, "resource_id": resource_id, "created": created,
             "attached": attached, "attach_edge": attach_edge}
+
+
+def hat_as_visual_resource(target_graph: Any, resource_id: str, *,
+                           shelf: Any = None,
+                           attach_to: Optional[str] = None) -> Dict[str, Any]:
+    """Reference a shelf resource as a **visual reference** — the image a
+    property is illustrated by.
+
+    This is the home of ``has_visual_reference`` after BUGFIX-CONN2: the edge no
+    longer points at a source Document (E31) but at the resource-layer image
+    node itself — the **LinkNode** (E73 Information Object, co-typed E36 Visual
+    Item on RDF export). Unlike :func:`hat_as_representation_model` /
+    :func:`hat_as_document`, no facet node is created: the visual resource IS the
+    Resource (LinkNode), so this op only references it into ``target_graph`` (the
+    R0 hinge) and, when ``attach_to`` names a **PropertyNode**, wires
+    ``PropertyNode ─has_visual_reference→ LinkNode`` (P138i).
+
+    The datamodel gates the attach (``_attach`` → ``connection_allowed``): a
+    non-PropertyNode ``attach_to`` is REFUSED (``attached=False``), never
+    degraded to a generic edge — the visual reference stays honest. The LinkNode
+    is protected from orphan cleanup by the same reference-check as every other
+    hat (:func:`remove_resource` keeps a resource referenced by any
+    non-acquisition node). Reuse-not-duplicate + idempotent.
+
+    Returns ``{resource_id, created, attached, attach_edge}`` (``created`` = the
+    resource was newly referenced into this graph)."""
+    existing = target_graph.find_node_by_id(resource_id)
+    res = _reference_resource(target_graph, resource_id, shelf)  # raises if absent
+    created = existing is None
+
+    attached, attach_edge = False, ""
+    if attach_to and _attach(
+            target_graph, attach_to, res.node_id, _EDGE_HAS_VISUAL_REF):
+        attached, attach_edge = True, _EDGE_HAS_VISUAL_REF
+
+    return {"resource_id": resource_id,
+            "created": created,
+            "attached": attached,
+            "attach_edge": attach_edge}
 
 
 # ── remove with acquisition-event cleanup (C2) ──────────────────────────────────

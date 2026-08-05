@@ -4,6 +4,68 @@ All notable changes to **s3dgraphy** are documented here.
 
 ## [Unreleased]
 
+### Changed (2026-08-05 — BUGFIX-CONN3, connections datamodel → v1.6.7)
+- Closes the two silent follow-ups of CONN2 (a legacy import edge and a shelf
+  attach that both went quietly wrong once `has_visual_reference` moved to a
+  LinkNode target).
+- **Legacy import** (`import_graphml.enhance_edge_type`): a dashed
+  `PropertyNode → DocumentNode` connector now imports as **`has_documentation`**
+  (P70i_is_documented_in — the property is documented in the source), not the
+  now-illegal `has_visual_reference`. The rarer `CombinerNode / bare ParadataNode
+  → DocumentNode` is left as **`generic_connection` with a warning** (no honest
+  single reading; a combiner cites no document and the DTC evidence chain
+  property←combiner←extractor→document is NOT synthesised at import). Zero illegal
+  edges produced.
+- **Domain choice (declared)**: `has_documentation.source` was **widened** to add
+  **`PropertyNode`** (judicious — a property may be documented in a source; P70i
+  reads true). Extractor/other rules unchanged. Alternative considered and
+  rejected: leaving PropertyNode→Document as warning+generic — but the honest
+  typed reading (has_documentation) is available and preferred, so only the rarer
+  combiner/paradata case falls back to generic. `em.ttl` needs no change
+  (has_documentation maps directly to crm:P70i, no em: subproperty declared).
+- **Shelf** (`shelf/core.py`): `hat_as_document` no longer offers
+  `has_visual_reference` (`_DOC_ATTACH_EDGES` = extracted_from, has_documentation);
+  a Document attaches via documentation/extraction, and a PropertyNode→Document
+  now attaches as `has_documentation`. New **`hat_as_visual_resource`** attaches a
+  **LinkNode** image via `has_visual_reference` from a PropertyNode — the correct
+  home of a visual reference after CONN2 (no facet node: the visual resource IS
+  the LinkNode). Datamodel-gated (a non-Property source is refused, not degraded);
+  orphan cleanup via the shared `remove_resource` reference-check. Exposed on
+  `api` and `shelf.__init__`.
+- Tests: `test_importer_edge_hygiene` updated (property→document = documentation;
+  combiner→document = generic+warning); `test_shelf_facets` +4
+  (visual-resource attach / refuse-non-property / idempotent; document never uses
+  visual_reference). Suite green, baseline FAILED unchanged.
+
+### Changed (2026-08-05 — BUGFIX-CONN2, connections datamodel → v1.6.6)
+- **`has_visual_reference` source/target corrected** (closes the two open domain
+  questions from BUGFIX-CONN; E.D. 2026-08-05):
+  - **SOURCE** narrowed from `[PropertyNode, ExtractorNode, CombinerNode,
+    ParadataNode]` to exactly **`[PropertyNode]`**. Only a property (an asserted
+    quale) is what a visual reference illustrates. Because Extractor/Combiner/
+    Document are all subclasses of `ParadataNode`, dropping the generic parent
+    now excludes them by class hierarchy. The extractor/combiner `denied_edges`
+    added in v1.6.5 become redundant for this edge but are KEPT as a defensive
+    guard (they still bite if the source is ever broadened back to `ParadataNode`).
+  - **TARGET** changed from `[DocumentNode]` to **`[LinkNode]`** (the resource-layer
+    image node, E73 Information Object / `ExternalResourceReference` — the same
+    P67 hinge RM/RMDoc use via `has_linked_resource`). The oddity was a visual
+    reference pointing at a source-document (E31); it now points at a visual
+    resource, keeping `DocumentNode` = *fonte*.
+- **CIDOC**: mapping stays `P138i_has_representation` with the target co-typed
+  `E36_Visual_Item`. Now range-consistent: `E36 ⊂ E73` (LinkNode's base class),
+  where it was strained for an `E31` Document. `rdf_exporter` co-typing is
+  target-agnostic → no logic change, comment updated. `em.ttl`
+  `em:hasVisualReference` domain `em:Paradata → em:Qualia`, range `E36` kept.
+  **CIDOC confirmation still owed to Felicetti** (E36 as target class, as for USNt).
+- **Follow-ups flagged** (need E.D. domain decisions, NOT silently rewired):
+  (a) `import_graphml.enhance_edge_type` still maps `PropertyNode/Combiner/
+  ParadataNode → DocumentNode ⇒ has_visual_reference` (legacy yEd heuristic, now
+  produces an edge the datamodel refuses); (b) `shelf.hat_as_document` lists
+  `has_visual_reference` among the Document-attach edges — it can no longer
+  validate (target is LinkNode), so a paradata attach silently no longer attaches;
+  a `hat_as_visual_resource(LinkNode)` + `has_visual_reference` path is the proper home.
+
 ### Added (2026-07-11 — .em.json v1 freeze)
 - **`.em.json` v1 native format** (frozen 2026-07-11): `exporter/emjson_exporter.py`
   (header with format semver, generator, datamodel_versions, ontology_versions;

@@ -1350,6 +1350,21 @@ def hat_as_document(target_graph: Graph, resource_id: str, *,
               geometry=geometry, mark_as_canonical=mark_as_canonical, attach_to=attach_to)
 
 
+def hat_as_visual_resource(target_graph: Graph, resource_id: str, *,
+                           shelf: Optional[Graph] = None,
+                           attach_to: Optional[str] = None) -> Dict[str, Any]:
+    """Reference a shelf resource as a VISUAL REFERENCE — the image a property is
+    illustrated by. After BUGFIX-CONN2 ``has_visual_reference`` targets the
+    resource-layer image (a LinkNode, co-typed E36 Visual Item), not a source
+    Document. No facet node: the visual resource IS the Resource, so this only
+    references the LinkNode and, when ``attach_to`` names a **PropertyNode**,
+    wires ``PropertyNode ─has_visual_reference→ LinkNode`` (P138i). A non-Property
+    ``attach_to`` is refused (``attached=False``), never degraded. Returns
+    ``{resource_id, created, attached, attach_edge}``."""
+    from .shelf import hat_as_visual_resource as _h
+    return _h(target_graph, resource_id, shelf=shelf, attach_to=attach_to)
+
+
 def remove_shelf_resource(graph: Graph, resource_id: str) -> Dict[str, Any]:
     """Remove a shelf resource + clean up its now-orphan acquisition event (kept
     if the resource is still referenced, e.g. hatted). Returns

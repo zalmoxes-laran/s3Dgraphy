@@ -78,14 +78,16 @@ def test_the_message_says_what_the_datamodel_would_allow():
 
 
 def test_exactly_one_candidate_is_named():
-    """Document → Document has a single reading (`has_visual_reference`): say
-    which, so the author knows exactly what to re-draw."""
+    """Extractor → Document has a single reading (`extracted_from`): say which,
+    so the author knows exactly what to re-draw. (Since BUGFIX-CONN2 the former
+    example Document → Document `has_visual_reference` is gone — a visual
+    reference now goes Property → LinkNode, and has two readings.)"""
     g = Graph(graph_id="g")
+    g.add_node(ExtractorNode(node_id="x1", name="EX.1"))
     g.add_node(DocumentNode(node_id="d1", name="D.1"))
-    g.add_node(DocumentNode(node_id="d2", name="D.2"))
-    g.add_edge("e1", "d1", "d2", "generic_connection")
+    g.add_edge("e1", "x1", "d1", "generic_connection")
     msg = _has(state_warnings(g), DEGRADED)[0]
-    assert "allows exactly 'has_visual_reference'" in msg
+    assert "allows exactly 'extracted_from'" in msg
 
 
 def test_no_possible_relation_is_said_outright():
@@ -291,11 +293,11 @@ def test_a_degraded_edge_record_carries_the_candidates():
     from s3dgraphy.edges.connection_resolver import state_warning_records
 
     g = Graph(graph_id="g")
+    g.add_node(ExtractorNode(node_id="x1", name="EX.1"))
     g.add_node(DocumentNode(node_id="d1", name="D.1"))
-    g.add_node(DocumentNode(node_id="d2", name="D.2"))
-    g.add_edge("e1", "d1", "d2", "generic_connection")
+    g.add_edge("e1", "x1", "d1", "generic_connection")
     (record,) = state_warning_records(g)
-    assert record["candidates"] == ["has_visual_reference"]
+    assert record["candidates"] == ["extracted_from"]
 
 
 def test_the_strings_are_exactly_the_records_messages():

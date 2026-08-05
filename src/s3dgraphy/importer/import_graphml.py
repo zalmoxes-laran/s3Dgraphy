@@ -3454,14 +3454,33 @@ class GraphMLImporter:
                 edge_type = "combines"
                 # print(f"Enhanced to combines: CombinerNode -> ExtractorNode")
 
-            # Any OTHER paradata node -> DocumentNode. The extraction case above
-            # takes precedence; what is left (a PropertyNode, a Combiner, a bare
-            # ParadataNode pointing at a document) has exactly ONE relation the
-            # datamodel admits for those endpoints: has_visual_reference
-            # ("the element has an associated visual reference").
-            elif (isinstance(source_node, (PropertyNode, CombinerNode, ParadataNode))
+            # PropertyNode -> DocumentNode. BUGFIX-CONN3: this is read as
+            # has_documentation (P70i_is_documented_in) — the honest shortcut
+            # when a legacy yEd dashed connector links a property to a source
+            # document. It is NO LONGER has_visual_reference: CONN2 moved that to
+            # PropertyNode->LinkNode (a visual reference illustrates via an image
+            # resource, not a source document). has_documentation.source was
+            # widened to include PropertyNode for exactly this reading (v1.6.7).
+            elif (isinstance(source_node, PropertyNode)
                   and isinstance(target_node, DocumentNode)):
-                edge_type = "has_visual_reference"
+                edge_type = "has_documentation"
+
+            # CombinerNode / bare ParadataNode -> DocumentNode. BUGFIX-CONN3:
+            # there is no honest single relation here — a combiner aggregates
+            # extractors and cites no document, and the modern evidence path is
+            # the DTC chain (property<-combiner<-extractor->document), which the
+            # importer cannot synthesise. Rather than assert a relation the model
+            # does not support (and NOT the now-illegal has_visual_reference), the
+            # edge is left as a generic_connection with a warning so the author
+            # can reclassify it; the import stays non-destructive.
+            elif (isinstance(source_node, (CombinerNode, ParadataNode))
+                  and isinstance(target_node, DocumentNode)):
+                self.graph.add_warning(
+                    f"{source_type} -> DocumentNode has no single datamodel "
+                    f"relation (a combiner/paradata does not 'document' a "
+                    f"source); left as generic_connection — reclassify if needed."
+                )
+                edge_type = "generic_connection"
         
         # Post-processing per generic_connection
         elif edge_type == "generic_connection":
