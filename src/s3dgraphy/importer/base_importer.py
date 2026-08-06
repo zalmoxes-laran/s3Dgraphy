@@ -21,7 +21,8 @@ class BaseImporter(ABC):
     Supports both mapped and automatic property creation modes.
     """
     def __init__(self, filepath: str, mapping_name: str = None, id_column: str = None,
-                overwrite: bool = False, filters: Optional[Dict[str, Any]] = None):
+                overwrite: bool = False, filters: Optional[Dict[str, Any]] = None,
+                graph: Optional[Graph] = None):
         """
         Initialize the importer.
 
@@ -68,9 +69,13 @@ class BaseImporter(ABC):
 
         # ✅ AGGIUNTA: Cache l'ID column una sola volta
         self._cached_id_column = None
-        
-        # Il grafo verrà inizializzato dalla classe figlia
-        #self.graph = None
+
+        # BUGFIX-XLSXIMPORTER (2026-08-06): initialize self.graph HERE, exactly as
+        # import_graphml.py:134 — accept an existing graph (import INTO it) or make
+        # a new one. `parse()` uses self.graph.add_node/add_edge/find_node_by_id,
+        # but this was left commented ("initialized by the child class") and the
+        # XLSX importer never did, so parse() raised `no attribute 'graph'`.
+        self.graph = graph if graph is not None else Graph(graph_id="imported_graph")
         self.warnings = []
 
     def _load_mapping(self, mapping_name: str) -> Dict[str, Any]:
@@ -354,7 +359,20 @@ class BaseImporter(ABC):
                     strat_type = excel_type
 
             node_class = get_stratigraphic_node_class(strat_type)
-            
+            # BUGFIX-XLSXIMPORTER (2026-08-06): honour the node_type DECLARED on the
+            # ID column (e.g. a source_list maps ID → DocumentNode). Resolved by
+            # class name from Node.node_type_map. A stratigraphic ID column keeps
+            # the long-standing get_stratigraphic_node_class default, so existing
+            # mappings (usm / pyarchinit / generic) are unchanged.
+            _id_nt = self._get_node_type_from_id_column()
+            if _id_nt and _id_nt not in ('US', 'StratigraphicUnit', 'StratigraphicNode'):
+                from ..nodes.base_node import Node
+                _resolved = next(
+                    (c for c in Node.node_type_map.values()
+                     if getattr(c, '__name__', None) == _id_nt), None)
+                if _resolved is not None:
+                    node_class = _resolved
+
             import uuid
             new_node = node_class(
                 node_id=str(uuid.uuid4()),
@@ -386,8 +404,8 @@ class BaseImporter(ABC):
         
         # Use default stratigraphic node class
         node_class = get_stratigraphic_node_class('US')
-        
-        # ✅ Try to find by name first (for existing graph enrichment)  
+
+        # ✅ Try to find by name first (for existing graph enrichment)
         existing_node = self._find_node_by_name(node_id)
 
         # If not found by name, try by ID (backward compatibility)

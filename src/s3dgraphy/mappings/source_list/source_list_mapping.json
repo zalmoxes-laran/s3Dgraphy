@@ -7,7 +7,7 @@
     "table_settings": {
         "format_type": "xlsx",
         "sheet_name": "Sources",
-        "start_row": 2
+        "start_row": 1
     },
     "column_mappings": {
         "ID": {

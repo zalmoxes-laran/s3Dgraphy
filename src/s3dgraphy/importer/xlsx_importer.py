@@ -17,7 +17,7 @@ class XLSXImporter(BaseImporter):
     """
     
     def __init__(self, filepath: str, mapping_name: str = None, id_column: str = None,
-                 overwrite: bool = False, filters=None):
+                 overwrite: bool = False, filters=None, graph=None):
         """
         Initialize the XLSX importer.
 
@@ -30,7 +30,8 @@ class XLSXImporter(BaseImporter):
                 restrict the imported rows. AND semantics. Filter column
                 names must appear in the mapping's ``column_mappings``.
         """
-        super().__init__(filepath, mapping_name, id_column, overwrite, filters=filters)
+        super().__init__(filepath, mapping_name, id_column, overwrite,
+                         filters=filters, graph=graph)
         self._validate_settings()
 
     def _validate_settings(self):
