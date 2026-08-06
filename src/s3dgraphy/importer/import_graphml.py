@@ -333,6 +333,26 @@ class GraphMLImporter:
                         if key in vocabolario:
                             self.graph.attributes[key] = vocabolario[key]
 
+                    # BUGFIX-CANVAS-IMPORT (2026-08-06): the header metadata above
+                    # go into graph.ATTRIBUTES — where s3Dgraphy's own resolver
+                    # reads them (builtin_rules._author_graph_level) — but the
+                    # emjson exporter serialises graph.DATA only, so they never
+                    # reached EMStudio. Also write the CANONICAL canvas-scope keys
+                    # into graph.data: author_name (composed display), license,
+                    # embargo — the EXACT fields EMStudio's CANVAS1 writes and
+                    # funnel.ts::readScopeValue reads (its g.data[...] canvas tier).
+                    # ONE read per consumer (s3Dgraphy: attributes; EMStudio: data);
+                    # both written here so neither is stale (DP-40).
+                    _an = vocabolario.get('author_name', '')
+                    _as = vocabolario.get('author_surname', '')
+                    _display = f"{_an} {_as}".strip()
+                    if _display:
+                        self.graph.data['author_name'] = _display
+                    if 'license' in vocabolario:
+                        self.graph.data['license'] = vocabolario['license']
+                    if 'embargo' in vocabolario:
+                        self.graph.data['embargo'] = vocabolario['embargo']
+
                     # Store the clean graph name (without vocabulary)
                     if stringa_pulita:
                         self.graph.attributes['graph_label'] = stringa_pulita
@@ -1952,8 +1972,14 @@ class GraphMLImporter:
             epoch_node = EpochNode(
                 node_id=uuid_id,
                 name=f"temp_{i}",  # Nome temporaneo con indice per debug
-                start_time=-10000,
-                end_time=10000
+                # BUGFIX-EPOCH (2026-08-06): UNDATED until the label proves a real
+                # date. A fabricated -10000/10000 made every undated epoch read as
+                # "10000 BC", so it sank to the bottom of a date sort and the
+                # from-sketch relayout re-imposed that order over a manual move.
+                # None → the emjson exporter omits start_time/end_time → the
+                # consumer keeps the epoch in document/manual order.
+                start_time=None,
+                end_time=None
             )
         
             epoch_node.attributes['original_id'] = original_id
@@ -2000,18 +2026,16 @@ class GraphMLImporter:
                         stringa_pulita, vocabolario = self.estrai_stringa_e_vocabolario(label_text)
                         epoch_node.set_name(stringa_pulita)
                         
-                        # Gestisci i valori 'XX' per start_time
-                        start_value = vocabolario.get('start', -10000)
-                        if isinstance(start_value, str) and start_value.lower() in ['xx', 'x']:
-                            start_value = 10000
-                            # print(f"Trovato valore placeholder 'XX' per start_time in epoca '{stringa_pulita}', usando valore 10000")
-                        
-                        # Gestisci i valori 'XX' per end_time
-                        end_value = vocabolario.get('end', 10000)
-                        if isinstance(end_value, str) and end_value.lower() in ['xx', 'x']:
-                            end_value = 10000
-                            # print(f"Trovato valore placeholder 'XX' per end_time in epoca '{stringa_pulita}', usando valore 10000")
-                        
+                        # BUGFIX-EPOCH (2026-08-06): keep the epoch UNDATED unless
+                        # the label carries a real NUMERIC date. A missing key, the
+                        # 'XX'/'X' placeholder, or any non-numeric value all mean
+                        # "no date" → None, NEVER a fabricated -10000/10000. Real
+                        # numeric dates (estrai_stringa_e_vocabolario returns int)
+                        # pass through unchanged, so dated epochs are untouched.
+                        start_raw = vocabolario.get('start')
+                        end_raw = vocabolario.get('end')
+                        start_value = start_raw if isinstance(start_raw, (int, float)) else None
+                        end_value = end_raw if isinstance(end_raw, (int, float)) else None
                         epoch_node.set_start_time(start_value)
                         epoch_node.set_end_time(end_value)
                         #print(f"Aggiornato nodo epoca: '{stringa_pulita}' (start={start_value}, end={end_value})")
@@ -2116,7 +2140,7 @@ class GraphMLImporter:
             if 'embargo' in vocabolario:
                 # print(f"Found embargo: {vocabolario['embargo']}")
                 graph.data['embargo_until'] = vocabolario['embargo']
-                    
+
             # Gestisce la licenza se presente
             if 'license' in vocabolario:
                 # print(f"Found license: {vocabolario['license']}")

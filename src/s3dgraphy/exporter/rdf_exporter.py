@@ -604,9 +604,13 @@ class RDFExporter:
         license_val = data.get("license")
         if license_val:
             ctx.add((graph_iri, CRM.P104_is_subject_to, Literal(license_val)))
-        embargo_until = data.get("embargo_until")
-        if embargo_until:
-            ctx.add((graph_iri, EM.embargoUntil, Literal(embargo_until)))
+        # BUGFIX-CANVAS-IMPORT (2026-08-06): the canonical canvas-scope key is
+        # `embargo` (what CANVAS1 writes and the funnel reads); `embargo_until` is
+        # the legacy key. Read the canonical first, fall back to legacy so old
+        # em.json still exports. ONE read, one meaning.
+        embargo = data.get("embargo") or data.get("embargo_until")
+        if embargo:
+            ctx.add((graph_iri, EM.embargoUntil, Literal(embargo)))
 
         # Nodes
         for node in g.nodes:

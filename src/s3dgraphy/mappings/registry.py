@@ -15,7 +15,10 @@ class MappingRegistry:
         self._mapping_directories = {
             'pyarchinit': [],
             'emdb': [],
-            'generic': []
+            'generic': [],
+            # AUX-COMPLETE (2026-08-06, DP-61): source_list — a bibliographic list
+            # of sources mapped into DocumentNodes (the Documents sheet of em_data).
+            'source_list': []
         }
         self._initialize_builtin_paths()
     
@@ -46,7 +49,10 @@ class MappingRegistry:
         self._mapping_directories['generic'].append(
             os.path.join(base_path, 'generic')
         )
-    
+        self._mapping_directories['source_list'].append(
+            os.path.join(base_path, 'source_list')
+        )
+
     def add_mapping_directory(self, mapping_type: str, directory: str, priority: str = 'high'):
         """
         Add a custom mapping directory.

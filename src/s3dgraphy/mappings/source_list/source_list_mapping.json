@@ -1,0 +1,34 @@
+{
+    "name": "Source list → Documents",
+    "description": "AUX-COMPLETE (DP-61): map a bibliographic source list (xlsx) into DocumentNodes — the Documents sheet of em_data. The ID column identifies each source (a DocumentNode); TITLE is carried as a property. The RICH bibliographic fields (FILENAME / YEAR / AUTHOR_IDS / ROLE / CONTENT_NATURE / GEOMETRY) map to DocumentNode attributes, whose schema extension is DP-58 — left to E.D.; for now only ID + TITLE are mapped, the rest is a declared follow-up.",
+    "version": "1.6.0",
+    "id_column": "ID",
+    "name_column": "TITLE",
+    "table_settings": {
+        "format_type": "xlsx",
+        "sheet_name": "Sources",
+        "start_row": 2
+    },
+    "column_mappings": {
+        "ID": {
+            "node_type": "DocumentNode",
+            "is_id": true,
+            "display_name": "Document ID",
+            "description": "Stable identifier of the source document."
+        },
+        "TITLE": {
+            "node_type": "PropertyNode",
+            "property_name": "title",
+            "display_name": "Title",
+            "description": "Title of the source."
+        }
+    },
+    "relations": [
+        {
+            "source_column": "ID",
+            "target_column": "TITLE",
+            "edge_type": "has_property"
+        }
+    ],
+    "allowed_formats": ["pdf", "doc", "docx", "txt", "jpg", "jpeg", "png"]
+}

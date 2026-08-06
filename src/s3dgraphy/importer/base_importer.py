@@ -84,7 +84,8 @@ class BaseImporter(ABC):
         from ..mappings import mapping_registry
         
         # Try different mapping types in order
-        mapping_types = ['pyarchinit', 'emdb', 'generic']
+        # (AUX-COMPLETE 2026-08-06: source_list added — bibliographic sources → Documents)
+        mapping_types = ['pyarchinit', 'emdb', 'generic', 'source_list']
         
         for mapping_type in mapping_types:
             logger.debug(f"Trying mapping type: {mapping_type}")
