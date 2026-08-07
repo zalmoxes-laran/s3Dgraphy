@@ -13,7 +13,7 @@ rdflib = pytest.importorskip("rdflib")
 
 from s3dgraphy.graph import Graph
 from s3dgraphy.nodes import (
-    DTCProcessNode, AuthorNode, LinkNode, RepresentationModelNode,
+    DTCProcessNode, AuthorNode, ResourceNode, RepresentationModelNode,
 )
 from s3dgraphy.exporter.rdf_exporter import RDFExporter, DEFAULT_BASE_URI
 
@@ -22,9 +22,9 @@ PROV = "http://www.w3.org/ns/prov#"
 CRM = "http://www.cidoc-crm.org/cidoc-crm/"
 
 
-def _resource(node_id, name, kind, url) -> LinkNode:
-    """A DTC Resource (input or output): a LinkNode carrying dtc_kind + resource_type."""
-    lk = LinkNode(node_id, name=name, url=url)
+def _resource(node_id, name, kind, url) -> ResourceNode:
+    """A DTC Resource (input or output): a ResourceNode carrying dtc_kind + resource_type."""
+    lk = ResourceNode(node_id, name=name, url=url)
     lk.data["dtc_kind"] = kind
     lk.data["resource_type"] = kind
     return lk
@@ -113,7 +113,7 @@ def test_dtc_emjson_roundtrip():
     by = {n.node_id: n for n in g2.nodes}
     # input + output are both Resources (links) carrying dtc_kind + resource_type
     for nid, kind in (("in1", "photo"), ("out1", "mesh")):
-        assert by[nid].node_type == "link", nid
+        assert by[nid].node_type == "resource", nid
         assert (by[nid].data or {}).get("dtc_kind") == kind, nid
         assert (by[nid].data or {}).get("resource_type") == kind, nid
     assert (by["proc1"].data or {}).get("dtc_kind") == "transformation"

@@ -1,9 +1,9 @@
 """Shelf substrate ops (pure; no UI, no connectors).
 
-A shelf is a :class:`~s3dgraphy.graph.Graph` whose nodes are LinkNode resources
+A shelf is a :class:`~s3dgraphy.graph.Graph` whose nodes are ResourceNode resources
 (R0 stable IDs). It self-identifies via ``graph.data["em_collection"] == "shelf"``
 so a standalone shelf file and a multigraph member are the same thing. Reuses the
-resource layer (LinkNode = stable ID) and the em.json I/O.
+resource layer (ResourceNode = stable ID) and the em.json I/O.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ SHELF_COLLECTION = "ShelfGraph"
 # conventional multigraph id for the per-study shelf (any id is accepted).
 DEFAULT_SHELF_ID = "shelf"
 
-_LINK_TYPE = "link"
+_LINK_TYPE = "resource"
 _RM_TYPE = "representation_model"
 _RMSF_TYPE = "representation_model_sf"
 _RMDOC_TYPE = "representation_model_doc"
@@ -27,7 +27,7 @@ _ACQ_TYPE = "dtc_acquisition"
 # Facet edges — ALL verified in the connections datamodel.
 #
 # The P67 hinge is invariant across every facet:
-#   facet ─has_linked_resource→ LinkNode        (P67_refers_to, the R0 hinge)
+#   facet ─has_linked_resource→ ResourceNode        (P67_refers_to, the R0 hinge)
 # What changes per facet is the edge towards *what it represents / documents*:
 #   RM       ─has_first_epoch→ EpochNode         (P10_falls_within, first epoch)
 #   RM       ─survive_in_epoch→ EpochNode        (P132, the further epochs)
@@ -36,7 +36,7 @@ _ACQ_TYPE = "dtc_acquisition"
 #   Extractor ─extracted_from→ Document          (P67 / J7 — the paradata entry)
 #   strat    ─has_documentation→ Document        (P70i_is_documented_in)
 #   property ─has_documentation→ Document        (P70i — CONN3 widening)
-#   property ─has_visual_reference→ LinkNode     (P138i — CONN2; hat_as_visual_resource)
+#   property ─has_visual_reference→ ResourceNode     (P138i — CONN2; hat_as_visual_resource)
 _EDGE_HAS_LINKED = "has_linked_resource"
 _EDGE_HAS_RM_SF = "has_representation_model_sf"
 _EDGE_HAS_RM_DOC = "has_representation_model_doc"
@@ -50,7 +50,7 @@ _EDGE_HAS_VISUAL_REF = "has_visual_reference"
 # datamodel decides which one applies (validate_connection): an Extractor takes
 # ``extracted_from`` (the paradata chain), a stratigraphic node OR a PropertyNode
 # takes ``has_documentation`` (P70i). BUGFIX-CONN3: ``has_visual_reference`` is
-# NO LONGER a Document-attach edge — after CONN2 it targets a LinkNode image, so
+# NO LONGER a Document-attach edge — after CONN2 it targets a ResourceNode image, so
 # a visual reference has its own home in :func:`hat_as_visual_resource`, not here.
 _DOC_ATTACH_EDGES = (_EDGE_EXTRACTED_FROM, _EDGE_HAS_DOCUMENTATION)
 
@@ -108,14 +108,14 @@ def add_to_shelf(shelf: Any, locator: str, *, resource_id: Optional[str] = None,
     """Add a resource to the shelf and return its entry.
 
     Reuse-not-duplicate: if ``resource_id`` is already present, the existing
-    LinkNode is updated (locator/origin), not duplicated. ``origin`` is the
+    ResourceNode is updated (locator/origin), not duplicated. ``origin`` is the
     capability/origin envelope (``repo``, ``capabilities``, ``scope``, …) preserved
     for downstream tier badges."""
-    from ..nodes.link_node import LinkNode
+    from ..nodes.resource_node import ResourceNode
     rid = resource_id or str(uuid.uuid4())
     node = shelf.find_node_by_id(rid)
     if node is None or getattr(node, "node_type", None) != _LINK_TYPE:
-        node = LinkNode(node_id=rid, name=name or "Unnamed Resource",
+        node = ResourceNode(node_id=rid, name=name or "Unnamed Resource",
                         url=locator or "", url_type=url_type or "",
                         description=description or "")
         shelf.add_node(node)
@@ -168,7 +168,7 @@ def instantiate_from_shelf(shelf: Any, resource_id: str, target_graph: Any):
     under a new ID — and its capability/origin is preserved. If ``target_graph``
     already references the ID, that existing node is returned (no duplicate). The
     resource STAYS on the shelf (the library keeps it). Returns the target node."""
-    from ..nodes.link_node import LinkNode
+    from ..nodes.resource_node import ResourceNode
     src = shelf.find_node_by_id(resource_id)
     if src is None or getattr(src, "node_type", None) != _LINK_TYPE:
         raise ValueError(f"{resource_id!r} is not a resource in the shelf")
@@ -176,7 +176,7 @@ def instantiate_from_shelf(shelf: Any, resource_id: str, target_graph: Any):
     if existing is not None:
         return existing  # already referenced — reuse, do not duplicate
     sd = _data(src)
-    node = LinkNode(node_id=resource_id,  # SAME stable ID = the reference
+    node = ResourceNode(node_id=resource_id,  # SAME stable ID = the reference
                     name=str(getattr(src, "name", "") or resource_id),
                     url=sd.get("url", "") or "",
                     url_type=sd.get("url_type", "") or "",
@@ -214,7 +214,7 @@ def _rm_referencing(graph: Any, resource_id: str):
 
 
 def _reference_resource(target_graph: Any, resource_id: str, shelf: Any):
-    """Reference the Resource (LinkNode) into ``target_graph`` by stable ID — from
+    """Reference the Resource (ResourceNode) into ``target_graph`` by stable ID — from
     ``shelf`` when given, else it must already be present. The R0 hinge."""
     if shelf is not None:
         return instantiate_from_shelf(shelf, resource_id, target_graph)
@@ -313,7 +313,7 @@ def attach_candidates(facet: str, graph: Any) -> List[Dict[str, Any]]:
     ``document`` the nodes that can point at a Document (Extractor → the
     paradata chain, stratigraphic node or PropertyNode → documentation). A
     visual reference is NOT a Document attach (CONN2/CONN3): it targets a
-    LinkNode image, see :func:`hat_as_visual_resource`."""
+    ResourceNode image, see :func:`hat_as_visual_resource`."""
     facet = (facet or "").lower()
     if facet not in _FACET_ATTACH_EDGES:
         raise ValueError(f"unknown facet {facet!r} (expected one of {FACETS})")
@@ -506,7 +506,7 @@ def hat_as_document(target_graph: Any, resource_id: str, *, shelf: Any = None,
     this op wires the hinge). ``attach_to`` picks its edge from the datamodel:
     an Extractor gets ``extracted_from``, a stratigraphic node OR a PropertyNode
     ``has_documentation`` (P70i). BUGFIX-CONN3: a Document is NOT attached via
-    ``has_visual_reference`` any more — a visual reference now targets a LinkNode
+    ``has_visual_reference`` any more — a visual reference now targets a ResourceNode
     image (see :func:`hat_as_visual_resource`). Reuse-not-duplicate + idempotent.
     Returns ``{doc_id, resource_id, created, attached, attach_edge}``."""
     from ..nodes.document_node import DocumentNode
@@ -545,16 +545,16 @@ def hat_as_visual_resource(target_graph: Any, resource_id: str, *,
 
     This is the home of ``has_visual_reference`` after BUGFIX-CONN2: the edge no
     longer points at a source Document (E31) but at the resource-layer image
-    node itself — the **LinkNode** (E73 Information Object, co-typed E36 Visual
+    node itself — the **ResourceNode** (E73 Information Object, co-typed E36 Visual
     Item on RDF export). Unlike :func:`hat_as_representation_model` /
     :func:`hat_as_document`, no facet node is created: the visual resource IS the
-    Resource (LinkNode), so this op only references it into ``target_graph`` (the
+    Resource (ResourceNode), so this op only references it into ``target_graph`` (the
     R0 hinge) and, when ``attach_to`` names a **PropertyNode**, wires
-    ``PropertyNode ─has_visual_reference→ LinkNode`` (P138i).
+    ``PropertyNode ─has_visual_reference→ ResourceNode`` (P138i).
 
     The datamodel gates the attach (``_attach`` → ``connection_allowed``): a
     non-PropertyNode ``attach_to`` is REFUSED (``attached=False``), never
-    degraded to a generic edge — the visual reference stays honest. The LinkNode
+    degraded to a generic edge — the visual reference stays honest. The ResourceNode
     is protected from orphan cleanup by the same reference-check as every other
     hat (:func:`remove_resource` keeps a resource referenced by any
     non-acquisition node). Reuse-not-duplicate + idempotent.

@@ -10,7 +10,7 @@ for stratigraphic units). They never create new top-level entities
 by themselves: they only
 
 1. add **enrichment child nodes and edges** (e.g. ``PropertyNode``
-   children added by emdb, ``LinkNode`` children added by DosCo),
+   children added by emdb, ``ResourceNode`` children added by DosCo),
 2. update **attributes on the host node** (e.g. DosCo setting
    ``DocumentNode.url``, sources-list setting
    ``author / license / embargo``).

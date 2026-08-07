@@ -12,7 +12,7 @@ import pytest
 
 from s3dgraphy import api
 from s3dgraphy.graph import Graph
-from s3dgraphy.nodes.link_node import LinkNode
+from s3dgraphy.nodes.resource_node import ResourceNode
 from s3dgraphy.resources import (
     Location,
     PassthroughBackend,
@@ -33,7 +33,7 @@ def _graph_with(*link_nodes):
 
 # ── stable ID ─────────────────────────────────────────────────────────────────
 def test_stable_id_is_node_uuid():
-    n = LinkNode(node_id="res-uuid-123", name="R", url="/a/b.jpg")
+    n = ResourceNode(node_id="res-uuid-123", name="R", url="/a/b.jpg")
     assert stable_resource_id(n) == "res-uuid-123" == n.node_id
 
 
@@ -53,7 +53,7 @@ def test_classify_locator(locator, kind):
 
 # ── passthrough resolution ─────────────────────────────────────────────────────
 def test_resolve_via_passthrough_backend():
-    n = LinkNode(node_id="r1", name="Zenodo", url="https://zenodo.org/record/28917")
+    n = ResourceNode(node_id="r1", name="Zenodo", url="https://zenodo.org/record/28917")
     g = _graph_with(n)
     loc = api.resolve_resource(g, "r1")
     assert loc == {"kind": "http_url", "value": "https://zenodo.org/record/28917",
@@ -61,9 +61,9 @@ def test_resolve_via_passthrough_backend():
 
 
 def test_existing_url_linknode_resolves_unchanged():
-    # a plain url/path LinkNode (what every current graph holds) resolves to its
+    # a plain url/path ResourceNode (what every current graph holds) resolves to its
     # locator verbatim — non-breaking.
-    n = LinkNode(node_id="r2", name="Img", url="http://aton.ispc.it/image.jpeg")
+    n = ResourceNode(node_id="r2", name="Img", url="http://aton.ispc.it/image.jpeg")
     g = _graph_with(n)
     loc = api.resolve_resource(g, "r2")
     assert loc["value"] == "http://aton.ispc.it/image.jpeg"
@@ -73,21 +73,21 @@ def test_existing_url_linknode_resolves_unchanged():
 def test_local_path_existence_is_checked(tmp_path):
     f = tmp_path / "asset.obj"
     f.write_text("x")
-    present = LinkNode(node_id="present", name="A", url=str(f))
-    missing = LinkNode(node_id="missing", name="B", url=str(tmp_path / "nope.obj"))
+    present = ResourceNode(node_id="present", name="A", url=str(f))
+    missing = ResourceNode(node_id="missing", name="B", url=str(tmp_path / "nope.obj"))
     g = _graph_with(present, missing)
     assert api.resolve_resource(g, "present")["exists"] is True
     assert api.resolve_resource(g, "missing")["exists"] is False
 
 
 def test_resolve_unknown_resource_is_none():
-    g = _graph_with(LinkNode(node_id="r", name="R", url="/x"))
+    g = _graph_with(ResourceNode(node_id="r", name="R", url="/x"))
     assert api.resolve_resource(g, "does-not-exist") is None
 
 
 # ── list / register ────────────────────────────────────────────────────────────
 def test_list_resources_lists_linknodes_only():
-    n = LinkNode(node_id="lr", name="Doc", url="/docs/a.pdf")
+    n = ResourceNode(node_id="lr", name="Doc", url="/docs/a.pdf")
     g = _graph_with(n)
     resources = api.list_resources(g)
     ids = {r["id"] for r in resources}
@@ -102,7 +102,7 @@ def test_register_resource_assigns_stable_id_and_stores_locator():
     out = api.register_resource(g, "/store/new.glb", name="New")
     assert out["locator"] == "/store/new.glb" and out["kind"] == "local_path"
     node = g.find_node_by_id(out["id"])
-    assert isinstance(node, LinkNode) and node.url == "/store/new.glb"
+    assert isinstance(node, ResourceNode) and node.url == "/store/new.glb"
     # the assigned ID is the stable resource identity → resolvable immediately
     assert api.resolve_resource(g, out["id"])["value"] == "/store/new.glb"
 
@@ -134,8 +134,8 @@ def test_registry_accepts_second_backend_ahead_of_passthrough():
     # higher-priority backend is tried first
     assert [b.name for b in reg.backends()] == ["stub", "passthrough"]
 
-    n_owned = LinkNode(node_id="owned-1", name="O", url="/local/orig.obj")
-    n_other = LinkNode(node_id="other-1", name="P", url="/local/other.obj")
+    n_owned = ResourceNode(node_id="owned-1", name="O", url="/local/orig.obj")
+    n_other = ResourceNode(node_id="other-1", name="P", url="/local/other.obj")
     g = _graph_with(n_owned, n_other)
 
     owned = api.resolve_resource(g, "owned-1", registry=reg)

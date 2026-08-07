@@ -967,7 +967,7 @@ class RDFExporter:
             if reason:
                 ctx.add((node_iri, RDFS.comment, Literal(reason)))
 
-        elif node_type == "link":
+        elif node_type == "resource":
             url = data.get("url")
             url_type = data.get("url_type")
             if url:
@@ -977,7 +977,7 @@ class RDFExporter:
                     ctx.add((node_iri, RDFS.seeAlso, Literal(url)))
             if url_type:
                 ctx.add((node_iri, CRM.P2_has_type, Literal(url_type)))
-            # DTC OUTPUT (slice b): a LinkNode that is a DTC output — carries
+            # DTC OUTPUT (slice b): a ResourceNode that is a DTC output — carries
             # data.dtc_kind — is the produced digital object (Resource). Beyond
             # its E73/url it is a crmdig:D1_Digital_Object / prov:Entity (the
             # process prov:generated it via dtc_had_output) and its kind projects
@@ -1070,9 +1070,9 @@ class RDFExporter:
         # has_visual_reference co-typing: the target is asserted to be an
         # E36 Visual Item — required for the P138i_has_representation mapping
         # to be range-consistent. Since BUGFIX-CONN2 (2026-08-05) the target
-        # is the resource-layer image node (LinkNode, E73 Information Object)
+        # is the resource-layer image node (ResourceNode, E73 Information Object)
         # rather than the former E31 Document; E36 is a subclass of E73, so
-        # co-typing a LinkNode as E36 is now clean (it was strained for E31).
+        # co-typing a ResourceNode as E36 is now clean (it was strained for E31).
         # The co-typing is target-agnostic, so no logic change was needed —
         # only the semantics of what the target IS. See Appendix B.1 of the
         # WP3 coverage analysis and the CIDOC note for Felicetti (confirm E36

@@ -988,7 +988,7 @@ def scene_extent(graph: Graph) -> Optional[Dict[str, Any]]:
 # UUID; the ``url`` is the *current locator*, not the identity. A pluggable
 # resolver maps ID → a concrete Location. See :mod:`s3dgraphy.resources`.
 def _resource_locator(node: Any) -> str:
-    """The current locator of a resource node (LinkNode ``url``)."""
+    """The current locator of a resource node (ResourceNode ``url``)."""
     url = getattr(node, "url", None)
     if url is None:
         url = (getattr(node, "data", {}) or {}).get("url", "")
@@ -1002,7 +1002,7 @@ def list_resources(graph: Graph) -> List[Dict[str, Any]]:
     from .resources import classify_locator, stable_resource_id
     out: List[Dict[str, Any]] = []
     for node in getattr(graph, "nodes", []) or []:
-        if getattr(node, "node_type", None) != "link":
+        if getattr(node, "node_type", None) != "resource":
             continue
         locator = _resource_locator(node)
         out.append({
@@ -1094,13 +1094,13 @@ def resolve_resource(graph: Graph, resource_id: str, *, registry: Any = None
                      ) -> Optional[Dict[str, Any]]:
     """Resolve a resource's stable ID to a Location dict via the resolver.
 
-    Looks up the LinkNode by its ``node_id`` (the stable ID), reads its current
+    Looks up the ResourceNode by its ``node_id`` (the stable ID), reads its current
     locator, and asks the resolver registry (default: passthrough) to map it to
     a :class:`~s3dgraphy.resources.Location`. Returns the Location as a dict
     ``{kind, value, exists}``, or ``None`` if no such resource exists."""
     from .resources import default_registry
     node = graph.find_node_by_id(resource_id)
-    if node is None or getattr(node, "node_type", None) != "link":
+    if node is None or getattr(node, "node_type", None) != "resource":
         return None
     locator = _resource_locator(node)
     reg = registry if registry is not None else default_registry()
@@ -1114,17 +1114,17 @@ def register_resource(graph: Graph, locator: str, *, name: Optional[str] = None,
                       description: Optional[str] = None) -> Dict[str, Any]:
     """Register a resource: assign a stable ID and store a locator (R0 STUB).
 
-    Creates a LinkNode carrying a new stable ID (a UUID unless ``resource_id`` is
+    Creates a ResourceNode carrying a new stable ID (a UUID unless ``resource_id`` is
     given) and the ``locator`` as its current ``url``, and adds it to the graph.
     This is the *identity + locator* half only — real ingest (copying bytes into
     an FS-index or MinIO store) is R1/R2, which will resolve the same ID through
     their backends. Returns ``{id, locator, kind}``."""
     import uuid
-    from .nodes.link_node import LinkNode
+    from .nodes.resource_node import ResourceNode
     from .resources import classify_locator
 
     rid = resource_id or str(uuid.uuid4())
-    node = LinkNode(
+    node = ResourceNode(
         node_id=rid,
         name=name or "Unnamed Resource",
         url=locator or "",
@@ -1210,7 +1210,7 @@ def bake_dtc(graph: Graph, injector_id: str) -> Dict[str, int]:
 
 
 # ── Shelf substrate (Shelf v2 core: a collection of un-hatted resources) ───────
-# A shelf-graph is a Graph of LinkNode resources (R0 stable IDs), representable as
+# A shelf-graph is a Graph of ResourceNode resources (R0 stable IDs), representable as
 # a multigraph member OR a standalone reusable em.json. Each entry preserves its
 # capability/origin for downstream tier badges. See :mod:`s3dgraphy.shelf`.
 def new_shelf(graph_id: str = "shelf", name: Optional[str] = None) -> Graph:
@@ -1267,7 +1267,7 @@ def instantiate_from_shelf(shelf: Graph, resource_id: str,
 
 # Hatting facets. The ROLE picks the facet, and facets are NOT exclusive — the
 # same Resource can be an RM of an epoch AND a Document in a paradata chain. Every
-# facet keeps the P67 hinge (facet ─has_linked_resource→ LinkNode); what differs is
+# facet keeps the P67 hinge (facet ─has_linked_resource→ ResourceNode); what differs is
 # the edge towards what it represents / documents.
 def hat_facets() -> Tuple[str, ...]:
     """The hatting facet names: ``("rm", "rmsf", "rmdoc", "document")``."""
@@ -1355,10 +1355,10 @@ def hat_as_visual_resource(target_graph: Graph, resource_id: str, *,
                            attach_to: Optional[str] = None) -> Dict[str, Any]:
     """Reference a shelf resource as a VISUAL REFERENCE — the image a property is
     illustrated by. After BUGFIX-CONN2 ``has_visual_reference`` targets the
-    resource-layer image (a LinkNode, co-typed E36 Visual Item), not a source
+    resource-layer image (a ResourceNode, co-typed E36 Visual Item), not a source
     Document. No facet node: the visual resource IS the Resource, so this only
-    references the LinkNode and, when ``attach_to`` names a **PropertyNode**,
-    wires ``PropertyNode ─has_visual_reference→ LinkNode`` (P138i). A non-Property
+    references the ResourceNode and, when ``attach_to`` names a **PropertyNode**,
+    wires ``PropertyNode ─has_visual_reference→ ResourceNode`` (P138i). A non-Property
     ``attach_to`` is refused (``attached=False``), never degraded. Returns
     ``{resource_id, created, attached, attach_edge}``."""
     from .shelf import hat_as_visual_resource as _h

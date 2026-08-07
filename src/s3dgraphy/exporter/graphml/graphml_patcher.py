@@ -82,7 +82,7 @@ STRUCTURAL_EDGE_TYPES = {
 }
 
 # Node types that should not be exported to GraphML (internal to s3dgraphy)
-INTERNAL_NODE_TYPES = {'geo_position', 'link', 'semantic_shape',
+INTERNAL_NODE_TYPES = {'geo_position', 'resource', 'semantic_shape',
                        'representation_model', 'representation_model_doc',
                        'representation_model_special_find', 'author'}
 

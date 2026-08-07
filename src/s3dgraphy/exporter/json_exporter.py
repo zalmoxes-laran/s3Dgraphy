@@ -185,7 +185,7 @@ class JSONExporter:
                 source_node = graph.find_node_by_id(edge.edge_source)
                 target_node = graph.find_node_by_id(edge.edge_target)
                 
-                if source_node and target_node and target_node.node_type == "link":
+                if source_node and target_node and target_node.node_type == "resource":
                     if source_node.node_id not in rm_links:
                         rm_links[source_node.node_id] = []
                     
@@ -280,7 +280,7 @@ class JSONExporter:
                 node_data = self._prepare_node_data(node)
                 nodes["combiners"][node.node_id] = node_data
                 
-            elif node.node_type == "link":
+            elif node.node_type == "resource":
                 node_data = self._prepare_node_data(node)
                 nodes["links"][node.node_id] = node_data
                 #print(f"Added link node to JSON: {node.node_id}")

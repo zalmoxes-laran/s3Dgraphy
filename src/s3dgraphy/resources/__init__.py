@@ -8,13 +8,13 @@ storage-agnostic resource ID** and ask a **resolver** to map it to a concrete
 
 R0 establishes the SEAM only:
 
-  * The **stable resource ID** is the ``LinkNode``'s node UUID (``node_id``).
-    This is ADDITIVE — no datamodel change, no ``LinkNode → ResourceNode``
-    rename. The LinkNode's ``url`` is treated as the *current locator*, NOT as
+  * The **stable resource ID** is the ``ResourceNode``'s node UUID (``node_id``).
+    This is ADDITIVE — no datamodel change, no ``ResourceNode → ResourceNode``
+    rename. The ResourceNode's ``url`` is treated as the *current locator*, NOT as
     the resource's identity.
   * A pluggable **backend registry** (:class:`ResolverRegistry`) with ONE
     default backend, :class:`PassthroughBackend`, which resolves a resource to
-    its stored locator (the LinkNode ``url``) — so existing graphs resolve
+    its stored locator (the ResourceNode ``url``) — so existing graphs resolve
     unchanged. Real storage backends (R1 FS-index, R2 MinIO) plug in later by
     registering ahead of the passthrough fallback.
 

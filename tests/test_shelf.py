@@ -1,6 +1,6 @@
 """Shelf v2 core (Session A) — the shelf-graph substrate.
 
-A shelf is a Graph of un-hatted LinkNode resources, representable as a multigraph
+A shelf is a Graph of un-hatted ResourceNode resources, representable as a multigraph
 member AND a standalone reusable em.json. Verifies: new/is_shelf; add (reuse-not-
 duplicate); list (with capability/origin); remove; save/load standalone round-trip
 (origin invariant preserved); instantiate-by-stable-ID into a study graph (reuse-
@@ -98,7 +98,7 @@ def test_instantiate_references_by_stable_id():
     study = Graph(graph_id="study")
     node = api.instantiate_from_shelf(s, "r1", study)
     # same stable ID = the reference (not a clone under a new id)
-    assert node.node_id == "r1" and node.node_type == "link"
+    assert node.node_id == "r1" and node.node_type == "resource"
     assert study.find_node_by_id("r1") is not None
     # capability/origin carried into the study
     assert (node.data or {}).get("origin") == _ORIGIN
@@ -113,7 +113,7 @@ def test_instantiate_is_idempotent():
     n1 = api.instantiate_from_shelf(s, "r1", study)
     n2 = api.instantiate_from_shelf(s, "r1", study)  # already referenced
     assert n1 is n2
-    links = [n for n in study.nodes if n.node_type == "link"]
+    links = [n for n in study.nodes if n.node_type == "resource"]
     assert len(links) == 1  # no duplicate
 
 

@@ -3,7 +3,7 @@
 A DTC = a ``DTCProcessNode`` plus its chain of **Resource** LinkNodes, wired by
 ``dtc_had_input`` (process → input), ``dtc_had_output`` (process → output) and
 ``dtc_derived_from`` (output → input). Resources are referenced by their **stable
-ID** (= the LinkNode UUID, :func:`s3dgraphy.resources.stable_resource_id`).
+ID** (= the ResourceNode UUID, :func:`s3dgraphy.resources.stable_resource_id`).
 
   * :func:`detach_dtc` extracts a DTC into a standalone JSON record (the
     "resident-with-data" form) keyed by resource stable IDs + kinds. Read-only —
@@ -25,10 +25,10 @@ from typing import Any, Dict, List, Optional
 DTC_RECORD_VERSION = 1
 
 PROCESS_TYPE = "dtc_process"
-RESOURCE_TYPE = "link"
+RESOURCE_TYPE = "resource"
 
 # role → the DTC chain edge (structural constants of the profile — verified in the
-# connections datamodel by the tests). input and output are BOTH Process→LinkNode
+# connections datamodel by the tests). input and output are BOTH Process→ResourceNode
 # edges, so the role IS the edge type (a node-pair lookup would be ambiguous).
 EDGE_HAD_INPUT = "dtc_had_input"        # Process → input Resource
 EDGE_HAD_OUTPUT = "dtc_had_output"      # Process → output Resource
@@ -137,7 +137,7 @@ def inject_dtc(graph: Any, record: Dict[str, Any], *,
     (so a DTC injected onto a graph that already owns the resources just adds the
     provenance overlay). Returns
     ``{"injector_id", "process_id", "resource_ids", "created"}``."""
-    from ..nodes import DTCProcessNode, LinkNode
+    from ..nodes import DTCProcessNode, ResourceNode
     from ..transforms import mark_as_injected
 
     proc_rec = record["process"]
@@ -162,7 +162,7 @@ def inject_dtc(graph: Any, record: Dict[str, Any], *,
         resource_ids.append(rid)
         node = graph.find_node_by_id(rid)
         if node is None:
-            node = LinkNode(rid, name=r.get("name") or rid, url=r.get("url") or "")
+            node = ResourceNode(rid, name=r.get("name") or rid, url=r.get("url") or "")
             if r.get("dtc_kind") is not None:
                 node.data["dtc_kind"] = r["dtc_kind"]
             if r.get("resource_type") is not None:

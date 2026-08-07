@@ -29,7 +29,7 @@ def test_hat_creates_rm_referencing_resource_by_id():
     assert out["created"] and out["rm_id"] == "lamp_model"
     # the Resource is referenced into the study by its SAME stable id (R0 hinge)
     res = study.find_node_by_id("r1")
-    assert res is not None and res.node_type == "link"
+    assert res is not None and res.node_type == "resource"
     assert (res.data or {}).get("origin", {}).get("repo") == "filesystem"  # origin carried
     # the RM node references the resource via has_linked_resource (P67)
     rm = study.find_node_by_id("lamp_model")
@@ -45,7 +45,7 @@ def test_hat_is_idempotent():
     b = api.hat_as_representation_model(study, "r1", shelf=shelf, rm_id="lamp_model")
     assert a["rm_id"] == b["rm_id"] and b["created"] is False
     rms = [n for n in study.nodes if n.node_type == "representation_model"]
-    links = [n for n in study.nodes if n.node_type == "link"]
+    links = [n for n in study.nodes if n.node_type == "resource"]
     edges = [e for e in study.edges if e.edge_type == "has_linked_resource"]
     assert len(rms) == 1 and len(links) == 1 and len(edges) == 1  # no duplicates
 

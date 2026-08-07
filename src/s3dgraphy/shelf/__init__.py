@@ -11,7 +11,7 @@ machinery — NO new node type, NO datamodel change:
   * as a **standalone, reusable em.json file** — a shelf is a file in its own
     right, importable into any study (save/load via the existing em.json I/O).
 
-Each shelf entry is a LinkNode (E73) carrying its resource identity (the stable
+Each shelf entry is a ResourceNode (E73) carrying its resource identity (the stable
 ID, R0) PLUS its **capability/origin** (repo, resource type, and any acquisition
 scope) on ``node.data["origin"]`` — preserved end-to-end so a downstream UI can
 badge the source tier. This substrate never strips it.

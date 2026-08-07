@@ -3,7 +3,7 @@
 The role determines the facet, and the facets are NOT exclusive: the same
 Resource may be an RM (of the epoch it depicts) AND a Document (a source in a
 paradata chain). Every facet keeps the P67 hinge
-(facet ─has_linked_resource→ LinkNode); what changes is the edge towards what it
+(facet ─has_linked_resource→ ResourceNode); what changes is the edge towards what it
 represents / documents:
 
   RM       ─has_first_epoch / survive_in_epoch→ EpochNode(s)
@@ -236,10 +236,10 @@ def test_document_is_idempotent():
     assert len([e for e in study.edges if e.edge_type == "has_linked_resource"]) == 1
 
 
-# ── BUGFIX-CONN3: visual reference is a LinkNode, not a Document ───────────────
+# ── BUGFIX-CONN3: visual reference is a ResourceNode, not a Document ───────────────
 def test_document_attach_never_uses_visual_reference():
     """A PropertyNode hatted onto a Document is DOCUMENTATION (P70i, CONN3
-    widening), never has_visual_reference — which now targets a LinkNode image,
+    widening), never has_visual_reference — which now targets a ResourceNode image,
     not a source document."""
     shelf = _shelf_with_resource()
     study = Graph(graph_id="study")
@@ -252,8 +252,8 @@ def test_document_attach_never_uses_visual_reference():
 
 
 def test_visual_resource_attaches_linknode_to_property():
-    """hat_as_visual_resource: PropertyNode ─has_visual_reference→ LinkNode. No
-    facet node — the visual resource IS the Resource (LinkNode); only the P138i
+    """hat_as_visual_resource: PropertyNode ─has_visual_reference→ ResourceNode. No
+    facet node — the visual resource IS the Resource (ResourceNode); only the P138i
     edge is wired."""
     shelf = _shelf_with_resource(rid="img1", url="/lib/plate.png")
     study = Graph(graph_id="study")
@@ -262,8 +262,8 @@ def test_visual_resource_attaches_linknode_to_property():
     out = api.hat_as_visual_resource(study, "img1", shelf=shelf, attach_to="P1")
     assert out["attached"] is True
     assert out["attach_edge"] == "has_visual_reference"
-    # the target is the LinkNode itself, not a new facet node
-    assert study.find_node_by_id("img1").node_type == "link"
+    # the target is the ResourceNode itself, not a new facet node
+    assert study.find_node_by_id("img1").node_type == "resource"
     assert _has(study, "P1", "img1", "has_visual_reference")
     # no facet node created (unlike RM/Doc): only the resource + the edge
     assert not any(n.node_type == "document" for n in study.nodes)
@@ -303,7 +303,7 @@ def test_same_resource_can_be_rm_and_document():
                                          epochs=["ep20"])
     doc = api.hat_as_document(study, "r1", shelf=shelf, doc_id="D.7", attach_to="EX1")
     assert rm["created"] and doc["created"]
-    assert len([n for n in study.nodes if n.node_type == "link"]) == 1  # one Resource
+    assert len([n for n in study.nodes if n.node_type == "resource"]) == 1  # one Resource
     assert _p67(study, "m_model", "r1") and _p67(study, "D.7", "r1")
     assert _has(study, "m_model", "ep20", "has_first_epoch")
     assert _has(study, "EX1", "D.7", "extracted_from")

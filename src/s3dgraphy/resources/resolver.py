@@ -3,7 +3,7 @@
 Pure Python, no web framework, no network. The resolver maps a **stable
 resource ID** to a concrete :class:`Location`. Storage backends are pluggable
 via :class:`ResolverRegistry`; R0 ships exactly one — :class:`PassthroughBackend`
-— which classifies a resource's *current locator* (a LinkNode ``url``) into a
+— which classifies a resource's *current locator* (a ResourceNode ``url``) into a
 Location without touching bytes. R1 (FS-index) and R2 (MinIO) will register
 richer backends ahead of the passthrough fallback.
 """
@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-# The location kinds a resolver can return. A locator (LinkNode ``url``) is
+# The location kinds a resolver can return. A locator (ResourceNode ``url``) is
 # classified into exactly one of these; storage backends produce the same set.
 LOCATION_KINDS = ("local_path", "file_uri", "s3_uri", "http_url")
 
@@ -39,7 +39,7 @@ class Location:
 def stable_resource_id(node: Any) -> str:
     """The storage-agnostic stable ID of a resource = its node UUID.
 
-    ADDITIVE: reuses the existing ``node_id``; the LinkNode ``url`` is only the
+    ADDITIVE: reuses the existing ``node_id``; the ResourceNode ``url`` is only the
     current locator, not the identity."""
     return getattr(node, "node_id")
 
@@ -98,7 +98,7 @@ class ResourceBackend:
 class PassthroughBackend(ResourceBackend):
     """The default R0 backend: resolve a resource to its stored locator as-is.
 
-    It performs no ingest and moves no bytes — it classifies the LinkNode
+    It performs no ingest and moves no bytes — it classifies the ResourceNode
     ``url`` into a :class:`Location` so existing url/path-based graphs resolve
     unchanged. Always resolves (never returns ``None``), so it is the correct
     lowest-priority fallback."""

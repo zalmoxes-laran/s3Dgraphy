@@ -57,7 +57,7 @@ def test_ingest_uploads_and_records_stable_id(tmp_path):
     assert client.put == [("em-resources", key, path)]  # object uploaded
     entry = be.entries()[0]
     assert entry.resource_id == rid and entry.object_key == key
-    assert entry.resource_type == "3d_model"          # classified via LinkNode vocab
+    assert entry.resource_type == "3d_model"          # classified via ResourceNode vocab
 
 
 def test_ingest_is_idempotent_by_source_path(tmp_path):

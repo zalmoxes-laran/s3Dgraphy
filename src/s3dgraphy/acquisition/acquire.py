@@ -3,7 +3,7 @@
 Consumes an :class:`AcquisitionDescriptor` (Tier 0 — opaque source, no inherited
 payload) and, on a Shelf:
 
-  * creates/reuses the **Resource** (LinkNode, R0 stable ID) for the asset, with
+  * creates/reuses the **Resource** (ResourceNode, R0 stable ID) for the asset, with
     ``origin`` = {repo, capabilities, scope} preserved for downstream tier badges
     (reuses the Session-A :func:`add_to_shelf`);
   * creates the **acquisition event** — a :class:`DTCAcquisitionNode`

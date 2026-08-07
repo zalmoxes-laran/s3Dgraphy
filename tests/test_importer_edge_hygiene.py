@@ -62,7 +62,7 @@ def test_the_legacy_stratigraphic_node_type_reaches_has_property(importer):
 def test_property_to_document_is_documentation(importer):
     """BUGFIX-CONN3: a PropertyNode pointing at a Document reads as
     `has_documentation` (P70i — the property is documented in this source). It is
-    NO LONGER `has_visual_reference`: CONN2 moved that to PropertyNode→LinkNode
+    NO LONGER `has_visual_reference`: CONN2 moved that to PropertyNode→ResourceNode
     (an image resource), so a legacy dashed property→document connector is
     documentation, not a visual reference. has_documentation.source was widened
     to include PropertyNode (v1.6.7) for exactly this reading."""

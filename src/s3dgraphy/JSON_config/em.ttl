@@ -449,7 +449,7 @@ em:hasVisualReference
     rdfs:subPropertyOf crm:P138i_has_representation ;
     rdfs:domain em:Qualia ;
     rdfs:range crm:E36_Visual_Item ;
-    rdfs:comment "A property (em:Qualia, an asserted quale) is visually illustrated or anchored by a VISUAL RESOURCE — the resource-layer image node (a LinkNode, E73 Information Object), not a source document. Revised 2026-08-05 (BUGFIX-CONN2): source narrowed to em:Qualia (was em:Paradata; only a property is illustrated), target moved from an E31 Document to the resource-layer image. The RDF exporter co-types the target LinkNode as E36_Visual_Item, which is range-consistent because E36 is a subclass of E73 (the LinkNode's base class). Distinct from em: extraction sourcing (P67/J7): a visual reference shows, an extraction source justifies. Maps to: connections_datamodel edge 'has_visual_reference' (source PropertyNode, target LinkNode)."@en .
+    rdfs:comment "A property (em:Qualia, an asserted quale) is visually illustrated or anchored by a VISUAL RESOURCE — the resource-layer image node (a ResourceNode, E73 Information Object), not a source document. Revised 2026-08-05 (BUGFIX-CONN2): source narrowed to em:Qualia (was em:Paradata; only a property is illustrated), target moved from an E31 Document to the resource-layer image. The RDF exporter co-types the target ResourceNode as E36_Visual_Item, which is range-consistent because E36 is a subclass of E73 (the ResourceNode's base class). Distinct from em: extraction sourcing (P67/J7): a visual reference shows, an extraction source justifies. Maps to: connections_datamodel edge 'has_visual_reference' (source PropertyNode, target ResourceNode)."@en .
 
 em:survivesInEpoch
     a owl:ObjectProperty ;

@@ -93,10 +93,10 @@ def test_acquire_creates_resource_event_and_edge():
     rid, acq_id = info["resource_id"], info["acquisition_id"]
     res = shelf.find_node_by_id(rid)
     acq = shelf.find_node_by_id(acq_id)
-    # the Resource (LinkNode) carries the locator + origin (for tier badges)
-    assert res.node_type == "link" and res.data["url"] == _ERCOLANO_RECORD["url"]
+    # the Resource (ResourceNode) carries the locator + origin (for tier badges)
+    assert res.node_type == "resource" and res.data["url"] == _ERCOLANO_RECORD["url"]
     assert res.data["origin"] == {"repo": "ercolano", "capabilities": [], "scope": None}
-    assert res.data.get("resource_type") == "proxy_model"  # .glb per LinkNode vocab
+    assert res.data.get("resource_type") == "proxy_model"  # .glb per ResourceNode vocab
     # the acquisition event is a DISTINCT DTC type (crmdig:D12), not a process node
     assert isinstance(acq, DTCAcquisitionNode) and acq.node_type == "dtc_acquisition"
     assert not isinstance(acq, DTCProcessNode)
@@ -115,7 +115,7 @@ def test_acquire_is_idempotent():
     info2, shelf = api.acquire_from_descriptor(desc, shelf)  # same record again
     assert info1["resource_id"] == info2["resource_id"]
     assert info1["acquisition_id"] == info2["acquisition_id"]
-    links = [n for n in shelf.nodes if n.node_type == "link"]
+    links = [n for n in shelf.nodes if n.node_type == "resource"]
     acqs = [n for n in shelf.nodes if n.node_type == "dtc_acquisition"]
     edges = [e for e in shelf.edges if e.edge_type == "dtc_had_output"]
     assert len(links) == 1 and len(acqs) == 1 and len(edges) == 1  # no duplicates

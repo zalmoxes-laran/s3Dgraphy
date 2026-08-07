@@ -10,7 +10,7 @@ keeps *genesis ≠ acquisition* as distinct TYPES inside the one DTC substrate
 (design decision §2/§3).
 
 Tier 0: the chain has a single ring — the acquisition event ─dtc_had_output→ the
-acquired Resource (LinkNode). The upstream root is an opaque external entity,
+acquired Resource (ResourceNode). The upstream root is an opaque external entity,
 recorded as literals on ``data`` (repo/record/agent/retrieved_at/rights), not as a
 genesis sub-graph. ``dtc_kind`` ∈ the ``acquisition`` axis of ``dtc_kinds``.
 """

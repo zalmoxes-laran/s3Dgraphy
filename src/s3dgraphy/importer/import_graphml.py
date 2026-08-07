@@ -12,7 +12,7 @@ from ..nodes.extractor_node import ExtractorNode
 from ..nodes.property_node import PropertyNode
 from ..nodes.epoch_node import EpochNode
 from ..nodes.group_node import GroupNode, ParadataNodeGroup, ActivityNodeGroup, TimeBranchNodeGroup
-from ..nodes.link_node import *
+from ..nodes.resource_node import *
 from ..nodes.author_node import AuthorNode, AuthorAINode
 from ..nodes.license_node import LicenseNode
 from ..nodes.embargo_node import EmbargoNode
@@ -1514,7 +1514,7 @@ class GraphMLImporter:
                 self.document_nodes_map[nodename] = uuid_id
                 # Se c'è un URL valido, crea un nodo Link
                 if nodeurl and nodeurl.strip() != 'Empty':
-                    link_node = self._create_link_node(document_node, nodeurl)
+                    resource_node = self._create_resource_node(document_node, nodeurl)
 
         elif self.EM_check_node_property(node_element):
             # Creazione del nodo proprietà e aggiunta al grafo
@@ -1559,7 +1559,7 @@ class GraphMLImporter:
 
             # Se c'è un URL valido, crea un nodo Link
             if nodeurl and nodeurl.strip() != 'Empty':
-                link_node = self._create_link_node(extractor_node, nodeurl)
+                resource_node = self._create_resource_node(extractor_node, nodeurl)
 
 
         elif self.EM_check_node_combiner(node_element):
@@ -1642,7 +1642,7 @@ class GraphMLImporter:
 
 
 
-    def _create_link_node(self, source_node, url):
+    def _create_resource_node(self, source_node, url):
         """
         Creates a Link node for a resource.
 
@@ -1651,38 +1651,38 @@ class GraphMLImporter:
             url (str): The URL or path of the resource
 
         Returns:
-            LinkNode: The Link node created
+            ResourceNode: The Link node created
         """
-        from ..nodes.link_node import LinkNode
+        from ..nodes.resource_node import ResourceNode
         
-        link_node_id = f"{source_node.node_id}_link"
+        resource_node_id = f"{source_node.node_id}_link"
         
         # Verifica se il nodo Link esiste già
-        existing_link_node = self.graph.find_node_by_id(link_node_id)
-        if existing_link_node:
-            return existing_link_node
+        existing_resource_node = self.graph.find_node_by_id(resource_node_id)
+        if existing_resource_node:
+            return existing_resource_node
         
         # Se non esiste, crealo
-        link_node = LinkNode(
-            node_id=link_node_id,
+        resource_node = ResourceNode(
+            node_id=resource_node_id,
             name=f"Link to {source_node.name}",
             description=f"Link to {source_node.description}" if source_node.description else "",
             url=url
         )
         
-        self.graph.add_node(link_node)
+        self.graph.add_node(resource_node)
         
         # Crea l'edge solo se non esiste già
-        edge_id = f"{source_node.node_id}_has_linked_resource_{link_node_id}"
+        edge_id = f"{source_node.node_id}_has_linked_resource_{resource_node_id}"
         if not self.graph.find_edge_by_id(edge_id):
             self.graph.add_edge(
                 edge_id=edge_id,
                 edge_source=source_node.node_id,
-                edge_target=link_node.node_id,
+                edge_target=resource_node.node_id,
                 edge_type="has_linked_resource"
             )
         
-        return link_node
+        return resource_node
         
     def handle_group_node(self, node_element):
         """
@@ -3482,7 +3482,7 @@ class GraphMLImporter:
             # has_documentation (P70i_is_documented_in) — the honest shortcut
             # when a legacy yEd dashed connector links a property to a source
             # document. It is NO LONGER has_visual_reference: CONN2 moved that to
-            # PropertyNode->LinkNode (a visual reference illustrates via an image
+            # PropertyNode->ResourceNode (a visual reference illustrates via an image
             # resource, not a source document). has_documentation.source was
             # widened to include PropertyNode for exactly this reading (v1.6.7).
             elif (isinstance(source_node, PropertyNode)

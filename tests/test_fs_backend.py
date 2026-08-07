@@ -8,7 +8,7 @@ unmatched files; registers above passthrough; non-breaking.
 
 from s3dgraphy import api
 from s3dgraphy.graph import Graph
-from s3dgraphy.nodes.link_node import LinkNode
+from s3dgraphy.nodes.resource_node import ResourceNode
 from s3dgraphy.resources import (
     FSIndexBackend,
     PassthroughBackend,

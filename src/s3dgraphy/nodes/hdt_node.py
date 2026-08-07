@@ -13,7 +13,7 @@ Granularity connectors (declared in s3Dgraphy_connections_datamodel.json):
 * has_digital_twin              — Node → HDTNode  (HP1)
 * has_digital_twin_component    — HDTNode → HDTNode (HP3 inverse, transitive)
 * contains_proposition_set      — HDTNode → GraphNode (HP33)
-* has_digital_object_part       — HDTNode → RepresentationModel* / LinkNode (HP29)
+* has_digital_object_part       — HDTNode → RepresentationModel* / ResourceNode (HP29)
 
 Use case (the Colosseo example)::
 

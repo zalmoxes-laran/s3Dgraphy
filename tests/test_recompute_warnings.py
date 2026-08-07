@@ -81,7 +81,7 @@ def test_exactly_one_candidate_is_named():
     """Extractor → Document has a single reading (`extracted_from`): say which,
     so the author knows exactly what to re-draw. (Since BUGFIX-CONN2 the former
     example Document → Document `has_visual_reference` is gone — a visual
-    reference now goes Property → LinkNode, and has two readings.)"""
+    reference now goes Property → ResourceNode, and has two readings.)"""
     g = Graph(graph_id="g")
     g.add_node(ExtractorNode(node_id="x1", name="EX.1"))
     g.add_node(DocumentNode(node_id="d1", name="D.1"))

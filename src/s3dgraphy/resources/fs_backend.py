@@ -53,11 +53,11 @@ _PRIORITY_EXTENSIONS = (
 def classify_resource_type(filename: str) -> str:
     """Classify a file into an EM resource type by extension.
 
-    Reuses ``LinkNode.RESOURCE_TYPES`` (the datamodel's own vocabulary) rather
+    Reuses ``ResourceNode.RESOURCE_TYPES`` (the datamodel's own vocabulary) rather
     than a hardcoded list; returns ``"unknown"`` when nothing matches."""
-    from ..nodes.link_node import LinkNode
+    from ..nodes.resource_node import ResourceNode
     ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
-    for res_type, exts in LinkNode.RESOURCE_TYPES.items():
+    for res_type, exts in ResourceNode.RESOURCE_TYPES.items():
         if ext in exts:
             return res_type
     return "unknown"

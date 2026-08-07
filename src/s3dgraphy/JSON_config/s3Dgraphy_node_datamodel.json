@@ -944,13 +944,13 @@
     "rotation": "Q9_is_expressed_in_terms_of"
    }
   },
-  "LinkNode": {
-   "class": "LinkNode",
+  "ResourceNode": {
+   "class": "ResourceNode",
    "parent": "Node",
    "abbreviation": "LINK",
    "label": "Link",
-   "description": "Class to represent a link node (LinkNode) in the graph. Attributes: url (str): URL of the link. url_type (str): Type of URL (e.g., 'External link', 'Image'). description (str): Description of the link.",
-   "s3Dgraphy_file": "link_node.py",
+   "description": "Class to represent a link node (ResourceNode) in the graph. Attributes: url (str): URL of the link. url_type (str): Type of URL (e.g., 'External link', 'Image'). description (str): Description of the link.",
+   "s3Dgraphy_file": "resource_node.py",
    "mapping": {
     "cidoc": "E73 Information Object",
     "cidoc_s3d": "ExternalResourceReference",
@@ -1071,9 +1071,9 @@
     },
     "to_resource": {
      "edge_type": "has_linked_resource",
-     "direction": "RMDoc → LinkNode",
+     "direction": "RMDoc → ResourceNode",
      "cidoc": "P67_refers_to",
-     "note": "The P67 hinge to the file on disk goes through the LinkNode, as for every other representation facet."
+     "note": "The P67 hinge to the file on disk goes through the ResourceNode, as for every other representation facet."
     }
    },
    "s3Dgraphy_file": "representation_node.py",
@@ -1428,7 +1428,7 @@
   }
  },
  "dtc_nodes": {
-  "_section_note": "DTC (Digital Twin Chain) substrate profile — the ECHOES deliverable: the DIGITAL PROVENANCE around documents. TWO event chunk classes, both DISTINCT TYPES in the one DTC substrate: DTCProcessNode = GENESIS/transformation (crmdig:D7_Digital_Machine_Event) that produces documents (input Resources -> Process -> output Resources); DTCAcquisitionNode = ACQUISITION/ingestion (crmdig:D12_Data_Transfer_Event ⊂ D7) — how an asset ENTERS this study from an opaque external source (Tier 0: single-ring, acquisition --dtc_had_output--> Resource; source root recorded as literals). genesis != acquisition is a distinction of TYPE, never confused. Distinct from EM-paradata (interpretation ON a document = CRMinf/HC17). BOTH the INPUT and the OUTPUT are RESOURCES = the EM LinkNode (E73/D1, the shared hinge a RepresentationModel/Document may reference), NOT dedicated classes: the process links to them via dtc_had_input / dtc_had_output (target LinkNode); a Resource that participates carries data.dtc_kind + resource_type and projects crmdig:D1 + prov:Entity + P2(dtc_kind). The DTC graph = Resources connected by Process events (Process --dtc_had_input[prov:used]--> input Resource; Process --dtc_had_output[prov:generated]--> output Resource; output Resource --dtc_derived_from[prov:wasDerivedFrom]--> input Resource). Option A naming; CRMdig+PROV-O mapping in em_extension, no D-numbers in the UI. Gated OUT of the stratigrapher palette (like hdto_nodes). Per-kind vocabulary is DATA-DRIVEN + expandable in em_visual_rules.json -> dtc_kinds (via utils.get_dtc_kinds). EM commons (Author/License/Embargo/LinkNode) reused, not duplicated. (LinkNode -> ResourceNode rename is a future coordinated step.)",
+  "_section_note": "DTC (Digital Twin Chain) substrate profile — the ECHOES deliverable: the DIGITAL PROVENANCE around documents. TWO event chunk classes, both DISTINCT TYPES in the one DTC substrate: DTCProcessNode = GENESIS/transformation (crmdig:D7_Digital_Machine_Event) that produces documents (input Resources -> Process -> output Resources); DTCAcquisitionNode = ACQUISITION/ingestion (crmdig:D12_Data_Transfer_Event ⊂ D7) — how an asset ENTERS this study from an opaque external source (Tier 0: single-ring, acquisition --dtc_had_output--> Resource; source root recorded as literals). genesis != acquisition is a distinction of TYPE, never confused. Distinct from EM-paradata (interpretation ON a document = CRMinf/HC17). BOTH the INPUT and the OUTPUT are RESOURCES = the EM ResourceNode (E73/D1, the shared hinge a RepresentationModel/Document may reference), NOT dedicated classes: the process links to them via dtc_had_input / dtc_had_output (target ResourceNode); a Resource that participates carries data.dtc_kind + resource_type and projects crmdig:D1 + prov:Entity + P2(dtc_kind). The DTC graph = Resources connected by Process events (Process --dtc_had_input[prov:used]--> input Resource; Process --dtc_had_output[prov:generated]--> output Resource; output Resource --dtc_derived_from[prov:wasDerivedFrom]--> input Resource). Option A naming; CRMdig+PROV-O mapping in em_extension, no D-numbers in the UI. Gated OUT of the stratigrapher palette (like hdto_nodes). Per-kind vocabulary is DATA-DRIVEN + expandable in em_visual_rules.json -> dtc_kinds (via utils.get_dtc_kinds). EM commons (Author/License/Embargo/ResourceNode) reused, not duplicated. (ResourceNode -> ResourceNode rename is a future coordinated step.)",
   "DTCProcessNode": {
    "class": "DTCProcessNode",
    "parent": "DTCNode",
@@ -1461,7 +1461,7 @@
    "parent": "DTCNode",
    "abbreviation": "DAC",
    "label": "DTC Acquisition",
-   "description": "A DTC ACQUISITION chunk: the digital event by which an asset ENTERS this study from an (opaque, Tier-0) external source — a data-transfer / ingestion event, DISTINCT from the genesis DTCProcessNode. Projected as crmdig:D12_Data_Transfer_Event (a subclass of D7_Digital_Machine_Event, ⊂ prov:Activity): 'events that transfer a digital object from one digital carrier to another; normally the digital object remains the same' — the object arrives opaque, no genesis is asserted. Tier 0: single-ring chain — the acquisition event --dtc_had_output[prov:generated]--> the acquired Resource (LinkNode); the upstream root is an opaque external entity recorded as literals on data (repo/record/agent/retrieved_at/rights), not a genesis sub-graph. data.dtc_kind from the `acquisition` axis (download / ingest / local_import). Keeps genesis != acquisition as distinct TYPES inside the one DTC substrate.",
+   "description": "A DTC ACQUISITION chunk: the digital event by which an asset ENTERS this study from an (opaque, Tier-0) external source — a data-transfer / ingestion event, DISTINCT from the genesis DTCProcessNode. Projected as crmdig:D12_Data_Transfer_Event (a subclass of D7_Digital_Machine_Event, ⊂ prov:Activity): 'events that transfer a digital object from one digital carrier to another; normally the digital object remains the same' — the object arrives opaque, no genesis is asserted. Tier 0: single-ring chain — the acquisition event --dtc_had_output[prov:generated]--> the acquired Resource (ResourceNode); the upstream root is an opaque external entity recorded as literals on data (repo/record/agent/retrieved_at/rights), not a genesis sub-graph. data.dtc_kind from the `acquisition` axis (download / ingest / local_import). Keeps genesis != acquisition as distinct TYPES inside the one DTC substrate.",
    "s3Dgraphy_file": "dtc_acquisition_node.py",
    "mapping": {
     "cidoc": "crmdig:D12_Data_Transfer_Event",

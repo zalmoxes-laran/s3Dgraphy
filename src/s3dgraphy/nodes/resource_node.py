@@ -1,15 +1,17 @@
 from .base_node import Node
 
-class LinkNode(Node):
+class ResourceNode(Node):
     """
-    Classe per rappresentare un nodo di collegamento (LinkNode) nel grafo.
-    
+    A RESOURCE node — the resource-layer hinge to an external file/URL (image,
+    document, 3D model, point cloud, web page…). Renamed from ``ResourceNode`` in
+    MIG1 (2026-08-06); ``node_type`` is now ``"resource"`` (was ``"link"``).
+
     Attributi:
         url (str): URL del collegamento.
         url_type (str): Tipo di URL (es. "External link", "Image").
         description (str): Descrizione del collegamento.
     """
-    node_type="link"
+    node_type="resource"
 
     # Valid resource types
     RESOURCE_TYPES = {
@@ -24,7 +26,7 @@ class LinkNode(Node):
 
     def __init__(self, node_id, name="Unnamed Link", url="", url_type="External link", description="No description"):
         """
-        Inizializza una nuova istanza di LinkNode.
+        Inizializza una nuova istanza di ResourceNode.
 
         Args:
             node_id (str): Identificatore univoco del nodo.
@@ -77,10 +79,10 @@ class LinkNode(Node):
 
     def to_dict(self):
         """
-        Converte l'istanza di LinkNode in un dizionario.
+        Converte l'istanza di ResourceNode in un dizionario.
 
         Returns:
-            dict: Rappresentazione del LinkNode come dizionario.
+            dict: Rappresentazione del ResourceNode come dizionario.
         """
         return {
             "id": self.node_id,
@@ -97,8 +99,8 @@ class LinkNode(Node):
 
 
 '''
-# Creazione di un LinkNode per un URL Zenodo
-link_node_zenodo = LinkNode(
+# Creazione di un ResourceNode per un URL Zenodo
+resource_node_zenodo = ResourceNode(
     node_id="USM04.zenodo",
     name="ZENODO URL",
     url="https://zenodo.org/record/28917",
@@ -106,8 +108,8 @@ link_node_zenodo = LinkNode(
     description="Zenodo repository entry"
 )
 
-# Creazione di un LinkNode per un’immagine a risoluzione completa
-link_node_image = LinkNode(
+# Creazione di un ResourceNode per un’immagine a risoluzione completa
+resource_node_image = ResourceNode(
     node_id="D.01.image",
     name="FullRES Image",
     url="http://aton.ispc.it/image.jpeg",
@@ -117,9 +119,9 @@ link_node_image = LinkNode(
 
 # Aggiunta dei nodi al grafo e connessione (esempio con edge tipo "generic")
 graph = Graph(graph_id="example_graph")
-graph.add_node(link_node_zenodo)
-graph.add_node(link_node_image)
-graph.add_edge(edge_id="link_edge_1", edge_source=link_node_zenodo.node_id, edge_target="some_target_node", edge_type="generic")
-graph.add_edge(edge_id="link_edge_2", edge_source=link_node_image.node_id, edge_target="some_target_node", edge_type="generic")
+graph.add_node(resource_node_zenodo)
+graph.add_node(resource_node_image)
+graph.add_edge(edge_id="link_edge_1", edge_source=resource_node_zenodo.node_id, edge_target="some_target_node", edge_type="generic")
+graph.add_edge(edge_id="link_edge_2", edge_source=resource_node_image.node_id, edge_target="some_target_node", edge_type="generic")
 
 '''

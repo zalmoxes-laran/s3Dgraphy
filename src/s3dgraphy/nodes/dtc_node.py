@@ -6,12 +6,12 @@ output **Resources** (produced files: mesh/orthophoto/table…). It is distinct
 from EM-paradata (interpretation *on* a document = CRMinf / HDT-O HC17): DTC is
 about how the digital objects came to be.
 
-Both the INPUT and the OUTPUT are **Resources** (the EM ``LinkNode``, E73/D1 —
+Both the INPUT and the OUTPUT are **Resources** (the EM ``ResourceNode``, E73/D1 —
 the shared hinge a RepresentationModel and/or a Document may reference), NOT
 dedicated node classes: so :class:`DTCProcessNode` is the ONLY DTC node class.
 The DTC graph = Resources connected by Process events: the process links to its
 input/output Resources via the ``dtc_had_input`` / ``dtc_had_output`` edges (target
-LinkNode); an output Resource ``dtc_derived_from`` an input Resource. (An earlier
+ResourceNode); an output Resource ``dtc_derived_from`` an input Resource. (An earlier
 form had DTCInputNode/DTCOutputNode classes — both retired.)
 
 Naming (Option A): EM-native ``...Node`` class; the CIDOC/CRMdig + PROV-O mapping
@@ -25,7 +25,7 @@ kind drawn from a DATA-DRIVEN, expandable vocabulary (``dtc_kinds`` in
 new kind (audio, spectroscopy…) is a JSON entry (+ a glyph), NOT a code change.
 
 EM commons are REUSED, never duplicated: Author (agent), License, Embargo, and
-LinkNode (the Resource itself) attach to the chain via the existing
+ResourceNode (the Resource itself) attach to the chain via the existing
 ``has_author`` / ``has_license`` / ``has_embargo`` / ``has_linked_resource`` edges.
 """
 

@@ -59,7 +59,7 @@ SCHEMA_VERSION = 2
 # type-specific fields the classes store as plain attributes.
 _LIFTED_ATTRS = (
     "start_time", "end_time", "color",          # EpochNode
-    "value", "property_type", "url",             # PropertyNode / LinkNode
+    "value", "property_type", "url",             # PropertyNode / ResourceNode
     "source",                                     # ExtractorNode
     "symbol", "label",                            # class-level display metadata
 )

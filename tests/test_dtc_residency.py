@@ -12,7 +12,7 @@ import pytest
 
 from s3dgraphy import api
 from s3dgraphy.graph import Graph
-from s3dgraphy.nodes import DTCProcessNode, LinkNode
+from s3dgraphy.nodes import DTCProcessNode, ResourceNode
 from s3dgraphy.dtc import (
     EDGE_DERIVED_FROM, EDGE_HAD_INPUT, EDGE_HAD_OUTPUT, dtc_injector_id,
 )
@@ -21,7 +21,7 @@ from s3dgraphy.transforms import is_injected
 
 
 def _resource(node_id, name, kind, url):
-    lk = LinkNode(node_id, name=name, url=url)
+    lk = ResourceNode(node_id, name=name, url=url)
     lk.data["dtc_kind"] = kind
     lk.data["resource_type"] = kind
     return lk
@@ -44,7 +44,7 @@ def test_detach_record_shape_and_stable_ids():
     rec = api.detach_dtc(g, "proc1")
     assert rec["dtc_record_version"] == 1
     assert rec["process"]["id"] == "proc1" and rec["process"]["dtc_kind"] == "transformation"
-    # resources referenced by STABLE ID (= the LinkNode UUID) + kind
+    # resources referenced by STABLE ID (= the ResourceNode UUID) + kind
     res = {r["id"]: r for r in rec["resources"]}
     assert set(res) == {"in1", "out1"}
     assert res["in1"]["role"] == "input" and res["in1"]["dtc_kind"] == "photo"
@@ -83,7 +83,7 @@ def test_detach_inject_roundtrip_same_ids_and_kinds():
     assert by["proc1"].node_type == "dtc_process"
     assert (by["proc1"].data or {}).get("dtc_kind") == "transformation"
     for rid, kind in (("in1", "photo"), ("out1", "mesh")):
-        assert by[rid].node_type == "link"
+        assert by[rid].node_type == "resource"
         assert (by[rid].data or {}).get("dtc_kind") == kind
         assert (by[rid].data or {}).get("resource_type") == kind
     ets = {e.edge_type for e in dst.edges}

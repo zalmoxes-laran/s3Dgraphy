@@ -28,7 +28,7 @@ from .nodes.base_node import Node
 #from .nodes import (
 #    Node, StratigraphicNode, GroupNode, ActivityNodeGroup,
 #    ParadataNodeGroup, ParadataNode, DocumentNode, CombinerNode,
-#    ExtractorNode, PropertyNode, EpochNode, GeoPositionNode, RepresentationModelNode, AuthorNode, LinkNode
+#    ExtractorNode, PropertyNode, EpochNode, GeoPositionNode, RepresentationModelNode, AuthorNode, ResourceNode
 #)
 
 # Edge-related imports
@@ -81,7 +81,7 @@ __all__ = [
     "GeoPositionNode",
     "RepresentationModelNode", 
     "AuthorNode", 
-    "LinkNode",
+    "ResourceNode",
     "Edge",
     "MultiGraphManager", 
     "load_graph_from_file", 

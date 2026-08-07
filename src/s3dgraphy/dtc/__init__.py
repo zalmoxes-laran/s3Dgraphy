@@ -7,7 +7,7 @@ realise that "residency" axis, reusing the existing ``injected_by`` + bake
 convention (:mod:`s3dgraphy.transforms.aux_tracking`) — no parallel mechanism.
 
 The DTC references its resources by **stable ID** (the Resource layer,
-:func:`s3dgraphy.resources.stable_resource_id` = the LinkNode UUID), so a DTC is
+:func:`s3dgraphy.resources.stable_resource_id` = the ResourceNode UUID), so a DTC is
 reusable across graphs: the same resources → the same provenance.
 """
 

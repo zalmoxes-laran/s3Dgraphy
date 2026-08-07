@@ -57,8 +57,15 @@ def schema_version_of(doc: Dict[str, Any]) -> int:
         return LEGACY_SCHEMA_VERSION
 
 
+# MIG1 (2026-08-06) one-shot legacy migration: node_type strings renamed in this
+# release. A legacy em.json still carries the old string; remap it at load so the
+# dataset opens on the new model. Add future renames here.
+_LEGACY_NODE_TYPE_ALIASES = {"link": "resource"}  # LinkNode → ResourceNode
+
+
 def _instantiate(node_type: str, payload: Dict[str, Any],
                  warnings: List[str]):
+    node_type = _LEGACY_NODE_TYPE_ALIASES.get(node_type, node_type)
     cls = Node.node_type_map.get(node_type)
     if cls is None:
         # ``Node`` is not in the map because it is the base class, not a type:

@@ -46,7 +46,7 @@ def test_fs_acquire_onto_shelf(tmp_path):
     desc = api.apply_acquisition_mapping("fs", api.fs_acquisition_record(path))
     info, shelf = api.acquire_from_descriptor(desc)
     res = shelf.find_node_by_id(info["resource_id"])
-    assert res.node_type == "link" and res.data["url"] == path
+    assert res.node_type == "resource" and res.data["url"] == path
     assert res.data["origin"] == {"repo": "filesystem", "capabilities": [], "scope": None}
     acq = shelf.find_node_by_id(info["acquisition_id"])
     assert acq.node_type == "dtc_acquisition" and acq.data.get("dtc_kind") == "local_import"
@@ -58,5 +58,5 @@ def test_fs_acquire_idempotent_by_path(tmp_path):
     i1, shelf = api.acquire_from_descriptor(desc)
     i2, shelf = api.acquire_from_descriptor(desc, shelf)   # re-scan same file
     assert i1["resource_id"] == i2["resource_id"]
-    links = [n for n in shelf.nodes if n.node_type == "link"]
+    links = [n for n in shelf.nodes if n.node_type == "resource"]
     assert len(links) == 1

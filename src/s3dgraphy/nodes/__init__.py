@@ -40,7 +40,7 @@ from .representation_node import (RepresentationModelNode,
                                   RepresentationModelDocNode,
                                   RepresentationModelSpecialFindNode)
 from .author_node import AuthorNode, AuthorAINode
-from .link_node import LinkNode
+from .resource_node import ResourceNode
 from .embargo_node import EmbargoNode
 from .license_node import LicenseNode
 from .graph_node import GraphNode
@@ -51,8 +51,8 @@ from .project_node import ProjectNode
 from .semantic_shape_node import SemanticShapeNode
 # DTC substrate profile (ECHOES). Two event classes: DTCProcessNode (genesis /
 # transformation, crmdig:D7) and DTCAcquisitionNode (acquisition / ingestion,
-# crmdig:D12 ⊂ D7). Both the INPUT and the OUTPUT are Resources (LinkNode, E73/D1)
-# — see dtc_had_input / dtc_had_output (target LinkNode). DTCInputNode/
+# crmdig:D12 ⊂ D7). Both the INPUT and the OUTPUT are Resources (ResourceNode, E73/D1)
+# — see dtc_had_input / dtc_had_output (target ResourceNode). DTCInputNode/
 # DTCOutputNode were retired.
 from .dtc_node import DTCNode
 from .dtc_process_node import DTCProcessNode
@@ -113,7 +113,7 @@ __all__ = [
     "RepresentationModelSpecialFindNode",
     "AuthorNode",
     "AuthorAINode",
-    "LinkNode",
+    "ResourceNode",
     "EmbargoNode",
     "LicenseNode",
     "GraphNode",
