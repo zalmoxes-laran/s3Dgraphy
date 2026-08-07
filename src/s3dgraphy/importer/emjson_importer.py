@@ -224,7 +224,132 @@ def parse_emjson(doc: Dict[str, Any]) -> Tuple[Graph, List[str]]:
         if isinstance(attrs, dict) and attrs and edge is not None:
             edge.attributes.update(attrs)
 
+    # MIG1-A (DP-65) · one-shot legacy migration of graph-scope rights metadata.
+    _migrate_legacy_graph_scope(graph)
+
     return graph, warnings
+
+
+# ---------------------------------------------------------------------------
+# MIG1-A · graph-scope rights metadata → first-class nodes (DP-65)
+# ---------------------------------------------------------------------------
+
+_LEGACY_GRAPH_SCOPE_FIELDS = ("author_name", "license", "embargo")
+
+
+def materialize_graph_scope(graph, *, author=None, license=None, embargo=None,
+                            em_id=None, orcid=None):
+    """Create (or reuse) the graph-scope structure of MIG1-A / DP-65 and return
+    the graph-self node.
+
+    Shared by the em.json one-shot legacy migration and the GraphML importer
+    (IMP1) so both produce the SAME shape: a ``GraphNode`` (the graph-self node)
+    owning a ``ParadataNodeGroup`` via ``has_paradata_nodegroup``, whose members
+    are the ``AuthorNode`` / ``LicenseNode`` / ``EmbargoNode``
+    (``is_in_paradata_nodegroup``). The display value lives in each member's
+    NAME (what the Data Funnel reads); ``em_id`` (the human-readable site key) is
+    stored on ``GraphNode.data``. An ORCID, when given, is kept on the author's
+    ``data`` (display still resolves to the name).
+
+    Idempotent: reuses an existing GraphNode (HDT-O may already have created it)
+    and its graph-scope PDG, never duplicates a member class, and mints
+    deterministic ids from the graph id so a re-import is reproducible.
+    """
+    from ..nodes.graph_node import GraphNode
+    from ..nodes.group_node import ParadataNodeGroup
+    from ..nodes.author_node import AuthorNode
+    from ..nodes.license_node import LicenseNode
+    from ..nodes.embargo_node import EmbargoNode
+
+    gid = graph.graph_id
+
+    # 1 · the graph-self node (reuse an existing one, e.g. authored by HDT-O)
+    roots = graph.get_nodes_by_type("graph")
+    root = roots[0] if roots else None
+    if root is None:
+        root = GraphNode(node_id=f"{gid}_graphroot", name="Graph")
+        graph.add_node(root)
+    if em_id not in (None, ""):
+        if not isinstance(getattr(root, "data", None), dict):
+            root.data = {}
+        root.data["em_id"] = str(em_id)
+
+    # 2 · its graph-scope ParadataNodeGroup — created LAZILY on the first member
+    # (an em_id-only call leaves the GraphNode without an empty PDG). Reuse an
+    # already-anchored one.
+    def _existing_pdg():
+        for e in graph.get_connected_edges(root.node_id):
+            if e.edge_type == "has_paradata_nodegroup" and e.edge_source == root.node_id:
+                p = graph.find_node_by_id(e.edge_target)
+                if p is not None:
+                    return p
+        return None
+
+    pdg = _existing_pdg()
+
+    # existing member node_types (idempotency — never a second author/…)
+    present = set()
+    if pdg is not None:
+        for e in graph.get_connected_edges(pdg.node_id):
+            if e.edge_type == "is_in_paradata_nodegroup" and e.edge_target == pdg.node_id:
+                m = graph.find_node_by_id(e.edge_source)
+                if m is not None:
+                    present.add(m.node_type)
+
+    def _add_member(node, member_data=None) -> None:
+        nonlocal pdg
+        if pdg is None:
+            pdg = ParadataNodeGroup(node_id=f"{gid}_graph_paradata",
+                                    name="Graph paradata")
+            graph.add_node(pdg)
+            graph.add_edge(f"{root.node_id}__has_paradata_nodegroup__{pdg.node_id}",
+                           root.node_id, pdg.node_id, "has_paradata_nodegroup")
+        # The value is a plain string; keep it verbatim in the node NAME (what
+        # the Data Funnel reads) and clear the constructor's default structured
+        # data so BOTH resolver formatters fall back to the name and the wire
+        # form matches the EMStudio side (which sets name only). ORCID is the one
+        # extra bit the GraphML header carries — kept on the author's data.
+        node.data = dict(member_data) if member_data else {}
+        graph.add_node(node)
+        graph.add_edge(
+            f"{node.node_id}__is_in_paradata_nodegroup__{pdg.node_id}",
+            node.node_id, pdg.node_id, "is_in_paradata_nodegroup")
+
+    if author not in (None, "") and "author" not in present:
+        _add_member(AuthorNode(node_id=f"{gid}_graph_author", name=str(author)),
+                    {"orcid": str(orcid)} if orcid not in (None, "") else None)
+    if license not in (None, "") and "license" not in present:
+        _add_member(LicenseNode(node_id=f"{gid}_graph_license", name=str(license)))
+    if embargo not in (None, "") and "embargo" not in present:
+        _add_member(EmbargoNode(node_id=f"{gid}_graph_embargo", name=str(embargo)))
+
+    return root
+
+
+def _migrate_legacy_graph_scope(graph) -> None:
+    """One-shot legacy migration: documents produced before MIG1-A (post
+    BUGFIX-CANVAS-IMPORT) carried the graph-scope author / licence / embargo as
+    ``graph.data['author_name' | 'license' | 'embargo']`` fields. Materialise
+    them into the DP-65 graph-scope nodes (shared :func:`materialize_graph_scope`)
+    and drop the legacy fields. No-op when there is nothing legacy to migrate —
+    files written by the IMP1 GraphML importer already carry the nodes.
+    """
+    data = getattr(graph, "data", None)
+    if not isinstance(data, dict):
+        return
+    legacy = {k: data.get(k) for k in _LEGACY_GRAPH_SCOPE_FIELDS
+              if data.get(k) not in (None, "")}
+    if not legacy:
+        return
+    materialize_graph_scope(
+        graph,
+        author=legacy.get("author_name"),
+        license=legacy.get("license"),
+        embargo=legacy.get("embargo"),
+    )
+    # drop the legacy fields we consumed (the nodes are now the truth)
+    for k in legacy:
+        data.pop(k, None)
 
 
 def import_emjson(filepath: str) -> Tuple[Graph, List[str]]:

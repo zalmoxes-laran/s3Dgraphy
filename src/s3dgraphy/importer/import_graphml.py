@@ -324,7 +324,11 @@ class GraphMLImporter:
                     if 'graph_id' in vocabolario:
                         graph_id = vocabolario['graph_id']
 
-                    # Store graph header metadata for downstream use
+                    # Store graph header metadata for downstream use. These stay
+                    # in graph.ATTRIBUTES (in-memory only — the emjson exporter
+                    # serialises graph.data/name, not attributes), so the DP-19
+                    # inference pass still sees the canvas author/license/embargo
+                    # presence. They are NOT the source of truth any more.
                     header_keys = [
                         'ORCID', 'author_name', 'author_surname',
                         'license', 'embargo', 'description'
@@ -333,28 +337,30 @@ class GraphMLImporter:
                         if key in vocabolario:
                             self.graph.attributes[key] = vocabolario[key]
 
-                    # BUGFIX-CANVAS-IMPORT (2026-08-06): the header metadata above
-                    # go into graph.ATTRIBUTES — where s3Dgraphy's own resolver
-                    # reads them (builtin_rules._author_graph_level) — but the
-                    # emjson exporter serialises graph.DATA only, so they never
-                    # reached EMStudio. Also write the CANONICAL canvas-scope keys
-                    # into graph.data: author_name (composed display), license,
-                    # embargo — the EXACT fields EMStudio's CANVAS1 writes and
-                    # funnel.ts::readScopeValue reads (its g.data[...] canvas tier).
-                    # ONE read per consumer (s3Dgraphy: attributes; EMStudio: data);
-                    # both written here so neither is stale (DP-40).
+                    # IMP1 (2026-08-07): the graph-scope author / licence /
+                    # embargo + EM-ID are materialised as first-class NODES
+                    # (MIG1-A / DP-65), NOT written to graph.data. Stash the
+                    # header values; parse() builds the nodes once
+                    # graph.graph_id is fixed (the GraphNode + member ids derive
+                    # from it), reusing the shared materialize_graph_scope helper.
+                    # The legacy graph.data path is gone from the importer — the
+                    # one-shot migration stays only for old em.json files.
                     _an = vocabolario.get('author_name', '')
                     _as = vocabolario.get('author_surname', '')
                     _display = f"{_an} {_as}".strip()
-                    if _display:
-                        self.graph.data['author_name'] = _display
-                    if 'license' in vocabolario:
-                        self.graph.data['license'] = vocabolario['license']
-                    if 'embargo' in vocabolario:
-                        self.graph.data['embargo'] = vocabolario['embargo']
+                    self._graph_scope_meta = {
+                        'author': _display or None,
+                        'license': vocabolario.get('license'),
+                        'embargo': vocabolario.get('embargo'),
+                        'orcid': vocabolario.get('ORCID'),
+                        'em_id': vocabolario.get('ID'),
+                    }
 
-                    # Store the clean graph name (without vocabulary)
+                    # Name the graph from the HEADER (IMP1): graph.name drives the
+                    # EMStudio slot label; the file name is only the fallback used
+                    # downstream when this is empty.
                     if stringa_pulita:
+                        self.graph.name = {'default': stringa_pulita}
                         self.graph.attributes['graph_label'] = stringa_pulita
 
                     break
@@ -528,7 +534,26 @@ class GraphMLImporter:
                 if hasattr(node, 'description') and '_continuity' in node.description:
                     pass
                     # print(f"  Found node with _continuity in description: {node.node_id} (Type: {node.node_type if hasattr(node, 'node_type') else 'Unknown'})")
-        
+
+        # IMP1 · materialise the graph-scope metadata (author / licence / embargo
+        # + EM-ID) as first-class nodes (MIG1-A / DP-65), reusing the SHARED
+        # helper so GraphML import and the em.json one-shot migration produce the
+        # SAME shape. Done here, after graph.graph_id is fixed (member ids derive
+        # from it) and after node/edge parsing, so there is no graph.data
+        # double-truth and no interference with the inference passes above.
+        meta = getattr(self, '_graph_scope_meta', None)
+        if meta and any(meta.get(k) for k in
+                        ('author', 'license', 'embargo', 'em_id')):
+            from .emjson_importer import materialize_graph_scope
+            materialize_graph_scope(
+                self.graph,
+                author=meta.get('author'),
+                license=meta.get('license'),
+                embargo=meta.get('embargo'),
+                em_id=meta.get('em_id'),
+                orcid=meta.get('orcid'),
+            )
+
         return self.graph
 
     def slipback_uuids_to_graphml(self):

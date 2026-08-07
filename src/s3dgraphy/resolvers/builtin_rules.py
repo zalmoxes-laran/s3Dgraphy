@@ -4,10 +4,13 @@
 - ``absolute_time_start`` / ``absolute_time_end``: feed Layer B (TPQ/TAQ closure)
   and reproduce the behavior of the previous hardcoded
   ``Graph._calculate_base_chronology``.
-- ``author``: declaration of the authorship property. Node-level and
-  swimlane-level getters return ``None`` until DP-51 formalizes AuthorNode
-  and has_author edges in yEd. Graph-level already works today: the Canvas
-  Header loader (DP-40) populates ``graph.attributes['author_name' | ...]``.
+- ``author`` / ``license`` / ``embargo``: rights metadata. Node- and
+  swimlane-level getters follow ``has_author`` / ``has_license`` /
+  ``has_embargo`` edges. Graph-level (MIG1-A / DP-65): read the AuthorNode /
+  LicenseNode / EmbargoNode MEMBERS of the graph-scope ParadataNodeGroup owned
+  by the graph-self node (``GraphNode``); the legacy ``graph.attributes`` read
+  is gone (clean cut — one reader per scope). A one-shot importer migration
+  materialises legacy ``graph.data`` fields into these nodes.
 """
 
 from .property_resolver import PropagationRule, register_rule
@@ -224,14 +227,57 @@ def _author_swimlane_level(graph, epoch):
     return _collect_authors(graph, epoch)
 
 
+def _graph_scope_members(graph, target_cls_name):
+    """Members of the graph-scope ParadataNodeGroup matching ``target_cls_name``.
+
+    MIG1-A / DP-65: the graph-self node (``GraphNode``, node_type ``graph``)
+    owns a graph-scope ``ParadataNodeGroup`` via ``has_paradata_nodegroup``; the
+    author / licence / embargo metadata live as ``AuthorNode`` / ``LicenseNode``
+    / ``EmbargoNode`` MEMBERS of that group (``is_in_paradata_nodegroup``),
+    replacing the legacy ``graph.attributes`` fields. Yields matching member
+    nodes (subclass-aware) in stable edge order.
+    """
+    try:
+        roots = graph.get_nodes_by_type("graph")
+    except Exception:
+        return
+    for root in roots:
+        for edge in graph.get_connected_edges(root.node_id):
+            if getattr(edge, "edge_type", None) != "has_paradata_nodegroup" \
+                    or edge.edge_source != root.node_id:
+                continue
+            pdg = graph.find_node_by_id(edge.edge_target)
+            if pdg is None:
+                continue
+            for medge in graph.get_connected_edges(pdg.node_id):
+                if getattr(medge, "edge_type", None) != "is_in_paradata_nodegroup" \
+                        or medge.edge_target != pdg.node_id:
+                    continue
+                member = graph.find_node_by_id(medge.edge_source)
+                if member is None:
+                    continue
+                for base in type(member).__mro__:
+                    if base.__name__ == target_cls_name:
+                        yield member
+                        break
+
+
 def _author_graph_level(graph):
-    """Canvas-header author from DP-40. Composes author_name+surname."""
-    attrs = getattr(graph, "attributes", {}) or {}
-    name = attrs.get("author_name")
-    surname = attrs.get("author_surname")
-    if name and surname:
-        return f"{name} {surname}".strip()
-    return name or surname or None
+    """Graph-scope author = ``AuthorNode`` members of the graph-scope PDG (DP-65).
+
+    MIG1-A clean cut: the legacy ``graph.attributes['author_name']`` read is
+    gone; the canvas tier is the graph-scope PDG member nodes (one reader per
+    scope). Multiple authors are joined like the node/swimlane levels.
+    """
+    seen = set()
+    parts = []
+    for author in _graph_scope_members(graph, "AuthorNode"):
+        text = _format_author(author)
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        parts.append(text)
+    return _AUTHOR_SEPARATOR.join(parts) if parts else None
 
 
 AUTHOR_RULE = PropagationRule(
@@ -272,8 +318,13 @@ def _license_swimlane_level(graph, epoch):
 
 
 def _license_graph_level(graph):
-    attrs = getattr(graph, "attributes", {}) or {}
-    return attrs.get("license") or None
+    """Graph-scope licence = first ``LicenseNode`` member of the graph-scope PDG
+    (DP-65). MIG1-A clean cut from ``graph.attributes['license']``."""
+    for lic in _graph_scope_members(graph, "LicenseNode"):
+        v = _format_license(lic)
+        if v:
+            return v
+    return None
 
 
 LICENSE_RULE = PropagationRule(
@@ -317,8 +368,13 @@ def _embargo_swimlane_level(graph, epoch):
 
 
 def _embargo_graph_level(graph):
-    attrs = getattr(graph, "attributes", {}) or {}
-    return attrs.get("embargo") or None
+    """Graph-scope embargo = first ``EmbargoNode`` member of the graph-scope PDG
+    (DP-65). MIG1-A clean cut from ``graph.attributes['embargo']``."""
+    for emb in _graph_scope_members(graph, "EmbargoNode"):
+        v = _format_embargo(emb)
+        if v:
+            return v
+    return None
 
 
 EMBARGO_RULE = PropagationRule(

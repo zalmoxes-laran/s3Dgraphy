@@ -1,12 +1,16 @@
-"""BUGFIX-CANVAS-IMPORT (2026-08-06) — graphml canvas metadata land in the
-CANONICAL fields the funnel / Canvas inspector read.
+"""IMP1 (2026-08-07) — the GraphML importer materialises the graph-scope
+rights metadata as first-class NODES (MIG1-A / DP-65), not graph.data fields.
 
-The canvas-scope author / license / embargo that EMStudio's CANVAS1 writes and
-``funnel.ts::readScopeValue`` reads live at ``graph.data['author_name' |
-'license' | 'embargo']`` (the em.json ``graph.data`` the exporter emits; the
-funnel's canonical read key). The importer used to put license/embargo under a
-DIFFERENT key (``embargo_until``) and the author only in an AuthorNode, so the
-imported metadata never showed in the UI nor propagated through the funnel.
+Header author / licence / embargo + EM-ID now become member nodes of a
+graph-scope ParadataNodeGroup owned by the graph-self node (GraphNode):
+
+    GraphNode ─has_paradata_nodegroup→ PDG ←is_in_paradata_nodegroup─ Author/License/Embargo
+
+The value lives in each member's NAME (what funnel.ts / builtin_rules read); the
+EM-ID (site key) is on GraphNode.data.em_id; the graph is named from the header.
+This supersedes BUGFIX-CANVAS-IMPORT (which wrote graph.data['author_name'|…]):
+the importer no longer writes those fields — the one-shot migration keeps reading
+legacy em.json, but freshly imported GraphML carries the nodes directly.
 """
 
 import pathlib
@@ -21,27 +25,73 @@ def _import():
     return GraphMLImporter(str(FIXTURE), Graph(graph_id="g")).parse()
 
 
-def test_author_lands_in_canonical_field():
+def _graph_root(g):
+    roots = g.get_nodes_by_type("graph")
+    assert roots, "the importer must materialise a graph-self GraphNode"
+    return roots[0]
+
+
+def _members(g):
+    """node_type -> the member node of the graph-scope PDG."""
+    root = _graph_root(g)
+    pdg_ids = [e.edge_target for e in g.get_connected_edges(root.node_id)
+               if e.edge_type == "has_paradata_nodegroup"
+               and e.edge_source == root.node_id]
+    assert pdg_ids, "the GraphNode must own a graph-scope ParadataNodeGroup"
+    out = {}
+    for pdg_id in pdg_ids:
+        for e in g.get_connected_edges(pdg_id):
+            if e.edge_type == "is_in_paradata_nodegroup" and e.edge_target == pdg_id:
+                m = g.find_node_by_id(e.edge_source)
+                out[m.node_type] = m
+    return out
+
+
+def test_author_is_a_graph_scope_node():
     g = _import()
-    # canonical canvas-tier author: graph.data['author_name'] (display name)
-    assert g.data.get("author_name") == "Emanuel Demetrescu"
+    author = _members(g).get("author")
+    assert author is not None, "an AuthorNode must exist in the graph-scope PDG"
+    # display value lives in the node name (composed name + surname)
+    assert author.name == "Emanuel Demetrescu"
 
 
-def test_license_lands_in_canonical_field():
+def test_author_keeps_orcid_on_data():
     g = _import()
-    assert g.data.get("license") == "CC-BY-NC"
+    author = _members(g)["author"]
+    assert (author.data or {}).get("orcid") == "0000-0002-1825-0097"
 
 
-def test_embargo_lands_in_canonical_key_not_legacy():
+def test_license_is_a_graph_scope_node():
     g = _import()
-    # canonical key is 'embargo' (what the funnel reads), NOT 'embargo_until'
-    assert g.data.get("embargo") == "2025-12-31"
+    lic = _members(g).get("license")
+    assert lic is not None and lic.name == "CC-BY-NC"
 
 
-def test_header_metadata_also_in_graph_attributes_for_s3dgraphy():
+def test_embargo_is_a_graph_scope_node():
     g = _import()
-    # s3Dgraphy's OWN resolver (builtin_rules._author_graph_level) reads
-    # graph.attributes; both stores are written so neither reader is stale (DP-40).
-    assert g.attributes.get("author_name") == "Emanuel"
-    assert g.attributes.get("license") == "CC-BY-NC"
-    assert g.attributes.get("ORCID") == "0000-0002-1825-0097"
+    emb = _members(g).get("embargo")
+    assert emb is not None and emb.name == "2025-12-31"
+
+
+def test_em_id_is_the_site_key_on_graphnode():
+    """The header ID (e.g. 'TestSite') is the human-readable EM-ID / site key,
+    stored on GraphNode.data.em_id (IMP1)."""
+    g = _import()
+    root = _graph_root(g)
+    assert (root.data or {}).get("em_id") == "TestSite"
+
+
+def test_graph_named_from_header_not_file():
+    """graph.name comes from the header label ('Archaeological Site'), not from
+    the fixture file name."""
+    g = _import()
+    name = g.name.get("default") if isinstance(g.name, dict) else g.name
+    assert name == "Archaeological Site"
+
+
+def test_no_legacy_graph_data_fields_written():
+    """Clean cut: the importer no longer writes graph.data['author_name'|
+    'license'|'embargo'] — the nodes are the single truth."""
+    g = _import()
+    for k in ("author_name", "license", "embargo"):
+        assert k not in (g.data or {}), f"graph.data must not carry {k!r} anymore"
