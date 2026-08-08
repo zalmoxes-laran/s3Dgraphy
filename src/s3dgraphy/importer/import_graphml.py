@@ -27,6 +27,44 @@ import json
 # Yworks XML namespace (used when scanning y:ImageNode elements)
 _Y_NS = '{http://www.yworks.com/xml/graphml}'
 
+# IMPKEYS · header-key aliases → canonical keys (single normalisation point).
+# The graphml header vocabulary (e.g. "Site [ID:GT16; LICENCE:CC-BY; ...]") is
+# authored by humans with US/UK spellings and casing; real files use e.g. UK
+# `LICENCE` and uppercase `EMBARGO` (Aiano). We map recognised VARIANTS to the
+# canonical keys the importer/materialiser read (MIG1-A/IMP1). Matching is
+# case-insensitive; keys are inspected from the real files (Aiano, Templu Mare)
+# plus common UK/US variants — not invented. Unknown keys pass through verbatim
+# (no loss); absent keys stay absent (no fabricated values).
+_HEADER_KEY_ALIASES = {
+    "id": "ID", "em_id": "ID", "emid": "ID",
+    "orcid": "ORCID",
+    "author_name": "author_name", "author": "author_name", "authorname": "author_name",
+    "author_surname": "author_surname", "surname": "author_surname",
+    "license": "license", "licence": "license",
+    "embargo": "embargo",
+    "description": "description",
+    "graph_id": "graph_id",
+}
+
+
+def _normalize_header_vocab(vocab):
+    """Return ``vocab`` with recognised variant keys renamed to canonical keys
+    (case-insensitive). An explicit canonical key already present is never
+    clobbered by a variant; unknown keys are kept verbatim."""
+    out = {}
+    # canonical keys first, so a variant can't overwrite an explicit canonical
+    for k, v in vocab.items():
+        canon = _HEADER_KEY_ALIASES.get(str(k).strip().lower())
+        if canon is not None and canon == k:
+            out[canon] = v
+    for k, v in vocab.items():
+        canon = _HEADER_KEY_ALIASES.get(str(k).strip().lower())
+        if canon is None:
+            out.setdefault(k, v)
+        elif canon != k:
+            out.setdefault(canon, v)
+    return out
+
 # --- Deterministic ids for elements without an EMID (E2) --------------------
 # A GraphML element that carries an ``EMID`` keeps it: that is the authored
 # identity and nothing here touches it. Everything else used to get a fresh
@@ -315,7 +353,12 @@ class GraphMLImporter:
             if RowNodeLabelModelParameter is None and ColumnNodeLabelModelParameter is None:
                 try:
                     stringa_pulita, vocabolario = self.estrai_stringa_e_vocabolario(nodelabel.text)
-                    
+                    # IMPKEYS · normalise header-key VARIANTS to the canonical keys
+                    # BEFORE anything reads them (one place, no scattered casing
+                    # logic). e.g. a real Aiano header uses UK `LICENCE`/`EMBARGO`;
+                    # without this its LicenseNode was silently never materialised.
+                    vocabolario = _normalize_header_vocab(vocabolario)
+
                     # Extract ID if present in vocabulary
                     if 'ID' in vocabolario:
                         graph_code = vocabolario['ID']
@@ -2073,118 +2116,9 @@ class GraphMLImporter:
                 pass
                 # print(f"ERROR durante l'elaborazione dell'etichetta: {e}")
 
-    def process_general_data(self, nodelabel, graph):
-        """
-        Processa i dati generali dal nodelabel e li aggiunge al grafo.
-        """
-        # print(f"\nProcessing general data from GraphML header:")
-        # print(f"Raw nodelabel text: '{nodelabel.text}'")
-        
-        stringa_pulita, vocabolario = self.estrai_stringa_e_vocabolario(nodelabel.text)
-        # print(f"Stringa pulita: '{stringa_pulita}'")
-        # print(f"Vocabolario estratto: {vocabolario}")
-        
-        try:
-            # Imposta il nome e l'ID del grafo
-            if 'ID' in vocabolario:
-                # print(f"Found ID: {vocabolario['ID']}")
-                graph.graph_id = vocabolario['ID']
-            else:
-                # Fallback al nome del file
-                import os
-                graph.graph_id = os.path.splitext(os.path.basename(self.filepath))[0]
-                # print(f"Using filename as graph ID: {graph.graph_id}")
-
-            graph.name = {'default': stringa_pulita}
-            # print(f"Set graph ID to: {graph.graph_id}")
-            # print(f"Set graph name to: {graph.name}")
-                
-            # Crea il nodo grafo stesso. `GraphNode` (node_type "graph") esiste
-            # apposta — "it allows the graph itself to be linked to other nodes,
-            # such as authors and licences" — e il datamodel lo ammette come
-            # source di has_author. Un `Node` nudo, invece, non ha alcun tipo: il
-            # nodo finiva fra i "non tipizzati" e ogni suo arco veniva rifiutato.
-            from ..nodes.graph_node import GraphNode
-            graph_node = GraphNode(
-                node_id=graph.graph_id,
-                name=stringa_pulita
-            )
-            graph.add_node(graph_node)
-                
-            # Crea e connetti il nodo autore se presente un ORCID
-            if 'ORCID' in vocabolario:
-                # print(f"Found ORCID: {vocabolario['ORCID']}")
-                from ..nodes.author_node import AuthorNode
-                
-                # Componi il nome completo per il display
-                author_name = vocabolario.get('author_name', '')
-                author_surname = vocabolario.get('author_surname', '')
-                display_name = f"{author_name} {author_surname}".strip()
-                
-                # Crea l'ID dell'autore
-                author_id = f"author_{vocabolario['ORCID']}"
-                
-                # Crea il nodo autore usando solo i parametri accettati dal costruttore
-                author_node = AuthorNode(
-                    node_id=author_id,
-                    orcid=vocabolario['ORCID'],
-                    name=author_name,
-                    surname=author_surname
-                )
-                # print(f"Created author node with ID: {author_id}")
-                
-                # Aggiungi il nodo al grafo
-                graph.add_node(author_node)
-                
-                # Aggiungi l'autore alla lista degli autori nei dati del grafo
-                if 'authors' not in graph.data:
-                    graph.data['authors'] = []
-                if author_id not in graph.data['authors']:
-                    graph.data['authors'].append(author_id)
-                
-                # Crea l'edge tra grafo e autore. Direzione: il grafo HA un
-                # autore, quindi source=grafo, target=autore — come dichiara il
-                # datamodel (has_author: GraphNode|… → AuthorNode) e come lo legge
-                # il resto della libreria (diagnostics._has_author_target parte
-                # dal nodo di origine). Era invertito, e l'arco degradava.
-                edge_id = f"authorship_{author_id}"
-                graph.add_edge(
-                    edge_id=edge_id,
-                    edge_source=graph.graph_id,
-                    edge_target=author_id,
-                    edge_type="has_author"
-                )
-                # print(f"Added author node and edge: {author_id}")
-                    
-            # Aggiorna la descrizione del grafo
-            if 'description' in vocabolario:
-                # print(f"Found description: {vocabolario['description']}")
-                graph.description = {'default': vocabolario['description']}
-                    
-            # Gestisce la data di embargo se presente
-            if 'embargo' in vocabolario:
-                # print(f"Found embargo: {vocabolario['embargo']}")
-                graph.data['embargo_until'] = vocabolario['embargo']
-
-            # Gestisce la licenza se presente
-            if 'license' in vocabolario:
-                # print(f"Found license: {vocabolario['license']}")
-                graph.data['license'] = vocabolario['license']
-
-            # print(f"\nGraph data after processing:")
-            # print(f"ID: {graph.graph_id}")
-            # print(f"Name: {graph.name}")
-            # print(f"Description: {graph.description}")
-            # print(f"Data: {graph.data}")
-            # print(f"Authors: {graph.data.get('authors', [])}")
-            
-        except Exception as e:
-            # print(f"Error processing general data: {e}")
-            import traceback
-            traceback.print_exc()
-
-
-
+    # IMPKEYS (2026-08-08): process_general_data was DEAD CODE after IMP1
+    # (the graph name + graph-scope nodes are set in extract_graph_id_and_code
+    # and materialize_graph_scope). Removed; header handling lives in one place.
 
     def _enrich_canonical_documents(self):
         """

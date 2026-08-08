@@ -276,30 +276,8 @@ def test_edges_touching_an_untyped_node_are_the_nodes_problem():
     assert rep["would_degrade"] == 0   # not an edge error: the endpoint has no type
 
 
-# ── F1: the graph's own node is a GraphNode, not an untyped one ──────────────
-def test_the_graph_node_is_typed_and_owns_its_author():
-    """`process_general_data` builds the node that represents the graph itself
-    (so authors/licences can hang off it). It used to build a bare `Node`, which
-    has no type at all, and to write the authorship edge backwards.
-
-    NOTE: this method is currently UNREACHABLE — nothing in the importer calls it,
-    and the header metadata lands in `graph.attributes` instead. The test drives
-    it directly so the fix is covered if/when it gets wired in."""
-    import xml.etree.ElementTree as ET
-    from s3dgraphy.graph import Graph
-    from s3dgraphy.importer.import_graphml import GraphMLImporter
-
-    g = Graph(graph_id="placeholder")
-    imp = GraphMLImporter(filepath="<none>", graph=g)
-    label = ET.fromstring(
-        '<NodeLabel>Templu Mare [ID:TM01; ORCID:0000-0002-1825-0097; '
-        'author_name:Ada; author_surname:Lovelace]</NodeLabel>')
-    imp.process_general_data(label, g)
-
-    node = g.find_node_by_id("TM01")
-    assert node is not None and node.node_type == "graph"
-
-    edge = next(e for e in g.edges if e.edge_type == "has_author")
-    assert edge.edge_source == "TM01"        # the graph HAS an author…
-    assert edge.edge_target.startswith("author_")   # …not the other way round
-    assert g.warnings == []                  # nothing degraded
+# IMPKEYS (2026-08-08): removed test_the_graph_node_is_typed_and_owns_its_author.
+# It drove the now-deleted dead method process_general_data; IMP1's
+# materialize_graph_scope is the real wiring (graph-self GraphNode + graph-scope
+# author as a PDG member via is_in_paradata_nodegroup, not has_author from the
+# graph node). The old has_author-from-graph model is superseded, not pending.
