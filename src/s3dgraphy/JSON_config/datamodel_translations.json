@@ -1,0 +1,1078 @@
+{
+ "schema": "s3Dgraphy_datamodel_translations",
+ "version": "1.0",
+ "languages": [
+  "en",
+  "it",
+  "el",
+  "he",
+  "es",
+  "pl",
+  "ro",
+  "fr"
+ ],
+ "entries": {
+  "ActivityNodeGroup": {
+   "description": {
+    "en": "Group node for activities. An activity is a logical group of actions that are kept together for a narrative purpose and information order (e.g., construction of a room of a building in year x, restoration activities of various parts of that room 20 years later).",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Activity Node Group",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "AuthorAINode": {
+   "description": {
+    "en": "AI agent (model + prompt_reference) responsible for asserting or refining one or more nodes. Python: AuthorAINode (node_type='author_ai'), subclass of AuthorNode. Already referenced as target in connections_datamodel.json has_author edge. The Python class carries 'model' and 'prompt_reference' in node.data for reproducibility.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "AI Author",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "AuthorNode": {
+   "description": {
+    "en": "Human author of one or more nodes. Identified by ORCID where possible. Python: AuthorNode (node_type='author'). The AI-assisted variant is AuthorAINode (subclass of AuthorNode). An isinstance check against AuthorNode matches both at the code level; the node_type discriminator and the em_extension.uri distinguish them semantically.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Author (human)",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "CombinerNode": {
+   "description": {
+    "en": "Node that represents the act of combining MULTIPLE extracted beliefs into a single conclusion. The 'X and Y therefore Z' step in the EM paradata chain: combiner takes multiple ExtractorNode inputs and produces a synthesized assertion. Distinct from ExtractorNode (single-source belief adoption).",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Combiner",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "ContinuityNode": {
+   "description": {
+    "en": "End of life of a SU/USV. Marks the point in time when a stratigraphic unit ceases to exist (destruction, dismantling, deep transformation that no longer preserves identity).",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "continuity node",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "DTCAcquisitionNode": {
+   "description": {
+    "en": "A DTC ACQUISITION chunk: the digital event by which an asset ENTERS this study from an (opaque, Tier-0) external source — a data-transfer / ingestion event, DISTINCT from the genesis DTCProcessNode. Projected as crmdig:D12_Data_Transfer_Event (a subclass of D7_Digital_Machine_Event, ⊂ prov:Activity): 'events that transfer a digital object from one digital carrier to another; normally the digital object remains the same' — the object arrives opaque, no genesis is asserted. Tier 0: single-ring chain — the acquisition event --dtc_had_output[prov:generated]--> the acquired Resource (ResourceNode); the upstream root is an opaque external entity recorded as literals on data (repo/record/agent/retrieved_at/rights), not a genesis sub-graph. data.dtc_kind from the `acquisition` axis (download / ingest / local_import). Keeps genesis != acquisition as distinct TYPES inside the one DTC substrate.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "DTC Acquisition",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "DTCProcessNode": {
+   "description": {
+    "en": "A DTC PROCESS chunk: the transformation/processing event that turns inputs into produced digital objects (data.dtc_kind from the `process` axis, e.g. transformation). Projected as a crmdig:D7_Digital_Machine_Event / prov:Activity; its inputs and outputs are the dtc_had_input (prov:used) and dtc_had_output (prov:generated) edges.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "DTC Process",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "DocumentNode": {
+   "description": {
+    "en": "Node that represents a document or source. Attributes: data (dict): Additional metadata, such as 'url_type'.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Document",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "DocumentaryStratigraphicUnit": {
+   "description": {
+    "en": "Documentary Stratigraphic Unit. Represents a conceptual stratigraphic unit inferred from historical or documentary sources rather than direct archaeological observation. A USD is the RESULT of a document (an SU posited because a document attests it), NOT a document itself.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "USD",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "EmbargoNode": {
+   "description": {
+    "en": "Represents a temporal embargo on access or distribution of a node, license, or whole graph. Carries embargo_start, embargo_end (optional, indefinite if absent), and reason. Connected via has_embargo edge to a Node, LicenseNode, or GraphNode.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Embargo",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "EpochNode": {
+   "description": {
+    "en": "Node representing a temporal epoch. It is a convenient grouping that allows attributing a series of actions to a temporal delta. Once the specific chronology data, expressed as start_time and end_time properties of individual SUs, is defined through dating elements, these epoch nodes are ignored where such specific data are available.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Epoch",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "ExtractorNode": {
+   "description": {
+    "en": "Node that represents the act of extracting information / adopting a belief FROM a single source (DocumentNode). The mediator between a source and an assertion: 'I adopted this belief because the source says so'. Distinct from CombinerNode which combines MULTIPLE extractions.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Extractor",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "FunctionalUnitNodeGroup": {
+   "description": {
+    "en": "Typed aggregation of the stratigraphic units that make up one recognisable functional/architectural component — the column made of its US, the wall made of its US (DP-72). Answers what a set of units IS, as a building component. Built BOTTOM-UP from the stratigraphic reading: the member units stay intact and fully stratigraphic underneath, each keeping its own epochs, paradata and provenance. Membership is a TAG axis, 'is_in_functional_unit' (m:n, additive), NOT the nesting axis 'is_part_of': the relation is the same mereological P46i, but a Functional Unit legitimately SPANS EPOCHS (a wall built across four of them still carries the roof as one body) and a swimlane box cannot, so the functional reading lives in its own view beside pure stratigraphy without either constraining the other. NOT an ActivityNodeGroup (DP-43: a cluster of actions/processes — what was DONE, not what the units ARE); NOT a generic container (DP-36: a US/USD/VSF acting as container is still a stratigraphic unit with its own formation event, while a Functional Unit has none of its own); NOT a LocationNodeGroup of kind 'functional' (a named PLACE answering 'where', not a COMPONENT answering 'what'); NOT a geometric construction grammar (the geometry type travels BY REFERENCE via 'geometry_type_ref', nothing internalized). Attach rules: members StratigraphicNode --is_in_functional_unit--> FunctionalUnit; nesting FunctionalUnit --is_in_functional_unit--> FunctionalUnit (the capital inside the column); FunctionalUnit --is_part_of--> US stays legal and means the whole component PHYSICALLY EMBEDDED in a stratigraphic unit (a column engaged in a later wall). The orthogonal axes stay orthogonal: a member keeps its own has_first_epoch / is_in_activity / is_in_location, and the Functional Unit has NO epoch of its own — its temporal extent is DERIVED from its members and may cover several epochs. EM manual: 'SU / USD / VSF as Container' (Stratigraphic Nodes) and the is_part_of connector.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Functional Unit",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "GeoPositionNode": {
+   "description": {
+    "en": "Class to represent a GeoPosition node in the graph. Attributes: type (str): Node type, set to 'geo_position'. data (dict): Data related to geographic position.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Geo Position",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "GraphNode": {
+   "description": {
+    "en": "Represents the EM graph itself as a node, used as anchor for graph-wide metadata (author, license, embargo, default epoch, project-level provenance). Enables graph-level inheritance for metadata propagation: values declared on the GraphNode become defaults for all contained nodes unless overridden. Targeted by has_author, has_license, has_embargo edges to carry global defaults. In HDT-O terms (D7.1) an EM graph IS a Heritage Proposition Set (HC16) — a named graph carrying formal assertions about a heritage entity. Connectable via contains_proposition_set (HP33) to one or more HDTNode (HC2 Heritage Digital Twin) instances.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Graph",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "GroupNode": {
+   "description": {
+    "en": "Node that represents a group of nodes. These groups can be of various types: see subclasses below.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "HDTNode": {
+   "description": {
+    "en": "Represents an HC2 Heritage Digital Twin (HDT-O, ECHOES D7.1). An HDT is a named container that aggregates Heritage Proposition Sets (em:EMGraph instances) about a heritage entity (HC1). HDTs can be nested hierarchically via has_digital_twin_component (HP3 inverse) — e.g. Colosseo_HDT_overall has component Colosseo_HDT_Flavian. An EM graph attaches to an HDT via contains_proposition_set (HP33). The HDT is linked to its real-world heritage entity (HC1) via has_digital_twin (HP1).",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Heritage Digital Twin",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "HeritageEntityNode": {
+   "description": {
+    "en": "HC1 Heritage Entity (HDT-O, ECHOES D7.1): the real-world entity socially recognized as having cultural/historical/scientific value that an HC2 Heritage Digital Twin (HDTNode) is a digital twin of. Completes the canonical HDT-O chain HC1 -has_digital_twin(HP1)-> HC2 -contains_proposition_set(HP33)-> HC16 (em:EMGraph/GraphNode). HDT-O-view node: not shown in the stratigrapher palette (like HDTNode/GraphNode). HC3 Tangible / HC4 Intangible specializations are deferred.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Heritage Entity",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "LicenseNode": {
+   "description": {
+    "en": "Represents the license under which a node (or the whole graph via GraphNode) is published. Identified by license_type (e.g. 'CC-BY-4.0') and url to the license text. Connected via has_license edge to Nodes or GraphNode.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "License",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "LocationNodeGroup": {
+   "description": {
+    "en": "Group node for spatial / locational membership of stratigraphic units and paradata. Orthogonal to ActivityNodeGroup (intention) and EpochNode (time): a Location answers the question 'what (named) place is this in?'. Three required kinds coexist on the same axis: 'toponym' (external/administrative identity, e.g. Pompei), 'study' (operational/procedural identity, e.g. Saggio4/A2) and 'functional' (interpretive/semantic identity, e.g. Casa del Fauno / Room 12). Propagation is additive: multiple memberships compose, none overrides — distinct from EpochNode which is substitutive (finest-grained wins). Membership is m:n via multiple is_in_location edges; the optional 'is_primary: true' attribute on one edge marks the membership rendered as a yEd group folder in em-graph. Locations are hierarchical: a LocationNodeGroup can itself be is_in_location of another LocationNodeGroup. A Location is identitary, not geometric: for coordinates / EPSG / shifts use GeoPositionNode (linked at the CIDOC level via P161).",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Location Node Group",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "NarrativeNode": {
+   "description": {
+    "en": "A narrative over the EM graph: an ordered sequence of chapters, each anchored to a lane (epoch, activity, area) or standing outside the stratigraphy (introduction, geographic placement), and each composed of prose blocks and embed blocks. An embed references an EM resource by its stable id and declares a view_type (matrix, scene3d, us, rm, document, source, paradata, map, timeline, table, un_scene; 'epoch3d' is the retired spelling of 'scene3d' and is still accepted on read) saying how it should be shown. Metadata follows the existing conventions: author / license / embargo (DP-32), lang (DP-63), version, and template_id recording which scaffolder produced the first draft.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Narrative",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "NegativeStratigraphicUnit": {
+   "description": {
+    "en": "Negative Stratigraphic Unit (US negativa, displayed 'US-') — a lacuna produced by a SUBTRACTION of matter: a pit cut, an opening broken through a wall, an erosion surface, a levelling. What defines it is the destructive act, which is what separates it from the NEUTRAL unit (USNt), a void that was never filled because it was never meant to be. Equally observable on the ground as a positive unit, hence the `real` family. POL6 (2026-08-04): the token is USN again — the historical spelling of this library and of what pyArchInit vendors, and the one that reads as the Italian 'US Negativa'. POL5 had briefly moved it to 'USNeg' to free USN for the neutral unit; that made a token spell one thing and mean another, and put the two projects in disagreement about a three-letter word.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "US-",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "NeutralStratigraphicUnit": {
+   "description": {
+    "en": "Neutral Stratigraphic Unit (Unità Stratigrafica Neutra, USNt) — a void that is part of the DESIGN and not the product of a destruction: the `risparmi` of masonry, a window or door opening, a niche, the empty volume of a room. The wall was built around it, so nothing was ever removed. The distinction from the negative unit (USN, displayed 'US-') is stratigraphic and not cosmetic: a demolition void is evidence of an ACT, a risparmio is evidence of an INTENTION, and reading one as the other dates the void to a removal that never happened. Added in POL5 (2026-08-04) on E.D.'s explicit authorisation; the token became USNt in POL6, when USN went back to the negativa.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "USNt",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "Node": {
+   "description": {
+    "en": "Base class for all nodes in the graph with CIDOC mapping",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "NonStructuralVirtualStratigraphicUnit": {
+   "description": {
+    "en": "Non-structural Virtual Stratigraphic Unit (USV/n). Represents a virtual reconstruction of non-structural elements, such as furniture, decorations, or other non-load bearing components that are no longer physically present but can be reconstructed based on archaeological evidence.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "USV/n",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "ParadataNode": {
+   "description": {
+    "en": "Base class for nodes representing the reasoning chain (paradata) supporting an assertion. Not a document — the documentation lives at the source end of the chain (DocumentNode reached via ExtractorNode → CombinerNode → Paradata).",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "ParadataNodeGroup": {
+   "description": {
+    "en": "Group node for paradata. This group brings together all paradata related to a stratigraphic unit: typically named '[US_name]_PD' (ParaData).",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Paradata Node Group",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "ProjectNode": {
+   "description": {
+    "en": "HC13 Project (HDT-O, ECHOES D7.1): the coordinated activities of institutions/research groups producing heritage-related outcomes; the organizational context under which studies are carried out and under which HDTs are created and curated (HC11 maintenance is carried out under a project, HP20). Includes studies via crm:P9_consists_of (D7.1 defines no direct HC13->HC9 property). HDT-O-view node: not shown in the stratigrapher palette.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Project",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "PropertyNode": {
+   "description": {
+    "en": "Node representing a property (qualia) of another node. The CIDOC class is CONDITIONAL on the qualia type — looked up at serialization time in em_qualia_types.json: dimensional qualia (height/width/weight) → E54_Dimension, typology qualia (color/style) → E55_Type, material → E57_Material, interpretive qualia (aesthetic_value) → crminf:I4_Proposition_Set. PropertyNode itself is the structural shell (em:Qualia); the semantic class comes from the qualia type catalogue.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Property",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "RepresentationModelDocNode": {
+   "description": {
+    "en": "3D representation of a documentary node — e.g. a historical photo georeferenced and positioned in 3D space at the location it depicts. Linked via crm:P138_represents to a DocumentNode (or ExtractorNode/CombinerNode that uses the document). Specialization of em:RepresentationModel.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Representation Model Document",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "RepresentationModelNode": {
+   "description": {
+    "en": "3D representation (model or spatialized image) of a stratigraphic node — real or virtual. Always linked to the represented node via crm:P138_represents.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Representation Model",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "RepresentationModelSpecialFindNode": {
+   "description": {
+    "en": "3D representation of a Special Find — e.g. a scanned capital repositioned according to an anastylosis hypothesis. Linked via crm:P138_represents to a SpecialFindUnit / VirtualSpecialFind. Specialization of em:RepresentationModel.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Representation Model Special Find",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "ResourceNode": {
+   "description": {
+    "en": "Class to represent a link node (ResourceNode) in the graph. Attributes: url (str): URL of the link. url_type (str): Type of URL (e.g., 'External link', 'Image'). description (str): Description of the link.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Link",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "ReusedSpecialFind": {
+   "description": {
+    "en": "Re-used architectural or decorative element (spolia) in archaeological reconstructions. A physical object observed in situ but originally produced for a different context — e.g. a Roman column re-used in a medieval church wall. Originating Development Project: DP-26 (spolia, last DP before the EM 1.5 cut).",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Reused Special Find",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "SemanticShapeNode": {
+   "description": {
+    "en": "3D proxy geometry (convex shapes or spheres) representing the spatial extent of a node. Used as a semantic proxy distinct from a full RepresentationModel: lighter weight, intended for spatial indexing and rough containment, not for visual rendering. Linked via crm:P138_represents to any Node.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Semantic Shape",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "SeriesOfDocumentaryStratigraphicUnit": {
+   "description": {
+    "en": "Series of Documentary Stratigraphic Units (USD). Pragmatic aggregation of multiple DocumentaryVirtualSUs (USD) treated as one logical unit. Same series-as-SU pattern as serSU, applied to the documentary family.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "USD series",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "SeriesOfNonStructuralVirtualStratigraphicUnit": {
+   "description": {
+    "en": "Series of non-structural Virtual Stratigraphic Units. Pragmatic aggregation of multiple NonStructuralVirtualSU (USVn) treated as one logical unit. Same series-as-SU pattern as serSU.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "USVn series",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "SeriesOfStratigraphicUnit": {
+   "description": {
+    "en": "Series of Stratigraphic Units (SU). A pragmatic stratigraphic aggregation: one logical SU representing multiple physical SUs treated as one (e.g. a series of column bases not worth numbering individually). The series IS itself an SU, not just a collection of SUs.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "US series",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "SeriesOfStructuralVirtualStratigraphicUnit": {
+   "description": {
+    "en": "Series of Structural Virtual Stratigraphic Units. Pragmatic aggregation of multiple StructuralVirtualSU (USVs) treated as one logical unit.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "USVs series",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "SpecialFindUnit": {
+   "description": {
+    "en": "Movable physical object whose ORIGINAL position is unknown (and sometimes whose pertinence to the site is uncertain). Distinct from in-situ artefacts — known to exist(ed) but displaced. Architectural artefacts, coins, fragments without findspot. Provenance / pertinence uncertainty is captured via paradata edges, not by class.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Special Find",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "StratigraphicEventNode": {
+   "description": {
+    "en": "An event that creates, modifies, or destroys a stratigraphic unit (e.g. an earthquake causing a plaster collapse, an act of demolition, the start of construction). Distinct from the resulting unit itself: an SE is the PROCESS, the SU is the result. Can be enriched by a 3D simulation (em:RepresentationModel) of the event. May be paired with its resulting unit to provide a temporal range bracketing the action.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "stratigraphic event node",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "StratigraphicNode": {
+   "description": {
+    "en": "Base class for all stratigraphic units within the graph structure. Inherits from Node and provides additional functionality specific to stratigraphy.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "StratigraphicUnit": {
+   "description": {
+    "en": "Stratigraphic Unit (SU) or negative stratigraphic unit. Represents a physical stratigraphic unit (positive or negative). It corresponds to an identifiable physical layer or interface in archaeological documentation.",
+    "it": "Unità stratigrafica (US): deposito o interfaccia negativa.",
+    "validated_it": true,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "US (or SU)",
+    "it": "US (o UStr)",
+    "validated_it": true,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "StructuralVirtualStratigraphicUnit": {
+   "description": {
+    "en": "Structural Virtual Stratigraphic Unit (USV/s). Represents a virtual reconstruction of structural elements, such as walls, columns, or other architectural components that are no longer physically present but can be reconstructed based on archaeological evidence.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "USV/s",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "StudyNode": {
+   "description": {
+    "en": "HC9 Study (HDT-O, ECHOES D7.1): a scholarly activity (research/analysis/documentation, any domain) about a Heritage Entity (HC1), with a disciplinary focus, that produces documentary outputs contributing to an HDT. In EM a study heads a proposition set (HC16/em:EMGraph). Chain: Project -includes(crm:P9)-> Study -was_about(HP23)-> HeritageEntity ; Study -produced(HP25)-> GraphNode. HDT-O-view node: not shown in the stratigrapher palette.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Study",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "TimeBranchNodeGroup": {
+   "description": {
+    "en": "An alternative timeline aggregating a set of mutually exclusive beliefs about a temporal interval. Two TimeBranch instances can be connected via em:contrastsWith (symmetric) to express alternative reconstructions of the same period. The Period nature (E4) anchors temporal identity; the alternative-set semantic is captured by contrastsWith.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Time Branch Node Group",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "TransformationStratigraphicUnit": {
+   "description": {
+    "en": "Transformation Unit. A family of actions modifying a surface or structure — the 'map of degradation' treated stratigraphically. Aggregates multiple A5 Stratigraphic Modification events via P46_is_composed_of.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "TSU",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "UnknownNode": {
+   "description": {
+    "en": "Fallback node for unrecognized types. This type of node should not normally appear in the system but serves exclusively to handle anomalies in the data.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Unknown node",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "VirtualSpecialFindUnit": {
+   "description": {
+    "en": "Hypothetical reconstruction of a fragmented Special Find. Virtual reassembly of fragments supported by paradata. Linked to the source fragments (DisplacedSpecialFind instances) via em:reconstructsFrom.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "Virtual Special Find",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  },
+  "WorkingUnit": {
+   "description": {
+    "en": "Working Unit. Traces of stone working on architectural surfaces — chisel marks, gradina, iccozza traces on Etruscan tomb walls, hammer impacts. UL is the FEATURE (the marks themselves); the producing event is a separate E12 Production linked via P108i_was_produced_by.",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   },
+   "label": {
+    "en": "UL",
+    "validated_it": false,
+    "validated_el": false,
+    "validated_he": false,
+    "validated_es": false,
+    "validated_pl": false,
+    "validated_ro": false,
+    "validated_fr": false
+   }
+  }
+ }
+}
