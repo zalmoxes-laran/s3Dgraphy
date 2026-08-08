@@ -119,11 +119,21 @@ def test_the_briefing_holds_only_the_named_activity(portamarina):
     assert "PortaMarina-lite.em.json" not in blob
 
 
-def test_a_target_that_is_not_an_activity_is_refused(portamarina):
-    """Better than handing a model an empty briefing and letting it improvise."""
+def test_an_epoch_target_is_accepted(portamarina):
+    """NARR-AI (2026-08-08): a site-story chapter is anchored to an EPOCH, not an
+    activity, so an epoch target now BUILDS a context — its actions are the
+    stratigraphic units that live in that lane."""
+    ctx = build_narrative_generation_context(portamarina, "EP.imperiale")
+    assert ctx["anchor_kind"] == "epoch"
+    assert ctx["activity"]["id"] == "EP.imperiale"
+
+
+def test_a_target_that_is_neither_activity_nor_epoch_is_refused(portamarina):
+    """Better than handing a model an empty briefing and letting it improvise —
+    a target that is neither an activity nor an epoch is still refused."""
     with pytest.raises(NarrativeError) as exc:
-        build_narrative_generation_context(portamarina, "EP.imperiale")
-    assert "not an ActivityNodeGroup" in str(exc.value)
+        build_narrative_generation_context(portamarina, "NO.SUCH.NODE")
+    assert "not an ActivityNodeGroup or EpochNode" in str(exc.value)
 
 
 def test_chapter_ref_is_accepted_as_an_alias(portamarina):

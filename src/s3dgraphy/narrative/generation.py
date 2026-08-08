@@ -144,16 +144,35 @@ def build_narrative_generation_context(
     target_id = activity_id or chapter_ref
     if not target_id:
         raise NarrativeError("build_narrative_generation_context needs an "
-                             "activity_id (or chapter_ref)")
-    activity = graph.find_node_by_id(target_id)
-    if not isinstance(activity, ActivityNodeGroup):
-        kind = type(activity).__name__ if activity is not None else "nothing"
-        raise NarrativeError(
-            f"'{target_id}' is {kind}, not an ActivityNodeGroup: generation is "
-            f"anchored to an activity, which is where the actions are")
+                             "activity_id or an epoch id (or chapter_ref)")
+    anchor = graph.find_node_by_id(target_id)
 
-    members = [graph.find_node_by_id(mid)
-               for mid in _in(graph, target_id, "is_in_activity")]
+    # NARR-AI (2026-08-08): the anchor may be an ActivityNodeGroup OR an
+    # EpochNode. A site-story is epoch-based (the narrative scaffold anchors its
+    # chapters to epochs), so an epoch chapter must be able to generate too: its
+    # "actions" are the stratigraphic units that live in that lane. The
+    # per-activity case is unchanged.
+    if isinstance(anchor, ActivityNodeGroup):
+        anchor_kind = "activity"
+        members = [graph.find_node_by_id(mid)
+                   for mid in _in(graph, target_id, "is_in_activity")]
+    elif isinstance(anchor, EpochNode):
+        anchor_kind = "epoch"
+        ids, seen_ids = [], set()
+        for et in ("has_first_epoch", "survive_in_epoch"):
+            for uid in _in(graph, target_id, et):
+                if uid not in seen_ids:
+                    seen_ids.add(uid)
+                    ids.append(uid)
+        members = [graph.find_node_by_id(uid) for uid in ids]
+    else:
+        kind = type(anchor).__name__ if anchor is not None else "nothing"
+        raise NarrativeError(
+            f"'{target_id}' is {kind}, not an ActivityNodeGroup or EpochNode: "
+            f"generation is anchored to an activity or an epoch (where the "
+            f"actions are)")
+
+    activity = anchor  # the anchor briefing (activity or epoch) below
     units = [m for m in members
              if m is not None and isinstance(m, StratigraphicNode)]
 
@@ -188,6 +207,10 @@ def build_narrative_generation_context(
     return {
         "graph_id": getattr(graph, "graph_id", ""),
         "template_id": template_id,
+        # NARR-AI: what the chapter is anchored to — "activity" or "epoch". The
+        # "activity" key keeps its name for the existing prompt/consumers; it
+        # holds the anchor briefing whichever kind it is.
+        "anchor_kind": anchor_kind,
         "activity": {
             **_node_brief(activity),
             "narrative": getattr(activity, "narrative", "") or "",
