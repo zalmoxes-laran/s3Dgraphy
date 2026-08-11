@@ -669,7 +669,21 @@ class RDFExporter:
 
         for edge in g.edges:
             if edge.edge_type == "has_property":
-                prop_unit[edge.edge_target] = edge.edge_source
+                # BUGFIX (2026-08-11, found by the RDF round-trip): this was a
+                # plain assignment, so a property with SEVERAL has_property
+                # parents (TempluMare has one with three) kept whichever edge
+                # happened to come LAST — and the projection therefore depended
+                # on edge ORDER. Two runs over the same graph with the edges in a
+                # different order emitted a different J30_has_domain, which makes
+                # export→import→export idempotence impossible by construction.
+                # Deterministic now: the smallest id wins, whatever the order.
+                # (Naming one parent for a multi-parent property is still a
+                # declared simplification — one I17 per pair would be the fuller
+                # projection — but it is at least the SAME one every time.)
+                prev = prop_unit.get(edge.edge_target)
+                prop_unit[edge.edge_target] = (
+                    edge.edge_source if prev is None
+                    else min(prev, edge.edge_source))
             elif edge.edge_type == "has_data_provenance":
                 tgt = node_by_id.get(edge.edge_target)
                 if tgt is not None and getattr(tgt, "node_type", None) in ARG_TYPES:
@@ -915,7 +929,13 @@ class RDFExporter:
             if ptype:
                 ctx.add((node_iri, EM.hasQualiaType, Literal(ptype)))
 
-        elif node_type == "epoch":
+        # BUGFIX (2026-08-11, found by the RDF round-trip): the branch tested for
+        # "epoch", but EpochNode.node_type is "EpochNode" — so it NEVER fired and
+        # no epoch ever carried its bounds or its colour into RDF. A projection of
+        # an EM graph without its chronology is missing the thing EM is about, and
+        # nothing downstream could have restored it. Both spellings are accepted
+        # now; the fix only ADDS triples.
+        elif node_type in ("EpochNode", "epoch"):
             start = getattr(node, "start_time", None)
             end = getattr(node, "end_time", None)
             color = getattr(node, "color", None)
@@ -1010,7 +1030,10 @@ class RDFExporter:
         elif node_type == "combiner":
             self._emit_belief_skeleton(node_iri, ctx)
 
-        elif node_type == "dtc_process":
+        # Same family of gap: DTCAcquisitionNode (crmdig:D12 ⊂ D7) carries the
+        # same `dtc_kind` fact and had no branch, so an acquisition's kind was
+        # dropped while a process's was kept.
+        elif node_type in ("dtc_process", "dtc_acquisition"):
             # DTC substrate profile (ECHOES): the process kind (e.g.
             # transformation) projects as crm:P2_has_type. The rdf:type
             # (crmdig:D7 + prov:Activity) is emitted from em_extension by the

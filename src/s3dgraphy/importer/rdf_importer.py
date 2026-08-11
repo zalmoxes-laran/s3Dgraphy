@@ -1,0 +1,1069 @@
+"""
+RDF importer for s3Dgraphy graphs — the return leg of the triplestore.
+
+``RDFExporter`` projects a property graph into CIDOC-CRM + HDT-O + EM; this
+module reads that projection back. Together they make the triplestore a place
+you can go INTO and come OUT of, which is what the CHANGELOG means by calling
+it a persistent source of truth: a store you can only write to is an archive,
+not a source.
+
+**Same single source of truth, read by the same code.** The three datamodels
+(``s3Dgraphy_node_datamodel.json``, ``s3Dgraphy_connections_datamodel.json``,
+``em_qualia_types.json``) are loaded through the exporter's own ``_Datamodel``
+class, and every map here is the INVERSE of a map built there. Nothing about
+the EM language is written twice: if a class, an edge or a qualia term changes
+in the JSON, both directions change with it.
+
+How the three inversions are resolved — the interesting part, because none of
+them is a plain dictionary flip:
+
+* **IRI → node class.** An exported node carries several ``rdf:type``: its own
+  em: class plus the CRM superclasses the exporter emits for CRM-only readers.
+  Reading, we take the **most specific** class — the one that is a Python
+  subclass of every other candidate — and the redundant superclasses fall away
+  on their own. No namespace heuristic, no ordering assumption.
+
+* **predicate → edge_type.** The core CRM predicates are heavily many-to-one
+  (nine of them carry two or more EM edges; ``P138i_has_representation`` carries
+  four). Three things disambiguate, in order: the em: subproperty for the AP11
+  physical family, the ``extension_mapping`` predicate where the datamodel
+  declares one, and — the general answer — the **declared endpoints**
+  (``allowed_connections``) matched against the classes of the two nodes the
+  triple actually joins. That last one is why this does not need a hand-written
+  table: the datamodel already says which edge can join which classes.
+
+* **CIDOC class → property_type.** This inverse is genuinely ambiguous (27
+  qualia share ``E54_Dimension``, 29 share ``E55_Type``), so it is NOT used as
+  the primary route. The exporter states the qualia id explicitly in
+  ``em:hasQualiaType``, and that is what is read. The class inverse remains as a
+  fallback for third-party RDF, and where it is ambiguous it records a warning
+  instead of picking one.
+
+Named graphs: each ``<base>/graph/<graph_id>`` subject typed ``em:EMGraph``
+becomes one s3Dgraphy ``Graph``. The graph id is recovered from that IRI rather
+than from the RDF context, because a Turtle document has no contexts — so the
+same reader handles TTL and TriG without a second code path.
+
+Author:  Emanuele Demetrescu
+Version: 1.6.0 — initial RDF import pipeline
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+
+try:
+    from rdflib import ConjunctiveGraph, Literal, URIRef
+    from rdflib.namespace import DCTERMS, PROV, RDF, RDFS
+except ImportError as _e:  # pragma: no cover
+    raise ImportError(
+        "RDFImporter requires rdflib. Install with: pip install rdflib"
+    ) from _e
+
+from ..graph import Graph as S3DGraph
+from ..nodes.base_node import Node
+from ..exporter.rdf_exporter import (
+    AP11_SUBPROPS,
+    CRM,
+    CRMARCHAEO,
+    CRMINF,
+    DEFAULT_BASE_URI,
+    EM,
+    HDTO,
+    _Datamodel,
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Format detection
+# ─────────────────────────────────────────────────────────────────────────────
+
+#: file extension → rdflib parser name. Mirrors RDFExporter.SUPPORTED_FORMATS
+#: from the other side: whatever the exporter can write, this can read.
+EXT_FORMATS: Dict[str, str] = {
+    "ttl": "turtle",
+    "turtle": "turtle",
+    "nt": "nt",
+    "ntriples": "nt",
+    "nq": "nquads",
+    "nquads": "nquads",
+    "trig": "trig",
+    "jsonld": "json-ld",
+    "json": "json-ld",
+    "rdf": "xml",
+    "xml": "xml",
+    "owl": "xml",
+}
+
+#: The formats that carry named graphs. For the others the graph identity is
+#: recovered from the EMGraph IRI (see the module docstring).
+QUAD_FORMATS = {"trig", "nquads", "json-ld"}
+
+
+def _format_for(source: Any, fmt: Optional[str]) -> str:
+    """Resolve the rdflib parser name from an explicit `fmt` or the extension."""
+    if fmt:
+        key = str(fmt).strip().lower()
+        return EXT_FORMATS.get(key, key)
+    if isinstance(source, (str, Path)):
+        text = str(source)
+        # a path, not a serialised document: extensions only mean something here
+        if "\n" not in text and len(text) < 4096:
+            ext = Path(text).suffix.lstrip(".").lower()
+            if ext in EXT_FORMATS:
+                return EXT_FORMATS[ext]
+    return "turtle"
+
+
+def _looks_like_path(source: Any) -> bool:
+    """Is this a file path rather than a serialised document?
+
+    Asked before touching the filesystem: ``Path(text).exists()`` on a 4 kB
+    Turtle document raises ``OSError: File name too long``, so the cheap
+    structural test comes first — a path has no newline and is short.
+    """
+    if isinstance(source, Path):
+        return source.exists()
+    if not isinstance(source, str):
+        return False
+    if "\n" in source or len(source) > 1024:
+        return False
+    try:
+        return Path(source).exists()
+    except OSError:  # pragma: no cover — defensive
+        return False
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Exporter artefacts that are NOT graph content
+# ─────────────────────────────────────────────────────────────────────────────
+
+#: Predicates the exporter mints from node CONTENT rather than from an edge —
+#: the CRMinf belief skeleton, the narrative authorship/endorsement projection.
+#: Re-reading them as edges would invent connections the property graph never
+#: had, so they are skipped by name, and the skip is declared rather than
+#: discovered as a surprise later.
+ARTEFACT_PREDICATES: Set[URIRef] = {
+    CRMINF.J2_concluded_that,
+    CRMINF.J4_that,
+    CRMINF.J5_holds_to_be,
+    CRMINF.J30_has_domain,
+    CRMINF.J31_has_range,
+    CRMINF.J32_has_property_type,
+    CRMINF.J7_is_based_on_evidence_from,
+    PROV.wasAttributedTo,
+    PROV.wasInfluencedBy,
+    HDTO.HP33i_is_proposition_set_of,
+}
+
+#: Predicates the exporter emits as the GENERIC companion of a more specific
+#: one, so they can never identify an edge on their own.
+#:
+#: ``AP11_has_physical_relation`` is written beside every ``em:cuts`` /
+#: ``em:abuts`` / … triple, for readers that do not know the subproperties. But
+#: ``generic_connection`` declares AP11 as its own ``extension_mapping`` in the
+#: datamodel, so without this a physical relation came back as BOTH its real
+#: type and a spurious ``generic_connection`` — the AP11 companion read as if it
+#: were a signature. Excluded here, ``generic_connection`` falls back to its core
+#: ``P130_shows_features_of``, which belongs to it alone.
+GENERIC_COMPANION_PREDICATES: Set[URIRef] = {
+    CRMARCHAEO.AP11_has_physical_relation,
+}
+
+#: Evidence-based tie-break for the CIDOC classes that TWO s3Dgraphy classes
+#: share. Exactly three exist (``E1_CRM_Entity``, ``E78_Collection``,
+#: ``E53_Place``) and they exist for one reason: those classes declare no
+#: ``em_extension.uri``, so both fall back to the same ``mapping.cidoc``. Two of
+#: the three are settled by the specificity rule on their own — ``UnknownNode``
+#: is a subclass of ``Node``, ``ParadataNodeGroup`` of ``GroupNode`` — so only
+#: ``E53_Place`` needs help: ``GeoPositionNode`` and ``LocationNodeGroup`` are
+#: unrelated in the hierarchy. It is decided by a triple the exporter writes for
+#: one and not the other, which is evidence rather than a guess.
+#:
+#: The upstream fix is one line of datamodel per class (a distinct
+#: ``em_extension.uri``); until E.D. decides that, this is the honest reading.
+CLASS_EVIDENCE: Dict[str, Tuple[URIRef, ...]] = {
+    "GeoPositionNode": (EM.shift_x, EM.shift_y, EM.shift_z, EM.rotation),
+}
+
+#: Node types whose ``P67_refers_to`` triples are a projection of their own
+#: content (a narrative's citations live in ``data.chapters``, not in edges).
+#: For any other source class P67 is a real edge, so the rule is narrow.
+P67_CONTENT_SOURCES = {"narrative"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The inverse of the three datamodels
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _InverseDatamodel:
+    """Every lookup the exporter does forwards, done backwards.
+
+    Built from the exporter's own ``_Datamodel`` — the same reader over the same
+    three JSON files — so the two directions cannot drift apart.
+    """
+
+    def __init__(self, config_dir: Optional[Path] = None):
+        self.dm = _Datamodel(config_dir=config_dir)
+
+        #: class name → class object, for the specificity test and for
+        #: ``allowed_connections`` matching. Taken from the live node registry
+        #: (``Node.node_type_map``, populated by ``__init_subclass__``) plus the
+        #: abstract bases those classes inherit from, which the datamodel names
+        #: in ``allowed_connections`` even though they are never instantiated.
+        self.class_by_name: Dict[str, type] = {"Node": Node}
+        for cls in Node.node_type_map.values():
+            self.class_by_name[cls.__name__] = cls
+            for base in cls.__mro__:
+                if issubclass(base, Node):
+                    self.class_by_name.setdefault(base.__name__, base)
+
+        #: class name → node_type string (what the constructor dispatch needs).
+        self.node_type_by_class: Dict[str, str] = {
+            cls.__name__: ntype for ntype, cls in Node.node_type_map.items()
+        }
+
+        #: primary IRI → [class names]. Many-to-one for the handful of classes
+        #: that declare no ``em_extension.uri`` and fall back to a shared
+        #: ``mapping.cidoc`` — see ``resolve_node_class``.
+        self.classes_by_iri: Dict[str, List[str]] = {}
+        for name in self.dm._node_class_index:
+            iri = self.dm.get_node_primary_iri(name)
+            if iri is not None:
+                self.classes_by_iri.setdefault(str(iri), []).append(name)
+
+        #: every IRI that appears as somebody's declared superclass. These are
+        #: the redundant types the exporter adds for CRM-only readers.
+        self.superclass_iris: Set[str] = set()
+        for name in self.dm._node_class_index:
+            for sc in self.dm.get_node_superclasses(name):
+                self.superclass_iris.add(str(sc))
+
+        #: signature IRI → [edge_type]. The signature is the most specific
+        #: predicate the exporter emits for that edge: the AP11 subproperty, or
+        #: the extension predicate, or the core CRM one.
+        self.edges_by_signature: Dict[str, List[str]] = {}
+        #: core predicate IRI → [edge_type] (the always-emitted generic triple)
+        self.edges_by_core: Dict[str, List[str]] = {}
+        #: edge_type → its core predicate IRI, for the dual-emission cover
+        self.core_of_edge: Dict[str, str] = {}
+        self._build_edge_inverse()
+
+        #: CIDOC class IRI → [qualia id]. Kept for third-party RDF; ambiguous
+        #: by nature, so never used to guess (see ``resolve_property_type``).
+        self.qualia_by_iri: Dict[str, List[str]] = {}
+        for qid, crm in self.dm._qualia_class_index.items():
+            from ..exporter.rdf_exporter import _resolve_prefixed
+            iri = _resolve_prefixed(crm)
+            if iri is not None:
+                self.qualia_by_iri.setdefault(str(iri), []).append(qid)
+
+        #: type_tag ← em: subproperty, inverse of AP11_SUBPROPS. Two edge types
+        #: share ``em:bondedTo`` and two share ``em:physicallyEquals``, so the
+        #: tag alone cannot name the edge — ``allowed_connections`` and the
+        #: canonical choice below finish the job.
+        self.tag_by_subprop: Dict[str, str] = {}
+        for tag, iri in AP11_SUBPROPS.items():
+            self.tag_by_subprop.setdefault(str(iri), tag)
+
+    def _build_edge_inverse(self) -> None:
+        edges = self.dm.connections_datamodel.get("edge_types", {})
+        for edge_type in edges:
+            pred, ext, tag, deprecated = self.dm.get_edge_mapping(edge_type)
+            if deprecated:
+                # written as canonical by the exporter (has_timebranch →
+                # is_in_timebranch); nothing in RDF can point back at the alias
+                continue
+            if tag:
+                sig = AP11_SUBPROPS.get(tag)
+            elif ext is not None and ext not in GENERIC_COMPANION_PREDICATES:
+                sig = ext
+            else:
+                sig = pred
+            if sig is not None and sig not in GENERIC_COMPANION_PREDICATES:
+                self.edges_by_signature.setdefault(str(sig), []).append(edge_type)
+            if pred is not None:
+                self.edges_by_core.setdefault(str(pred), []).append(edge_type)
+                self.core_of_edge[edge_type] = str(pred)
+
+    # ── node class ──────────────────────────────────────────────────────────
+
+    def resolve_node_class(self, type_iris: Sequence[str],
+                           has_pred=None) -> Tuple[Optional[str], Optional[str]]:
+        """(class_name, ambiguity_note) for a node's set of ``rdf:type`` IRIs.
+
+        The exported node is multi-typed: its own class plus the CRM
+        superclasses. We collect every type that names a class we know, drop the
+        ones that are only somebody's superclass, and keep the **most specific**
+        — the candidate that is a Python subclass of all the others. That test
+        is exact and needs no assumption about namespaces or emission order.
+
+        `has_pred(URIRef) -> bool` lets the caller answer "does this node carry
+        that triple?", which is how the one pair the hierarchy cannot separate
+        (``GeoPositionNode`` / ``LocationNodeGroup``) is decided — see
+        ``CLASS_EVIDENCE``.
+        """
+        candidates: List[str] = []
+        for iri in type_iris:
+            for name in self.classes_by_iri.get(iri, []):
+                if name not in candidates:
+                    candidates.append(name)
+        if not candidates:
+            return None, None
+
+        # a type that is ONLY a declared superclass is the redundant CRM one
+        specific = [
+            n for n in candidates
+            if str(self.dm.get_node_primary_iri(n)) not in self.superclass_iris
+        ] or candidates
+
+        # Evidence first: a candidate that the node's own triples confirm wins
+        # over any hierarchy reasoning, because it is a fact about this node
+        # rather than about the class tree.
+        if has_pred is not None and len(specific) > 1:
+            for name in specific:
+                preds = CLASS_EVIDENCE.get(name)
+                if preds and any(has_pred(p) for p in preds):
+                    return name, None
+
+        best = specific[0]
+        for name in specific[1:]:
+            a = self.class_by_name.get(name)
+            b = self.class_by_name.get(best)
+            if a is not None and b is not None and issubclass(a, b):
+                best = name
+
+        # `Node` is the base class, never a type: a node that resolves to it is
+        # one the projection could not type more precisely.
+        siblings = [
+            n for n in specific
+            if n != best and n != "Node"
+            and not (
+                self.class_by_name.get(best) is not None
+                and self.class_by_name.get(n) is not None
+                and issubclass(self.class_by_name[best], self.class_by_name[n])
+            )
+        ]
+        note = None
+        if siblings:
+            note = (f"class IRI is shared by {sorted([best] + siblings)}; "
+                    f"read as '{best}'")
+        return best, note
+
+    # ── edge type ───────────────────────────────────────────────────────────
+
+    def candidates_for_predicate(self, pred: str) -> List[str]:
+        """Edge types whose most specific emitted predicate is `pred`."""
+        return list(self.edges_by_signature.get(pred, []))
+
+    def core_candidates_for_predicate(self, pred: str) -> List[str]:
+        """Edge types whose generic CRM predicate is `pred`."""
+        return list(self.edges_by_core.get(pred, []))
+
+    def _accepts(self, declared: Sequence[str], class_name: Optional[str]) -> bool:
+        """Does a declared endpoint list accept a node of this class?
+
+        ``Node`` in the list means "anything"; a base class means the class and
+        every subclass of it. Resolved with ``issubclass`` on the live classes,
+        so the hierarchy comes from the code the datamodel is generated from.
+        """
+        if not declared:
+            return True
+        if class_name is None:
+            return True
+        cls = self.class_by_name.get(class_name)
+        if cls is None:
+            return True
+        for name in declared:
+            if name == "Node":
+                return True
+            base = self.class_by_name.get(name)
+            if base is not None and issubclass(cls, base):
+                return True
+        return False
+
+    def narrow_by_endpoints(self, candidates: Sequence[str],
+                            source_class: Optional[str],
+                            target_class: Optional[str]) -> List[str]:
+        """Keep the candidates the datamodel allows between these two classes.
+
+        This is the general answer to the many-to-one CRM predicates: the
+        datamodel already declares, per edge type, which classes may sit at each
+        end. `has_license` and `has_embargo` share `P104_is_subject_to` and are
+        told apart by their target (LicenseNode vs EmbargoNode) — not by a table
+        written here.
+        """
+        edges = self.dm.connections_datamodel.get("edge_types", {})
+        out: List[str] = []
+        for edge_type in candidates:
+            allowed = (edges.get(edge_type) or {}).get("allowed_connections") or {}
+            if (self._accepts(allowed.get("target") or [], target_class)
+                    and self._accepts(allowed.get("source") or [], source_class)):
+                out.append(edge_type)
+        # Prefer the candidates with the TIGHTEST declared target: a rule that
+        # names `Node` accepts everything and would otherwise win ties against
+        # the rule that names the actual class.
+        if len(out) > 1:
+            tight = [e for e in out
+                     if "Node" not in ((edges.get(e) or {})
+                                       .get("allowed_connections") or {}).get("target", [])]
+            if tight:
+                out = tight
+        return out
+
+    # ── property type ───────────────────────────────────────────────────────
+
+    def resolve_property_type(self, type_iris: Sequence[str]) -> Tuple[Optional[str], Optional[str]]:
+        """Fallback qualia resolution from the CIDOC class, with honesty.
+
+        Only reached when ``em:hasQualiaType`` is absent (third-party RDF). The
+        inverse is one-to-many for the big classes — 27 qualia share
+        ``E54_Dimension`` — so a unique answer is returned when there is one and
+        a warning otherwise. Guessing "height" for every dimension would be a
+        fabricated measurement.
+        """
+        for iri in type_iris:
+            ids = self.qualia_by_iri.get(iri) or []
+            if len(ids) == 1:
+                return ids[0], None
+            if len(ids) > 1:
+                return None, (f"{iri} maps to {len(ids)} qualia types "
+                              f"({', '.join(sorted(ids)[:4])}…); property_type "
+                              f"left unset — no em:hasQualiaType to read")
+        return None, None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Importer
+# ─────────────────────────────────────────────────────────────────────────────
+
+class RDFImporter:
+    """Rebuild s3Dgraphy graphs from RDF produced by ``RDFExporter``.
+
+    Usage::
+
+        importer = RDFImporter()
+        graphs = importer.parse("site.ttl")          # one Graph per em:EMGraph
+        graphs = importer.parse(ttl_text, fmt="turtle")
+        importer.parse("site.ttl", into_graph=existing)   # import INTO a graph
+
+    ``self.warnings`` collects every ambiguity and everything unrecognised, in
+    the same spirit as ``BaseImporter``: an importer that cannot read something
+    says so rather than dropping it quietly.
+    """
+
+    def __init__(self,
+                 base_uri: str = DEFAULT_BASE_URI,
+                 config_dir: Optional[Path] = None):
+        self.base_uri = base_uri.rstrip("/") + "/"
+        self.inverse = _InverseDatamodel(config_dir=config_dir)
+        self.warnings: List[str] = []
+        self.stats: Dict[str, int] = {
+            "graphs": 0, "nodes": 0, "edges": 0,
+            "nodes_unmapped": 0, "edges_unmapped": 0,
+            "artefacts_skipped": 0,
+        }
+
+    # ── public entry point ──────────────────────────────────────────────────
+
+    def parse(self,
+              source: Any,
+              fmt: Optional[str] = None,
+              into_graph: Optional[S3DGraph] = None,
+              multigraph: Optional[Any] = None) -> List[S3DGraph]:
+        """Parse RDF from a path, a string or bytes; return the rebuilt graphs.
+
+        Args:
+            source: file path, or a serialised RDF document (str/bytes).
+            fmt: rdflib format name or an extension ('ttl', 'trig', 'jsonld',
+                 …). Autodetected from the path suffix when omitted.
+            into_graph: import into this Graph instead of making new ones. The
+                graph keeps its own ``graph_id``; only its content grows.
+            multigraph: a MultiGraphManager to register the rebuilt graphs in.
+
+        Returns:
+            The list of graphs built (or the single ``into_graph``).
+        """
+        store = ConjunctiveGraph()
+        parse_format = _format_for(source, fmt)
+        if isinstance(source, (bytes, bytearray)):
+            store.parse(data=source.decode("utf-8"), format=parse_format)
+        elif _looks_like_path(source):
+            store.parse(str(source), format=parse_format)
+        else:
+            store.parse(data=str(source), format=parse_format)
+
+        graph_iris = sorted({str(s) for s in store.subjects(RDF.type, EM.EMGraph)})
+        if not graph_iris:
+            self.warnings.append(
+                "no em:EMGraph subject found — nothing identifies a graph in "
+                "this RDF; expected <base>/graph/<id> typed em:EMGraph")
+            return []
+
+        out: List[S3DGraph] = []
+        for graph_iri in graph_iris:
+            graph_id = self._graph_id_from_iri(graph_iri)
+            fresh = into_graph is None
+            target = into_graph if not fresh else S3DGraph(graph_id=graph_id)
+            self._rebuild_graph(store, graph_iri, target, prune_auto_geo=fresh)
+            self.stats["graphs"] += 1
+            if into_graph is None:
+                out.append(target)
+                if multigraph is not None:
+                    multigraph.graphs[target.graph_id] = target
+        return out if into_graph is None else [into_graph]
+
+    # ── SPARQL source (stretch) ─────────────────────────────────────────────
+
+    #: The CONSTRUCT that lifts a whole named graph out of a store. Written as a
+    #: CONSTRUCT rather than a DESCRIBE because DESCRIBE is implementation-defined
+    #: (each store decides how much of the neighbourhood to return) and this needs
+    #: exactly the graph's own triples, no more and no less.
+    CONSTRUCT_GRAPH = (
+        "CONSTRUCT {{ ?s ?p ?o }} WHERE {{ GRAPH <{graph_iri}> {{ ?s ?p ?o }} }}"
+    )
+    CONSTRUCT_ALL = "CONSTRUCT {{ ?s ?p ?o }} WHERE {{ ?s ?p ?o }}"
+
+    def sparql_query(self, graph_iri: Optional[str] = None) -> str:
+        """The CONSTRUCT this importer would send. Public so it is testable
+        without a live endpoint — and so a caller can run it by hand."""
+        if graph_iri:
+            return self.CONSTRUCT_GRAPH.format(graph_iri=graph_iri)
+        return self.CONSTRUCT_ALL.format()
+
+    def from_sparql(self,
+                    endpoint: str,
+                    graph_iri: Optional[str] = None,
+                    timeout: int = 60,
+                    multigraph: Optional[Any] = None) -> List[S3DGraph]:
+        """Pull a graph out of a SPARQL endpoint and rebuild it.
+
+        A ``CONSTRUCT`` asking for Turtle, then straight into :meth:`parse` — the
+        store is just another source of the same document, so there is no second
+        reconstruction path.
+
+        **Declared limit: this has NOT been exercised against a live store.** The
+        query construction is unit-tested (``sparql_query``) and the parse leg is
+        the same one every other test covers, but the HTTP conversation with a
+        real Virtuoso/Oxigraph — content negotiation, auth, paging on a large
+        CONSTRUCT — is untested. Treat it as a wired seam, not a verified path.
+        """
+        import urllib.parse
+        import urllib.request
+
+        query = self.sparql_query(graph_iri)
+        url = f"{endpoint}?{urllib.parse.urlencode({'query': query})}"
+        request = urllib.request.Request(
+            url, headers={"Accept": "text/turtle"})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            body = response.read()
+        return self.parse(body, fmt="turtle", multigraph=multigraph)
+
+    # ── graph identity ──────────────────────────────────────────────────────
+
+    def _graph_id_from_iri(self, graph_iri: str) -> str:
+        """`<base>/graph/<id>` → `<id>`; anything else → its last segment.
+
+        Read from the IRI and not from the RDF context on purpose: a Turtle
+        document has no contexts, so keying on the IRI is the one rule that
+        works for TTL and TriG alike.
+        """
+        marker = "graph/"
+        if marker in graph_iri:
+            return graph_iri.rsplit(marker, 1)[-1].strip("/")
+        return graph_iri.rstrip("/").rsplit("/", 1)[-1] or "imported_graph"
+
+    # ── graph rebuild ───────────────────────────────────────────────────────
+
+    def _rebuild_graph(self, store: ConjunctiveGraph, graph_iri: str,
+                       g: S3DGraph, prune_auto_geo: bool = False) -> None:
+        gref = URIRef(graph_iri)
+
+        name = self._one_literal(store, gref, RDFS.label)
+        if name:
+            g.name = {"default": name} if not isinstance(g.name, str) else name
+        desc = self._one_literal(store, gref, DCTERMS.description)
+        if desc:
+            g.description = ({"default": desc}
+                             if not isinstance(g.description, str) else desc)
+
+        if not isinstance(getattr(g, "data", None), dict):
+            g.data = {}
+
+        # graph-scope metadata (default author, license, embargo)
+        authors = [self._node_id_from_iri(str(o))
+                   for o in store.objects(gref, CRM.P94_has_created)]
+        authors = [a for a in authors if a]
+        if authors:
+            g.data["authors"] = authors
+        license_val = self._one_literal(store, gref, CRM.P104_is_subject_to)
+        if license_val:
+            g.data["license"] = license_val
+        embargo = self._one_literal(store, gref, EM.embargoUntil)
+        if embargo:
+            g.data["embargo"] = embargo
+
+        # HDT anchor: the HC2 twin this proposition set belongs to
+        for o in store.objects(gref, HDTO.HP33i_is_proposition_set_of):
+            g.data["parent_hdt_iri"] = str(o)
+            break
+
+        node_prefix = graph_iri.rstrip("/") + "/node/"
+        node_iris = self._collect_node_iris(store, node_prefix)
+
+        # nodes first: the edge resolution needs their classes
+        class_of: Dict[str, Optional[str]] = {}
+        id_of: Dict[str, str] = {}
+        for iri in node_iris:
+            node_id, class_name = self._rebuild_node(store, iri, g)
+            if node_id is None:
+                continue
+            id_of[iri] = node_id
+            class_of[iri] = class_name
+
+        # ``Graph.__init__`` creates a ``geo_<graph_id>`` position node as a
+        # convenience. When the RDF carries its own — and it usually does, under
+        # whatever id the graph had when the node was first made — the graph
+        # would end up with two, one of them content and one an artefact of
+        # having constructed a Graph object. The imported one is the content, so
+        # the auto-created one steps aside. Only for graphs WE made: in an
+        # ``into_graph`` import the caller's own geo node is theirs to keep.
+        if prune_auto_geo:
+            imported = set(id_of.values())
+            auto_id = f"geo_{g.graph_id}"
+            has_imported_geo = any(
+                type(n).__name__ == "GeoPositionNode" and n.node_id in imported
+                for n in g.nodes)
+            if has_imported_geo and auto_id not in imported:
+                g.nodes = [n for n in g.nodes if n.node_id != auto_id]
+
+        self._rebuild_edges(store, node_prefix, id_of, class_of, g)
+
+    @staticmethod
+    def _collect_node_iris(store: ConjunctiveGraph, node_prefix: str) -> List[str]:
+        """The subjects that ARE nodes of this graph.
+
+        ``dcterms:identifier`` is the marker: the exporter writes it for every
+        node and for nothing else, so the derived subjects it also mints
+        (``<arg>/belief``, ``<prop>/proposition``, the ``s3d:qualia_*`` type
+        placeholders) are excluded without having to enumerate them.
+        """
+        out: List[str] = []
+        for s in store.subjects(DCTERMS.identifier, None):
+            text = str(s)
+            if text.startswith(node_prefix):
+                out.append(text)
+        return sorted(set(out))
+
+    def _node_id_from_iri(self, iri: str) -> Optional[str]:
+        if "/node/" not in iri:
+            return None
+        return iri.rsplit("/node/", 1)[-1]
+
+    # ── node rebuild ────────────────────────────────────────────────────────
+
+    def _rebuild_node(self, store: ConjunctiveGraph, iri: str,
+                      g: S3DGraph) -> Tuple[Optional[str], Optional[str]]:
+        ref = URIRef(iri)
+
+        # The IDENTIFIER, not the IRI tail: the exporter slugifies spaces when
+        # minting IRIs but writes the original id in dcterms:identifier, so this
+        # is the lossless side of the pair.
+        node_id = self._one_literal(store, ref, DCTERMS.identifier)
+        if not node_id:
+            return None, None
+
+        type_iris = [str(o) for o in store.objects(ref, RDF.type)]
+
+        # A property node states its qualia id explicitly — the one route that
+        # is not ambiguous (the class inverse is one-to-many by nature).
+        qualia_type = self._one_literal(store, ref, EM.hasQualiaType)
+        class_name: Optional[str]
+        if qualia_type is not None:
+            class_name = "PropertyNode"
+        else:
+            class_name, note = self.inverse.resolve_node_class(
+                type_iris, has_pred=lambda p: (ref, p, None) in store)
+            if note:
+                self.warnings.append(f"node '{node_id}': {note}")
+
+        if class_name is None:
+            self.stats["nodes_unmapped"] += 1
+            self.warnings.append(
+                f"node '{node_id}': no known class for rdf:type "
+                f"{sorted(type_iris)} — kept as base Node")
+            class_name = "Node"
+
+        node_type = self.inverse.node_type_by_class.get(class_name)
+        payload: Dict[str, Any] = {"id": node_id}
+
+        label = self._one_literal(store, ref, RDFS.label)
+        if label:
+            payload["name"] = label
+        desc = self._one_literal(store, ref, DCTERMS.description)
+        if desc:
+            payload["description"] = desc
+
+        data = self._type_specific_data(store, ref, node_type, type_iris,
+                                        qualia_type, node_id)
+        if data:
+            payload["data"] = data
+
+        node = self._instantiate(node_type, class_name, payload)
+        if node is None:
+            return None, None
+        g.add_node(node, overwrite=True)
+        self.stats["nodes"] += 1
+        return node_id, class_name
+
+    def _instantiate(self, node_type: Optional[str], class_name: str,
+                     payload: Dict[str, Any]) -> Optional[Node]:
+        """Build the node through the emjson importer's constructor dispatch.
+
+        Reused rather than rewritten: "given a node_type and a payload, make the
+        node" is one problem, already solved there by signature inspection, and
+        a second implementation would be a second set of constructor quirks to
+        keep in step.
+        """
+        from .emjson_importer import _instantiate as _emjson_instantiate
+
+        local_warnings: List[str] = []
+        if node_type is None:
+            # a class the registry does not expose as a node_type (an abstract
+            # base, or `Node` itself): construct it directly
+            cls = self.inverse.class_by_name.get(class_name, Node)
+            try:
+                node = cls(payload["id"], payload.get("name", payload["id"]),
+                           payload.get("description", ""))
+            except Exception as exc:  # pragma: no cover — defensive
+                self.warnings.append(
+                    f"node '{payload['id']}': constructor failed for "
+                    f"{class_name} ({exc}); kept as base Node")
+                node = Node(payload["id"], payload.get("name", payload["id"]),
+                            payload.get("description", ""))
+            data = payload.get("data") or {}
+            if data:
+                if not isinstance(getattr(node, "data", None), dict):
+                    node.data = {}
+                node.data.update(data)
+            return node
+
+        node = _emjson_instantiate(node_type, payload, local_warnings)
+        self.warnings.extend(local_warnings)
+        return node
+
+    def _type_specific_data(self, store: ConjunctiveGraph, ref: URIRef,
+                            node_type: Optional[str], type_iris: Sequence[str],
+                            qualia_type: Optional[str],
+                            node_id: str) -> Dict[str, Any]:
+        """The inverse of ``_serialize_type_specific``, per node type."""
+        data: Dict[str, Any] = {}
+
+        if node_type == "property":
+            ptype = qualia_type
+            if ptype is None:
+                ptype, note = self.inverse.resolve_property_type(type_iris)
+                if note:
+                    self.warnings.append(f"node '{node_id}': {note}")
+            if ptype:
+                data["property_type"] = ptype
+            value = self._one_literal(store, ref, CRM.P90_has_value)
+            if value is not None:
+                data["value"] = value
+            return data
+
+        # The real value is "EpochNode" (the class name); "epoch" is accepted too
+        # because that is the string the exporter tested for until the round-trip
+        # showed it never matched — see the BUGFIX note there.
+        if node_type in ("EpochNode", "epoch"):
+            start = self._one_literal(store, ref, CRM["P82a_begin_of_the_begin"])
+            end = self._one_literal(store, ref, CRM["P82b_end_of_the_end"])
+            if start is not None:
+                data["start_time"] = _as_number(start)
+            if end is not None:
+                data["end_time"] = _as_number(end)
+            # P90 on an epoch is the lane colour (the exporter's own choice)
+            color = self._one_literal(store, ref, CRM.P90_has_value)
+            if color:
+                data["color"] = color
+            return data
+
+        if node_type in ("author", "author_ai"):
+            orcid = self._one_literal(store, ref, CRM.P48_has_preferred_identifier)
+            if orcid:
+                data["orcid"] = orcid
+            surname = self._one_literal(store, ref, CRM.P131_is_identified_by)
+            if surname:
+                data["surname"] = surname
+            model = self._one_literal(store, ref, EM.modelIdentifier)
+            if model:
+                data["model"] = model
+            prompt = self._one_literal(store, ref, EM.promptReference)
+            if prompt:
+                data["prompt_reference"] = prompt
+            return data
+
+        if node_type == "license":
+            ltype = self._one_literal(store, ref, CRM.P2_has_type)
+            if ltype:
+                data["license_type"] = ltype
+            url = self._one_object_text(store, ref, RDFS.seeAlso)
+            if url:
+                data["url"] = url
+            return data
+
+        if node_type == "embargo":
+            start = self._one_literal(store, ref, CRM["P82a_begin_of_the_begin"])
+            end = self._one_literal(store, ref, CRM["P82b_end_of_the_end"])
+            if start:
+                data["embargo_start"] = start
+            if end:
+                data["embargo_end"] = end
+            reason = self._one_literal(store, ref, RDFS.comment)
+            if reason:
+                data["reason"] = reason
+            return data
+
+        if node_type == "resource":
+            url = self._one_object_text(store, ref, RDFS.seeAlso)
+            if url:
+                data["url"] = url
+            # A resource can carry TWO `crm:P2_has_type` literals: its
+            # `url_type` and, when it is a DTC product, its `dtc_kind`. They are
+            # told apart by what each one IS rather than by order: `url_type` is
+            # a CONSTRUCTOR DEFAULT ("External link"), derived from the url and
+            # not authored, while `dtc_kind` is authored data and the D1/prov
+            # co-typing says it is there. So the default value is recognised and
+            # left to the constructor, and what remains is the kind.
+            ptypes = [str(o) for o in store.objects(ref, CRM.P2_has_type)
+                      if isinstance(o, Literal)]
+            is_dtc = any(t.endswith("D1_Digital_Object") for t in type_iris)
+            default_url_type = "External link"
+            authored = [p for p in ptypes if p != default_url_type]
+            if is_dtc:
+                if len(authored) == 1:
+                    data["dtc_kind"] = authored[0]
+                    data["resource_type"] = authored[0]
+                elif len(authored) > 1:
+                    self.warnings.append(
+                        f"node '{node_id}': {len(ptypes)} crm:P2_has_type values "
+                        f"{sorted(ptypes)} on a DTC resource — cannot tell "
+                        f"url_type from dtc_kind; read '{sorted(authored)[0]}' "
+                        f"as dtc_kind")
+                    data["dtc_kind"] = sorted(authored)[0]
+                    data["resource_type"] = sorted(authored)[0]
+                # a plain default-only P2 means no authored kind: leave it out
+            elif authored:
+                data["url_type"] = authored[0]
+            return data
+
+        if node_type == "geo_position":
+            epsg = self._one_literal(store, ref, CRM.P2_has_type)
+            if epsg and epsg.upper().startswith("EPSG:"):
+                data["epsg"] = _as_number(epsg.split(":", 1)[1])
+            for axis in ("shift_x", "shift_y", "shift_z", "rotation"):
+                v = self._one_literal(store, ref, EM[axis])
+                if v is not None:
+                    data[axis] = _as_number(v)
+            return data
+
+        if node_type == "extractor":
+            source = self._one_literal(store, ref, CRMINF.J7_is_based_on_evidence_from)
+            if source:
+                data["source"] = source
+            return data
+
+        if node_type in ("dtc_process", "dtc_acquisition"):
+            kind = self._one_literal(store, ref, CRM.P2_has_type)
+            if kind:
+                data["dtc_kind"] = kind
+            return data
+
+        if node_type == "narrative":
+            lang = self._one_literal(store, ref, CRM.P72_has_language)
+            if lang:
+                data["lang"] = lang
+            return data
+
+        return data
+
+    # ── edge rebuild ────────────────────────────────────────────────────────
+
+    def _rebuild_edges(self, store: ConjunctiveGraph, node_prefix: str,
+                       id_of: Dict[str, str], class_of: Dict[str, Optional[str]],
+                       g: S3DGraph) -> None:
+        """Turn node-to-node triples back into edges, once each.
+
+        The exporter emits a PAIR of triples per edge where it can — the
+        specific em:/extension predicate for expressive SPARQL and the generic
+        CRM one for CRM-only readers (and AP11 subproperty + AP11 generic for
+        the physical family). Reading naively would therefore produce two edges
+        where the author drew one. So the specific triples are resolved first
+        and the core predicate they imply is marked as already accounted for;
+        only the leftover core triples are resolved on their own.
+        """
+        # (source_iri, target_iri) → {predicate}
+        pairs: Dict[Tuple[str, str], Set[str]] = {}
+        for s, p, o in store:
+            if not isinstance(s, URIRef) or not isinstance(o, URIRef):
+                continue
+            s_text, o_text = str(s), str(o)
+            if s_text not in id_of or o_text not in id_of:
+                continue
+            if p in ARTEFACT_PREDICATES:
+                self.stats["artefacts_skipped"] += 1
+                continue
+            if p == RDF.type:
+                continue
+            pairs.setdefault((s_text, o_text), set()).add(str(p))
+
+        counter = 0
+        for (s_text, o_text), preds in sorted(pairs.items()):
+            src_class = class_of.get(s_text)
+            tgt_class = class_of.get(o_text)
+            src_id, tgt_id = id_of[s_text], id_of[o_text]
+
+            # P67 from a narrative is a projection of its chapters, not an edge
+            src_type = self.inverse.node_type_by_class.get(src_class or "")
+            if src_type in P67_CONTENT_SOURCES:
+                preds = {p for p in preds if p != str(CRM.P67_refers_to)}
+                if not preds:
+                    self.stats["artefacts_skipped"] += 1
+                    continue
+
+            resolved: List[str] = []
+            covered_cores: Set[str] = set()
+
+            # 1) the specific predicates name the edge almost by themselves
+            for pred in sorted(preds):
+                cands = self.inverse.candidates_for_predicate(pred)
+                if not cands:
+                    continue
+                pick = self._pick(cands, src_class, tgt_class, pred,
+                                  src_id, tgt_id, strict=True)
+                if pick is None:
+                    continue
+                resolved.append(pick)
+                core = self.inverse.core_of_edge.get(pick)
+                if core:
+                    covered_cores.add(core)
+                # the AP11 family also emits the generic AP11 triple; a
+                # specific em: subproperty therefore accounts for it too
+                covered_cores.add(str(CRMARCHAEO.AP11_has_physical_relation))
+
+            # 2) leftover core predicates — a triple the specific pass did not
+            #    already account for
+            for pred in sorted(preds):
+                if pred in covered_cores:
+                    continue
+                if self.inverse.candidates_for_predicate(pred):
+                    continue  # handled above (or deliberately unresolvable)
+                cands = self.inverse.core_candidates_for_predicate(pred)
+                if not cands:
+                    self.stats["edges_unmapped"] += 1
+                    self.warnings.append(
+                        f"predicate {pred} between '{src_id}' and '{tgt_id}' "
+                        f"matches no edge type — connection not imported")
+                    continue
+                pick = self._pick(cands, src_class, tgt_class, pred,
+                                  src_id, tgt_id)
+                if pick is not None:
+                    resolved.append(pick)
+
+            for edge_type in dict.fromkeys(resolved):
+                counter += 1
+                g.add_edge(f"rdf_e{counter}", src_id, tgt_id, edge_type)
+                self.stats["edges"] += 1
+
+    def _pick(self, candidates: List[str], src_class: Optional[str],
+              tgt_class: Optional[str], pred: str,
+              src_id: str, tgt_id: str,
+              strict: bool = False) -> Optional[str]:
+        """One edge type out of the candidates, or None.
+
+        `strict` is set on the SPECIFIC pass, and it is what stops a triple from
+        being counted twice. One predicate can be the *signature* of one edge and
+        the *generic companion* of another: ``P46i_forms_part_of`` identifies
+        ``heritage_part_of`` and is also emitted beside every ``is_part_of``. When
+        the only candidate is one the datamodel does not allow between these two
+        classes, the triple is the companion, not the edge — so it is declined
+        rather than forced.
+
+        Forcing it was not a silent error, which is how it was found: the graph's
+        own ``add_edge`` refuses a disallowed connection and rewrites it as
+        ``generic_connection``, so 28 ``is_part_of`` edges came back as
+        ``is_part_of`` PLUS 28 spurious generic ones.
+        """
+        narrowed = self.inverse.narrow_by_endpoints(candidates, src_class, tgt_class)
+        if len(narrowed) == 1:
+            return narrowed[0]
+        if strict and not narrowed:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        pool = narrowed or candidates
+        if not pool:
+            return None
+        # Declared canonical choice: the datamodel's own order, first wins. This
+        # is the residue the endpoints could not separate (e.g. `bonded_to` and
+        # `is_bonded_to`, two spellings of one relation that project to the same
+        # em: subproperty) — recorded, never silent.
+        pick = sorted(pool)[0]
+        self.warnings.append(
+            f"predicate {pred} between '{src_id}' and '{tgt_id}' is ambiguous "
+            f"between {sorted(pool)}; read as '{pick}'")
+        return pick
+
+    # ── literal helpers ─────────────────────────────────────────────────────
+
+    @staticmethod
+    def _one_literal(store: ConjunctiveGraph, ref: URIRef,
+                     pred: URIRef) -> Optional[str]:
+        for o in store.objects(ref, pred):
+            if isinstance(o, Literal):
+                return str(o)
+        return None
+
+    @staticmethod
+    def _one_object_text(store: ConjunctiveGraph, ref: URIRef,
+                         pred: URIRef) -> Optional[str]:
+        """A value that may have been emitted as a URIRef or as a Literal."""
+        for o in store.objects(ref, pred):
+            return str(o)
+        return None
+
+
+def _as_number(text: Any) -> Any:
+    """Numbers come back as numbers when they went out as numbers.
+
+    Epoch bounds and shift axes are numeric in the property graph; a Literal
+    read back as ``"476"`` would make an epoch's start a string and break every
+    chronological comparison downstream.
+    """
+    if text is None or isinstance(text, (int, float)):
+        return text
+    s = str(text).strip()
+    if not s:
+        return text
+    try:
+        if re.fullmatch(r"[+-]?\d+", s):
+            return int(s)
+        return float(s)
+    except ValueError:
+        return text
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Convenience helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def import_rdf(source: Any,
+               fmt: Optional[str] = None,
+               base_uri: str = DEFAULT_BASE_URI,
+               into_graph: Optional[S3DGraph] = None) -> Tuple[List[S3DGraph], List[str]]:
+    """One-call helper: (graphs, warnings)."""
+    importer = RDFImporter(base_uri=base_uri)
+    graphs = importer.parse(source, fmt=fmt, into_graph=into_graph)
+    return graphs, importer.warnings

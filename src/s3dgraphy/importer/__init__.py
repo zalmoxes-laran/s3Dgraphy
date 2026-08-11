@@ -73,14 +73,25 @@ def create_importer(
         # 'sqlite': SQLiteImporter,
         # 'csv': CSVImporter,
     }
-    
+
+    # RDF: registered by EXTENSION as well as by name, because a triplestore
+    # dump arrives as .ttl/.trig/.jsonld/.nt and the caller should not have to
+    # know which parser that is. Imported lazily — rdflib is the `[rdf]` extra,
+    # and requiring it to import the package would make the whole importer
+    # module unavailable to anyone who only reads GraphML.
+    rdf_formats = {'rdf', 'ttl', 'turtle', 'trig', 'jsonld', 'json-ld', 'nt',
+                   'ntriples', 'nquads', 'nq', 'rdf-xml'}
+    if format_type in rdf_formats:
+        from .rdf_importer import RDFImporter
+        return RDFImporter()
+
     # Validate format type
     if format_type not in importers:
         raise ValueError(
             f"Unsupported format type: {format_type}. "
-            f"Supported formats are: {', '.join(importers.keys())}"
+            f"Supported formats are: {', '.join(sorted(set(importers) | rdf_formats))}"
         )
-        
+
     # Special handling for GraphML
     if format_type == 'graphml':
         return importers[format_type](filepath, mapping_name, id_column, overwrite)
@@ -100,5 +111,19 @@ __all__ = [
     "GraphMLImporter",
     "BaseImporter",
     "XLSXImporter",
-    "create_importer"
+    "create_importer",
+    # RDF import — the return leg of the triplestore (needs the `[rdf]` extra).
+    # Exposed by name but NOT imported at module load: rdflib is optional, and a
+    # hard import here would break `from s3dgraphy.importer import *` for anyone
+    # who does not have it.
+    "RDFImporter",
+    "import_rdf",
 ]
+
+
+def __getattr__(name):
+    """Lazily expose the RDF importer, so rdflib stays an optional extra."""
+    if name in ("RDFImporter", "import_rdf"):
+        from . import rdf_importer
+        return getattr(rdf_importer, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
