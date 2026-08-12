@@ -662,28 +662,23 @@ class RDFExporter:
 
         node_by_id = {n.node_id: n for n in g.nodes}
 
-        # property_id → unit_id (has_property: unit → property)
-        prop_unit: Dict[str, str] = {}
+        # property_id → [unit_id] — ALL the units that claim this property.
+        # It was a single id, which meant a property with several parents lost
+        # every attribution but one. See the I17-per-pair emission below.
+        prop_units: Dict[str, List[str]] = {}
         # arg_id → [property_id] (has_data_provenance: property → arg)
         arg_props: Dict[str, List[str]] = {}
 
         for edge in g.edges:
             if edge.edge_type == "has_property":
-                # BUGFIX (2026-08-11, found by the RDF round-trip): this was a
-                # plain assignment, so a property with SEVERAL has_property
-                # parents (TempluMare has one with three) kept whichever edge
-                # happened to come LAST — and the projection therefore depended
-                # on edge ORDER. Two runs over the same graph with the edges in a
-                # different order emitted a different J30_has_domain, which makes
-                # export→import→export idempotence impossible by construction.
-                # Deterministic now: the smallest id wins, whatever the order.
-                # (Naming one parent for a multi-parent property is still a
-                # declared simplification — one I17 per pair would be the fuller
-                # projection — but it is at least the SAME one every time.)
-                prev = prop_unit.get(edge.edge_target)
-                prop_unit[edge.edge_target] = (
-                    edge.edge_source if prev is None
-                    else min(prev, edge.edge_source))
+                # Every parent is kept. This was first a plain assignment (so the
+                # LAST edge won and the projection depended on edge ORDER — found
+                # by the round-trip), then a deterministic min(). Both named ONE
+                # unit, and a property claimed by three units then said so about
+                # one: the other two attributions were simply absent from the
+                # RDF. Now all of them are collected and each becomes its own
+                # I17 below. Sorted, so the emission is order-independent.
+                prop_units.setdefault(edge.edge_target, []).append(edge.edge_source)
             elif edge.edge_type == "has_data_provenance":
                 tgt = node_by_id.get(edge.edge_target)
                 if tgt is not None and getattr(tgt, "node_type", None) in ARG_TYPES:
@@ -698,7 +693,7 @@ class RDFExporter:
                 ptype = getattr(prop_node, "property_type", None)
                 if not ptype or (isinstance(ptype, str) and ptype.lower() == "string"):
                     ptype = getattr(prop_node, "name", None) or "unknown"
-                unit_id = prop_unit.get(prop_id)
+                unit_ids = sorted(set(prop_units.get(prop_id, [])))
 
                 # J5: confidence qualia → I6 Belief Value
                 if str(ptype).lower().endswith("confidence_level"):
@@ -706,33 +701,56 @@ class RDFExporter:
                              self._node_iri(g.graph_id, prop_id)))
                     continue
 
-                # Reconstruction claim: belief J4 → the virtual unit (⊂ I4)
-                unit_node = node_by_id.get(unit_id) if unit_id else None
-                if (unit_node is not None
-                        and getattr(unit_node, "node_type", None) in VIRTUAL_TYPES
-                        and str(ptype).lower().endswith("existence")):
-                    ctx.add((belief_iri, CRMINF.J4_that,
-                             self._node_iri(g.graph_id, unit_id)))
-                    self.stats["belief_propositions"] = self.stats.get("belief_propositions", 0) + 1
+                # Reconstruction claim: belief J4 → the virtual unit (⊂ I4).
+                # Unchanged in meaning; it just runs per parent now, since a
+                # property may be claimed by more than one.
+                virtual_units = [
+                    uid for uid in unit_ids
+                    if getattr(node_by_id.get(uid), "node_type", None) in VIRTUAL_TYPES
+                ]
+                if virtual_units and str(ptype).lower().endswith("existence"):
+                    for uid in virtual_units:
+                        ctx.add((belief_iri, CRMINF.J4_that,
+                                 self._node_iri(g.graph_id, uid)))
+                        self.stats["belief_propositions"] = self.stats.get("belief_propositions", 0) + 1
                     continue
 
-                # Property claim: mint the I17 One-Proposition Set
+                # Property claim: ONE I17 One-Proposition Set PER (property, unit)
+                # PAIR. A proposition is "THIS unit has THIS value for THIS
+                # property" — so a property claimed by three units is three
+                # propositions, not one with a chosen subject. Naming one and
+                # dropping the others made the RDF quietly lossy, and no importer
+                # could have recovered what was never written.
+                #
+                # The IRI carries the pair (`…/proposition/<unit_id>`), which is
+                # what makes the set deterministic and re-readable: each I17 has
+                # a stable name derived from the two things it relates, so
+                # re-exporting the same graph mints the same IRIs whatever the
+                # order of the edges. A property with no parent at all still gets
+                # its bare `…/proposition` — the claim exists, its subject is
+                # simply not stated.
                 prop_iri = self._node_iri(g.graph_id, prop_id)
-                i17_iri = URIRef(str(prop_iri) + "/proposition")
-                ctx.add((i17_iri, RDF.type, CRMINF["I17_One-Proposition_Set"]))
-                if unit_id:
-                    ctx.add((i17_iri, CRMINF.J30_has_domain,
-                             self._node_iri(g.graph_id, unit_id)))
                 qualia_iri = S3D["qualia_" + _iri_local(str(ptype).rsplit(".", 1)[-1])]
-                ctx.add((i17_iri, CRMINF.J32_has_property_type, qualia_iri))
-                ctx.add((qualia_iri, RDF.type, CRM.E55_Type))
                 raw_value = getattr(prop_node, "value", None)
                 if raw_value is None or (isinstance(raw_value, str) and not raw_value.strip()):
                     raw_value = getattr(prop_node, "description", None)
-                if raw_value is not None and (not isinstance(raw_value, str) or raw_value.strip()):
-                    ctx.add((i17_iri, CRMINF.J31_has_range, Literal(raw_value)))
-                ctx.add((belief_iri, CRMINF.J4_that, i17_iri))
-                self.stats["belief_propositions"] = self.stats.get("belief_propositions", 0) + 1
+                has_value = raw_value is not None and (
+                    not isinstance(raw_value, str) or raw_value.strip())
+
+                for uid in (unit_ids or [None]):
+                    i17_iri = URIRef(
+                        f"{prop_iri}/proposition/{_iri_local(uid)}" if uid
+                        else f"{prop_iri}/proposition")
+                    ctx.add((i17_iri, RDF.type, CRMINF["I17_One-Proposition_Set"]))
+                    if uid:
+                        ctx.add((i17_iri, CRMINF.J30_has_domain,
+                                 self._node_iri(g.graph_id, uid)))
+                    ctx.add((i17_iri, CRMINF.J32_has_property_type, qualia_iri))
+                    ctx.add((qualia_iri, RDF.type, CRM.E55_Type))
+                    if has_value:
+                        ctx.add((i17_iri, CRMINF.J31_has_range, Literal(raw_value)))
+                    ctx.add((belief_iri, CRMINF.J4_that, i17_iri))
+                    self.stats["belief_propositions"] = self.stats.get("belief_propositions", 0) + 1
 
     # ── node serialization ──────────────────────────────────────────────────
 
@@ -1007,6 +1025,23 @@ class RDFExporter:
                 ctx.add((node_iri, RDF.type, CRMDIG.D1_Digital_Object))
                 ctx.add((node_iri, RDF.type, PROV.Entity))
                 ctx.add((node_iri, CRM.P2_has_type, Literal(dtc_kind)))
+
+        elif node_type == "LocationNodeGroup":
+            # The kind (toponym / study / functional) is the discriminator of the
+            # spatial plane and is REQUIRED by the constructor — a Location
+            # without it cannot be rebuilt. It was not projected at all, so a
+            # Location came back as a bare Node. The datamodel already declared
+            # how ("E53 Place + E55 Type (kind classifier via P2_has_type)"); this
+            # emits what that mapping says.
+            kind = getattr(node, "kind", None) or data.get("kind")
+            if kind:
+                ctx.add((node_iri, CRM.P2_has_type, Literal(kind)))
+            # propagation is real data too (additive vs substitutive changes what
+            # the membership MEANS), and only stated when it is not the default —
+            # a triple per node saying "the usual" is noise.
+            propagation = getattr(node, "propagation", None) or data.get("propagation")
+            if propagation and propagation != "additive":
+                ctx.add((node_iri, EM.propagation, Literal(propagation)))
 
         elif node_type == "geo_position":
             epsg = data.get("epsg")

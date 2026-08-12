@@ -467,12 +467,72 @@ em:firstAttestedInEpoch
     rdfs:range crm:E4_Period ;
     rdfs:comment "Documented shortcut: the unit was brought into existence (P92i, genesis event / SE node) during the epoch (event P10_falls_within epoch; crmarchaeo:AP25_occurs_during where an SE node is present). Declared subPropertyOf P10 on the unit's defining spacetime volume (P196). Maps to: connections_datamodel edge 'has_first_epoch'."@en .
 
+em:propagation
+    a owl:DatatypeProperty ;
+    rdfs:label "propagation"@en ;
+    rdfs:domain em:LocationNodeGroup ;
+    rdfs:comment "How membership of this Location propagates to its members: 'additive' (the default — multiple memberships compose, none overrides) or 'substitutive'. Stated only when it is not the default. Maps to: Python LocationNodeGroup.propagation."@en .
+
 em:hasAuthor
     a owl:ObjectProperty ;
     rdfs:subPropertyOf prov:wasAttributedTo ;
     rdfs:label "has author"@en ;
     rdfs:range em:Author ;
     rdfs:comment "Domain-neutral authorship attribution (any graph entity to a human or AI author). Replaces the earlier P94_has_created reading (invalid domain/range for physical units) and L10_had_input (digital machine events, not authorship). Maps to: connections_datamodel edge 'has_author'."@en .
+
+# ============================================================================
+# N. STRUCTURAL CLASSES — the six that shared a CIDOC class
+#    (added 2026-08-11, driven by the RDF round-trip)
+# ============================================================================
+#
+# These six classes had NO em: class of their own: they fell back on
+# mapping.cidoc and so projected in pairs onto E1, E78 and E53. The RDF was
+# therefore not self-describing — reading it back, a consumer could not tell a
+# Node from an UnknownNode, a NodeGroup from a ParadataNodeGroup, or a Location
+# from a GeoPosition, except by hunting for side-evidence (the presence of
+# em:shift_* triples), which fails exactly where it matters: a graph
+# georeferenced without a transform has no shift to find.
+#
+# Each declares rdfs:subClassOf its former CIDOC class, so nothing is taken
+# away from a CRM-only reader — the E1/E78/E53 statement is still there. What is
+# added is the ability to ask the question precisely.
+
+em:Node
+    a owl:Class ;
+    rdfs:label "EM Node (base)"@en ;
+    rdfs:subClassOf crm:E1_CRM_Entity ;
+    rdfs:comment "The base class every EM node inherits from. Declared not because it says anything beyond E1 — it does not — but so that a node serialized AS the base class is distinguishable from one the source could not type (em:UnknownNode). Maps to: Python Node (node_type='Node')."@en .
+
+em:UnknownNode
+    a owl:Class ;
+    rdfs:label "Unknown Node"@en ;
+    rdfs:subClassOf crm:E1_CRM_Entity ;
+    rdfs:comment "A node whose type the source could not determine — an anomaly in the data, not a modelling choice. Distinct from em:Node so that 'find the unrecognised units in this dataset' is a type query. Maps to: Python UnknownNode (node_type='unknown')."@en .
+
+em:NodeGroup
+    a owl:Class ;
+    rdfs:label "Node Group (abstract)"@en ;
+    rdfs:subClassOf crm:E78_Collection ;
+    rdfs:comment "Abstract superclass of the EM grouping axes — activity (intention), paradata (justification), timebranch (alternative time), location (place), functional unit (architectural composition). A group is a Collection of nodes and never changes what its members ARE. Maps to: Python GroupNode (node_type='Group')."@en .
+
+em:ParadataNodeGroup
+    a owl:Class ;
+    rdfs:label "Paradata Node Group"@en ;
+    rdfs:subClassOf em:NodeGroup , crm:E78_Collection ;
+    rdfs:comment "All the paradata of one stratigraphic unit gathered as a unit, by EM convention named '[US_name]_PD'. Distinct class so the paradata groups are findable by type rather than by naming convention. Maps to: Python ParadataNodeGroup (node_type='ParadataNodeGroup')."@en .
+
+em:LocationNodeGroup
+    a owl:Class ;
+    rdfs:label "Location Node Group"@en ;
+    rdfs:subClassOf em:NodeGroup , crm:E53_Place ;
+    rdfs:comment "The IDENTITARY side of place: what named place is this in — a toponym (Pompei), a study unit (Saggio4/A2) or a functional one (Casa del Fauno / Room 12). Still an E53 Place classified by E55 Type, exactly as before; the em: class exists to separate it from em:GeoPositionNode, which is the METRIC side and was sharing the same E53. Membership is m:n and additive. Maps to: Python LocationNodeGroup (node_type='LocationNodeGroup')."@en .
+
+em:GeoPositionNode
+    a owl:Class ;
+    rdfs:label "Geo Position"@en ;
+    rdfs:subClassOf crm:E53_Place ;
+    rdfs:comment "The METRIC anchor of a graph, one per graph: a CRS (epsg), the origin of the scene-local frame (shift_x/y/z — the point that is 0,0,0 in the scene, which may legitimately sit outside the geometry) and its azimuth (rotation, clockwise from north). Distinct from em:LocationNodeGroup: that one answers 'which place', this one answers 'where, in numbers'. Maps to: Python GeoPositionNode (node_type='geo_position')."@en .
+
 
 # ============================================================================
 # End of em.ttl v1.6.1

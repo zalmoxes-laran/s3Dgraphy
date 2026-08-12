@@ -23,6 +23,11 @@ them is a plain dictionary flip:
   subclass of every other candidate — and the redundant superclasses fall away
   on their own. No namespace heuristic, no ordering assumption.
 
+  Since 2026-08-11 the map is **bijective**: the six classes that used to share
+  E1/E78/E53 have distinct ``em_extension.uri``, so 50 classes give 50 distinct
+  IRIs. The evidence-based tie-break that used to separate the E53 pair is
+  retained for legacy TTL only (see ``CLASS_EVIDENCE``).
+
 * **predicate → edge_type.** The core CRM predicates are heavily many-to-one
   (nine of them carry two or more EM edges; ``P138i_has_representation`` carries
   four). Three things disambiguate, in order: the em: subproperty for the AP11
@@ -117,6 +122,17 @@ def _format_for(source: Any, fmt: Optional[str]) -> str:
     return "turtle"
 
 
+def _resolve_prefixed_name(name: Optional[str]) -> Optional[URIRef]:
+    """The exporter's own prefixed-name resolver, re-exported under a local name.
+
+    Imported once here rather than inside the loops that use it: the same
+    function on both sides means a CIDOC code spelled "E53 Place" resolves to the
+    same IRI going out and coming back.
+    """
+    from ..exporter.rdf_exporter import _resolve_prefixed
+    return _resolve_prefixed(name)
+
+
 def _looks_like_path(source: Any) -> bool:
     """Is this a file path rather than a serialised document?
 
@@ -172,18 +188,22 @@ GENERIC_COMPANION_PREDICATES: Set[URIRef] = {
     CRMARCHAEO.AP11_has_physical_relation,
 }
 
-#: Evidence-based tie-break for the CIDOC classes that TWO s3Dgraphy classes
-#: share. Exactly three exist (``E1_CRM_Entity``, ``E78_Collection``,
-#: ``E53_Place``) and they exist for one reason: those classes declare no
-#: ``em_extension.uri``, so both fall back to the same ``mapping.cidoc``. Two of
-#: the three are settled by the specificity rule on their own — ``UnknownNode``
-#: is a subclass of ``Node``, ``ParadataNodeGroup`` of ``GroupNode`` — so only
-#: ``E53_Place`` needs help: ``GeoPositionNode`` and ``LocationNodeGroup`` are
-#: unrelated in the hierarchy. It is decided by a triple the exporter writes for
-#: one and not the other, which is evidence rather than a guess.
+#: LEGACY FALLBACK ONLY (2026-08-11).
 #:
-#: The upstream fix is one line of datamodel per class (a distinct
-#: ``em_extension.uri``); until E.D. decides that, this is the honest reading.
+#: Three CIDOC classes used to be shared by two s3Dgraphy classes each — E1 by
+#: Node/UnknownNode, E78 by GroupNode/ParadataNodeGroup, E53 by
+#: LocationNodeGroup/GeoPositionNode — because none of the six declared an
+#: ``em_extension.uri``. The E53 pair was the hard one: unrelated in the class
+#: hierarchy, so it could only be read by looking for a triple the exporter
+#: writes for one and not the other. That inference is an INDIZIO, and it breaks
+#: precisely where it matters — a graph georeferenced without a transform has no
+#: ``em:shift_*`` to find, and its GeoPosition would come back as a Location.
+#:
+#: All six now have distinct URIs in the datamodel (and in ``em.ttl``), so
+#: ``IRI → class`` is bijective and this never fires on RDF written by the
+#: current exporter. It is kept for TTL produced BEFORE that change, where the
+#: shift triples are still the only evidence there is. Measured: 50 classes,
+#: 50 distinct primary IRIs, 0 collisions.
 CLASS_EVIDENCE: Dict[str, Tuple[URIRef, ...]] = {
     "GeoPositionNode": (EM.shift_x, EM.shift_y, EM.shift_z, EM.rotation),
 }
@@ -234,6 +254,19 @@ class _InverseDatamodel:
             if iri is not None:
                 self.classes_by_iri.setdefault(str(iri), []).append(name)
 
+        #: LEGACY index: CIDOC class IRI → [class names] built from
+        #: ``mapping.cidoc``, i.e. what each class projected as BEFORE it was
+        #: given an ``em_extension.uri``. Consulted only when the primary index
+        #: finds nothing, which is exactly the case of a TTL written by an older
+        #: release. Datamodel-driven like everything else — ``mapping.cidoc`` is
+        #: still there and still says what the CIDOC reading is.
+        self.legacy_classes_by_iri: Dict[str, List[str]] = {}
+        for name, entry in self.dm._node_class_index.items():
+            cidoc = (entry.get("mapping") or {}).get("cidoc")
+            iri = _resolve_prefixed_name(cidoc)
+            if iri is not None:
+                self.legacy_classes_by_iri.setdefault(str(iri), []).append(name)
+
         #: every IRI that appears as somebody's declared superclass. These are
         #: the redundant types the exporter adds for CRM-only readers.
         self.superclass_iris: Set[str] = set()
@@ -255,8 +288,7 @@ class _InverseDatamodel:
         #: by nature, so never used to guess (see ``resolve_property_type``).
         self.qualia_by_iri: Dict[str, List[str]] = {}
         for qid, crm in self.dm._qualia_class_index.items():
-            from ..exporter.rdf_exporter import _resolve_prefixed
-            iri = _resolve_prefixed(crm)
+            iri = _resolve_prefixed_name(crm)
             if iri is not None:
                 self.qualia_by_iri.setdefault(str(iri), []).append(qid)
 
@@ -311,6 +343,15 @@ class _InverseDatamodel:
                 if name not in candidates:
                     candidates.append(name)
         if not candidates:
+            # LEGACY: a document written before the distinct URIs types its nodes
+            # with the bare CIDOC class, which is now nobody's primary IRI. Fall
+            # back to what that class used to mean — and from here the old
+            # ambiguities are back, which is what CLASS_EVIDENCE is still for.
+            for iri in type_iris:
+                for name in self.legacy_classes_by_iri.get(iri, []):
+                    if name not in candidates:
+                        candidates.append(name)
+        if not candidates:
             return None, None
 
         # a type that is ONLY a declared superclass is the redundant CRM one
@@ -319,9 +360,10 @@ class _InverseDatamodel:
             if str(self.dm.get_node_primary_iri(n)) not in self.superclass_iris
         ] or candidates
 
-        # Evidence first: a candidate that the node's own triples confirm wins
-        # over any hierarchy reasoning, because it is a fact about this node
-        # rather than about the class tree.
+        # Evidence — LEGACY path only. With the distinct URIs of 2026-08-11 a
+        # node resolves to exactly one candidate and this is skipped entirely;
+        # it still reads a pre-change TTL, where the shift triples are the only
+        # thing telling a GeoPosition from a Location.
         if has_pred is not None and len(specific) > 1:
             for name in specific:
                 preds = CLASS_EVIDENCE.get(name)
@@ -640,6 +682,7 @@ class RDFImporter:
                 g.nodes = [n for n in g.nodes if n.node_id != auto_id]
 
         self._rebuild_edges(store, node_prefix, id_of, class_of, g)
+        self._rebuild_has_property_from_i17(store, node_prefix, id_of, g)
 
     @staticmethod
     def _collect_node_iris(store: ConjunctiveGraph, node_prefix: str) -> List[str]:
@@ -869,6 +912,19 @@ class RDFImporter:
                     data[axis] = _as_number(v)
             return data
 
+        if node_type == "LocationNodeGroup":
+            # kind is REQUIRED by the constructor (it raises on anything outside
+            # the enum), so a Location whose kind did not survive the projection
+            # degraded to a base Node. Read from the P2_has_type the datamodel's
+            # own mapping declares.
+            kind = self._one_literal(store, ref, CRM.P2_has_type)
+            if kind:
+                data["kind"] = kind
+            propagation = self._one_literal(store, ref, EM.propagation)
+            if propagation:
+                data["propagation"] = propagation
+            return data
+
         if node_type == "extractor":
             source = self._one_literal(store, ref, CRMINF.J7_is_based_on_evidence_from)
             if source:
@@ -975,6 +1031,54 @@ class RDFImporter:
             for edge_type in dict.fromkeys(resolved):
                 counter += 1
                 g.add_edge(f"rdf_e{counter}", src_id, tgt_id, edge_type)
+                self.stats["edges"] += 1
+
+    def _rebuild_has_property_from_i17(self, store: ConjunctiveGraph,
+                                       node_prefix: str,
+                                       id_of: Dict[str, str],
+                                       g: S3DGraph) -> None:
+        """Recover the `has_property` edges from the I17 propositions.
+
+        `has_property` is one of the two edges whose triples the edge pass
+        deliberately ignores: `crm:P43_has_dimension` / `em:hasQualia` carry it,
+        and they are read there — but the SUBJECT side of a proposition
+        (`J30_has_domain`) is in `ARTEFACT_PREDICATES`, because on its own it is
+        part of the belief skeleton and not a connection anyone drew.
+
+        Since the propositions became one-per-pair, though, they are the only
+        place that records EVERY unit claiming a property. A property with three
+        parents projects three I17, each naming its own unit; without this pass
+        two of those three attributions would be read as belief furniture and
+        dropped. So the I17 set is consulted for exactly this: `<i17>
+        J30_has_domain <unit>` where the I17's IRI names the property gives back
+        `unit --has_property--> property`.
+
+        Idempotent against the edge pass: an edge already rebuilt from the
+        P43/em:hasQualia triples is not added twice.
+        """
+        existing = {(e.edge_source, e.edge_target, e.edge_type) for e in g.edges}
+        counter = 0
+        i17_type = CRMINF["I17_One-Proposition_Set"]
+        for i17 in store.subjects(RDF.type, i17_type):
+            text = str(i17)
+            if "/proposition" not in text:
+                continue
+            prop_iri = text.rsplit("/proposition", 1)[0]
+            if not prop_iri.startswith(node_prefix):
+                continue
+            prop_id = id_of.get(prop_iri)
+            if prop_id is None:
+                continue
+            for unit in store.objects(i17, CRMINF.J30_has_domain):
+                unit_id = id_of.get(str(unit))
+                if unit_id is None:
+                    continue
+                key = (unit_id, prop_id, "has_property")
+                if key in existing:
+                    continue
+                existing.add(key)
+                counter += 1
+                g.add_edge(f"rdf_i17_{counter}", unit_id, prop_id, "has_property")
                 self.stats["edges"] += 1
 
     def _pick(self, candidates: List[str], src_class: Optional[str],

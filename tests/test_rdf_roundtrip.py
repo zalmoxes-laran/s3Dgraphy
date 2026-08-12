@@ -483,3 +483,255 @@ def test_sparql_result_goes_through_the_same_parse(tmp_path, monkeypatch):
                                        graph_iri="https://w3id.org/em/id/graph/from_store")
     assert [g.graph_id for g in graphs] == ["from_store"]
     assert {n.node_id for n in graphs[0].nodes} >= {"proc1", "in1", "out1"}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STEP A — the RDF is self-describing: IRI → class is bijective
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _structural_graph() -> Graph:
+    """The six classes that used to share three CIDOC classes, in one graph."""
+    from s3dgraphy.nodes import (
+        GeoPositionNode, LocationNodeGroup, ParadataNodeGroup, GroupNode,
+        UnknownNode,
+    )
+    g = Graph(graph_id="structural")
+    g.add_node(LocationNodeGroup("loc1", "Pompei", "toponym"))
+    g.add_node(ParadataNodeGroup("pd1", "US1_PD"))
+    g.add_node(GroupNode("grp1", "Generic group"))
+    g.add_node(UnknownNode("unk1", "?"))
+    return g
+
+
+def test_iri_to_class_is_bijective():
+    """50 classes, 50 distinct primary IRIs, zero collisions.
+
+    Before the distinct URIs of 2026-08-11 three CIDOC classes were shared by two
+    s3Dgraphy classes each, and the projection could not say which had been
+    written. This is the property that makes the RDF self-describing.
+    """
+    from s3dgraphy.importer.rdf_importer import _InverseDatamodel
+
+    inv = _InverseDatamodel()
+    collisions = {iri: names for iri, names in inv.classes_by_iri.items()
+                  if len(names) > 1}
+    assert not collisions, collisions
+    assert len(inv.classes_by_iri) == len(inv.dm._node_class_index)
+
+
+def test_the_three_former_collisions_resolve_without_evidence(tmp_path):
+    """Each of the six comes back as itself, from its rdf:type alone."""
+    original = _structural_graph()
+    ttl = _export(original, tmp_path / "s.ttl")
+    importer = RDFImporter()
+    rebuilt = importer.parse(ttl)[0]
+
+    classes = {n.node_id: type(n).__name__ for n in rebuilt.nodes}
+    assert classes["loc1"] == "LocationNodeGroup"
+    assert classes["pd1"] == "ParadataNodeGroup"
+    assert classes["grp1"] == "GroupNode"
+    assert classes["unk1"] == "UnknownNode"
+    assert not importer.warnings, importer.warnings
+
+
+def test_geoposition_without_a_transform_still_reads_as_a_geoposition(tmp_path):
+    """The case the evidence heuristic could NOT read.
+
+    A GeoPositionNode with no shift and no rotation emits no `em:shift_*`, so
+    the old tie-break had nothing to look at and fell through to
+    LocationNodeGroup — the two shared crm:E53_Place. With a distinct
+    `em:GeoPositionNode` in the datamodel the question is answered by the type
+    itself, whatever the node happens to carry.
+    """
+    from s3dgraphy.nodes import GeoPositionNode
+
+    g = Graph(graph_id="bare_geo")
+    geo = GeoPositionNode("geo_bare")
+    geo.data = {}                       # no epsg, no shift, no rotation
+    g.add_node(geo, overwrite=True)
+
+    ttl = _export(g, tmp_path / "bare.ttl")
+    # the evidence the old heuristic relied on is genuinely absent FROM THIS NODE
+    # (the graph auto-creates a geo node of its own, which does carry shifts)
+    rdf = _rdf(ttl)
+    bare = rdflib.URIRef(f"{DEFAULT_BASE_URI}graph/bare_geo/node/geo_bare")
+    preds = {str(p) for p in rdf.predicates(bare, None)}
+    assert not any("shift" in p or "rotation" in p for p in preds), sorted(preds)
+
+    importer = RDFImporter()
+    rebuilt = importer.parse(ttl)[0]
+    geo_back = next(n for n in rebuilt.nodes if n.node_id == "geo_bare")
+    assert type(geo_back).__name__ == "GeoPositionNode"
+    assert not importer.warnings, importer.warnings
+
+
+def test_crm_superclasses_are_still_emitted_for_crm_only_readers(tmp_path):
+    """Nothing was taken away: the E1/E78/E53 statements are still there.
+
+    The new em: classes are declared `rdfs:subClassOf` their former CIDOC class
+    and the exporter emits both, so a consumer that knows only CIDOC reads the
+    same graph it read before.
+    """
+    ttl = _export(_structural_graph(), tmp_path / "s.ttl")
+    g = _rdf(ttl)
+    CRM_NS = "http://www.cidoc-crm.org/cidoc-crm/"
+    base = f"{DEFAULT_BASE_URI}graph/structural/node/"
+    expected = {
+        "loc1": (f"{CRM_NS}E53_Place", "LocationNodeGroup"),
+        "pd1": (f"{CRM_NS}E78_Collection", "ParadataNodeGroup"),
+        "grp1": (f"{CRM_NS}E78_Collection", "NodeGroup"),
+        "unk1": (f"{CRM_NS}E1_CRM_Entity", "UnknownNode"),
+    }
+    for node_id, (crm_class, em_local) in expected.items():
+        types = {str(o) for o in g.objects(rdflib.URIRef(base + node_id),
+                                           rdflib.RDF.type)}
+        assert crm_class in types, (node_id, sorted(types))
+        assert f"https://w3id.org/em/ontology#{em_local}" in types, (
+            node_id, sorted(types))
+
+
+def test_structural_graph_round_trips_isomorphically(tmp_path):
+    ttl1 = _export(_structural_graph(), tmp_path / "a.ttl")
+    rebuilt = RDFImporter().parse(ttl1)[0]
+    ttl2 = _export(rebuilt, tmp_path / "b.ttl")
+    assert isomorphic(_rdf(ttl1), _rdf(ttl2))
+
+
+def test_legacy_ttl_without_the_new_uris_still_reads(tmp_path):
+    """Back-compatibility: TTL written BEFORE the distinct URIs.
+
+    Such a document types a GeoPosition as a bare crm:E53_Place, which is also
+    what a Location was. The evidence tie-break is kept for exactly this, and
+    the shift triples are what it reads.
+    """
+    legacy = f"""
+@prefix crm: <http://www.cidoc-crm.org/cidoc-crm/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix em: <https://w3id.org/em/ontology#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<{DEFAULT_BASE_URI}graph/legacy> a em:EMGraph .
+
+<{DEFAULT_BASE_URI}graph/legacy/node/geo_legacy> a crm:E53_Place ;
+    rdfs:label "geo_position" ;
+    dcterms:identifier "geo_legacy" ;
+    crm:P2_has_type "EPSG:4326" ;
+    em:shift_x 1.5 ;
+    em:shift_y 2.5 ;
+    em:shift_z 0.0 ;
+    em:rotation 0.0 .
+"""
+    importer = RDFImporter()
+    rebuilt = importer.parse(legacy, fmt="turtle")[0]
+    geo = next(n for n in rebuilt.nodes if n.node_id == "geo_legacy")
+    assert type(geo).__name__ == "GeoPositionNode"
+    assert geo.data.get("shift_x") == 1.5
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STEP B — one I17 per (property, unit) pair: the projection is not lossy
+# ─────────────────────────────────────────────────────────────────────────────
+
+CRMINF_NS = "http://www.cidoc-crm.org/extensions/crminf/"
+
+
+def _shared_property_graph() -> Graph:
+    """Three units claiming ONE property — the shape that used to lose two of
+    the three attributions on the way into RDF."""
+    from s3dgraphy.nodes import ExtractorNode
+
+    g = Graph(graph_id="shared_prop")
+    for uid in ("US_a", "US_b", "US_c"):
+        g.add_node(StratigraphicUnit(uid, name=uid))
+    g.add_node(PropertyNode("p_shared", name="height", description="",
+                            value="2.4", property_type="height"))
+    g.add_node(ExtractorNode("ext1", name="Extractor", source="D.1"))
+    for i, uid in enumerate(("US_a", "US_b", "US_c")):
+        g.add_edge(f"hp{i}", uid, "p_shared", "has_property")
+    g.add_edge("prov", "p_shared", "ext1", "has_data_provenance")
+    return g
+
+
+def test_one_i17_per_property_unit_pair(tmp_path):
+    """Three units, three propositions — each naming its own subject."""
+    g = _rdf(_export(_shared_property_graph(), tmp_path / "s.ttl"))
+    i17s = list(g.subjects(rdflib.RDF.type,
+                           rdflib.URIRef(CRMINF_NS + "I17_One-Proposition_Set")))
+    assert len(i17s) == 3, sorted(str(s) for s in i17s)
+
+    domains = {str(o).rsplit("/node/", 1)[-1]
+               for s in i17s
+               for o in g.objects(s, rdflib.URIRef(CRMINF_NS + "J30_has_domain"))}
+    assert domains == {"US_a", "US_b", "US_c"}, domains
+
+
+def test_i17_iris_name_the_pair_and_are_deterministic(tmp_path):
+    """The IRI carries the pair, which is what makes the set re-readable and the
+    export order-independent — a stable name derived from the two things the
+    proposition relates."""
+    g = _rdf(_export(_shared_property_graph(), tmp_path / "s.ttl"))
+    i17s = {str(s) for s in g.subjects(
+        rdflib.RDF.type, rdflib.URIRef(CRMINF_NS + "I17_One-Proposition_Set"))}
+    base = f"{DEFAULT_BASE_URI}graph/shared_prop/node/p_shared/proposition/"
+    assert i17s == {base + "US_a", base + "US_b", base + "US_c"}, sorted(i17s)
+
+
+def test_all_three_has_property_edges_come_back(tmp_path):
+    """The point of the whole step: nothing is lost on the way in OR out."""
+    original = _shared_property_graph()
+    ttl = _export(original, tmp_path / "s.ttl")
+    importer = RDFImporter()
+    rebuilt = importer.parse(ttl)[0]
+
+    parents = sorted(e.edge_source for e in rebuilt.edges
+                     if e.edge_type == "has_property"
+                     and e.edge_target == "p_shared")
+    assert parents == ["US_a", "US_b", "US_c"], parents
+
+    edges_before = {(e.edge_source, e.edge_target, e.edge_type)
+                    for e in original.edges}
+    edges_after = {(e.edge_source, e.edge_target, e.edge_type)
+                   for e in rebuilt.edges}
+    assert edges_after == edges_before
+
+
+def test_shared_property_round_trips_isomorphically(tmp_path):
+    ttl1 = _export(_shared_property_graph(), tmp_path / "a.ttl")
+    rebuilt = RDFImporter().parse(ttl1)[0]
+    ttl2 = _export(rebuilt, tmp_path / "b.ttl")
+    assert isomorphic(_rdf(ttl1), _rdf(ttl2))
+
+
+def test_single_parent_property_still_gets_exactly_one_i17(tmp_path):
+    """The ordinary case is unchanged in count — one parent, one proposition."""
+    g = _rdf(_export(_dtc_chain(), tmp_path / "a.ttl"))
+    i17s = list(g.subjects(rdflib.RDF.type,
+                           rdflib.URIRef(CRMINF_NS + "I17_One-Proposition_Set")))
+    assert len(i17s) == 1
+    assert str(i17s[0]).endswith("/node/p1/proposition/US1")
+
+
+@pytest.mark.skipif(not FIXTURE.exists(), reason="TempluMare fixture absent")
+def test_templumare_three_parent_property_keeps_all_three(tmp_path):
+    """The real case that motivated the change: TempluMare carries one property
+    claimed by three units. Before, two of those attributions were absent from
+    the RDF; nothing downstream could recover what was never written."""
+    from s3dgraphy.importer.emjson_importer import parse_emjson
+
+    doc = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    original, _w = parse_emjson(doc)
+
+    parents_of = {}
+    for e in original.edges:
+        if e.edge_type == "has_property":
+            parents_of.setdefault(e.edge_target, []).append(e.edge_source)
+    multi = {p: sorted(u) for p, u in parents_of.items() if len(u) > 1}
+    assert len(multi) == 1, multi          # exactly one such property
+    prop_id, expected_parents = next(iter(multi.items()))
+    assert len(expected_parents) == 3
+
+    ttl = _export(original, tmp_path / "tm.ttl")
+    rebuilt = RDFImporter().parse(ttl)[0]
+    got = sorted(e.edge_source for e in rebuilt.edges
+                 if e.edge_type == "has_property" and e.edge_target == prop_id)
+    assert got == expected_parents, (got, expected_parents)

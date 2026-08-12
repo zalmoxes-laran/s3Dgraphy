@@ -61,6 +61,15 @@
     "cidoc": "E1 CRM Entity",
     "cidoc_s3d": null
    },
+   "em_extension": {
+    "uri": "em:Node",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "crm:E1_CRM_Entity"
+    ],
+    "extension_status": "proposed",
+    "rationale": "A DISTINCT uri, not because the base node needs a class of its own in CIDOC terms — it is an E1 and nothing more — but because RDF must be self-describing. Node and UnknownNode both mapped to E1, so their projections were indistinguishable and a reader had to guess which had been written. subclass_of keeps a CRM-only reader seeing the E1."
+   },
    "properties": {
     "name": "P1_is_identified_by",
     "description": "P3_has_note"
@@ -618,6 +627,15 @@
     "cidoc_s3d": null,
     "alternative": "E89 Propositional Object"
    },
+   "em_extension": {
+    "uri": "em:NodeGroup",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "crm:E78_Collection"
+    ],
+    "extension_status": "proposed",
+    "rationale": "Superclass of the EM grouping axes (activity, paradata, timebranch, location, functional unit). It shared E78 with ParadataNodeGroup, so a generic group and a paradata group projected identically."
+   },
    "properties": {
     "name": "P1_is_identified_by",
     "description": "P3_has_note"
@@ -651,6 +669,16 @@
       "cidoc": "E78 Collection",
       "cidoc_s3d": "ParadataCollection",
       "alternative": "I4 Proposition Set + E78 Collection"
+     },
+     "em_extension": {
+      "uri": "em:ParadataNodeGroup",
+      "rdf_type": "owl:Class",
+      "subclass_of": [
+       "em:NodeGroup",
+       "crm:E78_Collection"
+      ],
+      "extension_status": "proposed",
+      "rationale": "The paradata of one stratigraphic unit gathered as a unit ('[US]_PD'). A distinct uri makes 'give me the paradata groups' a type query rather than a naming convention; still an E78 for CRM-only readers."
      },
      "properties": {
       "name": "P1_is_identified_by",
@@ -695,6 +723,16 @@
       "cidoc_s3d": null,
       "alternative": "E53 Place + E55 Type (kind classifier via P2_has_type)",
       "rationale": "No new s3d:Location class is introduced. A LocationNodeGroup is a pure CIDOC E53 Place; its three epistemic planes (toponym/study/functional) are expressed by classification with E55 Type instances (P2_has_type), which is the CIDOC-native pattern. CRMarchaeo does not introduce a Place-level container distinct from E53, so plain E53 is preferred."
+     },
+     "em_extension": {
+      "uri": "em:LocationNodeGroup",
+      "rdf_type": "owl:Class",
+      "subclass_of": [
+       "em:NodeGroup",
+       "crm:E53_Place"
+      ],
+      "extension_status": "proposed",
+      "rationale": "Revises the mapping rationale above on ONE point: the CIDOC modelling is unchanged (this IS an E53 Place classified by E55 Type), but a plain E53 was shared with GeoPositionNode, and the two are opposites — a Location is identitary ('what named place is this in?'), a GeoPosition is metric (an origin, a CRS, an azimuth). One class for both made the projection ambiguous, readable only by looking for shift triples, which a GeoPosition without a transform does not have."
      },
      "properties": {
       "name": "P1_is_identified_by",
@@ -934,6 +972,15 @@
     "cidoc": "E53 Place",
     "cidoc_s3d": null,
     "alternative": "SP5 Geometric Place Expression"
+   },
+   "em_extension": {
+    "uri": "em:GeoPositionNode",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "crm:E53_Place"
+    ],
+    "extension_status": "proposed",
+    "rationale": "The metric anchor of the graph: a CRS, an origin (shift) and an azimuth. Distinct from em:LocationNodeGroup, the identitary side of place — the two shared E53 and could only be told apart by the presence of shift triples, an inference that fails for a graph georeferenced without a transform."
    },
    "properties": {
     "name": "P1_is_identified_by",
@@ -1542,6 +1589,15 @@
     "cidoc": "E1 CRM Entity",
     "cidoc_s3d": null,
     "alternative": null
+   },
+   "em_extension": {
+    "uri": "em:UnknownNode",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "crm:E1_CRM_Entity"
+    ],
+    "extension_status": "proposed",
+    "rationale": "Distinct from em:Node: 'the source could not type this' is a different statement from 'this is the base class', and a consumer that wants to find the anomalies must be able to ask for them. Both remain E1 for CRM-only readers."
    },
    "properties": {
     "name": "P1_is_identified_by",
