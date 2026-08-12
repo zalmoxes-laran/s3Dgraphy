@@ -1,11 +1,16 @@
 {
  "_generated": "by `python -m s3dgraphy.tools.sync_node_datamodel` — DO NOT hand-edit. The flat class hierarchy (parent/node_type/description) is derived from the Python Node subclasses; hand-authored semantics and CIDOC mappings live in s3Dgraphy_node_datamodel.json.",
- "s3Dgraphy_data_model_version": "1.6.1",
+ "s3Dgraphy_data_model_version": "1.6.2",
  "node_types": {
   "ActivityNodeGroup": {
    "parent": "GroupNode",
    "node_type": "ActivityNodeGroup",
    "description": "Nodo gruppo per attività. Una attività è un gruppo logico di azioni che vengono tenute insieme per un fine narrativo e di ordine delle informazioni (es: costruzione di una stanza di un edificio nell'anno x, attività di restauro di varie parti di quella stanza 20 anni dopo)"
+  },
+  "AnnotationRegionNode": {
+   "parent": "Node",
+   "node_type": "annotation_region",
+   "description": "A region of one image (or one page), in normalised image coordinates."
   },
   "AuthorAINode": {
    "parent": "AuthorNode",

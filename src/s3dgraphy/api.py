@@ -134,6 +134,26 @@ def validate(graph: Graph) -> Dict[str, Any]:
     }
 
 
+# ── 2D annotation → paradata chain ─────────────────────────────────────────────
+def create_annotation_paradata(graph: Graph, image_id: str,
+                               region: Dict[str, Any], interpretation: str,
+                               property_type: str,
+                               target_unit_id: Optional[str] = None,
+                               author: Optional[str] = None):
+    """One 2D annotation → the whole paradata chain (Extractor · Property ·
+    AnnotationRegion, wired to the image and to the unit). Deterministic ids, so
+    a re-send converges instead of duplicating.
+
+    This is the seam the annotator's canvas will call — the semantics exist
+    before any UI does, which is the point: a region drawn on a photograph is a
+    CLAIM, and the chain is what makes it readable by somebody else.
+    See :mod:`s3dgraphy.annotation`.
+    """
+    from .annotation import create_annotation_paradata as _create
+    return _create(graph, image_id, region, interpretation, property_type,
+                   target_unit_id=target_unit_id, author=author)
+
+
 # ── project → TTL / RDF ────────────────────────────────────────────────────────
 def project_ttl(graph: Graph, *, base_uri: Optional[str] = None,
                 fmt: str = "turtle") -> str:

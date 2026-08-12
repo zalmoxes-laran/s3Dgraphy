@@ -49,6 +49,11 @@ from .heritage_entity_node import HeritageEntityNode
 from .study_node import StudyNode
 from .project_node import ProjectNode
 from .semantic_shape_node import SemanticShapeNode
+# 2D annotator (semantics first): a region of ONE IMAGE, in normalised image
+# coordinates. Deliberately NOT a SemanticShapeNode — that one is 3D geometry of
+# the SCENE (SP5, where a thing is), this one is E36 Visual Item (which part of
+# which picture). See the class docstring for why one class could not be both.
+from .annotation_region_node import AnnotationRegionNode, AnnotationRegionError
 # DTC substrate profile (ECHOES). Two event classes: DTCProcessNode (genesis /
 # transformation, crmdig:D7) and DTCAcquisitionNode (acquisition / ingestion,
 # crmdig:D12 ⊂ D7). Both the INPUT and the OUTPUT are Resources (ResourceNode, E73/D1)
@@ -122,6 +127,8 @@ __all__ = [
     "StudyNode",
     "ProjectNode",
     "SemanticShapeNode",
+    "AnnotationRegionNode",
+    "AnnotationRegionError",
     "DTCNode",
     "DTCProcessNode",
     "DTCAcquisitionNode",

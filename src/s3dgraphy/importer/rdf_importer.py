@@ -949,6 +949,43 @@ class RDFImporter:
                     data[axis] = _as_number(v)
             return data
 
+        if node_type == "annotation_region":
+            # The geometry comes back by PARSING the selector — the exact inverse
+            # of `AnnotationRegionNode.selector()`, which is what makes the region
+            # survive as a region and not as a string nobody can read. The
+            # constructor is strict (it refuses coordinates outside [0,1]), so a
+            # malformed selector must not reach it: warn and leave the geometry
+            # out, and the node degrades to a base Node rather than crashing the
+            # import of a whole graph.
+            from ..nodes.annotation_region_node import (
+                AnnotationRegionError, AnnotationRegionNode,
+            )
+            selector = self._one_literal(store, ref, EM.hasSelector)
+            if selector:
+                try:
+                    data.update(AnnotationRegionNode.parse_selector(str(selector)))
+                except AnnotationRegionError as exc:
+                    self.warnings.append(
+                        f"node '{node_id}': region selector not readable ({exc})")
+            else:
+                self.warnings.append(
+                    f"node '{node_id}': an annotation region with no "
+                    f"em:hasSelector has no geometry")
+            page = self._one_literal(store, ref, EM.onPage)
+            if page is not None:
+                data["page"] = _as_number(page)
+            # `resource_id` is the node's own copy of the is_on_resource edge, so
+            # a region is readable alone. The edge itself is rebuilt later, from
+            # the same triple; reading it here too is what stops the rebuilt node
+            # from coming back half — the alternative would be a region that
+            # knows its geometry but not which picture it is on.
+            on = self._one_object_text(store, ref, EM.isOnResource)
+            if on:
+                resource_id = self._node_id_from_iri(on)
+                if resource_id:
+                    data["resource_id"] = resource_id
+            return data
+
         if node_type == "LocationNodeGroup":
             # kind is REQUIRED by the constructor (it raises on anything outside
             # the enum), so a Location whose kind did not survive the projection

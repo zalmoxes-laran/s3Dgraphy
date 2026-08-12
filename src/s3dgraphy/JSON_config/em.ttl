@@ -273,6 +273,34 @@ em:SemanticShape
     rdfs:subClassOf crmgeo:SP5_Geometric_Place_Expression ;
     rdfs:comment "3D proxy geometry (convex shapes or spheres) representing the spatial extent of a node. Used as a semantic proxy distinct from a full RepresentationModel: lighter weight, intended for spatial indexing and rough containment, not for visual rendering. Linked via crm:P138_represents to any Node. Maps to: Python SemanticShapeNode (node_type='semantic_shape')."@en .
 
+em:AnnotationRegion
+    a owl:Class ;
+    rdfs:label "Annotation Region (2D, image space)"@en ;
+    rdfs:subClassOf crm:E36_Visual_Item ;
+    rdfs:comment "A region of ONE IMAGE — or of one page of a multi-page resource — in NORMALISED image coordinates [0,1]: the geometry of a 2D annotation. A region of a visual item IS a visual item, hence E36. DISTINCT from em:SemanticShape, which is 3D geometry of the SCENE (crmgeo:SP5, expressing WHERE a thing is): an AnnotationRegion makes no claim about where anything is, it says which part of which picture was looked at. Distinct from em:Location (E53 Place) for the same reason — a place is in the world, a region is in an image of it. Attached to its image with em:isOnResource (P106i) and is the precise target of em:hasVisualReference from a quale. Geometry travels as a selector literal (em:hasSelector). OPEN: the fine modelling of the geometry itself (selector literal vs a CRMgeo SP* expression) is to be confirmed with Felicetti; the class is decided, the selector is the interoperable form defensible today. Maps to: Python AnnotationRegionNode (node_type='annotation_region')."@en .
+
+em:hasSelector
+    a owl:DatatypeProperty ;
+    rdfs:label "has selector"@en ;
+    rdfs:domain em:AnnotationRegion ;
+    rdfs:range xsd:string ;
+    rdfs:comment "The geometry of an annotation region as a selector string, in the spirit of the W3C Web Annotation model: a Media Fragment for a rectangle ('xywh=percent:x,y,w,h') or an SVG-style point list for a polygon ('polygon(percent:x1,y1 x2,y2 ...)'). Percent units, so the region is resolution-independent — the same photograph re-exported at another size still resolves it. One string rather than a structure, so a consumer outside EM can act on the region without reading the s3Dgraphy datamodel. Stored in Python as AnnotationRegionNode.shape_kind + rect/points, from which it is derived (never a second copy of the geometry)."@en .
+
+em:onPage
+    a owl:DatatypeProperty ;
+    rdfs:label "on page"@en ;
+    rdfs:domain em:AnnotationRegion ;
+    rdfs:range xsd:nonNegativeInteger ;
+    rdfs:comment "Zero-based index of the page (or frame, or collection item) the region lives on: 0 for a plain single image, 2 for the third page of a PDF. Emitted only when non-zero — a bare image needs no page statement, and asserting 0 everywhere would put a fact in the store that nobody stated. Stored in Python as AnnotationRegionNode.page."@en .
+
+em:isOnResource
+    a owl:ObjectProperty ;
+    rdfs:label "is on resource"@en ;
+    rdfs:subPropertyOf crm:P106i_forms_part_of ;
+    rdfs:domain em:AnnotationRegion ;
+    rdfs:range crm:E73_Information_Object ;
+    rdfs:comment "The image (or source document) an annotation region is a region OF. P106i and NOT P46i: a region is an informational part of a symbolic object, not a physical part of a thing — and P46i is also the nesting axis of the EM drawing, so reusing it would make every region a box inside its image in the matrix, a layout claim nobody made. Maps to: connections_datamodel edge 'is_on_resource' (source AnnotationRegionNode, target ResourceNode|DocumentNode)."@en .
+
 
 # ============================================================================
 # 8. RIGHTS (License, Embargo) and GRAPH CONTAINER

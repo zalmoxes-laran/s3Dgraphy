@@ -1073,6 +1073,14 @@
     "validated_ro": false,
     "validated_fr": false
    }
+  },
+  "AnnotationRegionNode": {
+   "description": {
+    "en": "A region of ONE IMAGE (or one page of a multi-page resource) in NORMALISED image coordinates [0,1]: the geometry of a 2D annotation. Carries shape_kind (rect|polygon), the rect [x,y,w,h] or the polygon points [[x,y], ...], the page index (0 for a plain image) and the id of the resource it is on. Attached to its image with is_on_resource (P106i_forms_part_of) and is the precise target of has_visual_reference from a PropertyNode."
+   },
+   "label": {
+    "en": "Annotation Region"
+   }
   }
  }
 }

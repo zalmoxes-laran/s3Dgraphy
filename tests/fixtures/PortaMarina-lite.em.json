@@ -310,8 +310,8 @@
   },
   "header": {
     "datamodel_versions": {
-      "connections": "1.6.8",
-      "nodes": "1.6.1",
+      "connections": "1.6.9",
+      "nodes": "1.6.2",
       "qualia": "1.6.0"
     },
     "format": "em.json",

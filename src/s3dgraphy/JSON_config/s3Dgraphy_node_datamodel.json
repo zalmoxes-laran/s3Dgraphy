@@ -1,6 +1,6 @@
 {
- "s3Dgraphy_data_model_version": "1.6.1",
- "description": "s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings. v1.6.0 inaugurates a systematic CIDOC-CRM mapping revision: complete audit of all node types against CIDOC-CRM, CRMarchaeo, CRMinf, CRMdig, CRMsci, CRMgeo; replacement of legacy 'cidoc_s3d' pseudo-class names (invented strings without IRI or superclass declaration) with formal em:/s3d: IRIs declared as proper subclasses of CRM classes; introduction of CRMinf as primary (not alternative) for the paradata chain (ParadataNode, PropertyNode interpretive case, ExtractorNode, CombinerNode); introduction of PROV-O for AuthorNode to cover both human and AI agents; alignment with the Heritage Digital Twin Ontology (HDT-O) for containment / granularity properties; LocationNodeGroup (v1.5.3) adopted as the reference pattern (CIDOC-native composition via P2_has_type → E55 Type instances, with explicit extension_status and rationale). Companion deliverables: em.ttl (formal EM extension ontology, dereferenceable via w3id.org/em/) and hdto_extension.ttl (HDT-O granularity properties: contains_HDT, contains_SU, isPrimary). v1.5.4 added RSF (Reused Special Find — spolia) as a stratigraphic subtype, octagon with red border, family=real, is_series=false. Originating DP: DP-26 (spolia project, last DP before the EM 1.5 cut). v1.5.3 added LocationNodeGroup (E53 Place + E55 Type) for spatial / locational membership orthogonal to ActivityNodeGroup (intention) and EpochNode (time). v1.5.2 added family + is_series classification metadata on stratigraphic subtypes.",
+ "s3Dgraphy_data_model_version": "1.6.2",
+ "description": "s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings. v1.6.2 adds AnnotationRegionNode (em:AnnotationRegion, subclass of crm:E36_Visual_Item): the geometry of a 2D annotation in NORMALISED image space, distinct from SemanticShapeNode (3D scene geometry, crmgeo:SP5) - the semantics of the 2D annotator, defined before any canvas exists. v1.6.0 inaugurates a systematic CIDOC-CRM mapping revision: complete audit of all node types against CIDOC-CRM, CRMarchaeo, CRMinf, CRMdig, CRMsci, CRMgeo; replacement of legacy 'cidoc_s3d' pseudo-class names (invented strings without IRI or superclass declaration) with formal em:/s3d: IRIs declared as proper subclasses of CRM classes; introduction of CRMinf as primary (not alternative) for the paradata chain (ParadataNode, PropertyNode interpretive case, ExtractorNode, CombinerNode); introduction of PROV-O for AuthorNode to cover both human and AI agents; alignment with the Heritage Digital Twin Ontology (HDT-O) for containment / granularity properties; LocationNodeGroup (v1.5.3) adopted as the reference pattern (CIDOC-native composition via P2_has_type → E55 Type instances, with explicit extension_status and rationale). Companion deliverables: em.ttl (formal EM extension ontology, dereferenceable via w3id.org/em/) and hdto_extension.ttl (HDT-O granularity properties: contains_HDT, contains_SU, isPrimary). v1.5.4 added RSF (Reused Special Find — spolia) as a stratigraphic subtype, octagon with red border, family=real, is_series=false. Originating DP: DP-26 (spolia project, last DP before the EM 1.5 cut). v1.5.3 added LocationNodeGroup (E53 Place + E55 Type) for spatial / locational membership orthogonal to ActivityNodeGroup (intention) and EpochNode (time). v1.5.2 added family + is_series classification metadata on stratigraphic subtypes.",
  "components": [
   "CIDOC-CRM",
   "CRMarchaeo",
@@ -1216,6 +1216,45 @@
     "proxy",
     "generic"
    ]
+  },
+  "AnnotationRegionNode": {
+   "class": "AnnotationRegionNode",
+   "parent": "Node",
+   "abbreviation": "AR",
+   "label": "Annotation Region",
+   "description": "A region of ONE IMAGE (or one page of a multi-page resource) in NORMALISED image coordinates [0,1]: the geometry of a 2D annotation. Carries shape_kind (rect|polygon), the rect [x,y,w,h] or the polygon points [[x,y], ...], the page index (0 for a plain image) and the id of the resource it is on. Attached to its image with is_on_resource (P106i_forms_part_of) and is the precise target of has_visual_reference from a PropertyNode.",
+   "s3Dgraphy_file": "annotation_region_node.py",
+   "scope_note": "USE for a portion of a picture - 'this brick, in this photograph, on page 3'. DO NOT USE for geometry in the 3D space of the scene: that is SemanticShapeNode (crmgeo:SP5, a proxy hull or sphere expressing WHERE a thing is). They are separate classes because they answer different questions in different coordinate systems; one field set with a kind flag would force every reader to work out which meaning it was holding before it could use the numbers. DO NOT USE for a place either: a spatial grouping of units is LocationNodeGroup (E53 Place), which is about the world, not about an image of it. An AnnotationRegion makes no claim about where anything is - it says which part of which picture was looked at.",
+   "rationale": "A region of a visual item IS a visual item, hence crm:E36_Visual_Item, and its part-of relation to the whole image is P106i_forms_part_of (symbolic/informational mereology) - NOT P46i, which is physical containment between things and is also the drawing's nesting axis. Coordinates are normalised because a pixel region is only readable next to the resolution it was drawn at, and the same photograph is routinely re-exported at another size; normalised coordinates are a statement about the picture rather than about a file, and they express directly as a W3C Media Fragment. OPEN QUESTION (to confirm with Felicetti): the fine CIDOC modelling of the geometry itself - a selector literal (as here, aligned with the W3C Web Annotation model) versus a CRMgeo SP* geometric expression. The HOUSE of the node (E36 Visual Item) is decided; the selector is the interoperable form defensible today, and a refinement changes the projection of ONE field, not the class.",
+   "mapping": {
+    "cidoc": "E36 Visual Item",
+    "cidoc_s3d": null,
+    "alternative": "E36 Visual Item + crmgeo:SP* geometric expression (to confirm with Felicetti)",
+    "rationale": "E36 is the appearance of a thing, which is exactly what a region of an image is a part of. The geometry travels as a SELECTOR literal (Media Fragment for a rect, SVG-style point list for a polygon) via em:hasSelector, so a consumer outside EM can act on it without reading this datamodel."
+   },
+   "em_extension": {
+    "uri": "em:AnnotationRegion",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "crm:E36_Visual_Item"
+    ],
+    "extension_status": "proposed",
+    "rationale": "A DISTINCT uri because E36 Visual Item is also the co-type the exporter puts on an image ResourceNode (has_visual_reference): without its own class the projection could not say whether a node was the picture or a region of it, which is the bijectivity the RDF round-trip depends on."
+   },
+   "properties": {
+    "name": "P1_is_identified_by",
+    "description": "P3_has_note",
+    "shape_kind": "P2_has_type",
+    "selector": "em:hasSelector",
+    "page": "em:onPage",
+    "resource_id": "P106i_forms_part_of"
+   },
+   "shape_kinds": {
+    "rect": "[x, y, w, h] in [0,1]",
+    "polygon": "[[x, y], ...] in [0,1], at least 3 points",
+    "mask": "PHASE 2 - declared, not implemented: a raster mask needs a payload (a PNG, an RLE) and a place to keep it, which is a resource-layer decision. The class REFUSES it rather than accepting it and storing nothing."
+   },
+   "coordinate_space": "normalised image space, origin top-left, x and y in [0,1]; page is 0-based"
   }
  },
  "rights_nodes": {

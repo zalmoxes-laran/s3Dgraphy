@@ -857,3 +857,276 @@ def test_symmetric_orientation_is_stable_across_the_round_trip(tmp_path):
     ttl1 = _export(g, tmp_path / "b.ttl")
     ttl2 = _export(rebuilt, tmp_path / "c.ttl")
     assert isomorphic(_rdf(ttl1), _rdf(ttl2))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2D ANNOTATOR — the semantics, before any canvas
+#
+# An annotation is not a coloured box on a photograph: it is a claim, and the
+# chain is what makes it readable by somebody else. These tests pin the chain
+# (four nodes, four edges), the region's geometry, and the fact that all of it
+# survives the projection — because a store that cannot give the region back
+# cannot be the place the annotator reads from.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _annotated_graph(graph_id="annot") -> Graph:
+    """One image, one unit, two annotations — a rect and a polygon, one of them
+    on page 3 (so the page is exercised as something other than the default)."""
+    from s3dgraphy.annotation import create_annotation_paradata
+
+    g = Graph(graph_id=graph_id)
+    g.add_node(DocumentNode("img1", name="Foto Maiuri 1931", url="maiuri.jpg"))
+    g.add_node(StratigraphicUnit("US101", name="US101"))
+    create_annotation_paradata(
+        g, "img1", {"shape_kind": "rect", "rect": [0.12, 0.30, 0.25, 0.18], "page": 3},
+        interpretation="laterizio con malta di calce",
+        property_type="material", target_unit_id="US101")
+    create_annotation_paradata(
+        g, "img1",
+        {"shape_kind": "polygon",
+         "points": [[0.5, 0.5], [0.7, 0.52], [0.65, 0.8], [0.48, 0.72]]},
+        interpretation="lacuna di intonaco",
+        property_type="conservation_state", target_unit_id="US101")
+    return g
+
+
+def test_annotation_chain_is_four_nodes_and_four_edges():
+    """The chain, asserted as a chain: every link named, none of them generic."""
+    from s3dgraphy.annotation import create_annotation_paradata
+
+    g = Graph(graph_id="chain")
+    g.add_node(DocumentNode("img1", name="Foto", url="f.jpg"))
+    g.add_node(StratigraphicUnit("US101", name="US101"))
+    result = create_annotation_paradata(
+        g, "img1", {"shape_kind": "rect", "rect": [0.1, 0.1, 0.2, 0.2]},
+        interpretation="laterizio", property_type="material",
+        target_unit_id="US101")
+
+    assert result.warnings == [], result.warnings
+    kinds = {type(n).__name__ for n in g.nodes}
+    assert {"AnnotationRegionNode", "ExtractorNode", "PropertyNode",
+            "DocumentNode", "StratigraphicUnit"} <= kinds
+
+    edges = {(e.edge_type, e.edge_source, e.edge_target) for e in g.edges}
+    assert ("extracted_from", result.extractor_id, "img1") in edges
+    assert ("is_on_resource", result.region_id, "img1") in edges
+    assert ("has_visual_reference", result.property_id, result.region_id) in edges
+    assert ("has_property", "US101", result.property_id) in edges
+    # the whole point of the guard in `_ensure_edge`
+    assert not [e for e in g.edges if e.edge_type == "generic_connection"]
+
+
+def test_annotation_is_idempotent():
+    """A canvas that re-sends on every mouse-up must converge, not accumulate."""
+    from s3dgraphy.annotation import create_annotation_paradata
+
+    g = _annotated_graph()
+    nodes_before = len(g.nodes)
+    edges_before = len(g.edges)
+
+    again = create_annotation_paradata(
+        g, "img1", {"shape_kind": "rect", "rect": [0.12, 0.30, 0.25, 0.18], "page": 3},
+        interpretation="laterizio con malta di calce",
+        property_type="material", target_unit_id="US101")
+
+    assert again.created is False
+    assert len(g.nodes) == nodes_before
+    assert len(g.edges) == edges_before
+
+
+def test_the_same_region_read_twice_is_one_region_with_two_properties():
+    """Two authors point at the same brick and disagree: ONE region, two qualia.
+
+    This is what keeps the region's identity geometric and not interpretive — the
+    alternative (a region per reading) would duplicate the geometry and lose the
+    fact that they are talking about the same thing.
+    """
+    from s3dgraphy.annotation import create_annotation_paradata
+
+    g = Graph(graph_id="disagree")
+    g.add_node(DocumentNode("img1", name="Foto", url="f.jpg"))
+    g.add_node(StratigraphicUnit("US101", name="US101"))
+    rect = {"shape_kind": "rect", "rect": [0.2, 0.2, 0.3, 0.3]}
+    a = create_annotation_paradata(g, "img1", rect, "laterizio", "material", "US101")
+    b = create_annotation_paradata(g, "img1", rect, "tufo", "material", "US101")
+
+    assert a.region_id == b.region_id
+    assert a.property_id != b.property_id
+    regions = [n for n in g.nodes if type(n).__name__ == "AnnotationRegionNode"]
+    assert len(regions) == 1
+    refs = [e for e in g.edges if e.edge_type == "has_visual_reference"]
+    assert {e.edge_source for e in refs} == {a.property_id, b.property_id}
+
+
+def test_annotation_warns_instead_of_writing_an_unnameable_edge():
+    """An image that is a resource FILE and not a source: said, not degraded.
+
+    `extracted_from` takes a SOURCE (a DocumentNode); the resource layer's file
+    node is not one. The annotation is still made — region, property,
+    is_on_resource — and the missing link is reported with its reason.
+    """
+    from s3dgraphy.annotation import create_annotation_paradata
+
+    g = Graph(graph_id="resource_image")
+    g.add_node(ResourceNode("res1", name="foto.jpg", url="foto.jpg"))
+    g.add_node(StratigraphicUnit("US101", name="US101"))
+    result = create_annotation_paradata(
+        g, "res1", {"shape_kind": "rect", "rect": [0.1, 0.1, 0.2, 0.2]},
+        interpretation="laterizio", property_type="material",
+        target_unit_id="US101")
+
+    assert not [e for e in g.edges if e.edge_type == "generic_connection"]
+    assert not [e for e in g.edges if e.edge_type == "extracted_from"]
+    assert any("extracted_from" in w for w in result.warnings)
+    # and what CAN be said, was said
+    assert {e.edge_type for e in g.edges} == {"is_on_resource",
+                                             "has_visual_reference",
+                                             "has_property"}
+
+
+def test_annotation_region_geometry_survives_the_round_trip(tmp_path):
+    """Export → import: the region comes back as a REGION, not as a string.
+
+    The geometry travels as one selector literal and is parsed back, so this test
+    is what pins those two functions as actual inverses.
+    """
+    original = _annotated_graph()
+    importer = RDFImporter()
+    rebuilt = importer.parse(_export(original, tmp_path / "a.ttl"))[0]
+    assert not importer.warnings, importer.warnings
+
+    regions = {n.node_id: n for n in rebuilt.nodes
+               if type(n).__name__ == "AnnotationRegionNode"}
+    assert len(regions) == 2
+
+    by_kind = {r.shape_kind: r for r in regions.values()}
+    rect = by_kind["rect"]
+    assert [round(v, 6) for v in rect.rect] == [0.12, 0.30, 0.25, 0.18]
+    assert rect.page == 3
+    assert rect.data.get("resource_id") == "img1"   # the node's own copy
+
+    poly = by_kind["polygon"]
+    assert [[round(x, 6), round(y, 6)] for x, y in poly.points] == [
+        [0.5, 0.5], [0.7, 0.52], [0.65, 0.8], [0.48, 0.72]]
+    assert poly.page == 0
+
+    # the four edges of each chain come back with their names
+    types = [e.edge_type for e in rebuilt.edges]
+    assert types.count("is_on_resource") == 2
+    assert types.count("has_visual_reference") == 2
+    assert types.count("has_property") == 2
+    assert types.count("extracted_from") == 2
+    assert "generic_connection" not in types
+
+
+def test_annotation_paradata_roundtrip(tmp_path):
+    """RT1 for the annotation chain: export → import → export is isomorphic."""
+    original = _annotated_graph()
+    ttl1 = _export(original, tmp_path / "1.ttl")
+    rebuilt = RDFImporter().parse(ttl1)[0]
+    ttl2 = _export(rebuilt, tmp_path / "2.ttl")
+
+    g1, g2 = _rdf(ttl1), _rdf(ttl2)
+    assert isomorphic(g1, g2), (
+        f"annotation projection is not stable: {len(g1)} vs {len(g2)} triples")
+    # declared, so a change in the projection is visible in the diff
+    assert len(g1) == len(g2)
+
+
+def test_annotation_region_has_its_own_class_in_the_projection(tmp_path):
+    """em:AnnotationRegion, not "some E36": the region must be distinguishable
+    from the picture it is on, or the round-trip cannot tell them apart."""
+    from rdflib import Namespace, RDF as RDF_
+
+    EM = Namespace("https://w3id.org/em/ontology#")
+    CRM = Namespace("http://www.cidoc-crm.org/cidoc-crm/")
+    store = _rdf(_export(_annotated_graph(), tmp_path / "a.ttl"))
+
+    regions = set(store.subjects(RDF_.type, EM.AnnotationRegion))
+    assert len(regions) == 2
+    for r in regions:
+        assert (r, RDF_.type, CRM.E36_Visual_Item) in store   # the CRM reading
+        assert next(store.objects(r, EM.hasSelector), None) is not None
+        assert next(store.objects(r, EM.isOnResource), None) is not None
+        assert (r, CRM.P106i_forms_part_of, None) in store    # the core predicate
+
+    # and the region is NOT confusable with the image it is on. A DocumentNode
+    # projects as crm:E31_Document (it has no em: class of its own — it needs
+    # none, E31 is not shared), so THAT is what must stay disjoint from the
+    # regions: the picture and a region of the picture are two subjects.
+    images = set(store.subjects(RDF_.type, CRM.E31_Document))
+    assert images and not (images & regions)
+
+
+def test_em_ttl_declares_the_annotation_region():
+    """The rule of this batch: nothing is used before it is defined."""
+    from rdflib import Namespace, RDF as RDF_, RDFS as RDFS_
+
+    ttl = Path(__file__).resolve().parents[1] / (
+        "src/s3dgraphy/JSON_config/em.ttl")
+    onto = rdflib.Graph()
+    onto.parse(str(ttl), format="turtle")
+    EM = Namespace("https://w3id.org/em/ontology#")
+    CRM = Namespace("http://www.cidoc-crm.org/cidoc-crm/")
+    OWL_ = Namespace("http://www.w3.org/2002/07/owl#")
+
+    assert (EM.AnnotationRegion, RDFS_.subClassOf, CRM.E36_Visual_Item) in onto
+    assert (EM.isOnResource, RDFS_.subPropertyOf, CRM.P106i_forms_part_of) in onto
+    assert (EM.hasSelector, RDF_.type, OWL_.DatatypeProperty) in onto
+    assert (EM.onPage, RDF_.type, OWL_.DatatypeProperty) in onto
+
+
+def test_annotation_region_does_not_collide_with_the_semantic_shape(tmp_path):
+    """The two geometries are two classes, and the projection says which is which.
+
+    A region in image space and a proxy hull in scene space would be
+    indistinguishable if they shared a class — and then a reader could not know
+    whether the numbers it holds are pixels of a photograph or metres of a site.
+    """
+    from s3dgraphy.nodes import SemanticShapeNode
+    from rdflib import Namespace, RDF as RDF_
+
+    EM = Namespace("https://w3id.org/em/ontology#")
+    g = _annotated_graph("both")
+    shape = SemanticShapeNode("shape1", "US101 proxy", type="proxy")
+    shape.add_convex_shape([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0])
+    g.add_node(shape)
+
+    store = _rdf(_export(g, tmp_path / "a.ttl"))
+    assert len(set(store.subjects(RDF_.type, EM.AnnotationRegion))) == 2
+    assert len(set(store.subjects(RDF_.type, EM.SemanticShape))) == 1
+    assert not (set(store.subjects(RDF_.type, EM.AnnotationRegion))
+                & set(store.subjects(RDF_.type, EM.SemanticShape)))
+
+
+def test_the_annotation_iris_enter_the_inverse_without_colliding():
+    """The return leg is datamodel-driven, so the new class and edge must be
+    findable there — and findable UNAMBIGUOUSLY, by either route.
+
+    Two routes, because a projection can be written by two kinds of producer:
+      · the SIGNATURE (the em: subproperty we emit) — unique by construction;
+      · the CORE CRM predicate, which P106i and P138i share with others, and
+        which is disambiguated by the endpoints.
+    A CRM-only writer that emits only `P106i` is therefore still read as
+    `is_on_resource`, and only as that.
+    """
+    from s3dgraphy.importer.rdf_importer import _InverseDatamodel
+
+    inv = _InverseDatamodel()
+    CRM_ = "http://www.cidoc-crm.org/cidoc-crm/"
+    EM_ = "https://w3id.org/em/ontology#"
+
+    # the CLASS: its own IRI, nobody else's
+    assert inv.classes_by_iri[EM_ + "AnnotationRegion"] == ["AnnotationRegionNode"]
+    assert not {i: n for i, n in inv.classes_by_iri.items() if len(n) > 1}
+
+    # the EDGE, by signature
+    assert inv.candidates_for_predicate(EM_ + "isOnResource") == ["is_on_resource"]
+    # and by core predicate + endpoints
+    assert inv.narrow_by_endpoints(
+        inv.core_candidates_for_predicate(CRM_ + "P106i_forms_part_of"),
+        "AnnotationRegionNode", "DocumentNode") == ["is_on_resource"]
+    # P138i is shared by five edge types; the region as a target picks exactly one
+    assert inv.narrow_by_endpoints(
+        inv.core_candidates_for_predicate(CRM_ + "P138i_has_representation"),
+        "PropertyNode", "AnnotationRegionNode") == ["has_visual_reference"]

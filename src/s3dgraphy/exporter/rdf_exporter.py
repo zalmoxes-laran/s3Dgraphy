@@ -1056,6 +1056,27 @@ class RDFExporter:
                 if v is not None:
                     ctx.add((node_iri, EM[axis], Literal(v)))
 
+        elif node_type == "annotation_region":
+            # The geometry travels as ONE selector literal (Media Fragment for a
+            # rect, SVG-style point list for a polygon), not as a bag of numbers:
+            # a consumer outside EM can resolve `xywh=percent:…` against the
+            # image without knowing anything about this datamodel, and the string
+            # is derived from the node's own fields rather than stored twice.
+            selector = getattr(node, "selector", None)
+            if callable(selector):
+                ctx.add((node_iri, EM.hasSelector, Literal(selector())))
+            shape_kind = getattr(node, "shape_kind", None)
+            if shape_kind:
+                ctx.add((node_iri, CRM.P2_has_type, Literal(shape_kind)))
+            # Page 0 is emitted as NOTHING. A plain image has no page, and
+            # asserting `onPage 0` for every region would put a fact in the store
+            # that nobody stated — and the importer defaults to 0 anyway, so the
+            # round-trip is exact either way.
+            page = getattr(node, "page", 0)
+            if page:
+                ctx.add((node_iri, EM.onPage,
+                         Literal(int(page), datatype=XSD.nonNegativeInteger)))
+
         elif node_type == "extractor":
             source = getattr(node, "source", None)
             if source:
