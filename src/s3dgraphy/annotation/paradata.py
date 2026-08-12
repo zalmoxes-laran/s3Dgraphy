@@ -26,8 +26,10 @@ from ..nodes.annotation_region_node import (
     AnnotationRegionError,
     AnnotationRegionNode,
 )
+from ..nodes.document_node import DocumentNode
 from ..nodes.extractor_node import ExtractorNode
 from ..nodes.property_node import PropertyNode
+from ..nodes.resource_node import ResourceNode
 from ..nodes.stratigraphic_node import StratigraphicNode
 
 #: Frozen namespace for the deterministic ids of this module. Its only job is to
@@ -42,6 +44,60 @@ _EDGE_EXTRACTED_FROM = "extracted_from"
 _EDGE_HAS_PROPERTY = "has_property"
 _EDGE_HAS_VISUAL_REFERENCE = "has_visual_reference"
 _EDGE_IS_ON_RESOURCE = "is_on_resource"
+_EDGE_HAS_LINKED_RESOURCE = "has_linked_resource"
+
+
+def _source_document(graph: Graph, image_id: str, image: Any,
+                     result: "AnnotationParadataResult") -> Optional[str]:
+    """The DOCUMENT an extraction can cite for this image — minting one if the
+    image is a bare resource file.
+
+    The problem, measured when the chain was first built: `extracted_from` takes
+    a SOURCE (a `DocumentNode`), and the resource layer's file node is not one —
+    so annotating a `ResourceNode` produced a chain with no extraction link at
+    all. Two bad ways out were available and are NOT taken here:
+
+      · widening `extracted_from` to `ResourceNode` — that would say a file is a
+        source, and in EM it is not: a source is a thing somebody authored and
+        can be cited, a resource is bytes on a disk;
+      · converting the node's type — the resource is still a resource, and
+        rewriting somebody's node under them is not a promotion, it is a loss.
+
+    So the image is PROMOTED, not converted: a `DocumentNode` is minted beside it
+    and linked to it with `has_linked_resource` (P67). The document is what the
+    extraction cites; the resource stays what the region lives on. The two
+    statements are different and now both exist:
+
+        Extractor      ──extracted_from──▶ Document ──has_linked_resource──▶ Resource
+        AnnotationRegion ──is_on_resource──────────────────────────────────▶ Resource
+
+    The id is a uuid5 of the resource id, so annotating the same image twice
+    reuses the same document instead of minting a second one.
+    """
+    if isinstance(image, DocumentNode):
+        result.source_document_id = image_id
+        return image_id
+    if not isinstance(image, ResourceNode):
+        # Something else entirely (a US? an epoch?). Not our business to promote:
+        # say so and let the caller see a chain without the extraction link.
+        result.warnings.append(
+            f"annotation: '{image_id}' is a {type(image).__name__}, neither a "
+            f"document nor a resource; nothing to cite as a source")
+        return None
+
+    doc_id = _stable_id(f"document-of-resource|{image_id}")
+    if graph.find_node_by_id(doc_id) is None:
+        doc = DocumentNode(
+            node_id=doc_id,
+            name=getattr(image, "name", None) or image_id,
+            description="source promoted from an annotated resource",
+        )
+        doc.data["promoted_from_resource"] = image_id
+        graph.add_node(doc)
+        result.created = True
+    result.source_document_id = doc_id
+    _ensure_edge(graph, doc_id, image_id, _EDGE_HAS_LINKED_RESOURCE, result)
+    return doc_id
 
 
 @dataclass
@@ -53,6 +109,10 @@ class AnnotationParadataResult:
     extractor_id: str
     image_id: str
     target_unit_id: Optional[str]
+    #: the Document the extraction cites. Equal to `image_id` when the annotated
+    #: node was already a source; a MINTED document when it was a bare resource
+    #: file (see `_source_document`); None when there was nothing to cite.
+    source_document_id: Optional[str] = None
     edge_ids: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
     #: False when every node and edge was already in the graph — i.e. this call
@@ -63,6 +123,7 @@ class AnnotationParadataResult:
     def as_dict(self) -> Dict[str, Any]:
         return {
             "region_id": self.region_id,
+            "source_document_id": self.source_document_id,
             "property_id": self.property_id,
             "extractor_id": self.extractor_id,
             "image_id": self.image_id,
@@ -263,9 +324,14 @@ def create_annotation_paradata(
     # ── the edges ────────────────────────────────────────────────────────────
 
     if image is not None:
-        _ensure_edge(graph, extractor_id, image_id, _EDGE_EXTRACTED_FROM, result,
-                     why="an extraction is from a SOURCE — a DocumentNode; the "
-                         "resource layer's file node is not one")
+        # The extraction cites a SOURCE; the region lives on the IMAGE. When the
+        # annotated node is a bare resource these are two different nodes, and
+        # the promotion above is what makes the first one exist.
+        source_id = _source_document(graph, image_id, image, result)
+        if source_id is not None:
+            _ensure_edge(graph, extractor_id, source_id, _EDGE_EXTRACTED_FROM,
+                         result,
+                         why="an extraction is from a SOURCE — a DocumentNode")
         _ensure_edge(graph, region_id, image_id, _EDGE_IS_ON_RESOURCE, result)
 
     # the precise visual reference: the quale is shown HERE, not just "in this photo"

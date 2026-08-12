@@ -958,12 +958,14 @@ def test_the_same_region_read_twice_is_one_region_with_two_properties():
     assert {e.edge_source for e in refs} == {a.property_id, b.property_id}
 
 
-def test_annotation_warns_instead_of_writing_an_unnameable_edge():
-    """An image that is a resource FILE and not a source: said, not degraded.
+def test_annotating_a_resource_promotes_it_to_a_source():
+    """A resource FILE is not a source — so one is minted beside it.
 
-    `extracted_from` takes a SOURCE (a DocumentNode); the resource layer's file
-    node is not one. The annotation is still made — region, property,
-    is_on_resource — and the missing link is reported with its reason.
+    `extracted_from` cites a SOURCE (a DocumentNode). Annotating a bare
+    `ResourceNode` used to leave the chain without its extraction link. It is now
+    PROMOTED, not converted: a Document is minted next to the resource and linked
+    with `has_linked_resource`, so both statements exist and stay distinct —
+    the extraction cites the document, the region lives on the resource.
     """
     from s3dgraphy.annotation import create_annotation_paradata
 
@@ -975,13 +977,56 @@ def test_annotation_warns_instead_of_writing_an_unnameable_edge():
         interpretation="laterizio", property_type="material",
         target_unit_id="US101")
 
+    assert result.warnings == [], result.warnings
+    assert not [e for e in g.edges if e.edge_type == "generic_connection"]
+    doc_id = result.source_document_id
+    assert doc_id and doc_id != "res1"
+
+    edges = {(e.edge_type, e.edge_source, e.edge_target) for e in g.edges}
+    assert ("has_linked_resource", doc_id, "res1") in edges   # the promotion
+    assert ("extracted_from", result.extractor_id, doc_id) in edges
+    assert ("is_on_resource", result.region_id, "res1") in edges  # the pixels
+    # the resource is still a resource: promotion is not conversion
+    assert type(g.find_node_by_id("res1")).__name__ == "ResourceNode"
+
+
+def test_the_promoted_document_is_minted_once():
+    """Annotating the same image twice reuses its document."""
+    from s3dgraphy.annotation import create_annotation_paradata
+
+    g = Graph(graph_id="promo")
+    g.add_node(ResourceNode("res1", name="foto.jpg", url="foto.jpg"))
+    g.add_node(StratigraphicUnit("US101", name="US101"))
+    a = create_annotation_paradata(
+        g, "res1", {"shape_kind": "rect", "rect": [0.1, 0.1, 0.2, 0.2]},
+        "laterizio", "material", "US101")
+    b = create_annotation_paradata(
+        g, "res1", {"shape_kind": "rect", "rect": [0.5, 0.5, 0.2, 0.2]},
+        "malta", "material", "US101")
+
+    assert a.source_document_id == b.source_document_id
+    docs = [n for n in g.nodes if type(n).__name__ == "DocumentNode"]
+    assert len(docs) == 1
+    assert docs[0].data.get("promoted_from_resource") == "res1"
+
+
+def test_annotating_something_that_is_no_source_at_all_warns():
+    """The guard is still there for what cannot be promoted.
+
+    A US is neither a document nor a resource: there is nothing to cite, and the
+    chain is made without an extraction link rather than with an unnameable one.
+    """
+    from s3dgraphy.annotation import create_annotation_paradata
+
+    g = Graph(graph_id="odd")
+    g.add_node(StratigraphicUnit("US101", name="US101"))
+    result = create_annotation_paradata(
+        g, "US101", {"shape_kind": "rect", "rect": [0.1, 0.1, 0.2, 0.2]},
+        "laterizio", "material")
+
     assert not [e for e in g.edges if e.edge_type == "generic_connection"]
     assert not [e for e in g.edges if e.edge_type == "extracted_from"]
-    assert any("extracted_from" in w for w in result.warnings)
-    # and what CAN be said, was said
-    assert {e.edge_type for e in g.edges} == {"is_on_resource",
-                                             "has_visual_reference",
-                                             "has_property"}
+    assert any("nothing to cite" in w for w in result.warnings), result.warnings
 
 
 def test_annotation_region_geometry_survives_the_round_trip(tmp_path):
@@ -1130,3 +1175,236 @@ def test_the_annotation_iris_enter_the_inverse_without_colliding():
     assert inv.narrow_by_endpoints(
         inv.core_candidates_for_predicate(CRM_ + "P138i_has_representation"),
         "PropertyNode", "AnnotationRegionNode") == ["has_visual_reference"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROXY-AS-PROPERTY — the geometry of a unit, with its provenance
+#
+# The proxy used to be a SemanticShapeNode hanging off the unit on its own, and a
+# lone node cannot say where it came from. As a property it inherits the paradata
+# chain, and one proxy can be synthesised from several sources. These tests pin
+# the chain, the payload, and the fact that the payload survives the projection —
+# which it did NOT before this batch: a proxy came back from the store as an
+# empty shape with a label.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _proxy_graph(graph_id="proxy") -> Graph:
+    """A unit whose geometry is known from two sources, one of them a region
+    traced on a photograph — plus an RMDoc that declares how it was posed."""
+    from s3dgraphy.annotation import create_annotation_paradata
+    from s3dgraphy.geometry import create_geometry_proxy
+    from s3dgraphy.nodes import RepresentationModelDocNode
+
+    g = Graph(graph_id=graph_id)
+    g.add_node(StratigraphicUnit("US101", name="US101"))
+    g.add_node(DocumentNode("D1", name="Foto Maiuri 1931", url="maiuri.jpg"))
+    g.add_node(DocumentNode("D2", name="Mesh fotogrammetrica 2024"))
+
+    # the 2D annotation: an interpretation traced on the photograph
+    annot = create_annotation_paradata(
+        g, "D1", {"shape_kind": "polygon",
+                  "points": [[0.2, 0.2], [0.6, 0.25], [0.55, 0.7], [0.18, 0.62]]},
+        interpretation="estensione del paramento", property_type="material",
+        target_unit_id="US101")
+
+    # the proxy: read from the traced region AND from the mesh
+    create_geometry_proxy(
+        g, "US101",
+        {"convexshapes": [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0]],
+         "spheres": [[0.5, 0.5, 0.5, 0.25]]},
+        extractor_sources=[annot.region_id, "D2"])
+
+    # the spatialisation of the photograph, with a property of its own
+    g.add_node(RepresentationModelDocNode("rmd1", "Foto Maiuri, posata"))
+    g.add_node(PropertyNode("pose1", name="methodology_used",
+                            value="feature matching su 8 punti noti",
+                            property_type="methodology_used"))
+    g.add_edge("e_rmd_prop", "rmd1", "pose1", "has_property")
+    g.add_edge("e_doc_rmd", "D1", "rmd1", "has_representation_model_doc")
+    return g
+
+
+def test_geometry_proxy_is_a_property_that_carries_its_payload():
+    from s3dgraphy.geometry import create_geometry_proxy
+
+    g = Graph(graph_id="one_source")
+    g.add_node(StratigraphicUnit("US101", name="US101"))
+    g.add_node(DocumentNode("D1", name="Mesh"))
+    result = create_geometry_proxy(
+        g, "US101", {"convexshapes": [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0]]},
+        extractor_sources=["D1"])
+
+    assert result.warnings == [], result.warnings
+    prop = g.find_node_by_id(result.property_id)
+    assert type(prop).__name__ == "PropertyNode"
+    assert prop.property_type == "geometry"
+    shape = g.find_node_by_id(result.shape_id)
+    assert type(shape).__name__ == "SemanticShapeNode"
+    assert shape.convexshapes == [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0]]
+
+    edges = {(e.edge_type, e.edge_source, e.edge_target) for e in g.edges}
+    assert ("has_property", "US101", result.property_id) in edges
+    assert ("has_semantic_shape", result.property_id, result.shape_id) in edges
+    assert ("has_data_provenance", result.property_id, result.extractor_ids[0]) in edges
+    assert ("extracted_from", result.extractor_ids[0], "D1") in edges
+    # ONE source: no combiner is invented
+    assert result.combiner_id is None
+    assert not [n for n in g.nodes if type(n).__name__ == "CombinerNode"]
+    assert not [e for e in g.edges if e.edge_type == "generic_connection"]
+
+
+def test_two_sources_are_joined_by_a_combiner():
+    """"Synthesised from two readings" is the ordinary paradata chain, not a
+    mechanism of its own."""
+    from s3dgraphy.geometry import create_geometry_proxy
+
+    g = Graph(graph_id="two_sources")
+    g.add_node(StratigraphicUnit("US101", name="US101"))
+    g.add_node(DocumentNode("D1", name="Mesh"))
+    g.add_node(DocumentNode("D2", name="Foto 1931"))
+    result = create_geometry_proxy(g, "US101", {"url": "US101_proxy.glb"},
+                                   extractor_sources=["D1", "D2"])
+
+    assert result.combiner_id is not None
+    assert len(result.extractor_ids) == 2
+    edges = {(e.edge_type, e.edge_source, e.edge_target) for e in g.edges}
+    for extractor_id in result.extractor_ids:
+        assert ("combines", result.combiner_id, extractor_id) in edges
+    # the property hangs off the COMBINER: it is the conclusion of the chain
+    assert ("has_data_provenance", result.property_id, result.combiner_id) in edges
+    assert not [e for e in g.edges
+                if e.edge_type == "has_data_provenance"
+                and e.edge_target in result.extractor_ids]
+
+
+def test_geometry_proxy_is_idempotent():
+    from s3dgraphy.geometry import create_geometry_proxy
+
+    g = _proxy_graph()
+    nodes_before, edges_before = len(g.nodes), len(g.edges)
+    again = create_geometry_proxy(
+        g, "US101",
+        {"convexshapes": [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0]],
+         "spheres": [[0.5, 0.5, 0.5, 0.25]]},
+        extractor_sources=[n.node_id for n in g.nodes
+                           if type(n).__name__ == "AnnotationRegionNode"] + ["D2"])
+    assert again.created is False
+    assert (len(g.nodes), len(g.edges)) == (nodes_before, edges_before)
+
+
+def test_a_proxy_with_no_payload_is_refused():
+    """A shape claiming a volume nobody described is worse than an error."""
+    from s3dgraphy.geometry import create_geometry_proxy
+
+    g = Graph(graph_id="empty")
+    g.add_node(StratigraphicUnit("US101", name="US101"))
+    with pytest.raises(ValueError):
+        create_geometry_proxy(g, "US101", {})
+
+
+def test_an_extractor_can_cite_an_annotation_region():
+    """A traced region is evidence — a more precise citation than the whole
+    picture, and it reaches its own source through is_on_resource."""
+    g = _proxy_graph()
+    region = next(n for n in g.nodes if type(n).__name__ == "AnnotationRegionNode")
+    citing = [e for e in g.edges
+              if e.edge_type == "extracted_from" and e.edge_target == region.node_id]
+    assert len(citing) == 1
+    # and from there the source is still reachable
+    onto_image = [e for e in g.edges
+                  if e.edge_type == "is_on_resource" and e.edge_source == region.node_id]
+    assert [e.edge_target for e in onto_image] == ["D1"]
+    assert not [e for e in g.edges if e.edge_type == "generic_connection"]
+
+
+def test_an_rmdoc_can_declare_how_it_was_posed():
+    """STEP C: the structural permission, and only that.
+
+    A spatialisation is a reconstruction, so it must be able to say how it is
+    known. The mathematics of the pose is not modelled here — a property and its
+    chain are."""
+    g = _proxy_graph()
+    edges = {(e.edge_type, e.edge_source, e.edge_target) for e in g.edges}
+    assert ("has_property", "rmd1", "pose1") in edges
+    assert not [e for e in g.edges if e.edge_type == "generic_connection"]
+
+    # a plain RepresentationModel is NOT a source of has_property
+    assert not Graph.validate_connection("representation_model", "property",
+                                         "has_property")
+    assert Graph.validate_connection("representation_model_doc", "property",
+                                     "has_property")
+
+
+def test_the_semantic_shape_payload_survives_the_round_trip(tmp_path):
+    """It did not, before this batch: the numbers were never projected."""
+    original = _proxy_graph()
+    importer = RDFImporter()
+    rebuilt = importer.parse(_export(original, tmp_path / "a.ttl"))[0]
+    assert not importer.warnings, importer.warnings
+
+    shape = next(n for n in rebuilt.nodes
+                 if type(n).__name__ == "SemanticShapeNode")
+    assert shape.convexshapes == [[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0]]
+    assert shape.spheres == [[0.5, 0.5, 0.5, 0.25]]
+    assert shape.type == "proxy"
+
+    prop = next(n for n in rebuilt.nodes
+                if type(n).__name__ == "PropertyNode"
+                and getattr(n, "property_type", None) == "geometry")
+    edges = {(e.edge_type, e.edge_source, e.edge_target) for e in rebuilt.edges}
+    assert ("has_semantic_shape", prop.node_id, shape.node_id) in edges
+    assert ("has_property", "US101", prop.node_id) in edges
+
+
+def test_geometry_proxy_roundtrip(tmp_path):
+    """RT1 for the whole picture: proxy + provenance + annotation + RMDoc."""
+    original = _proxy_graph()
+    ttl1 = _export(original, tmp_path / "1.ttl")
+    rebuilt = RDFImporter().parse(ttl1)[0]
+    ttl2 = _export(rebuilt, tmp_path / "2.ttl")
+
+    g1, g2 = _rdf(ttl1), _rdf(ttl2)
+    assert isomorphic(g1, g2), (
+        f"proxy projection is not stable: {len(g1)} vs {len(g2)} triples\n"
+        f"only in first : {sorted(set(g1) - set(g2))[:6]}\n"
+        f"only in second: {sorted(set(g2) - set(g1))[:6]}")
+    assert len(g1) == len(g2)
+
+    # every edge type of the chain came back with its name
+    types = [e.edge_type for e in rebuilt.edges]
+    for expected in ("has_property", "has_semantic_shape", "has_data_provenance",
+                     "combines", "extracted_from", "is_on_resource",
+                     "has_visual_reference", "has_representation_model_doc"):
+        assert expected in types, (expected, sorted(set(types)))
+    assert "generic_connection" not in types
+
+
+def test_the_geometry_qualia_projects_as_its_own_class(tmp_path):
+    """`geometry` is a registered qualia type, so the property carries the CIDOC
+    class the vocabulary gives it — not the generic E54_Dimension."""
+    from rdflib import Namespace, RDF as RDF_
+
+    CRMGEO = Namespace("http://www.cidoc-crm.org/extensions/crmgeo/")
+    CRM = Namespace("http://www.cidoc-crm.org/cidoc-crm/")
+    EM = Namespace("https://w3id.org/em/ontology#")
+    store = _rdf(_export(_proxy_graph(), tmp_path / "a.ttl"))
+
+    geometry_props = set(store.subjects(EM.hasQualiaType, rdflib.Literal("geometry")))
+    assert len(geometry_props) == 1
+    prop = next(iter(geometry_props))
+    assert (prop, RDF_.type, CRMGEO.SP5_Geometric_Place_Expression) in store
+    assert (prop, RDF_.type, CRM.E54_Dimension) not in store
+
+
+def test_em_ttl_declares_the_payload_properties():
+    """Nothing is emitted before it is defined."""
+    from rdflib import Namespace, RDF as RDF_
+
+    ttl = Path(__file__).resolve().parents[1] / (
+        "src/s3dgraphy/JSON_config/em.ttl")
+    onto = rdflib.Graph()
+    onto.parse(str(ttl), format="turtle")
+    EM = Namespace("https://w3id.org/em/ontology#")
+    OWL_ = Namespace("http://www.w3.org/2002/07/owl#")
+    assert (EM.convexShape, RDF_.type, OWL_.DatatypeProperty) in onto
+    assert (EM.sphere, RDF_.type, OWL_.DatatypeProperty) in onto

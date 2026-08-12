@@ -1,10 +1,10 @@
 {
     "metadata": {
-      "version": "1.6.0",
-      "last_updated": "2026-07-15",
+      "version": "1.6.1",
+      "last_updated": "2026-08-11",
       "maintainers": ["Emanuel Demetrescu"],
       "license": "CC-BY-4.0",
-      "changelog": "v1.6.0: version realigned to the EM language version (EM 1.6) — supersedes the standalone 4.x line (last was 4.2), so all EM JSON config files now share the 1.6.x scheme. Added optional `rationale` + `example` fields to qualia entries (a plain-language why + a concrete case), shown by the EMStudio vocabulary picker when creating a PropertyNode. Seeded for the temporal qualia (absolute_time_start / absolute_time_end / dating_method); to be filled in for the rest incrementally. Prior (4.x) history: v4.2 added rationale/example scaffolding; v4.1: expanded spatial elevation qualia for pyArchInit us_table quote (all E54_Dimension): elevation_relative, elevation_min_absolute, elevation_max_absolute, elevation_min_relative, elevation_max_relative, elevation_min_usm, elevation_max_usm (the generic 'elevation' = absolute MASL, used by quota_abs). Each pyArchInit quota column maps to its own qualia id so they don't collide on the single-PropertyNode-per-property_name rule. v4.0: verified all v3.0 CIDOC-CRM mappings (correct). Expanded with: volume, area, circumference in dimensional; color, texture, finish, patina, hardness, porosity in material; damage_type, fragility, completeness in state; tool_marks, joining_technique in technical; bounding_box, footprint_area in spatial; duration, terminus_post_quem, terminus_ante_quem, relative_chronology in temporal; ceremonial_function, ritual_function, defensive_function, domestic_function, symbolic_function in telic; school, workshop, period_attribution in stylistic. NEW subcategories: iconographic + semantic under cultural_interpretive (iconographic_subject, narrative_content, iconographic_program, aesthetic_value, religious_significance, monumental_status, attribution). Added provenance_history, exhibition_history, publication_history under administrative; NEW ownership subcategory (current_custodian, ownership_chain). NEW CATEGORY epistemic — meta-qualia central to EM paradata model (confidence_level, certainty_level, uncertainty_factors, methodology_used, validation_method, source_quality, primary_contributor, review_status, last_modified)."
+      "changelog": "v1.6.1: added the spatial qualia `geometry` — the PROXY as a quale. The geometry-without-material of a unit becomes a PropertyNode whose payload is a SemanticShapeNode (has_semantic_shape), so the proxy inherits the paradata chain a lone node could not have, and one proxy can be synthesised from several sources. CIDOC default crmgeo:SP5_Geometric_Place_Expression, flagged `confirm_with: Felicetti` (E36 is the alternative, to be decided together with em:AnnotationRegion). v1.6.0: version realigned to the EM language version (EM 1.6) — supersedes the standalone 4.x line (last was 4.2), so all EM JSON config files now share the 1.6.x scheme. Added optional `rationale` + `example` fields to qualia entries (a plain-language why + a concrete case), shown by the EMStudio vocabulary picker when creating a PropertyNode. Seeded for the temporal qualia (absolute_time_start / absolute_time_end / dating_method); to be filled in for the rest incrementally. Prior (4.x) history: v4.2 added rationale/example scaffolding; v4.1: expanded spatial elevation qualia for pyArchInit us_table quote (all E54_Dimension): elevation_relative, elevation_min_absolute, elevation_max_absolute, elevation_min_relative, elevation_max_relative, elevation_min_usm, elevation_max_usm (the generic 'elevation' = absolute MASL, used by quota_abs). Each pyArchInit quota column maps to its own qualia id so they don't collide on the single-PropertyNode-per-property_name rule. v4.0: verified all v3.0 CIDOC-CRM mappings (correct). Expanded with: volume, area, circumference in dimensional; color, texture, finish, patina, hardness, porosity in material; damage_type, fragility, completeness in state; tool_marks, joining_technique in technical; bounding_box, footprint_area in spatial; duration, terminus_post_quem, terminus_ante_quem, relative_chronology in temporal; ceremonial_function, ritual_function, defensive_function, domestic_function, symbolic_function in telic; school, workshop, period_attribution in stylistic. NEW subcategories: iconographic + semantic under cultural_interpretive (iconographic_subject, narrative_content, iconographic_program, aesthetic_value, religious_significance, monumental_status, attribution). Added provenance_history, exhibition_history, publication_history under administrative; NEW ownership subcategory (current_custodian, ownership_chain). NEW CATEGORY epistemic — meta-qualia central to EM paradata model (confidence_level, certainty_level, uncertainty_factors, methodology_used, validation_method, source_quality, primary_contributor, review_status, last_modified)."
     },
     "qualia_categories": [
       {
@@ -556,6 +556,26 @@
                 "data_type": "float",
                 "units": ["m2"],
                 "expected_extractors": ["3d_model_measurement", "drawing_measurement", "gis_analysis"]
+              },
+              {
+                "id": "geometry",
+                "name": "Geometry (proxy)",
+                "description": "The geometry-without-material of a unit: what shape it has and where, without asserting what it is made of. THE PROXY, as a quale. The numbers do not live in the property's value — they live in a SemanticShapeNode reached with has_semantic_shape (convex hulls / spheres inline, or a .glb via its url), so the payload can be a file when it is large and inline when it is small, without changing what the property says.",
+                "mappings": {
+                  "cidoc_crm": "SP5_Geometric_Place_Expression",
+                  "cidoc_crm_namespace": "crmgeo",
+                  "confirm_with": "Felicetti",
+                  "mapping_note": "DEFAULT, defensible, NOT final. SP5 is CRMgeo's class for the geometric expression of a place, which is what a proxy hull is; the alternative under discussion is E36_Visual_Item (the appearance of a thing) — the same choice being confirmed for em:AnnotationRegion, and the two should be decided together. Whichever wins changes the projection of this qualia type, not the modelling of the proxy as a property."
+                },
+                "data_type": "reference",
+                "payload": {
+                  "carrier": "SemanticShapeNode",
+                  "edge": "has_semantic_shape",
+                  "forms": ["convexshapes", "spheres", "url (.glb)"]
+                },
+                "rationale": "Before EM 1.6.2 the proxy was a SemanticShapeNode hanging off the unit on its own, and a lone node cannot say where it came from: it had no paradata chain, so 'the proxy of US101' could not be traced to a measurement, a photograph or a reprojection. As a property it inherits the chain every other quale has (extractor → combiner → property), which is also what lets ONE proxy be synthesised from several sources — a 3D model plus a historical photograph — instead of one node per source with nothing to join them.",
+                "example": "The volume of US101 reconstructed from a photogrammetric mesh and a 1931 photograph: one geometry property, two extractors, a combiner, and a SemanticShape carrying the resulting convex hull.",
+                "expected_extractors": ["3d_model_measurement", "photogrammetric_reprojection", "2d_annotation_reprojection", "geometric_calculation"]
               }
             ]
           },

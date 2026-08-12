@@ -949,6 +949,30 @@ class RDFImporter:
                     data[axis] = _as_number(v)
             return data
 
+        if node_type == "semantic_shape":
+            # The inverse of the payload projection. Note `type`: the
+            # SemanticShape constructor validates it against its own enum, so a
+            # value it would refuse is dropped with a warning rather than
+            # crashing the import of the whole graph.
+            convex = [self._floats(o) for o in store.objects(ref, EM.convexShape)]
+            spheres = [self._floats(o) for o in store.objects(ref, EM.sphere)]
+            if convex:
+                data["convexshapes"] = sorted(convex)
+            if spheres:
+                data["spheres"] = sorted(spheres)
+            url = self._one_object_text(store, ref, RDFS.seeAlso)
+            if url:
+                data["url"] = url
+            shape_type = self._one_literal(store, ref, CRM.P2_has_type)
+            if shape_type:
+                if shape_type in ("proxy", "generic"):
+                    data["type"] = shape_type
+                else:
+                    self.warnings.append(
+                        f"node '{node_id}': semantic shape type "
+                        f"'{shape_type}' is not one the class accepts; ignored")
+            return data
+
         if node_type == "annotation_region":
             # The geometry comes back by PARSING the selector — the exact inverse
             # of `AnnotationRegionNode.selector()`, which is what makes the region
@@ -1202,6 +1226,24 @@ class RDFImporter:
         return pick
 
     # ── literal helpers ─────────────────────────────────────────────────────
+
+    @staticmethod
+    def _floats(value: Any) -> List[float]:
+        """A space-separated coordinate literal → the numbers it holds.
+
+        Sorting the resulting lists (see the caller) is what keeps the round-trip
+        stable: RDF is a SET, so the order two hulls come back in is not the
+        order they went out in, and a proxy whose hulls swapped places would
+        re-export to different literals — not a difference in the geometry, but
+        enough to break isomorphism-of-the-second-projection.
+        """
+        out: List[float] = []
+        for chunk in str(value).replace(",", " ").split():
+            try:
+                out.append(float(chunk))
+            except ValueError:
+                continue
+        return out
 
     @staticmethod
     def _one_literal(store: ConjunctiveGraph, ref: URIRef,

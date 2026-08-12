@@ -1056,6 +1056,37 @@ class RDFExporter:
                 if v is not None:
                     ctx.add((node_iri, EM[axis], Literal(v)))
 
+        elif node_type == "semantic_shape":
+            # PROXY-AS-PROPERTY (v1.6.3): the SemanticShape is the PAYLOAD of a
+            # geometry property, so the numbers are the whole point of the node
+            # and the projection dropped them — a proxy came back from the store
+            # as an empty shape with a label. Now they travel.
+            #
+            # One literal per hull and per sphere rather than one blob: they are
+            # separate objects, and a consumer reading "the third hull" should
+            # not have to parse a container to get at it. Coordinates are
+            # space-separated with fixed precision, for the same reason the 2D
+            # selector has fixed precision — this string is what the round-trip
+            # compares.
+            for part in (getattr(node, "convexshapes", None) or []):
+                ctx.add((node_iri, EM.convexShape,
+                         Literal(" ".join(f"{float(v):.6f}" for v in part))))
+            for sphere in (getattr(node, "spheres", None) or []):
+                ctx.add((node_iri, EM.sphere,
+                         Literal(" ".join(f"{float(v):.6f}" for v in sphere))))
+            shape_type = getattr(node, "type", None)
+            if shape_type:
+                ctx.add((node_iri, CRM.P2_has_type, Literal(shape_type)))
+            # The .glb form of the same payload: same predicate a ResourceNode
+            # uses for its file, so "where the bytes are" reads the same way
+            # everywhere.
+            url = getattr(node, "url", None) or (data.get("url") if data else None)
+            if url:
+                if isinstance(url, str) and url.startswith(("http://", "https://")):
+                    ctx.add((node_iri, RDFS.seeAlso, URIRef(url)))
+                else:
+                    ctx.add((node_iri, RDFS.seeAlso, Literal(url)))
+
         elif node_type == "annotation_region":
             # The geometry travels as ONE selector literal (Media Fragment for a
             # rect, SVG-style point list for a polygon), not as a bag of numbers:

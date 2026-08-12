@@ -154,6 +154,23 @@ def create_annotation_paradata(graph: Graph, image_id: str,
                    target_unit_id=target_unit_id, author=author)
 
 
+def create_geometry_proxy(graph: Graph, unit_id: str, shape: Dict[str, Any],
+                          extractor_sources: Optional[List[str]] = None,
+                          author: Optional[str] = None,
+                          name: Optional[str] = None):
+    """The PROXY of a unit, as a property with its provenance.
+
+    The geometry-without-material of a US is a `PropertyNode(geometry)` whose
+    payload is a SemanticShape (hulls/spheres inline or a `.glb`), not a lone
+    SemanticShape hanging off the unit — so it inherits the paradata chain, and
+    ONE proxy can be synthesised from several sources.
+    See :mod:`s3dgraphy.geometry`.
+    """
+    from .geometry import create_geometry_proxy as _create
+    return _create(graph, unit_id, shape, extractor_sources=extractor_sources,
+                   author=author, name=name)
+
+
 # ── project → TTL / RDF ────────────────────────────────────────────────────────
 def project_ttl(graph: Graph, *, base_uri: Optional[str] = None,
                 fmt: str = "turtle") -> str:

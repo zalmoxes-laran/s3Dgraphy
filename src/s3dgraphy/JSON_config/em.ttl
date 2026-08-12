@@ -271,7 +271,21 @@ em:SemanticShape
     a owl:Class ;
     rdfs:label "Semantic Shape (proxy geometry)"@en ;
     rdfs:subClassOf crmgeo:SP5_Geometric_Place_Expression ;
-    rdfs:comment "3D proxy geometry (convex shapes or spheres) representing the spatial extent of a node. Used as a semantic proxy distinct from a full RepresentationModel: lighter weight, intended for spatial indexing and rough containment, not for visual rendering. Linked via crm:P138_represents to any Node. Maps to: Python SemanticShapeNode (node_type='semantic_shape')."@en .
+    rdfs:comment "3D proxy geometry (convex shapes or spheres, or a .glb via rdfs:seeAlso) representing the spatial extent of a node. Lighter weight than a full RepresentationModel: intended for spatial indexing and rough containment, not for visual rendering. SINCE 2026-08-11 IT IS A PAYLOAD: the proxy of a unit is a quale — a property of type 'geometry' — and this class is what that property points at through P138i (has_semantic_shape). The reason is paradata: a lone shape cannot say where it came from, while a property inherits the extractor/combiner chain, so one proxy can be synthesised from several sources (a photogrammetric mesh and a historical photograph). The class itself did not change; who points at it did. Maps to: Python SemanticShapeNode (node_type='semantic_shape')."@en .
+
+em:convexShape
+    a owl:DatatypeProperty ;
+    rdfs:label "convex shape"@en ;
+    rdfs:domain em:SemanticShape ;
+    rdfs:range xsd:string ;
+    rdfs:comment "One convex hull of a semantic shape, as a space-separated list of coordinate triplets (x y z x y z ...), fixed to 6 decimals. REPEATABLE: a shape may carry several hulls, and each is its own statement rather than an element of a parsed container — a consumer after 'the third hull' should not have to take a blob apart to reach it. Stored in Python as SemanticShapeNode.convexshapes. Added 2026-08-11 with the proxy-as-property model: the shape became the PAYLOAD of a geometry property, so the numbers are the point of the node and had to start travelling (before, a proxy came back from the store as an empty shape with a label)."@en .
+
+em:sphere
+    a owl:DatatypeProperty ;
+    rdfs:label "sphere"@en ;
+    rdfs:domain em:SemanticShape ;
+    rdfs:range xsd:string ;
+    rdfs:comment "One sphere of a semantic shape, as 'x y z r' with fixed precision. Repeatable, for the same reason as em:convexShape. Stored in Python as SemanticShapeNode.spheres."@en .
 
 em:AnnotationRegion
     a owl:Class ;
