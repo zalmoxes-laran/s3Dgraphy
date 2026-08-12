@@ -396,6 +396,43 @@ class _InverseDatamodel:
 
     # ── edge type ───────────────────────────────────────────────────────────
 
+    def symmetric_spellings(self, candidates: Sequence[str]) -> Optional[str]:
+        """The canonical name when these candidates are SPELLINGS OF ONE relation.
+
+        `bonded_to` / `is_bonded_to` and `equals` / `is_physically_equal_to` are
+        not a lossy collision: the datamodel declares all four **symmetric**, and
+        gives each pair a ``type_tag`` that resolves to the SAME ``em:``
+        subproperty. Two names for a relation that has no direction collapse to
+        one predicate because that is what they mean — inventing two
+        subproperties to keep them apart would assert a direction the relation
+        does not have.
+
+        So the test is structural, not a hand-kept list of names: every candidate
+        belongs to the AP11 physical family AND they all resolve to one
+        subproperty. When that holds, this is a canonicalisation like
+        ``has_timebranch → is_in_timebranch``, and it is silent.
+
+        The canonical member is the one the datamodel calls the canonical form —
+        the v5.0 em_data.xlsx spelling, which is the one WITHOUT the directional
+        `is_…` prefix. Returns None when the candidates are not such a family, so
+        every other ambiguity still warns.
+        """
+        if len(candidates) < 2:
+            return None
+        edges = self.dm.connections_datamodel.get("edge_types", {})
+        subprops: Set[str] = set()
+        for name in candidates:
+            mapping = (edges.get(name) or {}).get("mapping") or {}
+            tag = mapping.get("type_tag")
+            iri = AP11_SUBPROPS.get(tag) if tag else None
+            if iri is None:
+                return None          # not the physical family: not this case
+            subprops.add(str(iri))
+        if len(subprops) != 1:
+            return None              # different relations, genuinely ambiguous
+        # the canonical spelling: no directional prefix, shortest wins the tie
+        return sorted(candidates, key=lambda n: (n.startswith("is_"), len(n), n))[0]
+
     def candidates_for_predicate(self, pred: str) -> List[str]:
         """Edge types whose most specific emitted predicate is `pred`."""
         return list(self.edges_by_signature.get(pred, []))
@@ -1110,10 +1147,17 @@ class RDFImporter:
         pool = narrowed or candidates
         if not pool:
             return None
-        # Declared canonical choice: the datamodel's own order, first wins. This
-        # is the residue the endpoints could not separate (e.g. `bonded_to` and
-        # `is_bonded_to`, two spellings of one relation that project to the same
-        # em: subproperty) — recorded, never silent.
+        # SYMMETRIC SPELLINGS — not an ambiguity at all. Two names for one
+        # directionless relation collapse onto one predicate BY DESIGN (the
+        # datamodel declares them symmetric and gives them the same em:
+        # subproperty), so canonicalising is the correct reading and warning
+        # about it reported a non-problem. Silent, exactly like
+        # `has_timebranch → is_in_timebranch`.
+        canonical = self.inverse.symmetric_spellings(pool)
+        if canonical is not None:
+            return canonical
+        # Everything else that the endpoints could not separate IS an ambiguity:
+        # a choice is made and recorded, never silently.
         pick = sorted(pool)[0]
         self.warnings.append(
             f"predicate {pred} between '{src_id}' and '{tgt_id}' is ambiguous "

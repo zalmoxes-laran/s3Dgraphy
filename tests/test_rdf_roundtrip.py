@@ -735,3 +735,125 @@ def test_templumare_three_parent_property_keeps_all_three(tmp_path):
     got = sorted(e.edge_source for e in rebuilt.edges
                  if e.edge_type == "has_property" and e.edge_target == prop_id)
     assert got == expected_parents, (got, expected_parents)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STEP A (2026-08-11 combo) — symmetric relations: canonicalising is not a loss
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _symmetric_graph() -> Graph:
+    """Both directional spellings of both symmetric physical relations."""
+    g = Graph(graph_id="symmetric")
+    for uid in ("A", "B", "C", "D"):
+        g.add_node(StratigraphicUnit(uid, name=uid))
+    g.add_edge("s1", "A", "B", "is_bonded_to")
+    g.add_edge("s2", "C", "D", "is_physically_equal_to")
+    return g
+
+
+def test_symmetric_properties_are_declared_symmetric_in_em_ttl():
+    """`em:bondedTo` and `em:physicallyEquals` are owl:SymmetricProperty.
+
+    They must be: the datamodel declares all four edge spellings symmetric, so
+    the ontology has to say the relation has no direction — otherwise a reasoner
+    would treat `A bondedTo B` and `B bondedTo A` as different facts.
+    """
+    from pathlib import Path as _Path
+    import s3dgraphy
+
+    ttl = _Path(s3dgraphy.__file__).parent / "JSON_config" / "em.ttl"
+    onto = rdflib.Graph()
+    onto.parse(str(ttl), format="turtle")
+    OWL = rdflib.namespace.OWL
+    EM_NS = "https://w3id.org/em/ontology#"
+    for local in ("bondedTo", "physicallyEquals"):
+        types = set(onto.objects(rdflib.URIRef(EM_NS + local), rdflib.RDF.type))
+        assert OWL.SymmetricProperty in types, (local, types)
+        assert OWL.ObjectProperty in types, (local, types)
+
+
+def test_symmetric_spellings_canonicalise_without_a_warning(tmp_path):
+    """The heart of the step: no warning, because there is no problem.
+
+    Two names for a directionless relation collapse onto one predicate BY
+    DESIGN. Reporting that as an ambiguity was reporting a non-problem.
+    """
+    importer = RDFImporter()
+    rebuilt = importer.parse(_export(_symmetric_graph(), tmp_path / "s.ttl"))[0]
+
+    assert importer.warnings == [], importer.warnings
+    types = {(e.edge_source, e.edge_target, e.edge_type) for e in rebuilt.edges}
+    assert types == {("A", "B", "bonded_to"), ("C", "D", "equals")}, types
+
+
+def test_symmetric_round_trip_is_isomorphic(tmp_path):
+    """Canonicalising does not change the RDF: `is_bonded_to` and `bonded_to`
+    were always the same triple, which is why the projection is stable."""
+    ttl1 = _export(_symmetric_graph(), tmp_path / "a.ttl")
+    rebuilt = RDFImporter().parse(ttl1)[0]
+    ttl2 = _export(rebuilt, tmp_path / "b.ttl")
+    assert isomorphic(_rdf(ttl1), _rdf(ttl2))
+
+
+def test_the_canonical_spelling_projects_identically(tmp_path):
+    """`is_bonded_to` and `bonded_to` produce the SAME RDF — which is the
+    evidence that collapsing them loses nothing."""
+    a = Graph(graph_id="sym")
+    a.add_node(StratigraphicUnit("A", name="A"))
+    a.add_node(StratigraphicUnit("B", name="B"))
+    a.add_edge("e", "A", "B", "is_bonded_to")
+
+    b = Graph(graph_id="sym")
+    b.add_node(StratigraphicUnit("A", name="A"))
+    b.add_node(StratigraphicUnit("B", name="B"))
+    b.add_edge("e", "A", "B", "bonded_to")
+
+    assert isomorphic(_rdf(_export(a, tmp_path / "a.ttl")),
+                      _rdf(_export(b, tmp_path / "b.ttl")))
+
+
+def test_other_ambiguities_still_warn():
+    """The silence is narrow: only the symmetric spellings stop warning.
+
+    Checked on the rule itself rather than by constructing a graph, because the
+    endpoints resolve nearly everything else — the point is that the test is
+    structural (one em: subproperty, AP11 family) and not a blanket exemption.
+    """
+    from s3dgraphy.importer.rdf_importer import _InverseDatamodel
+
+    inv = _InverseDatamodel()
+    assert inv.symmetric_spellings(["is_bonded_to", "bonded_to"]) == "bonded_to"
+    assert inv.symmetric_spellings(
+        ["equals", "is_physically_equal_to"]) == "equals"
+    # different relations of the same family → NOT a spelling pair
+    assert inv.symmetric_spellings(["cuts", "fills"]) is None
+    # outside the physical family → never silent
+    assert inv.symmetric_spellings(["has_license", "has_embargo"]) is None
+    assert inv.symmetric_spellings(["is_part_of", "is_in_functional_unit"]) is None
+
+
+def test_symmetric_orientation_is_stable_across_the_round_trip(tmp_path):
+    """The exporter keeps the AUTHORED direction, and the importer gives it back.
+
+    Declared, because it is a choice: for a symmetric relation `A→B` and `B→A`
+    say the same thing, so the projection COULD normalise the subject to the
+    smaller id. It does not — it keeps what the author wrote, which is what makes
+    the property-graph round-trip exact (the rebuilt edge has the same source and
+    target as the original). Two graphs that authored the same bond in opposite
+    directions therefore project to different triples; that is a semantic
+    equivalence an OWL reasoner resolves via owl:SymmetricProperty, not a
+    difference in what was said.
+    """
+    g = Graph(graph_id="orient")
+    g.add_node(StratigraphicUnit("Z", name="Z"))
+    g.add_node(StratigraphicUnit("A", name="A"))
+    g.add_edge("e", "Z", "A", "bonded_to")        # authored high → low
+
+    rebuilt = RDFImporter().parse(_export(g, tmp_path / "a.ttl"))[0]
+    edge = next(e for e in rebuilt.edges if e.edge_type == "bonded_to")
+    assert (edge.edge_source, edge.edge_target) == ("Z", "A")
+
+    # and it is stable: exporting the rebuilt graph gives the same triples
+    ttl1 = _export(g, tmp_path / "b.ttl")
+    ttl2 = _export(rebuilt, tmp_path / "c.ttl")
+    assert isomorphic(_rdf(ttl1), _rdf(ttl2))
