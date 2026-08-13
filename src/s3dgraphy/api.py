@@ -134,6 +134,54 @@ def validate(graph: Graph) -> Dict[str, Any]:
     }
 
 
+# ── the em.json CONTAINER: a project is one file ───────────────────────────────
+#
+# An em.json is ALWAYS a container: `{"graphs": {...}}`, 1..N study graphs plus
+# the project shelf. A single graph is a container-of-one. This is the shape
+# Heriverse already reads, so adopting it costs nobody a migration — and reading
+# accepts the legacy single-graph form too, so nothing on disk breaks.
+
+def load_container(doc: EmJson):
+    """Read a container OR a legacy single-graph document → (Container, warnings)."""
+    from .container import parse_container
+    return parse_container(doc)
+
+
+def load_container_file(path: str):
+    """Read a container file (either shape) → (Container, warnings)."""
+    from .container import load_container_file as _load
+    return _load(path)
+
+
+def container_to_emjson(container) -> EmJson:
+    """Serialise a Container — always the `graphs` shape, one graph included."""
+    from .container import build_container
+    return build_container(container)
+
+
+def save_container_file(container, path: str) -> str:
+    from .container import save_container_file as _save
+    return _save(container, path)
+
+
+def container_of(graph: Graph, shelf: Optional[Graph] = None):
+    """Wrap one graph (and optionally its shelf) as a container-of-one."""
+    from .container import container_of as _wrap
+    return _wrap(graph, shelf=shelf)
+
+
+def merge_containers(container, other):
+    """Integrate another project into this one — ADD its graphs, merge shared
+    nodes by UUID. Returns a MergeReport.
+
+    The offline "integrate later": no server, no session. Declared limit — this
+    is add + merge-by-UUID, NOT conflict resolution; the report's `merged_nodes`
+    is exactly the set where a divergent edit could have been overwritten.
+    """
+    from .container import merge_into_container
+    return merge_into_container(container, other)
+
+
 # ── 2D annotation → paradata chain ─────────────────────────────────────────────
 def create_annotation_paradata(graph: Graph, image_id: str,
                                region: Dict[str, Any], interpretation: str,

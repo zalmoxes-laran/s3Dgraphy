@@ -90,7 +90,7 @@ def _entry(node: Any) -> Dict[str, Any]:
     from ..resources import classify_locator, stable_resource_id
     d = _data(node)
     url = d.get("url", "") or getattr(node, "url", "") or ""
-    return {
+    entry = {
         "id": stable_resource_id(node),
         "name": str(getattr(node, "name", "") or ""),
         "locator": url,
@@ -98,21 +98,75 @@ def _entry(node: Any) -> Dict[str, Any]:
         "resource_type": d.get("resource_type", ""),
         "origin": d.get("origin"),  # capability/origin — never stripped
     }
+    # SHELF1 · the three fences and where the bytes live. Listed as RECORDED and
+    # as EFFECTIVE, side by side, because they answer two different questions: a
+    # UI badge shows what to act on (effective), while "did anybody actually say
+    # this?" is what tells a curated entry from an inherited assumption. Folding
+    # them into one field would quietly turn every legacy resource into a claim.
+    for key in ("checksum", "scope", "residency"):
+        if d.get(key):
+            entry[key] = d[key]
+    entry["effective_scope"] = (
+        node.effective_scope() if hasattr(node, "effective_scope")
+        else d.get("scope") or "own-study")
+    entry["effective_residency"] = (
+        node.effective_residency() if hasattr(node, "effective_residency")
+        else d.get("residency") or "reference")
+    return entry
+
+
+def find_by_checksum(shelf: Any, checksum: str) -> Optional[Any]:
+    """The shelf entry with this content digest, or None.
+
+    Content identity, not name identity: the same photograph filed twice under
+    two names in two folders is ONE resource, and the digest is the only thing
+    that knows it. This is what makes the shelf a curated list rather than a pile
+    that grows every time somebody drags the same file again.
+    """
+    if not checksum:
+        return None
+    for n in getattr(shelf, "nodes", []) or []:
+        if getattr(n, "node_type", None) != _LINK_TYPE:
+            continue
+        if _data(n).get("checksum") == checksum:
+            return n
+    return None
 
 
 def add_to_shelf(shelf: Any, locator: str, *, resource_id: Optional[str] = None,
                  name: Optional[str] = None, url_type: Optional[str] = None,
                  description: Optional[str] = None,
                  resource_type: Optional[str] = None,
-                 origin: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                 origin: Optional[Dict[str, Any]] = None,
+                 checksum: Optional[str] = None,
+                 scope: Optional[str] = None,
+                 residency: Optional[str] = None) -> Dict[str, Any]:
     """Add a resource to the shelf and return its entry.
 
-    Reuse-not-duplicate: if ``resource_id`` is already present, the existing
-    ResourceNode is updated (locator/origin), not duplicated. ``origin`` is the
-    capability/origin envelope (``repo``, ``capabilities``, ``scope``, …) preserved
-    for downstream tier badges."""
+    Reuse-not-duplicate, on TWO keys. If ``resource_id`` is already present the
+    existing ResourceNode is updated, not duplicated — and if a ``checksum``
+    matches an entry already on the shelf, that entry is the one returned, even
+    under a different id: the same bytes are the same resource, wherever they
+    were dragged from.
+
+    ``origin`` is the capability/origin envelope (``repo``, ``capabilities``,
+    ``scope``, …) preserved for downstream tier badges. ``scope`` /
+    ``residency`` are the shelf's own axes (see ResourceNode) and are written
+    only when given."""
     from ..nodes.resource_node import ResourceNode
     rid = resource_id or str(uuid.uuid4())
+    # dedup by CONTENT first: the same bytes under another id are not a second
+    # resource. Checked before the id so a re-drag from another folder lands on
+    # the entry that is already curated instead of beside it.
+    if checksum:
+        twin = find_by_checksum(shelf, checksum)
+        if twin is not None and twin.node_id != rid:
+            d = _data(twin)
+            if scope is not None:
+                twin.set_scope(scope) if hasattr(twin, "set_scope") else d.__setitem__("scope", scope)
+            if residency is not None:
+                twin.set_residency(residency) if hasattr(twin, "set_residency") else d.__setitem__("residency", residency)
+            return _entry(twin)
     node = shelf.find_node_by_id(rid)
     if node is None or getattr(node, "node_type", None) != _LINK_TYPE:
         node = ResourceNode(node_id=rid, name=name or "Unnamed Resource",
@@ -129,6 +183,12 @@ def add_to_shelf(shelf: Any, locator: str, *, resource_id: Optional[str] = None,
         d["resource_type"] = resource_type
     if origin is not None:
         d["origin"] = origin
+    if checksum:
+        d["checksum"] = str(checksum)
+    if scope is not None:
+        node.set_scope(scope) if hasattr(node, "set_scope") else d.__setitem__("scope", scope)
+    if residency is not None:
+        node.set_residency(residency) if hasattr(node, "set_residency") else d.__setitem__("residency", residency)
     return _entry(node)
 
 

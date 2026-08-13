@@ -112,7 +112,11 @@ def test_a_new_document_round_trips_with_the_canonical_key(tmp_path):
     path = export_emjson(_graph_with_canonical_doc(), str(tmp_path / "g.em.json"))
     payload = json.loads(open(path, encoding="utf-8").read())
     assert payload["header"]["schema_version"] == SCHEMA_VERSION
-    doc_node = next(n for n in payload["graph"]["nodes"] if n["id"] == "D.1")
+    # An em.json FILE is a container since 2026-08-13: one graph is a
+    # container-of-one, so the nodes live in the member rather than in a
+    # top-level `graph` section.
+    member = next(iter(payload["graphs"].values()))
+    doc_node = next(n for n in member["nodes"] if n["id"] == "D.1")
     data = doc_node.get("data") or {}
     assert data.get("em_canonical_document") is True
     assert "em_master_document" not in data     # the old spelling is never written

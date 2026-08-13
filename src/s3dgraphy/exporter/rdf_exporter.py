@@ -1027,6 +1027,19 @@ class RDFExporter:
                 ctx.add((node_iri, RDF.type, CRMDIG.D1_Digital_Object))
                 ctx.add((node_iri, RDF.type, PROV.Entity))
                 ctx.add((node_iri, CRM.P2_has_type, Literal(dtc_kind)))
+            # SHELF1 · integrity and the three fences. Emitted only when
+            # RECORDED — absent means nobody said, and a default written into a
+            # store becomes an assertion that travels. (The sane reading lives
+            # in `ResourceNode.effective_scope`, on the consumer's side.)
+            checksum = data.get("checksum")
+            if checksum:
+                ctx.add((node_iri, EM.checksum, Literal(str(checksum))))
+            scope = data.get("scope")
+            if scope:
+                ctx.add((node_iri, EM.resourceScope, Literal(str(scope))))
+            residency = data.get("residency")
+            if residency:
+                ctx.add((node_iri, EM.residency, Literal(str(residency))))
 
         elif node_type == "LocationNodeGroup":
             # The kind (toponym / study / functional) is the discriminator of the

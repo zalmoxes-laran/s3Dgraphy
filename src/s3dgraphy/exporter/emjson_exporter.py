@@ -215,12 +215,22 @@ def build_emjson(graph: Graph, layout: Optional[Dict[str, Any]] = None) -> Dict[
 
 
 def export_emjson(graph: Graph, output_path: str,
-                  layout: Optional[Dict[str, Any]] = None) -> str:
-    """Serialize `graph` to `.em.json` at output_path. Returns the path."""
-    doc = build_emjson(graph, layout=layout)
-    path = Path(output_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(doc, f, ensure_ascii=False, indent=2, sort_keys=True)
-        f.write("\n")
-    return str(path)
+                  layout: Optional[Dict[str, Any]] = None,
+                  *, shelf: Optional[Graph] = None) -> str:
+    """Serialize `graph` to an `.em.json` FILE at output_path. Returns the path.
+
+    **The file is always a CONTAINER** (2026-08-13): `{"graphs": {...}}` with
+    this graph as its single member, plus the shelf when there is one. A project
+    is one portable file, and a single graph is a container-of-one — the shape
+    Heriverse already reads.
+
+    Note the division of labour, because the two are easy to confuse:
+    :func:`build_emjson` builds the document of ONE graph and is what every
+    in-memory caller uses (it is also the builder each container member goes
+    through); this function writes the FILE, and a file is a project.
+    """
+    from ..container import container_of, save_container_file
+    container = container_of(graph, shelf=shelf)
+    if layout:
+        container.layout = layout
+    return save_container_file(container, output_path)

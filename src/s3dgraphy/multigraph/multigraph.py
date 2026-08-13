@@ -116,6 +116,55 @@ class MultiGraphManager:
             graph.name = new_name
             # print(f"Graph '{new_graph_id or current_graph_id}' name updated to '{new_name}'.")
 
+    # ── the em.json CONTAINER (2026-08-13) ─────────────────────────────────
+    #
+    # `load_graph` above reads ONE GraphML file. This reads a PROJECT: an
+    # em.json container with 1..N graphs plus its shelf. The two coexist because
+    # they answer different questions — "open this file" and "open this project"
+    # — and the manager is where a project's graphs are supposed to live.
+
+    def load_container(self, filepath, *, replace=False):
+        """Load an em.json container (or a legacy single-graph file) into this
+        manager. Returns ``(container, warnings)``.
+
+        `replace=False` ADDS the container's graphs to whatever is already
+        loaded, which is the offline "integrate later" gesture; `replace=True`
+        is "open this project" and clears first. The default is the additive
+        one because losing what is already open is the more expensive mistake.
+        """
+        from ..container import load_container_file
+        container, warnings = load_container_file(filepath)
+        if replace:
+            self.graphs = {}
+        for graph_id, graph in container.graphs.items():
+            self.graphs[graph_id] = graph
+        if container.shelf is not None:
+            self.graphs[container.shelf.graph_id] = container.shelf
+        self.container = container
+        return container, warnings
+
+    def save_container(self, filepath, *, active_graph_id=None):
+        """Write EVERY loaded graph into ONE container file. Returns the path.
+
+        The shelf is recognised by its marker rather than by its id, so a
+        project keeps its shelf as a member instead of it becoming an extra
+        study graph on the next open.
+        """
+        from ..container import Container, is_shelf_member, save_container_file
+        graphs, shelf = {}, None
+        for graph_id, graph in self.graphs.items():
+            if is_shelf_member(graph):
+                shelf = graph
+            else:
+                graphs[graph_id] = graph
+        container = Container(
+            graphs=graphs, shelf=shelf,
+            active_graph_id=active_graph_id or getattr(
+                getattr(self, "container", None), "active_graph_id", None),
+        )
+        return save_container_file(container, filepath)
+
+
 multi_graph_manager = MultiGraphManager()
 
 def load_graph_from_file(filepath, graph_id=None, overwrite=False):
@@ -130,3 +179,9 @@ def get_all_graph_ids():
 
 def remove_graph(graph_id):
     multi_graph_manager.remove_graph(graph_id)
+
+def load_container(filepath, replace=False):
+    return multi_graph_manager.load_container(filepath, replace=replace)
+
+def save_container(filepath, active_graph_id=None):
+    return multi_graph_manager.save_container(filepath, active_graph_id=active_graph_id)

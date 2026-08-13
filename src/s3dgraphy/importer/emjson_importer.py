@@ -142,7 +142,43 @@ def _instantiate(node_type: str, payload: Dict[str, Any],
 
 
 def parse_emjson(doc: Dict[str, Any]) -> Tuple[Graph, List[str]]:
-    """Parse an already-loaded .em.json dict into a Graph."""
+    """Parse an already-loaded .em.json dict into a Graph.
+
+    **Both shapes are accepted.** An em.json is a CONTAINER since 2026-08-13
+    (`{"graphs": {...}}`, 1..N graphs plus the project shelf), and every file
+    written before then is a single-graph document. This function keeps its
+    contract — one graph in, one graph out — and for a container it returns the
+    ACTIVE member: a caller who asked for "the graph" gets the graph that was in
+    front, which is what they would have opened by hand.
+
+    A caller who wants the whole project uses
+    :func:`s3dgraphy.container.parse_container` (or `api.load_container`) — that
+    is the one that also hands back the other graphs and the shelf. Keeping the
+    two apart is deliberate: silently returning only one graph out of five to
+    somebody who does not know there are five is how data goes missing.
+    """
+    from ..container import is_container
+
+    if is_container(doc):
+        from ..container import parse_container
+        container, warnings = parse_container(doc)
+        # A SHELF-ONLY container is a real and ordinary file: `save_shelf`
+        # writes exactly that. Somebody opening it wants the shelf, so hand it
+        # back rather than refusing — the first version raised here, and the
+        # thing it refused to open was the shelf's own file.
+        active = container.active() or container.shelf
+        if active is None:
+            raise EmJsonImportError(
+                "this em.json container holds no graph at all")
+        if len(container.graphs) > 1:
+            # Said, not hidden: the reader IS dropping content here, and the
+            # caller may well have a way to open the rest.
+            warnings.append(
+                f"this em.json is a container with {len(container.graphs)} "
+                f"graphs; read the active one ('{active.graph_id}'). Use "
+                f"api.load_container to open the whole project")
+        return active, warnings
+
     warnings: List[str] = []
 
     header = doc.get("header") or {}

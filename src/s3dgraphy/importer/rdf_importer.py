@@ -917,6 +917,14 @@ class RDFImporter:
             url = self._one_object_text(store, ref, RDFS.seeAlso)
             if url:
                 data["url"] = url
+            # SHELF1 · integrity and the three fences, read only when PRESENT:
+            # a resource that says nothing must come back saying nothing.
+            for key, pred in (("checksum", EM.checksum),
+                              ("scope", EM.resourceScope),
+                              ("residency", EM.residency)):
+                value = self._one_literal(store, ref, pred)
+                if value:
+                    data[key] = str(value)
             # A resource can carry TWO `crm:P2_has_type` literals: its
             # `url_type` and, when it is a DTC product, its `dtc_kind`. They are
             # told apart by what each one IS rather than by order: `url_type` is

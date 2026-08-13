@@ -24,7 +24,20 @@ class ResourceNode(Node):
         "point_cloud": ["e57", "pts", "las", "laz"]
     }
 
-    def __init__(self, node_id, name="Unnamed Link", url="", url_type="External link", description="No description"):
+    #: Where a resource comes from, in order of distance (the shelf's THREE
+    #: FENCES). Not a technical detail: it is the axis the search must be able
+    #: to filter on and the UI must show, because "is this mine, my twin's, or
+    #: another site's?" changes what a comparison means.
+    SCOPES = ("own-study", "own-HDT", "other-HDT")
+
+    #: Whether the bytes live here or elsewhere (Tropy's linked/managed).
+    #: `reference` = I keep the URI, it stays at home; `resident` = I copied it
+    #: into my own store, so the comparison travels with my study, offline too.
+    RESIDENCIES = ("reference", "resident")
+
+    def __init__(self, node_id, name="Unnamed Link", url="", url_type="External link",
+                 description="No description", checksum=None, scope=None,
+                 residency=None):
         """
         Inizializza una nuova istanza di ResourceNode.
 
@@ -34,6 +47,19 @@ class ResourceNode(Node):
             url (str, opzionale): URL del collegamento. Defaults to "".
             url_type (str, opzionale): Tipo di URL. Defaults to "External link".
             description (str, opzionale): Descrizione del collegamento. Defaults to "No description".
+            checksum (str, opzionale): content digest, ``"sha256:<hex>"``. The
+                ALGORITHM travels with the value on purpose — a bare hex string
+                is unreadable in two years, and a checksum nobody can verify is
+                worse than none. Absent for a pure URI/LOD resource: there are no
+                bytes here to hash, and its identity is already the URI.
+            scope (str, opzionale): one of :attr:`SCOPES`.
+            residency (str, opzionale): one of :attr:`RESIDENCIES`.
+
+        The three new fields are **additive and optional**, and they are written
+        ONLY when given. Absent means UNKNOWN, not false: every resource written
+        before these existed must keep saying nothing rather than start claiming
+        it is un-hashed, own-study and by-reference — three assertions nobody
+        made. (Reading is a different matter: see :meth:`effective_scope`.)
         """
         super().__init__(node_id=node_id, name=name)
 
@@ -43,6 +69,49 @@ class ResourceNode(Node):
             "url_type": url_type or self._determine_url_type(url),
             "description": description or f"Link to {name}"
         }
+        if checksum:
+            self.data["checksum"] = str(checksum)
+        if scope is not None:
+            self.set_scope(scope)
+        if residency is not None:
+            self.set_residency(residency)
+
+    # ── the three fences, and where the bytes live ──────────────────────────
+
+    def set_scope(self, scope):
+        """Set the provenance fence. Raises on an unknown value: a scope outside
+        the three is not a scope, and silently keeping it would put a word into
+        the search filters that nothing can ever match."""
+        if scope not in self.SCOPES:
+            raise ValueError(
+                f"scope must be one of {list(self.SCOPES)}, got {scope!r}")
+        self.data["scope"] = scope
+
+    def set_residency(self, residency):
+        """Set where the bytes live. Raises on an unknown value, same reason."""
+        if residency not in self.RESIDENCIES:
+            raise ValueError(
+                f"residency must be one of {list(self.RESIDENCIES)}, got {residency!r}")
+        self.data["residency"] = residency
+
+    def effective_scope(self):
+        """The scope to USE when none was recorded.
+
+        ``own-study`` is the sane reading of a resource somebody put in their own
+        shelf before the field existed — but it is a reading, made here, by the
+        consumer. The document itself still says nothing, which is why this is a
+        method and not a default written into ``data``.
+        """
+        return self.data.get("scope") or "own-study"
+
+    def effective_residency(self):
+        """The residency to USE when none was recorded: a remote URI is a
+        reference (the bytes are somebody else's), anything else is resident."""
+        recorded = self.data.get("residency")
+        if recorded:
+            return recorded
+        url = str(self.data.get("url") or "")
+        return "reference" if url.startswith(("http://", "https://", "s3://")) else "resident"
 
     @property
     def url(self):

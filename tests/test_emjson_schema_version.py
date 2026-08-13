@@ -112,7 +112,9 @@ def test_derived_marks_survive_a_round_trip(tmp_path):
 
     path = export_emjson(g, str(tmp_path / "g.em.json"))
     payload = json.loads(open(path, encoding="utf-8").read())
-    written = next(e for e in payload["graph"]["edges"]
+    # container-of-one: the edges are in the member (see container.py)
+    member = next(iter(payload["graphs"].values()))
+    written = next(e for e in member["edges"]
                    if e["edge_type"] == "has_property")
     assert written["attributes"] == {"derived": True, "derived_from": "PD1"}
 

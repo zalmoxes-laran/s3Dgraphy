@@ -76,6 +76,24 @@ em:AIAuthor
     rdfs:subClassOf em:Author , prov:SoftwareAgent ;
     rdfs:comment "An AI agent (LLM, image generator, etc.) that authored or refined EM nodes. Carries model identifier and prompt reference for reproducibility. Maps to: Python AuthorAINode (node_type='author_ai'). Note: Python AuthorAINode inherits from AuthorNode for isinstance() compatibility, but in OWL em:AIAuthor and em:HumanAuthor are siblings, NOT in subClassOf relation."@en .
 
+em:checksum
+    a owl:DatatypeProperty ;
+    rdfs:label "checksum"@en ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Content digest of a resource, as 'sha256:<hex>'. The ALGORITHM travels with the value on purpose: a bare hex string is unreadable in two years, and a digest nobody can verify is worse than none. Integrity AND dedup — the same photograph filed twice in two folders is ONE resource, and the digest is the only thing that knows it; the stable ID stays the IDENTITY, this is additive. Absent for a pure URI/LOD resource: there are no bytes here to hash, and its identity is already the URI. OPEN (confirm_with: Felicetti): a CIDOC-native form would be an E42_Identifier typed as a digest (or PREMIS messageDigest); a literal is the defensible minimum until the modelling of digital-object integrity is settled across the family."@en .
+
+em:resourceScope
+    a owl:DatatypeProperty ;
+    rdfs:label "resource scope"@en ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Which FENCE a shelf resource comes from, in order of distance: 'own-study' (this EM study), 'own-HDT' (the study's Heritage Digital Twin), 'other-HDT' (another site's twin — a COMPARANDUM). Not an implementation detail: it is the axis resource search must be able to filter on and the interface must show, because whether a thing is mine, my twin's or another site's changes what a comparison means. Emitted only when recorded — absent means nobody said, not 'own-study'. OPEN (confirm_with: Felicetti): the provenance of a comparandum is ALSO carried by the DTC acquisition (repo_id / record_id, DTCAcquisitionNode); whether this literal should instead be derived from that chain is the modelling question to settle — today it is stated because a shelf entry must be filterable without walking a chain."@en .
+
+em:residency
+    a owl:DatatypeProperty ;
+    rdfs:label "residency"@en ;
+    rdfs:range xsd:string ;
+    rdfs:comment "Where the bytes of a resource live: 'reference' (the URI stays at home, light but dependent on the network and on somebody else's fence) or 'resident' (copied into my own store, heavier but the comparison travels with my study, offline included). The same linked/managed distinction Tropy makes. Emitted only when recorded."@en .
+
 em:orcidVerified
     a owl:DatatypeProperty ;
     rdfs:label "ORCID verified"@en ;

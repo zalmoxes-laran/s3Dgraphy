@@ -1509,3 +1509,151 @@ def test_em_ttl_declares_orcid_verified():
     assert (EM_.orcidVerified, RDF_.type, OWL_.DatatypeProperty) in onto
     assert (EM_.orcidVerified, RDFS_.domain, EM_.Author) in onto
     assert (EM_.orcidVerified, RDFS_.range, XSD_.boolean) in onto
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SHELF1 — the shelf's "wide list": checksum, the three fences, residency
+#
+# The shelf is the wide list (the video-editing analogy: file browser → shelf →
+# timeline). Three fields make an entry more than a path: the DIGEST that says
+# two files are one resource, the FENCE it comes from (mine / my twin's /
+# another site's — the comparanda), and where the bytes LIVE.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _shelf_resource_graph(graph_id="shelfres") -> Graph:
+    g = Graph(graph_id=graph_id)
+    local = ResourceNode("res_local", name="foto_scavo.jpg", url="/dati/foto_scavo.jpg",
+                         checksum="sha256:" + "ab" * 32,
+                         scope="own-study", residency="resident")
+    remote = ResourceNode("res_lod", name="comparandum",
+                          url="https://ecch.example/object/42",
+                          scope="other-HDT", residency="reference")
+    legacy = ResourceNode("res_legacy", name="vecchia", url="old.png")
+    for n in (local, remote, legacy):
+        g.add_node(n)
+    return g
+
+
+def test_shelf_fields_are_optional_and_absent_by_default():
+    """Legacy = ABSENT = unknown, never a default written into the document.
+
+    A resource recorded before these fields existed must keep saying nothing
+    rather than start claiming it is un-hashed, own-study and by-reference —
+    three assertions nobody made.
+    """
+    legacy = ResourceNode("r", name="x", url="a.png")
+    for key in ("checksum", "scope", "residency"):
+        assert key not in legacy.data
+    # the sane READING lives on the consumer's side, and is a method
+    assert legacy.effective_scope() == "own-study"
+    assert legacy.effective_residency() == "resident"          # a local path
+    assert ResourceNode("r2", url="https://x/y").effective_residency() == "reference"
+
+
+def test_a_scope_outside_the_three_fences_is_refused():
+    """A scope outside the three is not a scope: keeping it would put a word in
+    the search filters that nothing can ever match."""
+    for bad in ("mine", "own study", "", "OTHER-HDT"):
+        with pytest.raises(ValueError):
+            ResourceNode("r", scope=bad)
+    for bad in ("copied", "linked", "maybe"):
+        with pytest.raises(ValueError):
+            ResourceNode("r", residency=bad)
+
+
+def test_shelf_fields_survive_the_round_trip(tmp_path):
+    original = _shelf_resource_graph()
+    importer = RDFImporter()
+    rebuilt = importer.parse(_export(original, tmp_path / "a.ttl"))[0]
+    assert not importer.warnings, importer.warnings
+
+    by_id = {n.node_id: n for n in rebuilt.nodes}
+    local = by_id["res_local"].data
+    assert local["checksum"] == "sha256:" + "ab" * 32
+    assert local["scope"] == "own-study"
+    assert local["residency"] == "resident"
+
+    remote = by_id["res_lod"].data
+    assert remote["scope"] == "other-HDT"
+    assert remote["residency"] == "reference"
+    assert "checksum" not in remote          # no bytes here to hash
+
+    assert not {"checksum", "scope", "residency"} & set(by_id["res_legacy"].data)
+
+
+def test_shelf_projection_is_isomorphic(tmp_path):
+    original = _shelf_resource_graph()
+    ttl1 = _export(original, tmp_path / "1.ttl")
+    rebuilt = RDFImporter().parse(ttl1)[0]
+    ttl2 = _export(rebuilt, tmp_path / "2.ttl")
+    g1, g2 = _rdf(ttl1), _rdf(ttl2)
+    assert isomorphic(g1, g2), f"{len(g1)} vs {len(g2)} triples"
+    assert len(g1) == len(g2)
+
+
+def test_the_shelf_graph_is_a_graph_you_can_save_and_reopen():
+    """Model A: the shelf is a saved LIST, not a computed view of orphans."""
+    from s3dgraphy.shelf.core import (
+        add_to_shelf, is_shelf, list_shelf, new_shelf, SHELF_COLLECTION,
+    )
+    from s3dgraphy import api
+
+    shelf = new_shelf("shelf_demo", "Scavo 2026")
+    assert is_shelf(shelf)
+    digest = "sha256:" + "cd" * 32
+    add_to_shelf(shelf, "/dati/foto1.jpg", name="foto1", checksum=digest,
+                 scope="own-study", residency="resident")
+    add_to_shelf(shelf, "https://ecch.example/object/42", name="comparandum",
+                 scope="other-HDT", residency="reference")
+    assert len(list_shelf(shelf)) == 2
+
+    # it is an em.json like any other — that is the whole point of Model A
+    doc = api.graph_to_emjson(shelf)
+    assert doc["graph"].get("data", {}).get("em_collection") == SHELF_COLLECTION \
+        or doc["graph"].get("em_collection") == SHELF_COLLECTION \
+        or shelf.data["em_collection"] == SHELF_COLLECTION
+    reopened, warnings = api.load_emjson(doc)
+    kinds = {n.node_id: type(n).__name__ for n in reopened.nodes}
+    assert list(kinds.values()).count("ResourceNode") == 2, kinds
+
+
+def test_the_same_bytes_are_one_shelf_entry():
+    """Dedup by CONTENT: the same photograph in two folders is one resource.
+
+    Name identity cannot see this — the file is called something else and lives
+    somewhere else — which is exactly why the digest exists.
+    """
+    from s3dgraphy.shelf.core import add_to_shelf, list_shelf, new_shelf
+
+    shelf = new_shelf()
+    digest = "sha256:" + "ef" * 32
+    first = add_to_shelf(shelf, "/dati/2024/foto.jpg", name="foto", checksum=digest,
+                         scope="own-study", residency="resident")
+    again = add_to_shelf(shelf, "/backup/copia_di_foto.jpg", name="copia",
+                         checksum=digest)
+    assert first["id"] == again["id"]
+    assert len(list_shelf(shelf)) == 1
+
+
+def test_shelf_entries_report_recorded_and_effective_side_by_side():
+    """Two different questions: what to act on, and whether anybody said it."""
+    from s3dgraphy.shelf.core import add_to_shelf, list_shelf, new_shelf
+
+    shelf = new_shelf()
+    add_to_shelf(shelf, "https://ecch.example/object/42", name="lod")
+    entry = list_shelf(shelf)[0]
+    assert "scope" not in entry                     # nobody recorded one
+    assert entry["effective_scope"] == "own-study"  # …and this is the reading
+    assert entry["effective_residency"] == "reference"
+
+
+def test_em_ttl_declares_the_shelf_properties():
+    from rdflib import Namespace, RDF as RDF_
+
+    ttl = Path(__file__).resolve().parents[1] / "src/s3dgraphy/JSON_config/em.ttl"
+    onto = rdflib.Graph()
+    onto.parse(str(ttl), format="turtle")
+    EM_ = Namespace("https://w3id.org/em/ontology#")
+    OWL_ = Namespace("http://www.w3.org/2002/07/owl#")
+    for prop in (EM_.checksum, EM_.resourceScope, EM_.residency):
+        assert (prop, RDF_.type, OWL_.DatatypeProperty) in onto, prop
