@@ -170,6 +170,34 @@ def container_of(graph: Graph, shelf: Optional[Graph] = None):
     return _wrap(graph, shelf=shelf)
 
 
+def bump_project_version(container, *, at: Optional[str] = None):
+    """Advance the project's version IF the content changed (P3).
+
+    The digest decides, so pressing save on an unchanged project does not invent
+    a revision. Returns the `ProjectVersion`.
+    """
+    from .container import bump_version
+    return bump_version(container, at=at)
+
+
+def pin_project_version(container, *, at: Optional[str] = None) -> Dict[str, Any]:
+    """Freeze the project as a citable snapshot — `{id, pinned_at, version,
+    document}` (P3). The DOI/PID is the Catalog's to mint; this is the stable
+    thing it mints FOR."""
+    from .container import pin_version
+    return pin_version(container, at=at)
+
+
+def container_to_ttl(container, path: str, *, base_uri: Optional[str] = None,
+                     format: str = "turtle") -> str:
+    """Project → RDF: every member graph plus `prov:wasRevisionOf` / version."""
+    from .exporter.rdf_exporter import RDFExporter
+    kwargs: Dict[str, Any] = {"format": format}
+    if base_uri:
+        kwargs["base_uri"] = base_uri
+    return RDFExporter(path, **kwargs).export_container(container)
+
+
 def merge_containers(container, other):
     """Integrate another project into this one — ADD its graphs, merge shared
     nodes by UUID. Returns a MergeReport.

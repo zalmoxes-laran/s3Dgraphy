@@ -519,6 +519,65 @@ class RDFExporter:
         store.serialize(destination=self.output_path, format=self.rdflib_format)
         return self.output_path
 
+    def export_container(self, container) -> str:
+        """Serialize a whole PROJECT: every member graph plus its version (P3).
+
+        The project is a subject of its own — `<base>project/<digest>` — because
+        the version is a fact about the project and not about any one graph.
+        Each member is declared part of it, so a reader can go from a graph to
+        the revision it belongs to without knowing how the file was arranged.
+        """
+        store = ConjunctiveGraph()
+        self._bind_namespaces(store)
+        members = list(container.graphs.values())
+        if getattr(container, "shelf", None) is not None:
+            members.append(container.shelf)
+        for graph in members:
+            ctx = store.get_context(self._graph_iri(graph))
+            self._serialize_graph(graph, ctx)
+            self.stats["graphs"] += 1
+        self._serialize_project_version(container, store)
+        store.serialize(destination=self.output_path, format=self.rdflib_format)
+        return self.output_path
+
+    def _serialize_project_version(self, container, store) -> None:
+        """The light-weight versioning triples: PROV + DCTERMS, and no DTC.
+
+        `prov:wasRevisionOf` is the standard way to say "this grew out of that",
+        and `dcterms:hasVersion` carries the number people say out loud. The DTC
+        (crmdig:D7 and friends) is deliberately NOT used: it records how a
+        digital object was MADE, and using it to track that a document changed
+        would be a category error — a DTC tracking the DTC.
+
+        OPEN (confirm_with: Felicetti): a CIDOC-native reading would make each
+        revision an E73 with a P148/E13 chain or an F-series work/expression
+        split; PROV/DCTERMS is the defensible default for a counter and a
+        pointer, which is all this is.
+        """
+        version = getattr(container, "version", None)
+        if version is None:
+            return
+        project_iri = URIRef(f"{self.base_uri}project/{_iri_local(version.id or 'unversioned')}")
+        ctx = store.get_context(project_iri)
+        ctx.add((project_iri, RDF.type, PROV.Entity))
+        ctx.add((project_iri, RDF.type, CRM.E73_Information_Object))
+        ctx.add((project_iri, DCTERMS.hasVersion, Literal(str(version.number))))
+        if version.id:
+            ctx.add((project_iri, DCTERMS.identifier, Literal(version.id)))
+        if version.was_revision_of:
+            ctx.add((project_iri, PROV.wasRevisionOf,
+                     URIRef(f"{self.base_uri}project/"
+                            f"{_iri_local(version.was_revision_of)}")))
+        if version.modified_at:
+            ctx.add((project_iri, DCTERMS.modified,
+                     Literal(str(version.modified_at), datatype=XSD.dateTime)))
+        members = list(container.graphs.values())
+        if getattr(container, "shelf", None) is not None:
+            members.append(container.shelf)
+        for graph in members:
+            ctx.add((self._graph_iri(graph), DCTERMS.isPartOf, project_iri))
+        self.stats["project_versions"] = self.stats.get("project_versions", 0) + 1
+
     # ── path/format helpers ─────────────────────────────────────────────────
 
     def _adjust_extension(self, path: str) -> str:

@@ -66,6 +66,93 @@ GRAPHS_KEY = "graphs"
 SHELF_MEMBER_ID = "shelf"
 
 
+# ── P3 · light-weight project versioning ─────────────────────────────────────
+#
+# The key under which the project's version travels in the file. Deliberately
+# NOT inside `header`: the header describes the FORMAT (em.json version,
+# datamodel stamps) and this describes the WORK. Two different questions, and a
+# reader looking for "which version of the study is this" should not have to
+# know how the format numbers itself.
+VERSION_KEY = "version"
+
+
+@dataclass
+class ProjectVersion:
+    """Which revision of the project this file is — the light-weight kind.
+
+    Four fields and no event log: a counter you can say out loud ("v3"), a
+    stable id of THIS content, the id of the version it grew out of, and when.
+    That is enough to answer "what did I merge, and against what do I compare",
+    and to pin something citable — which is what a project needs before it needs
+    a full history.
+
+    NOT the DTC. A transformation chain records how a digital object was MADE
+    (crmdig:D7 and friends); this records that a document changed. Using the DTC
+    to track the DTC would be a category error and an unreadable graph.
+    """
+
+    number: int = 1
+    #: content digest of this version, `sha256:<12 hex>` — the algorithm travels
+    #: with the value, as everywhere else in EM (see the shelf checksum)
+    id: str = ""
+    was_revision_of: Optional[str] = None
+    modified_at: Optional[str] = None
+
+    def as_dict(self) -> Dict[str, Any]:
+        out: Dict[str, Any] = {"number": self.number}
+        if self.id:
+            out["id"] = self.id
+        if self.was_revision_of:
+            out["was_revision_of"] = self.was_revision_of
+        if self.modified_at:
+            out["modified_at"] = self.modified_at
+        return out
+
+    @staticmethod
+    def from_dict(raw: Any) -> Optional["ProjectVersion"]:
+        if not isinstance(raw, dict):
+            return None
+        try:
+            number = int(raw.get("number") or 1)
+        except (TypeError, ValueError):
+            number = 1
+        return ProjectVersion(
+            number=number,
+            id=str(raw.get("id") or ""),
+            was_revision_of=(str(raw["was_revision_of"])
+                             if raw.get("was_revision_of") else None),
+            modified_at=(str(raw["modified_at"]) if raw.get("modified_at") else None),
+        )
+
+    def label(self) -> str:
+        """"v3 (from v2)" — the sentence a status bar wants."""
+        if self.was_revision_of:
+            return f"v{self.number} (from {self.was_revision_of[:15]})"
+        return f"v{self.number}"
+
+
+def content_digest(doc: Dict[str, Any]) -> str:
+    """`sha256:<12 hex>` over the project's CONTENT.
+
+    The graphs and which one was active — NOT the layout, and not the version
+    block itself. Moving a box is not a new version of a study, and hashing the
+    version block would make every hash depend on the previous one for no gain.
+
+    This is what decides whether a save is a new version: "did the content
+    change" is then MEASURED rather than assumed, and pressing save three times
+    on an unchanged project does not invent three revisions.
+    """
+    import hashlib
+
+    payload = {
+        GRAPHS_KEY: doc.get(GRAPHS_KEY) or {},
+        "active_graph_id": doc.get("active_graph_id"),
+    }
+    blob = json.dumps(payload, sort_keys=True, ensure_ascii=False,
+                      separators=(",", ":")).encode("utf-8")
+    return "sha256:" + hashlib.sha256(blob).hexdigest()[:12]
+
+
 @dataclass
 class Container:
     """One project: its graphs, its shelf, and which graph was in front.
@@ -82,6 +169,9 @@ class Container:
     active_graph_id: Optional[str] = None
     header: Dict[str, Any] = field(default_factory=dict)
     layout: Dict[str, Any] = field(default_factory=dict)
+    #: P3 · which revision of the work this is (None = never versioned; the
+    #: first write gives it a v1 rather than pretending it always had one)
+    version: Optional[ProjectVersion] = None
 
     def graph_ids(self) -> List[str]:
         return list(self.graphs.keys())
@@ -141,10 +231,12 @@ def parse_container(doc: Dict[str, Any]) -> Tuple[Container, List[str]]:
             active_graph_id=graph.graph_id,
             header=header,
             layout=layout,
+            version=ProjectVersion.from_dict(doc.get(VERSION_KEY)),
         )
         return container, list(graph_warnings)
 
-    container = Container(header=header, layout=layout)
+    container = Container(header=header, layout=layout,
+                          version=ProjectVersion.from_dict(doc.get(VERSION_KEY)))
     members = doc[GRAPHS_KEY]
     for member_id, section in members.items():
         if not isinstance(section, dict):
@@ -219,7 +311,68 @@ def build_container(container: Container) -> Dict[str, Any]:
         doc["active_graph_id"] = active
     if container.layout:
         doc["layout"] = container.layout
+    if container.version is not None:
+        doc[VERSION_KEY] = container.version.as_dict()
     return doc
+
+
+def bump_version(container: Container, *, at: Optional[str] = None) -> ProjectVersion:
+    """Advance the project's version IF the content changed. Returns the version.
+
+    The digest decides. An unchanged project keeps the version it had — a save
+    is not an edit, and a counter that measured how often somebody pressed ⌘S
+    would tell you nothing about the work.
+
+    A change records `was_revision_of` pointing at the digest it grew out of:
+    that chain is `prov:wasRevisionOf` in the RDF projection, and it is the
+    thread a citation follows backwards.
+    """
+    doc = build_container(container)
+    digest = content_digest(doc)
+    current = container.version
+    if current is not None and current.id == digest:
+        return current
+    stamp = at
+    if stamp is None:
+        from .editorial import now_iso
+        stamp = now_iso()
+    container.version = ProjectVersion(
+        number=(current.number + 1) if current is not None else 1,
+        id=digest,
+        was_revision_of=(current.id or None) if current is not None else None,
+        modified_at=stamp,
+    )
+    return container.version
+
+
+def pin_version(container: Container, *, at: Optional[str] = None) -> Dict[str, Any]:
+    """Freeze the project as it stands — the snapshot a citation can point at.
+
+    Returns ``{"id", "pinned_at", "version", "document"}`` where `document` is a
+    complete, self-contained container document. Immutable by construction
+    rather than by promise: it is a serialised copy, so later edits to the live
+    container cannot reach into it.
+
+    The id is the CONTENT digest, so two pins of the same content are the same
+    pin — pinning twice by accident does not create two citable things that
+    claim to be different.
+
+    DECLARED LIMIT: this is the snapshot, not the identifier. Minting a DOI/PID
+    belongs to the Catalog; what this guarantees is that there is something
+    stable for it to mint *for*.
+    """
+    version = bump_version(container, at=at)
+    doc = build_container(container)
+    stamp = at
+    if stamp is None:
+        from .editorial import now_iso
+        stamp = now_iso()
+    return {
+        "id": version.id,
+        "pinned_at": stamp,
+        "version": version.as_dict(),
+        "document": json.loads(json.dumps(doc, ensure_ascii=False)),
+    }
 
 
 def load_container_file(path: str) -> Tuple[Container, List[str]]:
@@ -228,7 +381,16 @@ def load_container_file(path: str) -> Tuple[Container, List[str]]:
     return parse_container(doc)
 
 
-def save_container_file(container: Container, path: str) -> str:
+def save_container_file(container: Container, path: str, *,
+                        bump: bool = True) -> str:
+    """Write the project. P3 · a save that CHANGES THE CONTENT is a new version.
+
+    `bump=False` writes without touching the version — for the callers that are
+    exporting a copy rather than saving the work (a snapshot, a conversion),
+    where advancing the project's revision would be a lie about what happened.
+    """
+    if bump:
+        bump_version(container)
     doc = build_container(container)
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -562,4 +724,9 @@ def merge_into_container(container: Container, other: Container) -> MergeReport:
 
     if container.active_graph_id not in container.graphs:
         container.active_graph_id = next(iter(container.graphs), None)
+    # P3 · integrating somebody else's graphs makes a new version of the
+    # project. The digest still decides: a merge that changed nothing (you
+    # already had it all) is not a revision, and would only make the number
+    # lie about how much has happened.
+    bump_version(container)
     return report
