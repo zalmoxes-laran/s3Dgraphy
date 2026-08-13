@@ -29,5 +29,6 @@ provenance mechanism would be a second paradata model to keep in step.
 """
 
 from .proxy import GeometryProxyResult, create_geometry_proxy
+from .migrate import migrate_legacy_proxies
 
-__all__ = ["create_geometry_proxy", "GeometryProxyResult"]
+__all__ = ["create_geometry_proxy", "GeometryProxyResult", "migrate_legacy_proxies"]

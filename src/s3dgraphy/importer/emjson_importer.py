@@ -227,6 +227,12 @@ def parse_emjson(doc: Dict[str, Any]) -> Tuple[Graph, List[str]]:
     # MIG1-A (DP-65) · one-shot legacy migration of graph-scope rights metadata.
     _migrate_legacy_graph_scope(graph)
 
+    # EM 1.6.2 · one-shot legacy migration of the proxy: a bare SemanticShape
+    # hanging off a unit becomes a geometry Property carrying that shape. See
+    # geometry/migrate.py. Idempotent: a graph already in the new shape is a no-op.
+    from ..geometry.migrate import migrate_legacy_proxies
+    migrate_legacy_proxies(graph)
+
     return graph, warnings
 
 
