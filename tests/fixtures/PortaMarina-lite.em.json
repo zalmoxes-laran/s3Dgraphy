@@ -269,8 +269,9 @@
       {
         "data": {
           "name": "Emanuel",
-          "orcid": "0000-0002-0805-4364",
-          "surname": "Demetrescu"
+          "orcid": "0000-0002-5065-7970",
+          "surname": "Demetrescu",
+          "verified": false
         },
         "id": "A.demetrescu",
         "name": "Emanuel",
@@ -282,7 +283,8 @@
           "name": "Claude",
           "orcid": "noorcid",
           "prompt_reference": "EXT.prompt.cantiere",
-          "surname": "Anthropic"
+          "surname": "Anthropic",
+          "verified": false
         },
         "id": "AI.claude",
         "name": "Claude",

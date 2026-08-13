@@ -8,8 +8,25 @@ class AuthorNode(Node):
     a specific node via the ``has_author`` edge type. In the yEd palette it
     appears as an ImageNode with label prefix ``A.``.
 
+    **The ORCID iD is the identity.** The other fields are how a human reads it;
+    the iD is what makes two authors the same author across machines, projects
+    and years. ``verified`` says whether that iD was CONFIRMED through ORCID or
+    merely DECLARED by whoever typed it.
+
+    Claim now, verify later. An archaeologist on a dig with no network can
+    declare their iD and start working — the authorship is real and attributed
+    from the first node. Nothing about data preparation waits for a connection.
+    What waits is *publishing as that person*, because a claim about who you are
+    is only worth what it can be checked against, and out there it will be
+    checked. So ``verified`` is not a permission flag: it is the difference
+    between "this is who I say I am" and "this is who ORCID says I am".
+
     Attributes:
-        orcid (str): ORCID identifier (optional).
+        orcid (str): the ORCID iD — the identity itself (optional; ``noorcid``
+            means "no identity declared", which is what legacy authors carry).
+        verified (bool): False = claimed, True = confirmed through ORCID.
+            Defaults to False, which is also what every author authored before
+            this field existed correctly reads as.
         name (str): First name (optional).
         surname (str): Family name (optional).
     """
@@ -17,7 +34,7 @@ class AuthorNode(Node):
 
     def __init__(self, node_id, name="author", description="",
                  orcid="noorcid", surname="nosurname",
-                 first_name=None):
+                 first_name=None, verified=False):
         """Initialize a new AuthorNode.
 
         ``name`` here is the node's display name (kept backwards-compatible
@@ -33,6 +50,12 @@ class AuthorNode(Node):
             "orcid": orcid,
             "name": first_name if first_name is not None else name,
             "surname": surname,
+            # `is True`, not `bool()`. This value decides whether a publication
+            # may claim to be by this person, so only the boolean True verifies:
+            # `bool("false")` is True, and an identity must never be promoted by
+            # a string that happens to be non-empty. Anything else — a string, a
+            # number, None — reads as "not verified", which is the safe side.
+            "verified": verified is True,
         }
 
     def to_dict(self):
@@ -65,10 +88,11 @@ class AuthorAINode(AuthorNode):
 
     def __init__(self, node_id, name="author_ai", description="",
                  orcid="noorcid", surname="nosurname", first_name=None,
-                 model="", prompt_reference=""):
+                 model="", prompt_reference="", verified=False):
         super().__init__(
             node_id=node_id, name=name, description=description,
             orcid=orcid, surname=surname, first_name=first_name,
+            verified=verified,
         )
         self.data["model"] = model
         self.data["prompt_reference"] = prompt_reference

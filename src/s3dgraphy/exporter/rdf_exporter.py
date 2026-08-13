@@ -968,6 +968,7 @@ class RDFExporter:
             orcid = data.get("orcid")
             if orcid and orcid != "noorcid":
                 ctx.add((node_iri, CRM.P48_has_preferred_identifier, Literal(orcid)))
+                self._emit_orcid_verification(node_iri, data, ctx)
             surname = data.get("surname")
             if surname and surname != "nosurname":
                 ctx.add((node_iri, CRM.P131_is_identified_by, Literal(surname)))
@@ -976,6 +977,7 @@ class RDFExporter:
             orcid = data.get("orcid")
             if orcid and orcid != "noorcid":
                 ctx.add((node_iri, CRM.P48_has_preferred_identifier, Literal(orcid)))
+                self._emit_orcid_verification(node_iri, data, ctx)
             model = data.get("model")
             if model:
                 ctx.add((node_iri, EM.modelIdentifier, Literal(model)))
@@ -1129,6 +1131,28 @@ class RDFExporter:
             kind = data.get("dtc_kind")
             if kind:
                 ctx.add((node_iri, CRM.P2_has_type, Literal(kind)))
+
+    def _emit_orcid_verification(self, node_iri: URIRef, data: Dict[str, Any],
+                                 ctx) -> None:
+        """Say whether the declared ORCID iD was CONFIRMED, and only then.
+
+        Emitted **only for a verified author**, and that asymmetry is the point.
+        "Verified" is a positive fact somebody established; "not verified" is the
+        absence of one, and absence is what an empty graph already says. Writing
+        `verified false` into a store would turn "nobody has checked yet" into an
+        assertion that travels — and a reader downstream cannot tell a claim of
+        falsity from a silence.
+
+        The predicate is `em:orcidVerified`. A CIDOC-native alternative would be
+        an E13 Attribute Assignment reifying the check (who verified, when,
+        against which authority), which is the *right* shape once the flow
+        records those facts — it does not yet, and reifying an event with no
+        actor and no date would be inventing provenance. Flagged
+        `confirm_with: Felicetti` in em.ttl.
+        """
+        if data.get("verified") is True:
+            ctx.add((node_iri, EM.orcidVerified,
+                     Literal(True, datatype=XSD.boolean)))
 
     def _emit_belief_skeleton(self, node_iri: URIRef, ctx) -> None:
         """CRMinf belief expansion (I2) for argumentation nodes.

@@ -76,6 +76,13 @@ em:AIAuthor
     rdfs:subClassOf em:Author , prov:SoftwareAgent ;
     rdfs:comment "An AI agent (LLM, image generator, etc.) that authored or refined EM nodes. Carries model identifier and prompt reference for reproducibility. Maps to: Python AuthorAINode (node_type='author_ai'). Note: Python AuthorAINode inherits from AuthorNode for isinstance() compatibility, but in OWL em:AIAuthor and em:HumanAuthor are siblings, NOT in subClassOf relation."@en .
 
+em:orcidVerified
+    a owl:DatatypeProperty ;
+    rdfs:label "ORCID verified"@en ;
+    rdfs:domain em:Author ;
+    rdfs:range xsd:boolean ;
+    rdfs:comment "True when the author's declared ORCID iD has been CONFIRMED through ORCID (via the identity broker), as opposed to merely declared by whoever typed it. The ORCID iD is the identity; this says whether that identity has been checked. Emitted ONLY when true: 'not verified' is the absence of a check, not an assertion of falsity, and an empty graph already says it — writing `false` would turn 'nobody has looked yet' into a claim that travels. Claim now, verify later: an author may work, author nodes and prepare data with a declared iD; what verification gates is PUBLISHING AS that person. Stored in Python as AuthorNode.data['verified']. OPEN (confirm_with: Felicetti): a CIDOC-native form would reify the check as an E13 Attribute Assignment (who verified, when, against which authority) — the right shape once the flow records those facts, which it does not yet; reifying an event with no actor and no date would be inventing provenance."@en .
+
 em:modelIdentifier
     a owl:DatatypeProperty ;
     rdfs:label "model identifier"@en ;

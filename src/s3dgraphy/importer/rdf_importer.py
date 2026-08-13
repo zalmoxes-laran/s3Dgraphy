@@ -883,6 +883,13 @@ class RDFImporter:
             prompt = self._one_literal(store, ref, EM.promptReference)
             if prompt:
                 data["prompt_reference"] = prompt
+            # The identity claim comes back as a claim: only the literal `true`
+            # verifies. Everything else — absent, "false", anything odd — reads
+            # as claimed, which is the safe side of a question about who someone
+            # is. (The exporter only writes the triple when it is true, so the
+            # absent case is the ordinary one.)
+            verified = self._one_literal(store, ref, EM.orcidVerified)
+            data["verified"] = str(verified).lower() == "true" if verified else False
             return data
 
         if node_type == "license":

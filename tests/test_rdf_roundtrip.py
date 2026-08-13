@@ -1408,3 +1408,104 @@ def test_em_ttl_declares_the_payload_properties():
     OWL_ = Namespace("http://www.w3.org/2002/07/owl#")
     assert (EM.convexShape, RDF_.type, OWL_.DatatypeProperty) in onto
     assert (EM.sphere, RDF_.type, OWL_.DatatypeProperty) in onto
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY — the ORCID iD is the identity; `verified` says whether it was checked
+#
+# Claim now, verify later. Someone on a dig with no network declares their iD
+# and starts working: the authorship is real from the first node. What waits for
+# a connection is PUBLISHING AS that person — so `verified` must survive the
+# projection, and "not verified" must never be mistaken for a claim of falsity.
+# ─────────────────────────────────────────────────────────────────────────────
+
+EM_NS = "https://w3id.org/em/ontology#"
+
+
+def _identity_graph(graph_id="ident") -> Graph:
+    from s3dgraphy.nodes import AuthorAINode
+
+    g = Graph(graph_id=graph_id)
+    g.add_node(AuthorNode("a1", name="Emanuel", surname="Demetrescu",
+                          orcid="0000-0002-1825-0097", verified=True))
+    g.add_node(AuthorNode("a2", name="Sul campo", surname="Rossi",
+                          orcid="0000-0001-5109-3700", verified=False))
+    g.add_node(AuthorAINode("ai1", name="Claude", model="claude-opus-5"))
+    g.add_node(StratigraphicUnit("US101", name="US101"))
+    g.add_edge("e1", "US101", "a1", "has_author")
+    return g
+
+
+def test_author_verified_defaults_to_claimed():
+    """Every author authored before this field existed reads as CLAIMED — which
+    is what they are: nobody checked them."""
+    a = AuthorNode("a", name="X", orcid="0000-0002-1825-0097")
+    assert a.data["verified"] is False
+
+
+def test_only_the_boolean_true_verifies():
+    """An identity must not be promoted by a string that happens to be truthy.
+
+    `bool("false")` is True, and this value decides whether a publication may
+    claim to be by this person — so the coercion is `is True`, not `bool()`.
+    """
+    for value in (True,):
+        assert AuthorNode("a", verified=value).data["verified"] is True
+    for value in ("false", "true", "yes", 1, 0, None, [], object()):
+        assert AuthorNode("a", verified=value).data["verified"] is False, value
+
+
+def test_verified_survives_the_round_trip(tmp_path):
+    original = _identity_graph()
+    importer = RDFImporter()
+    rebuilt = importer.parse(_export(original, tmp_path / "a.ttl"))[0]
+    assert not importer.warnings, importer.warnings
+
+    by_id = {n.node_id: n for n in rebuilt.nodes}
+    assert by_id["a1"].data["verified"] is True
+    assert by_id["a1"].data["orcid"] == "0000-0002-1825-0097"
+    assert by_id["a2"].data["verified"] is False
+    assert by_id["a2"].data["orcid"] == "0000-0001-5109-3700"
+    assert by_id["ai1"].data["verified"] is False
+
+
+def test_unverified_authors_say_nothing_rather_than_saying_false(tmp_path):
+    """Absence, not a negative assertion.
+
+    "Nobody has checked yet" is what an empty graph already says. Writing
+    `verified false` into a store would turn that silence into a claim that
+    travels — and a reader downstream cannot tell a claim of falsity from a
+    check that has not happened.
+    """
+    from rdflib import Namespace
+
+    EM_ = Namespace(EM_NS)
+    store = _rdf(_export(_identity_graph(), tmp_path / "a.ttl"))
+    triples = list(store.triples((None, EM_.orcidVerified, None)))
+    assert len(triples) == 1                      # the verified author, and only him
+    assert bool(triples[0][2].toPython()) is True  # never a `false` literal
+
+
+def test_identity_projection_is_isomorphic(tmp_path):
+    """RT1 for the identity layer: the second projection is the same graph."""
+    original = _identity_graph()
+    ttl1 = _export(original, tmp_path / "1.ttl")
+    rebuilt = RDFImporter().parse(ttl1)[0]
+    ttl2 = _export(rebuilt, tmp_path / "2.ttl")
+    g1, g2 = _rdf(ttl1), _rdf(ttl2)
+    assert isomorphic(g1, g2), f"{len(g1)} vs {len(g2)} triples"
+    assert len(g1) == len(g2)
+
+
+def test_em_ttl_declares_orcid_verified():
+    from rdflib import Namespace, RDF as RDF_, RDFS as RDFS_
+
+    ttl = Path(__file__).resolve().parents[1] / "src/s3dgraphy/JSON_config/em.ttl"
+    onto = rdflib.Graph()
+    onto.parse(str(ttl), format="turtle")
+    EM_ = Namespace(EM_NS)
+    OWL_ = Namespace("http://www.w3.org/2002/07/owl#")
+    XSD_ = Namespace("http://www.w3.org/2001/XMLSchema#")
+    assert (EM_.orcidVerified, RDF_.type, OWL_.DatatypeProperty) in onto
+    assert (EM_.orcidVerified, RDFS_.domain, EM_.Author) in onto
+    assert (EM_.orcidVerified, RDFS_.range, XSD_.boolean) in onto
