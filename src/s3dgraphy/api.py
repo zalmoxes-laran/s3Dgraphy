@@ -240,6 +240,54 @@ def clear_stamps(node) -> None:
     _clear(node)
 
 
+# ── P4.1 · the CRDT algebra ───────────────────────────────────────────────────
+def stamp_field(node, field: str, *, by=None, at: Optional[str] = None) -> None:
+    """Record WHEN a single field was set, and by whom (P4.1).
+
+    The seam that makes field-level merging real. The node stamp answers "when
+    was this node last touched", which speaks for every field at once — so two
+    people editing different parts of the same node still collide. A field that
+    carries its own clock does not: the merge can see that you changed the
+    description and somebody else changed the dating, and keep both.
+
+    Written LAZILY, by whoever edits: nothing here stamps a field nobody
+    touched, and a node nobody fought over stays as light as it was.
+    `field` is addressed as `name` / `description` / `data.<key>`.
+    """
+    from .crdt import Clock, set_field_clock
+    from .editorial import normalize_orcid, now_iso
+
+    data = getattr(node, "data", None)
+    if not isinstance(data, dict):
+        data = {}
+        node.data = data
+    payload = {"data": data}
+    set_field_clock(payload, field,
+                    Clock(ts=at or now_iso(), by=normalize_orcid(by)))
+
+
+def apply_op(section: Dict[str, Any], op: Dict[str, Any]):
+    """Apply ONE CRDT operation to an em.json graph section. See
+    :mod:`s3dgraphy.crdt` — idempotent, and refusing a stale op is a normal
+    answer, not an error."""
+    from .crdt import apply_op_to_section
+    return apply_op_to_section(section, op)
+
+
+def make_op(kind: str, **fields):
+    """Build a CRDT operation (`add_node`, `update_field`, `remove_node`,
+    `add_edge`, `remove_edge`)."""
+    from .crdt import make_op as _make
+    return _make(kind, **fields)
+
+
+def live_nodes(section: Dict[str, Any]):
+    """The nodes a VIEW should show: everything not tombstoned. The merge sees
+    the tombstones; a view must not."""
+    from .crdt import live_nodes as _live
+    return _live(section)
+
+
 # ── 2D annotation → paradata chain ─────────────────────────────────────────────
 def create_annotation_paradata(graph: Graph, image_id: str,
                                region: Dict[str, Any], interpretation: str,

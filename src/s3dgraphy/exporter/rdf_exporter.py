@@ -922,6 +922,16 @@ class RDFExporter:
             stamp = Literal(str(modified_at), datatype=XSD.dateTime)
             ctx.add((node_iri, EM.modifiedAt, stamp))
             ctx.add((node_iri, DCTERMS.modified, stamp))
+        # P4.1 · the TOMBSTONE. A deletion is a fact somebody stated, with a hand
+        # and an instant, and a projection that dropped it would publish a graph
+        # in which the deletion never happened — which is how a deleted node
+        # comes back from a triplestore. Emitted only when the node carries one.
+        removed = data.get("removed")
+        if isinstance(removed, dict) and removed.get("ts"):
+            ctx.add((node_iri, EM.removedAt,
+                     Literal(str(removed["ts"]), datatype=XSD.dateTime)))
+            if removed.get("by"):
+                ctx.add((node_iri, EM.removedBy, agent(removed["by"])))
 
     def _compute_primary_iri(self, node: Any, cls_name: str,
                              node_type: Optional[str]) -> Optional[URIRef]:

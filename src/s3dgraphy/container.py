@@ -31,15 +31,20 @@ Deciding by date rather than by arrival makes the result **independent of the
 order you merge in** — A into B and B into A land on the same project, which is
 the least a collaboration tool owes you.
 
+**P4.1 (2026-08-13) — the merge is a CRDT, and P3's missing piece arrived.**
+The algebra moved to :mod:`s3dgraphy.crdt`: **OR-Set** for presence (with
+tombstones) and **LWW-per-field** for content, clocks = the editorial stamps.
+What that buys, concretely: two people who edited DIFFERENT fields of the same
+node now keep **both** edits — the field-level fusion P3 had to declare as a
+limit. Only a field they both wrote is a decision, and it is reported per field.
+
 What this module deliberately does NOT do:
 
-* **field-level fusion.** The unit of resolution is the NODE: if you changed a
-  description and somebody else changed a date, the newer node wins whole and
-  the other edit is in the conflict list, not merged in. Keeping both needs a
-  common ancestor (three-way) or a version vector, which is P4 — and guessing
-  at it here would produce nodes neither of you wrote.
-* **real-time co-editing** of the same graph — that is the em-server hub
-  (ADR-002 grows from selection-sync to operation-sync). P4.
+* **real-time transport.** The relay (em-server: fan-out + op-log + presence) is
+  P4.2, and the client is P4.3. The algebra converges without a coordinator,
+  which is exactly why it can be built and proved first, on a table.
+* **tombstone GC.** Deletions stay as marks; compacting them belongs to the
+  snapshot pass (P4.2), when it is knowable that every client is past the point.
 * **manual conflict resolution UI**: this module produces the record; deciding
   what to do about it belongs upstream, where a person is.
 
@@ -55,6 +60,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from . import crdt
 from .graph import Graph
 
 #: The key that makes a document a container.
@@ -443,6 +449,13 @@ class Conflict:
     #: the losing version, verbatim, so upstream can offer "keep A's version"
     #: without having to have kept the other file open
     loser_payload: Optional[Dict[str, Any]] = None
+    #: P4.1 · WHICH field this outcome is about. A node two people edited in
+    #: different places now yields one entry per contested field instead of one
+    #: verdict on the whole node — the difference between "your description was
+    #: overwritten" and "your node was overwritten".
+    field: Optional[str] = None
+    #: the value that lost, for that field
+    loser_value: Any = None
 
     def as_dict(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {
@@ -451,6 +464,9 @@ class Conflict:
             "winner": dict(self.winner),
             "loser": dict(self.loser),
         }
+        if self.field:
+            out["field"] = self.field
+            out["loser_value"] = self.loser_value
         if self.field_hint:
             out["field_hint"] = list(self.field_hint)
         if self.loser_payload is not None:
@@ -478,6 +494,12 @@ class MergeReport:
     shelf_added: int = 0
     shelf_merged: int = 0
     conflicts: List[Conflict] = field(default_factory=list)
+    #: P4.1 · presence outcomes: how many nodes/edges came out DELETED, and how
+    #: many a later edit brought back. A resurrection is deliberate and must be
+    #: visible — that is the whole reason tombstones exist.
+    removed_nodes: int = 0
+    resurrected_nodes: int = 0
+    removed_edges: int = 0
     warnings: List[str] = field(default_factory=list)
 
     def as_dict(self) -> Dict[str, Any]:
@@ -490,6 +512,9 @@ class MergeReport:
             "shelf_added": self.shelf_added,
             "shelf_merged": self.shelf_merged,
             "conflicts": [c.as_dict() for c in self.conflicts],
+            "removed_nodes": self.removed_nodes,
+            "resurrected_nodes": self.resurrected_nodes,
+            "removed_edges": self.removed_edges,
             "warnings": list(self.warnings),
         }
 
@@ -603,22 +628,50 @@ def _pick_winner(mine: Any, theirs: Any) -> Tuple[str, str]:
     return ("mine", "tie") if dump_mine <= dump_theirs else ("theirs", "tie")
 
 
+def _write_payload(target: Graph, node_id: str, payload: Dict[str, Any],
+                   report: MergeReport) -> None:
+    """Put a merged payload back into the graph as a node.
+
+    Re-instantiated from the payload with the em.json importer's own constructor
+    dispatch, rather than assigning field by field: the payload IS the em.json
+    shape, so rebuilding from it guarantees the object and the file agree. A
+    class that refuses the payload keeps the old object and says so — losing a
+    node because a constructor was fussy would be worse than a stale field.
+    """
+    from .importer.emjson_importer import _instantiate
+
+    warnings: List[str] = []
+    node = _instantiate(payload.get("node_type"), payload, warnings)
+    report.warnings.extend(warnings)
+    if node is None:
+        report.warnings.append(
+            f"node '{node_id}': merged payload could not be rebuilt; kept the "
+            f"previous version")
+        return
+    target.add_node(node, overwrite=True)
+
+
 def _merge_graph_into(target: Graph, incoming: Graph, report: MergeReport) -> None:
-    """Fold `incoming` into `target`, keyed by UUID, resolving by DATE.
+    """Fold `incoming` into `target`, keyed by UUID — a CRDT merge (P4.1).
 
-    A node id IS the identity — that is what the UUID ids were for (offline
-    merges were the stated reason in ADR-002). So a node already present is the
-    same node; a node absent is added.
+    A node id IS the identity (that is what the UUID ids were for; ADR-002 §6
+    says offline merges were the reason). So a node already present is the same
+    node, and the two versions are merged by the algebra in
+    :mod:`s3dgraphy.crdt`: **OR-Set** for presence (tombstones included) and
+    **LWW-per-field** for content, with the editorial stamps as clocks.
 
-    P3 · when the same node exists on both sides with DIFFERENT content, the
-    editorial stamps decide (`_pick_winner`) and the loser is recorded in
-    `report.conflicts`. The winner keeps ITS OWN stamps — it is never re-stamped
-    with the session running the merge, which is the same rule the audit applies
-    to `applyRemoteOp`: somebody else's edit stays somebody else's edit.
+    What P3 could not do and this does: two people who edited DIFFERENT fields of
+    the same node now keep **both** edits. Only a field they both wrote is a
+    decision, and then it is reported per field — which is why
+    `report.conflicts` is now a list of field outcomes rather than of whole
+    nodes.
 
-    Edges are added when their (source, type, target) triple is not already
-    there, which is the only definition of "the same edge" that survives two
-    people minting edge ids independently.
+    The winner keeps ITS OWN stamps: never re-stamped with the session running
+    the merge (AUDIT1's rule for work that arrives from elsewhere).
+
+    Edges are identified by their (source, type, target) triple — the only
+    definition of "the same edge" that survives two people minting ids
+    independently — and carry their own tombstones.
     """
     existing_nodes = {n.node_id for n in target.nodes}
     for node in list(incoming.nodes):
@@ -627,44 +680,41 @@ def _merge_graph_into(target: Graph, incoming: Graph, report: MergeReport) -> No
             mine = target.find_node_by_id(node.node_id)
             snap_mine = _node_snapshot(mine) if mine is not None else {}
             snap_theirs = _node_snapshot(node)
-            if _content_of(snap_mine) == _content_of(snap_theirs):
-                # the same node, said the same way. Keep the more recent stamps
-                # so the project records the latest hand, and report nothing:
-                # no work is at stake, and a conflict list that cries wolf is a
-                # conflict list nobody reads.
-                side, _ = _pick_winner(mine, node)
-                if side == "theirs":
-                    target.add_node(node, overwrite=True)
-                continue
-            side, reason = _pick_winner(mine, node)
-            winner, loser = (mine, node) if side == "mine" else (node, mine)
-            if side == "theirs":
-                target.add_node(node, overwrite=True)
-            w_at, w_by, w_which = _stamp_of(winner)
-            l_at, l_by, l_which = _stamp_of(loser)
-            report.conflicts.append(Conflict(
-                node_id=node.node_id,
-                reason=reason,
-                winner={"by": w_by, "at": w_at, "stamp": w_which,
-                        "side": "mine" if side == "mine" else "theirs"},
-                loser={"by": l_by, "at": l_at, "stamp": l_which,
-                       "side": "theirs" if side == "mine" else "mine"},
-                field_hint=_diverging_fields(_content_of(snap_mine),
-                                             _content_of(snap_theirs)),
-                loser_payload=(snap_theirs if side == "mine" else snap_mine),
-            ))
+            outcome = crdt.merge_payloads(snap_mine, snap_theirs)
+            if crdt.canonical(outcome.payload) != crdt.canonical(snap_mine):
+                _write_payload(target, node.node_id, outcome.payload, report)
+            for field_outcome in outcome.fields:
+                report.conflicts.append(Conflict(
+                    node_id=field_outcome.node_id,
+                    reason=field_outcome.reason,
+                    winner=dict(field_outcome.winner),
+                    loser=dict(field_outcome.loser),
+                    field_hint=[field_outcome.field],
+                    loser_payload=(snap_theirs
+                                   if field_outcome.winner.get("side") == "mine"
+                                   else snap_mine),
+                    field=field_outcome.field,
+                    loser_value=field_outcome.loser_value,
+                ))
+            if outcome.removed:
+                report.removed_nodes += 1
+            if outcome.resurrected:
+                report.resurrected_nodes += 1
         else:
             target.add_node(node)
             existing_nodes.add(node.node_id)
             report.added_nodes += 1
 
     existing_edges = {
-        (e.edge_source, e.edge_type, e.edge_target) for e in target.edges
+        (e.edge_source, e.edge_type, e.edge_target): e for e in target.edges
     }
     existing_edge_ids = {getattr(e, "edge_id", None) for e in target.edges}
     for edge in list(incoming.edges):
         key = (edge.edge_source, edge.edge_type, edge.edge_target)
         if key in existing_edges:
+            # P4.1 · the same relation on both sides: the tombstones decide, so a
+            # deletion is not undone by the mere presence of the edge elsewhere
+            _merge_edge_tombstones(existing_edges[key], edge, report)
             continue
         edge_id = getattr(edge, "edge_id", None)
         # two independent authors can mint the same edge id for different edges;
@@ -676,9 +726,33 @@ def _merge_graph_into(target: Graph, incoming: Graph, report: MergeReport) -> No
         except ValueError as exc:
             report.warnings.append(f"edge {key} not merged: {exc}")
             continue
-        existing_edges.add(key)
+        new_edge = next((e for e in target.edges
+                         if getattr(e, "edge_id", None) == edge_id), None)
+        if new_edge is not None:
+            incoming_attrs = getattr(edge, "attributes", None)
+            if isinstance(incoming_attrs, dict) and incoming_attrs:
+                attrs = getattr(new_edge, "attributes", None)
+                if isinstance(attrs, dict):
+                    attrs.update(incoming_attrs)
+        existing_edges[key] = new_edge if new_edge is not None else edge
         existing_edge_ids.add(edge_id)
         report.added_edges += 1
+
+
+def _merge_edge_tombstones(mine: Any, theirs: Any, report: MergeReport) -> None:
+    """Resolve the presence of ONE relation both sides know about."""
+    mine_attrs = getattr(mine, "attributes", None)
+    if not isinstance(mine_attrs, dict):
+        return
+    theirs_attrs = getattr(theirs, "attributes", None) or {}
+    a = crdt.Clock.from_dict(mine_attrs.get(crdt.REMOVED_KEY))
+    b = crdt.Clock.from_dict(theirs_attrs.get(crdt.REMOVED_KEY)
+                             if isinstance(theirs_attrs, dict) else None)
+    if not a.stamped and not b.stamped:
+        return
+    mark = crdt.newer(a, b)
+    mine_attrs[crdt.REMOVED_KEY] = mark.as_dict()
+    report.removed_edges += 1
 
 
 def merge_into_container(container: Container, other: Container) -> MergeReport:

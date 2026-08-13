@@ -856,6 +856,14 @@ class RDFImporter:
             value = self._one_object_text(store, ref, pred)
             if value:
                 out[key] = normalize_orcid(value) or value
+        # P4.1 · the tombstone comes back as a tombstone
+        removed_at = self._one_literal(store, ref, EM.removedAt)
+        if removed_at:
+            mark = {"ts": normalize_instant(removed_at)}
+            removed_by = self._one_object_text(store, ref, EM.removedBy)
+            if removed_by:
+                mark["by"] = normalize_orcid(removed_by) or removed_by
+            out["removed"] = mark
         for key, pred in (("created_at", PROV.generatedAtTime),
                           ("modified_at", EM.modifiedAt)):
             value = self._one_literal(store, ref, pred)

@@ -140,7 +140,8 @@ def test_p3a_exact_tie_is_broken_stably_and_declared():
     theirs = _project("scavo", _unit("US1", description="B", by=BRUNO,
                                      at="2026-08-13T10:00:00Z"))
     report = merge_into_container(mine, theirs)
-    assert [c.reason for c in report.conflicts] == ["tie"]
+    # P4.1 · il nome del motivo dice ANCHE che cosa ha deciso: `tie-author`
+    assert [c.reason for c in report.conflicts] == ["tie-author"]
     # il tie-break è arbitrario ma DICHIARATO e stabile (iD minore): quello che
     # non deve essere è casuale o dipendente dall'ordine
     assert mine.graphs["scavo"].find_node_by_id("US1").description == "B"
@@ -156,15 +157,20 @@ def test_p3b_the_conflict_names_who_overwrote_whom_and_where():
                                      description="muro di fondazione",
                                      by=BRUNO, at="2026-08-13T11:30:00Z"))
     report = merge_into_container(mine, theirs)
+    # P4.1 · UN esito PER CAMPO, non un verdetto sul nodo intero: qui i campi
+    # contesi sono due (name e description), quindi due voci.
+    assert {c.field for c in report.conflicts} == {"name", "description"}
     c = report.conflicts[0].as_dict()
     assert c["node_id"] == "US1"
     assert c["winner"] == {"by": BRUNO, "at": "2026-08-13T11:30:00Z",
                            "stamp": "modified_at", "side": "theirs"}
     assert c["loser"]["by"] == ANNA and c["loser"]["at"] == "2026-08-13T10:00:00Z"
-    # dove guardare, non un diff
-    assert set(c["field_hint"]) == {"name", "description"}
-    # e la versione perdente viaggia col conflitto, così "tieni quella di Anna"
-    # non richiede di avere ancora aperto l'altro file
+    # dove guardare: il campo, non un diff
+    assert c["field_hint"] == [c["field"]]
+    # il VALORE perdente viaggia col conflitto (e la versione intera pure), così
+    # "tieni quella di Anna" non richiede di avere ancora aperto l'altro file
+    desc = next(x for x in report.conflicts if x.field == "description")
+    assert desc.loser_value == "muro"
     assert c["loser_payload"]["description"] == "muro"
 
 

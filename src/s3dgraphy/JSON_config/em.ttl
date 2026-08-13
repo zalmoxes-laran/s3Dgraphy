@@ -121,6 +121,19 @@ em:modifiedAt
     rdfs:range xsd:dateTime ;
     rdfs:comment "When a node was last modified (ISO-8601, UTC). Stored in Python as node.data['modified_at']. The creation instant projects as prov:generatedAtTime, which is standard PROV; PROV has no lightweight counterpart for 'last modified' without reifying an activity, so this is stated with dcterms:modified alongside it — em:modifiedAt exists so the pair reads as one vocabulary and so the round-trip has a single predicate to look for. OPEN (confirm_with: Felicetti): if the family settles on dcterms:modified alone, this becomes redundant and should be retired rather than kept as a synonym."@en .
 
+em:removedAt
+    a owl:DatatypeProperty ;
+    rdfs:label "removed at"@en ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment "When a node was DELETED (ISO-8601, UTC). A deletion in EM is a TOMBSTONE, not an absence: the node keeps its id and carries this mark, because 'deleted' and 'not yet known to you' are different states and a collaboration that cannot tell them apart resurrects the dead. Views hide a tombstoned node; the merge sees it, and an edit later than the deletion revives it deliberately (P4.1, OR-Set semantics). Stored in Python as node.data['removed']['ts']. Emitted only when the node carries a tombstone. OPEN (confirm_with: Felicetti): a CIDOC-native form would reify the deletion as an E13/D-series event with its own actor and time; a pair of properties is the defensible minimum for a mark that is taken automatically and carries no other fact."@en .
+
+em:removedBy
+    a owl:ObjectProperty ;
+    rdfs:label "removed by"@en ;
+    rdfs:subPropertyOf prov:wasAttributedTo ;
+    rdfs:range prov:Agent ;
+    rdfs:comment "Who deleted a node — the ORCID iD as an IRI. Companion of em:removedAt; see there for why a deletion is a mark rather than an absence. Stored in Python as node.data['removed']['by']."@en .
+
 em:modelIdentifier
     a owl:DatatypeProperty ;
     rdfs:label "model identifier"@en ;
