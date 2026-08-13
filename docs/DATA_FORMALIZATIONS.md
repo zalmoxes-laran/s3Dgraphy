@@ -237,6 +237,121 @@ graph.nodes  # Contains only StratigraphicNode, PropertyNode, etc.
 
 ---
 
+## The proxy as the qualia `geometry`
+
+*Datamodel versions: nodes **1.6.3** · connections **1.6.10** · qualia **1.6.1**.*
+
+### Why
+
+A *proxy* is the geometry-without-material of a unit: the shape US101 has,
+without asserting what it is made of. It used to be a `SemanticShapeNode`
+hanging off the unit on its own — and **a lone node cannot say where it came
+from**. "The proxy of US101" could not be traced to a measurement, a photograph
+or a reprojection, because it had no paradata chain to be traced through.
+
+Making it a property fixes exactly that, and buys one more thing: **one proxy can
+be synthesised from several sources** — a photogrammetric mesh *and* a 1931
+photograph — instead of one node per source with nothing to join them.
+
+### How
+
+```
+US ──has_property──▶ PropertyNode(property_type="geometry")
+                          │  has_semantic_shape
+                          ▼
+                     SemanticShapeNode   (convex hulls / spheres, or a .glb in url)
+
+provenance, the ordinary chain:
+    Extractor(s) ──combines──◀── Combiner ──◀── has_data_provenance ── the property
+```
+
+Nothing here is special-cased for geometry: the provenance uses the same
+`extracted_from` / `combines` / `has_data_provenance` edges every other property
+uses. A geometry property that needed its own provenance mechanism would be a
+second paradata model to keep in step.
+
+Two details worth knowing:
+
+- the property's `value` is a **reference** to the shape, not the numbers.
+  Copying them would be a second copy of the geometry, free to drift from the
+  first;
+- with **one** source no `CombinerNode` is created. An inference node between a
+  single extractor and a property would assert a reasoning step nobody performed.
+
+```python
+from s3dgraphy import api
+
+api.create_geometry_proxy(
+    graph, "US101",
+    {"convexshapes": [[0, 0, 0, 1, 0, 0, 1, 1, 0]]},
+    extractor_sources=["D1", "D2"],      # mesh + historical photograph
+)
+```
+
+`SemanticShapeNode` itself is unchanged — same fields, same CIDOC mapping. What
+changed is **who points at it**; its `type='proxy'` option now names the *role of
+the carrier*, not a standalone node kind.
+
+### The invariant: annotating **is** extracting
+
+The act of annotating is always an extraction — something is pulled out of a
+source — and the region always lives on a document. That is the invariant. What
+**varies** is *what* is being extracted, which is why the annotator must ask
+before it records:
+
+| You annotate to… | Chain | Extractor? |
+|---|---|---|
+| state the identity/extent of a unit | region → extractor → property → US | yes |
+| measure (a scale on the image) | region → extractor → dimensional property | yes (a metric quale) |
+| record two readings of one region | 1 region, 2 extractors, 2 properties | yes (1:N) |
+| register 2D↔3D (an RMDoc pose) | region → extractor → correspondence → RMDoc | yes (target = the RMDoc) |
+| photogrammetry (Aïoli) | region → 3D reprojection → SemanticShape | yes (photogrammetric provenance) |
+| "look here" — a bare bookmark | — | **no**: it is a *note*, outside the paradata |
+
+Consequences that the datamodel already carries:
+
+- a region is a node of its own, **deduplicated by geometry** — the same
+  rectangle traced twice is ONE region, referenced by `has_visual_reference` from
+  *every* property that reads it. Two authors can point at the same brick and
+  disagree;
+- `create_annotation_paradata` does *get-or-create* on the region and adds **one
+  extractor + one property per call**, rather than welding them to a single one;
+- an `ExtractorNode` may cite an `AnnotationRegionNode` through `extracted_from`
+  (CRMinf `J7_is_based_on_evidence_from` takes *evidence*, and a traced region is
+  evidence — a more precise citation than the whole picture). This is a widened
+  target rather than a new edge type: the relation "this extraction is based on
+  that" already exists and already has a name.
+
+### Promotion: a resource is not a source
+
+`extracted_from` cites a **source** — a `DocumentNode`. The resource layer's file
+node is not one: a source is something somebody authored and can be cited, a
+resource is bytes on a disk. So annotating a `ResourceNode` **promotes** it
+rather than converting it: a `DocumentNode` is minted beside it and linked with
+`has_linked_resource` (P67).
+
+```
+Extractor        ──extracted_from──▶ Document ──has_linked_resource──▶ Resource
+AnnotationRegion ──is_on_resource───────────────────────────────────▶ Resource
+```
+
+The extraction cites the document; the region lives on the pixels. The document's
+id is a `uuid5` of the resource id, so annotating the same image twice reuses it.
+
+### Open with CIDOC (declared, not settled)
+
+The `geometry` qualia maps to **`crmgeo:SP5_Geometric_Place_Expression`** as a
+*defensible default, not a final answer* — the vocabulary entry carries
+`confirm_with: "Felicetti"`. The alternative under discussion is
+`E36_Visual_Item`, which is the same choice open for `em:AnnotationRegion`; the
+two should be decided together. Whichever wins changes the **projection of one
+field**, not the modelling of the proxy as a property.
+
+Also open, and untouched here: how the proxy-as-property and the spatialisation
+chain attach to the **HDT-O** (Theodoridou).
+
+---
+
 ## Summary
 
 | Aspect | Excel | s3dgraphy | Extended Matrix GraphML |

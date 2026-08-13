@@ -139,7 +139,13 @@ Node type reference
      - Heritage Digital Twin (HDT-O ``HC2``) aggregation node.
    * - ``SemanticShapeNode``
      - ``semantic_shape``
-     - 3D proxy geometry (convex shapes / spheres).
+     - 3D geometry (convex hulls / spheres, or a ``.glb`` in ``url``). Since
+       1.6.3 it is the **payload** of a ``geometry`` property, not a standalone
+       proxy — see :ref:`proxy-as-property` below.
+   * - ``AnnotationRegionNode``
+     - ``annotation_region``
+     - A region of ONE image, in normalised [0,1] coordinates: the geometry of a
+       2D annotation.
    * - ``RepresentationModelNode``
      - ``representation_model``
      - 3D model / spatialised image for stratigraphic units.
@@ -273,6 +279,90 @@ Graph & Heritage Digital Twin nodes
    :show-inheritance:
 
 .. automodule:: s3dgraphy.nodes.hdt_node
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. _proxy-as-property:
+
+Geometry: the proxy is a property, the shape is its payload
+-----------------------------------------------------------
+
+**Datamodel versions: nodes 1.6.3 · connections 1.6.10 · qualia 1.6.1.**
+
+A *proxy* is the geometry-without-material of a unit: the shape US101 has,
+without asserting what it is made of. Until 1.6.3 it was a
+``SemanticShapeNode`` hanging off the unit on its own — and a lone node cannot
+say where it came from. "The proxy of US101" could not be traced to a
+measurement, a photograph or a reprojection, because it had no paradata chain to
+be traced through.
+
+The proxy is now a ``PropertyNode`` whose ``property_type`` is ``geometry``, and
+the SemanticShape is what that property points at::
+
+    US ──has_property──▶ Property(geometry) ──has_semantic_shape──▶ SemanticShape
+                              ▲                                    (hulls | spheres | .glb)
+                              │ has_data_provenance
+                        Extractor(s) ──combines──◀── Combiner
+
+Two things follow, and both are the point: the proxy inherits the chain every
+other quale has, so it can say *how* it is known; and ONE proxy can be
+synthesised from SEVERAL sources — a photogrammetric mesh and a 1931 photograph —
+instead of one node per source with nothing to join them.
+
+``SemanticShapeNode`` itself did not change: same fields, same CIDOC mapping.
+What changed is **who points at it**. Its ``type='proxy'`` option now names the
+ROLE OF THE CARRIER ("this shape is the geometry of something"), not a standalone
+proxy node.
+
+.. warning::
+
+   This is a **breaking change** for readers that expect a lone
+   ``SemanticShapeNode`` attached to the unit (EM-blender-tools, Heriverse). See
+   ``docs/deprecations.md`` for the migration.
+
+Building one::
+
+    from s3dgraphy import api
+
+    api.create_geometry_proxy(
+        graph, "US101",
+        {"convexshapes": [[0, 0, 0, 1, 0, 0, 1, 1, 0]]},   # or {"url": "US101.glb"}
+        extractor_sources=["D1", region_id],               # a document, a 2D region
+    )
+
+With one source the call creates one extractor and no combiner — an inference
+node between a single extractor and a property would assert a reasoning step
+nobody performed. With several, a ``CombinerNode`` joins them and the property
+hangs off it, because the property is the *conclusion* of the chain.
+
+2D annotation
+-------------
+
+``AnnotationRegionNode`` is a region of ONE image — or of one page of a
+multi-page resource — in NORMALISED [0,1] coordinates. It is an
+``E36_Visual_Item`` (a region of a visual item is a visual item), attached to its
+image with ``is_on_resource`` (P106i) and cited by a property with
+``has_visual_reference`` (P138i).
+
+It is **interpretation, not raw evidence**: tracing "this and not that" is
+already interpreting, so a region never appears bare — it is created inside a
+chain, by ``api.create_annotation_paradata``.
+
+Do NOT confuse it with ``SemanticShapeNode``: that one is 3D geometry of the
+SCENE (``crmgeo:SP5``, expressing *where* a thing is), while a region makes no
+claim about where anything is — it says *which part of which picture* was looked
+at. They are separate classes because they answer different questions in
+different coordinate systems; one field set with a kind flag would force every
+reader to work out which meaning it was holding before it could use the numbers.
+
+Coordinates are normalised because a pixel region is only readable next to the
+resolution it was drawn at, and the same photograph is routinely re-exported at
+another size; normalised coordinates are a statement about the picture rather
+than about a file, and they express directly as a W3C Media Fragment (the
+selector the RDF projection emits, ``em:hasSelector``).
+
+.. automodule:: s3dgraphy.nodes.annotation_region_node
    :members:
    :undoc-members:
    :show-inheritance:

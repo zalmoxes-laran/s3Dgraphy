@@ -12,6 +12,67 @@ for migration audits:
 PYTHONWARNINGS=default::DeprecationWarning python your_script.py
 ```
 
+## Superseded modelling (1.6.3): the proxy is no longer a standalone node
+
+*Datamodel versions: nodes **1.6.3** · connections **1.6.10** · qualia **1.6.1**.*
+
+| What | Until 1.6.2 | From 1.6.3 |
+| ---- | ----------- | ---------- |
+| the proxy of a unit | a `SemanticShapeNode` attached to the unit | a `PropertyNode(property_type="geometry")` that POINTS AT a `SemanticShapeNode` through `has_semantic_shape` |
+
+This is a **breaking change for readers**, not for writers: nothing was removed
+from `SemanticShapeNode` — same class, same fields, same CIDOC mapping — but a
+consumer that looks for a lone shape hanging off the unit will no longer find
+one, because the shape now hangs off the property.
+
+**Why it changed.** A lone node cannot say where it came from. As a property the
+proxy inherits the paradata chain (extractor → combiner → property), which is
+also what lets ONE proxy be synthesised from several sources — a photogrammetric
+mesh and a historical photograph — instead of one node per source with nothing to
+join them. See *The proxy as the qualia `geometry`* in
+`docs/DATA_FORMALIZATIONS.md`.
+
+**Who is affected.**
+
+- **EM-blender-tools** — the proxy is at home there (`proxy_to_rm_projection`,
+  proxy-finding, export). Import/export must read and write the `geometry`
+  property with its SemanticShape/`.glb` payload instead of the bare node.
+- **Heriverse** — the parser that pulls the proxy out of the JSON must follow the
+  property. Same family as the `ResourceNode` / graph-scope changes already
+  communicated.
+- Anything else that walks `has_semantic_shape` **from a unit**: the edge now
+  starts at the property. (`has_semantic_shape` still accepts any `Node` as its
+  source, so old graphs remain readable — they are simply proxies without a
+  chain.)
+
+**Reading it, both shapes:**
+
+```python
+# 1.6.3 — the proxy of a unit, through its property
+def proxy_shapes(graph, unit_id):
+    for e in graph.edges:
+        if e.edge_type != "has_property" or e.edge_source != unit_id:
+            continue
+        prop = graph.find_node_by_id(e.edge_target)
+        if getattr(prop, "property_type", None) != "geometry":
+            continue
+        for e2 in graph.edges:
+            if e2.edge_type == "has_semantic_shape" and e2.edge_source == prop.node_id:
+                yield graph.find_node_by_id(e2.edge_target)
+```
+
+**Migration.** Legacy graphs (a `SemanticShapeNode` reached directly from a unit)
+keep working and keep their geometry; what they lack is the chain. A one-shot
+migration — *standalone shape → geometry property + payload*, in the family of
+the other one-shot migrations already run — is **not shipped yet**: until it is,
+a reader that wants to cover both cases should try the property first and fall
+back to the direct edge.
+
+**Not deprecated:** `SemanticShapeNode`, `has_semantic_shape`, and the
+`type='proxy'` option. The last one is re-read rather than retired: it now names
+the *role of the carrier* ("this shape is the geometry of something"), not a
+standalone proxy node.
+
 ## Deprecated importers (1.6 → removed in 2.0)
 
 | Symbol            | Deprecated in | Removed in | Replacement                                         |
