@@ -101,6 +101,26 @@ em:orcidVerified
     rdfs:range xsd:boolean ;
     rdfs:comment "True when the author's declared ORCID iD has been CONFIRMED through ORCID (via the identity broker), as opposed to merely declared by whoever typed it. The ORCID iD is the identity; this says whether that identity has been checked. Emitted ONLY when true: 'not verified' is the absence of a check, not an assertion of falsity, and an empty graph already says it — writing `false` would turn 'nobody has looked yet' into a claim that travels. Claim now, verify later: an author may work, author nodes and prepare data with a declared iD; what verification gates is PUBLISHING AS that person. Stored in Python as AuthorNode.data['verified']. OPEN (confirm_with: Felicetti): a CIDOC-native form would reify the check as an E13 Attribute Assignment (who verified, when, against which authority) — the right shape once the flow records those facts, which it does not yet; reifying an event with no actor and no date would be inventing provenance."@en .
 
+em:createdBy
+    a owl:ObjectProperty ;
+    rdfs:label "created by (editorial)"@en ;
+    rdfs:subPropertyOf prov:wasAttributedTo ;
+    rdfs:range prov:Agent ;
+    rdfs:comment "The EDITORIAL author of a node: who typed it into the file, taken automatically from the session identity and the clock, the way git records an author. DISTINCT from em:has_author / AuthorNode, which is INTERPRETIVE responsibility — who stands behind the reading — and distinct again from historical time (epochs). A node created by a student and interpreted by a director carries both, and they answer different questions. The object is the ORCID iD as an IRI (https://orcid.org/…); stored in Python as node.data['created_by'] in the bare canonical form. Emitted only when recorded: a node with no editorial author is a node nobody signed, which is not the same as a node authored by 'unknown'. Declared as a subproperty of prov:wasAttributedTo so a PROV-aware reader sees the attribution without knowing em: — and the exporter ALSO writes the plain prov:wasAttributedTo triple, for readers that do no inference."@en .
+
+em:lastEditedBy
+    a owl:ObjectProperty ;
+    rdfs:label "last edited by (editorial)"@en ;
+    rdfs:subPropertyOf prov:wasAttributedTo ;
+    rdfs:range prov:Agent ;
+    rdfs:comment "The last hand on a node — who modified it most recently. Stored in Python as node.data['modified_by'] (bare ORCID iD), emitted as an ORCID IRI. LAST-HAND, NOT A HISTORY: this overwrites, and the full sequence of edits is a different object (an event stream) that EM does not record today. A separate predicate from em:createdBy so the round-trip can tell the two apart — prov:wasAttributedTo alone could not, and both are attributions. OPEN (confirm_with: Felicetti): the CIDOC-native form of an edit is an E13 Attribute Assignment (or a crmdig:D7 modification event) with its own actor and time; a pair of properties is the defensible minimum for a stamp that is taken automatically and carries no other fact about the event."@en .
+
+em:modifiedAt
+    a owl:DatatypeProperty ;
+    rdfs:label "modified at (editorial)"@en ;
+    rdfs:range xsd:dateTime ;
+    rdfs:comment "When a node was last modified (ISO-8601, UTC). Stored in Python as node.data['modified_at']. The creation instant projects as prov:generatedAtTime, which is standard PROV; PROV has no lightweight counterpart for 'last modified' without reifying an activity, so this is stated with dcterms:modified alongside it — em:modifiedAt exists so the pair reads as one vocabulary and so the round-trip has a single predicate to look for. OPEN (confirm_with: Felicetti): if the family settles on dcterms:modified alone, this becomes redundant and should be retired rather than kept as a synonym."@en .
+
 em:modelIdentifier
     a owl:DatatypeProperty ;
     rdfs:label "model identifier"@en ;
