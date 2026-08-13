@@ -22,15 +22,26 @@ somebody else works on theirs, and afterwards one container takes in the other's
 graphs — nodes shared between them merge **by UUID**, which s3Dgraphy has always
 been able to do (`add_node(overwrite=True)`). No server, no session, no lock.
 
+**P3 (2026-08-13) — the merge is now DATED and the conflicts are VISIBLE.**
+Two divergent edits of the same node no longer resolve as "whoever arrived
+last": the editorial stamps decide (`modified_at`, falling back to
+`created_at`), the more recent version wins, and every contested node is
+recorded in `MergeReport.conflicts` saying *who overwrote whom, and when*.
+Deciding by date rather than by arrival makes the result **independent of the
+order you merge in** — A into B and B into A land on the same project, which is
+the least a collaboration tool owes you.
+
 What this module deliberately does NOT do:
 
-* **conflict resolution.** Merging is ADDITIVE: a graph that is not there is
-  added, and a node that is there already is overwritten by the incoming one.
-  Two divergent edits of the same node are a real problem with a real answer
-  (three-way merge, or a CRDT), and pretending to solve it with "last writer
-  wins" would silently destroy somebody's work. Phase 2, declared.
+* **field-level fusion.** The unit of resolution is the NODE: if you changed a
+  description and somebody else changed a date, the newer node wins whole and
+  the other edit is in the conflict list, not merged in. Keeping both needs a
+  common ancestor (three-way) or a version vector, which is P4 — and guessing
+  at it here would produce nodes neither of you wrote.
 * **real-time co-editing** of the same graph — that is the em-server hub
-  (ADR-002 grows from selection-sync to operation-sync). Phase 4.
+  (ADR-002 grows from selection-sync to operation-sync). P4.
+* **manual conflict resolution UI**: this module produces the record; deciding
+  what to do about it belongs upstream, where a person is.
 
 Reading accepts BOTH shapes, always: the legacy single-graph document (which is
 every file written before today) opens as a container-of-one, and nothing on
@@ -236,6 +247,55 @@ def container_of(graph: Graph, *, shelf: Optional[Graph] = None) -> Container:
 
 # ── integrate later ─────────────────────────────────────────────────────────
 
+# ── P3 · the dated merge and its record ──────────────────────────────────────
+
+#: Which reason decided a contested node.
+#:
+#: ``newer``      — the stamps differ and the more recent version won.
+#: ``tie``        — the two stamps are the same instant; a stable tie-break
+#:                  decided (see `_pick_winner`), and the flag says so.
+#: ``unstamped``  — at least one side carries no editorial stamp, so the DATE
+#:                  DID NOT DECIDE. The incoming version is kept (the previous
+#:                  behaviour), and this reason exists so nobody reads that as a
+#:                  judgement: an absent stamp is unknown, not older.
+CONFLICT_REASONS = ("newer", "tie", "unstamped")
+
+
+@dataclass
+class Conflict:
+    """One node two people edited — with who won, who lost, and why.
+
+    The whole point of P3. `merged_nodes` could already tell you *how many*
+    nodes were touched twice; this says WHICH, and names the two hands, so the
+    sentence a person reads is "B (11:30) overwrote A (10:00) on node X" instead
+    of "3 nodes merged".
+    """
+
+    node_id: str
+    reason: str
+    winner: Dict[str, Any] = field(default_factory=dict)   # {"by":…, "at":…, "side":…}
+    loser: Dict[str, Any] = field(default_factory=dict)
+    #: which fields actually diverged (`name`, `description`, `data.value`, …) —
+    #: not a diff, a pointer to where to look
+    field_hint: List[str] = field(default_factory=list)
+    #: the losing version, verbatim, so upstream can offer "keep A's version"
+    #: without having to have kept the other file open
+    loser_payload: Optional[Dict[str, Any]] = None
+
+    def as_dict(self) -> Dict[str, Any]:
+        out: Dict[str, Any] = {
+            "node_id": self.node_id,
+            "reason": self.reason,
+            "winner": dict(self.winner),
+            "loser": dict(self.loser),
+        }
+        if self.field_hint:
+            out["field_hint"] = list(self.field_hint)
+        if self.loser_payload is not None:
+            out["loser_payload"] = self.loser_payload
+        return out
+
+
 @dataclass
 class MergeReport:
     """What a merge did, in the terms somebody would want to check.
@@ -243,6 +303,9 @@ class MergeReport:
     Not a boolean: after taking in a colleague's file you want to know which
     graphs arrived, which were already yours, and how many nodes were the SAME
     node seen twice. A merge that only says "ok" is a merge you cannot audit.
+
+    P3 · `merged_nodes` stays the COUNT of same-UUID encounters; `conflicts` is
+    the list of the ones where the two versions actually diverged.
     """
 
     added_graphs: List[str] = field(default_factory=list)
@@ -252,6 +315,7 @@ class MergeReport:
     added_edges: int = 0
     shelf_added: int = 0
     shelf_merged: int = 0
+    conflicts: List[Conflict] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
 
     def as_dict(self) -> Dict[str, Any]:
@@ -263,16 +327,133 @@ class MergeReport:
             "added_edges": self.added_edges,
             "shelf_added": self.shelf_added,
             "shelf_merged": self.shelf_merged,
+            "conflicts": [c.as_dict() for c in self.conflicts],
             "warnings": list(self.warnings),
         }
 
 
+def _node_snapshot(node: Any) -> Dict[str, Any]:
+    """The node as the em.json exporter writes it — one serializer, not two."""
+    from .exporter.emjson_exporter import _node_payload
+    return _node_payload(node)
+
+
+def _content_of(snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    """The snapshot WITHOUT the editorial stamps.
+
+    Two versions that differ only in when they were saved are not a conflict:
+    nobody's work is at stake, and reporting one would train people to ignore
+    the list. So divergence is judged on content, and the stamps are only how
+    the winner is chosen.
+    """
+    from .editorial import FIELDS as EDITORIAL_FIELDS
+
+    out = {k: v for k, v in snapshot.items() if k != "data"}
+    data = snapshot.get("data")
+    if isinstance(data, dict):
+        stripped = {k: v for k, v in data.items() if k not in EDITORIAL_FIELDS}
+        if stripped:
+            out["data"] = stripped
+    return out
+
+
+def _diverging_fields(a: Dict[str, Any], b: Dict[str, Any]) -> List[str]:
+    """Where the two versions differ, named for a human ("data.value")."""
+    hints: List[str] = []
+    for key in sorted(set(a) | set(b)):
+        if key == "data":
+            continue
+        if a.get(key) != b.get(key):
+            hints.append(key)
+    da = a.get("data") if isinstance(a.get("data"), dict) else {}
+    db = b.get("data") if isinstance(b.get("data"), dict) else {}
+    for key in sorted(set(da) | set(db)):
+        if da.get(key) != db.get(key):
+            hints.append(f"data.{key}")
+    return hints
+
+
+def _stamp_of(node: Any) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """``(instant, by, which)`` — the editorial stamp that dates a node.
+
+    `modified_at` when there is one, else `created_at`: the last hand is what a
+    merge is comparing, and a node nobody has edited since creation is dated by
+    its creation. `which` says which of the two answered, because a report that
+    compares a modification against a creation should be able to say so.
+    """
+    data = getattr(node, "data", None)
+    if not isinstance(data, dict):
+        return None, None, None
+    if data.get("modified_at"):
+        return str(data["modified_at"]), data.get("modified_by"), "modified_at"
+    if data.get("created_at"):
+        return str(data["created_at"]), data.get("created_by"), "created_at"
+    return None, None, None
+
+
+def _instant(text: Optional[str]):
+    """An ISO-8601 stamp as a comparable, timezone-aware datetime, or None.
+
+    Naive stamps are read as UTC rather than refused: they are the ordinary
+    output of a tool that did not think about zones, and treating them as
+    unstamped would throw away real ordering information.
+    """
+    if not text:
+        return None
+    from datetime import datetime, timezone
+    try:
+        parsed = datetime.fromisoformat(str(text).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _pick_winner(mine: Any, theirs: Any) -> Tuple[str, str]:
+    """Which version of a contested node survives, and why.
+
+    Returns ``(side, reason)`` where side is ``"mine"`` or ``"theirs"``.
+
+    By DATE, not by arrival — that is what makes the outcome the same whichever
+    file you open first. When the two instants are identical the date cannot
+    decide, so a stable tie-break does: the smaller editor iD wins, and failing
+    that the smaller serialisation. It is arbitrary, and it is *declared*
+    arbitrary by `reason="tie"` — what it must not be is random, or dependent on
+    merge order, because then two people merging the same two files would end up
+    with different projects and no way to tell.
+    """
+    mine_at, mine_by, _ = _stamp_of(mine)
+    theirs_at, theirs_by, _ = _stamp_of(theirs)
+    a, b = _instant(mine_at), _instant(theirs_at)
+    if a is None or b is None:
+        # the date did not decide: keep the historical behaviour (incoming wins)
+        # and say that it was not a judgement
+        return "theirs", "unstamped"
+    if a > b:
+        return "mine", "newer"
+    if b > a:
+        return "theirs", "newer"
+    key_mine = str(mine_by or "")
+    key_theirs = str(theirs_by or "")
+    if key_mine != key_theirs:
+        return ("mine", "tie") if key_mine < key_theirs else ("theirs", "tie")
+    dump_mine = json.dumps(_node_snapshot(mine), sort_keys=True, ensure_ascii=False)
+    dump_theirs = json.dumps(_node_snapshot(theirs), sort_keys=True, ensure_ascii=False)
+    return ("mine", "tie") if dump_mine <= dump_theirs else ("theirs", "tie")
+
+
 def _merge_graph_into(target: Graph, incoming: Graph, report: MergeReport) -> None:
-    """Fold `incoming` into `target`, keyed by UUID.
+    """Fold `incoming` into `target`, keyed by UUID, resolving by DATE.
 
     A node id IS the identity — that is what the UUID ids were for (offline
     merges were the stated reason in ADR-002). So a node already present is the
-    same node, and it is overwritten by the incoming one; a node absent is added.
+    same node; a node absent is added.
+
+    P3 · when the same node exists on both sides with DIFFERENT content, the
+    editorial stamps decide (`_pick_winner`) and the loser is recorded in
+    `report.conflicts`. The winner keeps ITS OWN stamps — it is never re-stamped
+    with the session running the merge, which is the same rule the audit applies
+    to `applyRemoteOp`: somebody else's edit stays somebody else's edit.
+
     Edges are added when their (source, type, target) triple is not already
     there, which is the only definition of "the same edge" that survives two
     people minting edge ids independently.
@@ -280,8 +461,36 @@ def _merge_graph_into(target: Graph, incoming: Graph, report: MergeReport) -> No
     existing_nodes = {n.node_id for n in target.nodes}
     for node in list(incoming.nodes):
         if node.node_id in existing_nodes:
-            target.add_node(node, overwrite=True)
             report.merged_nodes += 1
+            mine = target.find_node_by_id(node.node_id)
+            snap_mine = _node_snapshot(mine) if mine is not None else {}
+            snap_theirs = _node_snapshot(node)
+            if _content_of(snap_mine) == _content_of(snap_theirs):
+                # the same node, said the same way. Keep the more recent stamps
+                # so the project records the latest hand, and report nothing:
+                # no work is at stake, and a conflict list that cries wolf is a
+                # conflict list nobody reads.
+                side, _ = _pick_winner(mine, node)
+                if side == "theirs":
+                    target.add_node(node, overwrite=True)
+                continue
+            side, reason = _pick_winner(mine, node)
+            winner, loser = (mine, node) if side == "mine" else (node, mine)
+            if side == "theirs":
+                target.add_node(node, overwrite=True)
+            w_at, w_by, w_which = _stamp_of(winner)
+            l_at, l_by, l_which = _stamp_of(loser)
+            report.conflicts.append(Conflict(
+                node_id=node.node_id,
+                reason=reason,
+                winner={"by": w_by, "at": w_at, "stamp": w_which,
+                        "side": "mine" if side == "mine" else "theirs"},
+                loser={"by": l_by, "at": l_at, "stamp": l_which,
+                       "side": "theirs" if side == "mine" else "mine"},
+                field_hint=_diverging_fields(_content_of(snap_mine),
+                                             _content_of(snap_theirs)),
+                loser_payload=(snap_theirs if side == "mine" else snap_mine),
+            ))
         else:
             target.add_node(node)
             existing_nodes.add(node.node_id)
@@ -317,11 +526,12 @@ def merge_into_container(container: Container, other: Container) -> MergeReport:
     have is merged by UUID. The shelf merges into the project shelf the same way,
     so two people who collected the same photograph end up with one entry.
 
-    Declared limit: this is `add` + `merge-by-UUID`, NOT conflict resolution. If
-    both of you edited the same node, the incoming version wins and yours is
-    gone — which is why the report says how many nodes were merged: that number
-    is exactly the set of nodes where a conflict COULD have happened, and it is
-    the number a person should look at before trusting the result.
+    P3 · contested nodes are resolved by DATE (the more recent editorial stamp
+    wins) and every one of them is listed in `report.conflicts` with who
+    overwrote whom. Declared limit: the unit is the NODE, not the field — two
+    people who edited different parts of the same node do not get both edits,
+    they get the newer node and a conflict entry naming the other. Field-level
+    fusion needs a common ancestor and is P4.
     """
     report = MergeReport()
     for graph_id, incoming in other.graphs.items():
@@ -344,6 +554,10 @@ def merge_into_container(container: Container, other: Container) -> MergeReport:
             _merge_graph_into(container.shelf, other.shelf, shelf_report)
             report.shelf_added = len(list(container.shelf.nodes)) - before
             report.shelf_merged = shelf_report.merged_nodes
+            # a shelf entry two people described differently is contested like
+            # any other node — the list is one list, or half the conflicts are
+            # invisible for no reason a user could guess
+            report.conflicts.extend(shelf_report.conflicts)
             report.warnings.extend(shelf_report.warnings)
 
     if container.active_graph_id not in container.graphs:

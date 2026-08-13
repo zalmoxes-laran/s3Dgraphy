@@ -182,6 +182,36 @@ def merge_containers(container, other):
     return merge_into_container(container, other)
 
 
+# ── editorial stamps (last hand) ──────────────────────────────────────────────
+def stamp_created(node, *, by=None, at: Optional[str] = None) -> Dict[str, Any]:
+    """Record who made a node and when — the automatic, git-like stamp.
+
+    Idempotent: a node that already declares its creation keeps it. DISTINCT
+    from `has_author` (interpretive responsibility) and from epochs (historical
+    time). See :mod:`s3dgraphy.editorial`.
+    """
+    from .editorial import stamp_created as _stamp
+    return _stamp(node, by=by, at=at)
+
+
+def stamp_modified(node, *, by=None, at: Optional[str] = None) -> Dict[str, Any]:
+    """Record the LAST hand on a node. Overwrites; this is a stamp, not a log."""
+    from .editorial import stamp_modified as _stamp
+    return _stamp(node, by=by, at=at)
+
+
+def read_stamps(node) -> Dict[str, Any]:
+    """The editorial stamps a node carries — only the ones it actually says."""
+    from .editorial import read_stamps as _read
+    return _read(node)
+
+
+def clear_stamps(node) -> None:
+    """Drop the editorial stamps (anonymising a graph before publication)."""
+    from .editorial import clear_stamps as _clear
+    _clear(node)
+
+
 # ── 2D annotation → paradata chain ─────────────────────────────────────────────
 def create_annotation_paradata(graph: Graph, image_id: str,
                                region: Dict[str, Any], interpretation: str,

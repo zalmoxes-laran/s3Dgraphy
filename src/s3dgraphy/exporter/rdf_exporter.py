@@ -784,6 +784,10 @@ class RDFExporter:
         # ranked ref is emitted, with the strength-aware predicate.
         self._serialize_authority_refs(node, node_iri, ctx)
 
+        # AUDIT1 · the editorial stamps (who typed this, and when) — every node
+        # type, so it belongs here and not in the per-type branches.
+        self._serialize_editorial(node, node_iri, ctx)
+
         # Type-specific (node_type already computed above for primary IRI logic)
         self._serialize_type_specific(node, node_type, node_iri, ctx,
                                       graph_id=g.graph_id)
@@ -812,6 +816,53 @@ class RDFExporter:
                 ref.get("match"), DEFAULT_AUTHORITY_PREDICATE)
             ctx.add((node_iri, pred, URIRef(uri)))
             self.stats["authority_refs"] = self.stats.get("authority_refs", 0) + 1
+
+    def _serialize_editorial(self, node: Any, node_iri: URIRef, ctx) -> None:
+        """Emit the last-hand stamps (AUDIT1) as PROV-O.
+
+        ``created_by`` → ``em:createdBy`` AND the plain ``prov:wasAttributedTo``;
+        ``modified_by`` → ``em:lastEditedBy`` (a subproperty of the same);
+        ``created_at`` → ``prov:generatedAtTime``;
+        ``modified_at`` → ``em:modifiedAt`` and ``dcterms:modified``.
+
+        The pairs are deliberate. The em: predicates are what the round-trip
+        reads, because ``prov:wasAttributedTo`` alone cannot say WHICH hand it
+        was; the PROV/DC ones are what a reader who never heard of EM gets for
+        free. Nothing is emitted for a field the node does not carry: these
+        stamps are automatic, and an automatic "unknown" written into a store is
+        an invented record.
+
+        The agent is the ORCID iD as an IRI — an ORCID iD IS a URL, so there is
+        no minting to do. A ``*_by`` that is not a well-formed iD is written as a
+        literal instead of being dropped: it is still the only trace of who was
+        editing.
+        """
+        data = getattr(node, "data", {}) or {}
+        if not isinstance(data, dict):
+            return
+        from ..editorial import normalize_orcid
+
+        def agent(value: Any):
+            orcid = normalize_orcid(value)
+            return URIRef(f"https://orcid.org/{orcid}") if orcid else Literal(str(value))
+
+        created_by = data.get("created_by")
+        if created_by:
+            who = agent(created_by)
+            ctx.add((node_iri, EM.createdBy, who))
+            ctx.add((node_iri, PROV.wasAttributedTo, who))
+        modified_by = data.get("modified_by")
+        if modified_by:
+            ctx.add((node_iri, EM.lastEditedBy, agent(modified_by)))
+        created_at = data.get("created_at")
+        if created_at:
+            ctx.add((node_iri, PROV.generatedAtTime,
+                     Literal(str(created_at), datatype=XSD.dateTime)))
+        modified_at = data.get("modified_at")
+        if modified_at:
+            stamp = Literal(str(modified_at), datatype=XSD.dateTime)
+            ctx.add((node_iri, EM.modifiedAt, stamp))
+            ctx.add((node_iri, DCTERMS.modified, stamp))
 
     def _compute_primary_iri(self, node: Any, cls_name: str,
                              node_type: Optional[str]) -> Optional[URIRef]:

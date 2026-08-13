@@ -788,6 +788,10 @@ class RDFImporter:
 
         data = self._type_specific_data(store, ref, node_type, type_iris,
                                         qualia_type, node_id)
+        # AUDIT1 · the editorial stamps are read for EVERY node type, next to
+        # where they are written (`_serialize_editorial`) — one generic pass, not
+        # a line in each branch.
+        data.update(self._editorial_data(store, ref))
         if data:
             payload["data"] = data
 
@@ -833,6 +837,34 @@ class RDFImporter:
         node = _emjson_instantiate(node_type, payload, local_warnings)
         self.warnings.extend(local_warnings)
         return node
+
+    def _editorial_data(self, store: ConjunctiveGraph,
+                        ref: URIRef) -> Dict[str, Any]:
+        """The inverse of ``_serialize_editorial`` — the last-hand stamps.
+
+        Read from the em: predicates, not from ``prov:wasAttributedTo``: the
+        exporter writes both, and the PROV one cannot say whether the agent it
+        names is the creator or the last editor. An agent that came back as an
+        ORCID IRI is returned to its bare canonical form, which is what the
+        property graph stores.
+        """
+        from ..editorial import normalize_instant, normalize_orcid
+
+        out: Dict[str, Any] = {}
+        for key, pred in (("created_by", EM.createdBy),
+                          ("modified_by", EM.lastEditedBy)):
+            value = self._one_object_text(store, ref, pred)
+            if value:
+                out[key] = normalize_orcid(value) or value
+        for key, pred in (("created_at", PROV.generatedAtTime),
+                          ("modified_at", EM.modifiedAt)):
+            value = self._one_literal(store, ref, pred)
+            if value:
+                # rdflib rewrites `…Z` as `…+00:00` on the way through: the same
+                # instant, spelled differently. Canonicalised here so a graph
+                # does not come home with every stamp reworded.
+                out[key] = normalize_instant(value)
+        return out
 
     def _type_specific_data(self, store: ConjunctiveGraph, ref: URIRef,
                             node_type: Optional[str], type_iris: Sequence[str],
