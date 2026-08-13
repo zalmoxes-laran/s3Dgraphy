@@ -536,3 +536,109 @@ def test_d5_field_clocks_and_field_tombstones_have_the_same_digest():
     section2 = json.loads(FIXTURE_B.read_text(encoding="utf-8"))["section"]
     crdt.apply_ops_to_section(section2, list(reversed(payload["ops"])))
     assert _digest(section2) == digest, "e l'ordine inverso arriva allo stesso posto"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# P4.2 — la compattazione (GC): togliere ciò che tutti hanno superato
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# I tombstone e i clock sono la memoria che rende possibile la convergenza, e
+# sono anche l'unica parte che cresce. Il GC toglie quello che nessuno può più
+# contraddire — e la precondizione è tutto l'argomento di sicurezza: `before`
+# dev'essere un punto che ogni partecipante ha superato. Chi può saperlo è il
+# chiamante (il relay prende il minimo dei watermark dei client connessi).
+
+
+def _gc_section():
+    return {
+        "graph_id": "gc",
+        "nodes": [
+            # una cancellazione che nessuno può più contraddire
+            {"id": "morto", "node_type": "US", "name": "morto",
+             "data": {"created_at": T1, "removed": {"ts": T1, "by": ANNA}}},
+            # una cancellazione RECENTE: non si tocca
+            {"id": "appena-morto", "node_type": "US", "name": "appena morto",
+             "data": {"created_at": T1, "removed": {"ts": T3, "by": BRUNO}}},
+            # un nodo vivo con un clock vecchio e un tombstone di campo recente
+            {"id": "US1", "node_type": "US", "name": "US1", "description": "viva",
+             "data": {"created_at": T1, "field_clocks": {
+                 "description": {"ts": T1, "by": ANNA},
+                 "data.nota": {"ts": T3, "by": BRUNO, "removed": True}}}},
+        ],
+        "edges": [{"id": "e1", "source": "US1", "target": "US1",
+                   "edge_type": "generic_connection",
+                   "attributes": {"removed": {"ts": T1, "by": ANNA}}}],
+    }
+
+
+def test_gc_drops_what_is_settled_and_keeps_what_is_not():
+    section = _gc_section()
+    before = api.crdt_stats(section)
+    assert before == {"node_tombstones": 2, "edge_tombstones": 1,
+                      "field_clocks": 1, "field_tombstones": 1}
+
+    report = api.compact(section, before_ts=T2)
+
+    assert report["nodes_dropped"] == 1        # solo quello vecchio
+    assert report["edges_dropped"] == 1
+    assert report["field_clocks_dropped"] == 1
+    assert report["field_tombstones_dropped"] == 0   # è recente: resta
+    after = api.crdt_stats(section)
+    assert after == {"node_tombstones": 1, "edge_tombstones": 0,
+                     "field_clocks": 0, "field_tombstones": 1}
+
+
+def test_gc_does_not_change_the_observable_state():
+    """Il requisito che rende il GC accettabile: dopo, si vede la stessa cosa.
+    Un GC che cambia ciò che l'utente legge non è manutenzione, è una modifica."""
+    section = _gc_section()
+    live_before = [(n["id"], n.get("description")) for n in api.live_nodes(section)]
+    api.compact(section, before_ts=T2)
+    live_after = [(n["id"], n.get("description")) for n in api.live_nodes(section)]
+    assert live_after == live_before
+
+
+def test_gc_never_touches_a_tombstone_that_is_still_alive():
+    """La cancellazione più recente del punto di taglio resta: qualcuno potrebbe
+    ancora non averla vista, e toglierla la farebbe sparire dal mondo."""
+    section = _gc_section()
+    api.compact(section, before_ts=T2)
+    ids = [n["id"] for n in section["nodes"]]
+    assert "appena-morto" in ids and "morto" not in ids
+
+
+def test_gc_with_no_watermark_does_nothing():
+    """Nessun punto che si possa giustificare → nessuna compattazione. Il default
+    prudente: non sapere quando tutti sono passati non è un permesso."""
+    section = _gc_section()
+    before = api.crdt_stats(section)
+    report = api.compact(section, before_ts="")
+    assert report["total"] == 0
+    assert api.crdt_stats(section) == before
+
+
+def test_gc_works_on_a_whole_container():
+    doc = {"header": {}, "graphs": {"gc": _gc_section()}, "active_graph_id": "gc"}
+    report = api.compact(doc, before_ts=T2)
+    assert report["nodes_dropped"] == 1
+    assert api.crdt_stats(doc)["node_tombstones"] == 1
+
+
+def test_gc_keeps_the_state_mergeable():
+    """Dopo il GC il documento è ancora un documento: si fonde, e converge."""
+    section = _gc_section()
+    api.compact(section, before_ts=T2)
+    doc = {"header": {"format": "em.json", "version": "1.0"},
+           "graphs": {"gc": section}, "active_graph_id": "gc"}
+    other = json.loads(json.dumps(doc))
+    crdt.apply_ops_to_section(other["graphs"]["gc"], [crdt.make_op(
+        "update_field", node_id="US1", field="description", value="aggiornata",
+        ts=T3, author=BRUNO)])
+    a, b = json.loads(json.dumps(doc)), json.loads(json.dumps(other))
+    crdt.apply_ops_to_section(a["graphs"]["gc"], [])
+    merged_a = crdt.merge_payloads(a["graphs"]["gc"]["nodes"][-1],
+                                   b["graphs"]["gc"]["nodes"][-1])
+    merged_b = crdt.merge_payloads(b["graphs"]["gc"]["nodes"][-1],
+                                   a["graphs"]["gc"]["nodes"][-1])
+    assert crdt.canonical(merged_a.payload) == crdt.canonical(merged_b.payload)
+    assert merged_a.payload["description"] == "aggiornata"

@@ -342,12 +342,19 @@ def unstamped_fields(node) -> List[str]:
     return _audit(_node_payload(node))
 
 
-def apply_op(section: Dict[str, Any], op: Dict[str, Any]):
+def apply_op(section: Dict[str, Any], op: Dict[str, Any]) -> Dict[str, Any]:
     """Apply ONE CRDT operation to an em.json graph section. See
     :mod:`s3dgraphy.crdt` — idempotent, and refusing a stale op is a normal
-    answer, not an error."""
+    answer, not an error.
+
+    Returns a **dict** (`{applied, reason, node_id, fields}`), not the internal
+    dataclass: this is the api surface, which is what another PROCESS talks to
+    (em-server puts the answer straight on a socket). Handing a caller across
+    that boundary an object it has to know the shape of is how a library leaks
+    into a transport.
+    """
     from .crdt import apply_op_to_section
-    return apply_op_to_section(section, op)
+    return apply_op_to_section(section, op).as_dict()
 
 
 def make_op(kind: str, **fields):
@@ -355,6 +362,74 @@ def make_op(kind: str, **fields):
     `add_edge`, `remove_edge`)."""
     from .crdt import make_op as _make
     return _make(kind, **fields)
+
+
+def compact(doc_or_section: Dict[str, Any], *, before_ts: str,
+            before_by: Optional[str] = None) -> Dict[str, Any]:
+    """GC the CRDT bookkeeping everybody has already passed (P4.2).
+
+    Accepts a container document (`{"graphs": {...}}`) or a single graph section.
+    Returns the compaction report as a dict — numbers, because "it got smaller"
+    is not a claim anybody can check.
+
+    **Precondition**: `before_ts` must be an instant every participant has passed,
+    so no operation older than it can still arrive. The caller is the only one who
+    can know that (a relay takes the minimum watermark across its connected
+    clients); this function trusts it. Observably nothing changes: same live
+    nodes, same live fields, same values.
+    """
+    from .crdt import Clock, compact_container_doc, compact_section
+
+    mark = Clock(ts=before_ts, by=before_by)
+    if isinstance(doc_or_section, dict) and isinstance(doc_or_section.get("graphs"), dict):
+        return compact_container_doc(doc_or_section, mark).as_dict()
+    return compact_section(doc_or_section, mark).as_dict()
+
+
+def content_digest(doc: Dict[str, Any]) -> str:
+    """`sha256:<12 hex>` over a project's CONTENT — the equality oracle (P3).
+
+    Exposed on the api surface because it is what two PROCESSES compare when they
+    want to know whether they agree: a relay checking that a room converged, a
+    test checking that live and offline landed in the same place. The rule it
+    encodes (graphs and the active id; not the layout, not the version block) is
+    the library's, and must not be re-derived by anybody who needs the answer.
+    """
+    from .container import content_digest as _digest
+    return _digest(doc)
+
+
+def crdt_stats(doc_or_section: Dict[str, Any]) -> Dict[str, int]:
+    """How much bookkeeping a document is carrying: tombstones and field clocks.
+
+    The number a caller measures before and after a compaction — and the one an
+    operator watches to know whether the GC is keeping up.
+    """
+    from .crdt import FIELD_CLOCKS_KEY, REMOVED_KEY
+
+    sections = ([s for s in (doc_or_section.get("graphs") or {}).values()
+                 if isinstance(s, dict)]
+                if isinstance(doc_or_section.get("graphs"), dict)
+                else [doc_or_section])
+    out = {"node_tombstones": 0, "edge_tombstones": 0,
+           "field_clocks": 0, "field_tombstones": 0}
+    for section in sections:
+        for node in section.get("nodes") or []:
+            data = node.get("data") if isinstance(node.get("data"), dict) else {}
+            if isinstance(data.get(REMOVED_KEY), dict):
+                out["node_tombstones"] += 1
+            clocks = data.get(FIELD_CLOCKS_KEY)
+            if isinstance(clocks, dict):
+                for entry in clocks.values():
+                    if isinstance(entry, dict) and entry.get(REMOVED_KEY):
+                        out["field_tombstones"] += 1
+                    else:
+                        out["field_clocks"] += 1
+        for edge in section.get("edges") or []:
+            attrs = edge.get("attributes") if isinstance(edge.get("attributes"), dict) else {}
+            if isinstance(attrs.get(REMOVED_KEY), dict):
+                out["edge_tombstones"] += 1
+    return out
 
 
 def live_nodes(section: Dict[str, Any]):

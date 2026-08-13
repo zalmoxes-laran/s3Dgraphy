@@ -887,3 +887,111 @@ def live_edges(section: Dict[str, Any]) -> List[Dict[str, Any]]:
         if not mark.stamped:
             out.append(edge)
     return out
+
+
+# ── compaction (P4.2) ────────────────────────────────────────────────────────
+
+@dataclass
+class CompactionReport:
+    """What a compaction removed. Numbers, because "it got smaller" is not a
+    claim anybody can check."""
+
+    nodes_dropped: int = 0
+    edges_dropped: int = 0
+    field_clocks_dropped: int = 0
+    field_tombstones_dropped: int = 0
+
+    def total(self) -> int:
+        return (self.nodes_dropped + self.edges_dropped
+                + self.field_clocks_dropped + self.field_tombstones_dropped)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "nodes_dropped": self.nodes_dropped,
+            "edges_dropped": self.edges_dropped,
+            "field_clocks_dropped": self.field_clocks_dropped,
+            "field_tombstones_dropped": self.field_tombstones_dropped,
+            "total": self.total(),
+        }
+
+
+def compact_section(section: Dict[str, Any], before: Clock) -> CompactionReport:
+    """Drop the bookkeeping everybody has already seen (the GC of P4.1/P4.1b).
+
+    Tombstones and field clocks are the memory that makes convergence possible;
+    they are also the part that only grows. Compaction removes the entries OLDER
+    than `before` — a node whose deletion nobody can still contradict is simply
+    gone, and a field clock nobody can still lose to is not needed to defend the
+    value.
+
+    **THE PRECONDITION, and it is the whole safety argument**: `before` must be a
+    point every participant has passed, so that no operation older than it can
+    still arrive. The caller is the one who can know that (em-server takes the
+    minimum watermark across connected clients); this function trusts it, and a
+    caller who passes a `before` that is too recent will let a late operation win
+    against a fallback instead of against the real clock. That is why the
+    parameter is an instant and not a flag: the honest version of "clean up" is
+    "clean up what happened before this, which I can justify".
+    Observably, nothing changes: the compacted state has the same live nodes,
+    the same live fields and the same values.
+    """
+    report = CompactionReport()
+    if not before.stamped:
+        return report
+
+    nodes: List[Dict[str, Any]] = section.get("nodes") or []
+    kept_nodes: List[Dict[str, Any]] = []
+    for node in nodes:
+        mark = tombstone(node)
+        # a node whose deletion is settled disappears for good — it was already
+        # invisible, so nothing on screen changes
+        if mark is not None and is_removed(node) and clock_order(mark, before) < 0:
+            report.nodes_dropped += 1
+            continue
+        kept_nodes.append(node)
+        data = node.get("data") if isinstance(node.get("data"), dict) else None
+        if not data:
+            continue
+        clocks = data.get(FIELD_CLOCKS_KEY)
+        if not isinstance(clocks, dict):
+            continue
+        for name in list(clocks):
+            entry = clocks[name]
+            if not isinstance(entry, dict):
+                continue
+            if clock_order(Clock.from_dict(entry), before) >= 0:
+                continue
+            if entry.get(REMOVED_KEY):
+                report.field_tombstones_dropped += 1
+            else:
+                report.field_clocks_dropped += 1
+            del clocks[name]
+        if not clocks:
+            del data[FIELD_CLOCKS_KEY]
+    section["nodes"] = kept_nodes
+
+    edges: List[Dict[str, Any]] = section.get("edges") or []
+    kept_edges = []
+    for edge in edges:
+        attrs = edge.get("attributes") if isinstance(edge.get("attributes"), dict) else {}
+        mark = Clock.from_dict(attrs.get(REMOVED_KEY))
+        if mark.stamped and clock_order(mark, before) < 0:
+            report.edges_dropped += 1
+            continue
+        kept_edges.append(edge)
+    section["edges"] = kept_edges
+    return report
+
+
+def compact_container_doc(doc: Dict[str, Any], before: Clock) -> CompactionReport:
+    """Compact every member of a container document, in place."""
+    report = CompactionReport()
+    for section in (doc.get("graphs") or {}).values():
+        if not isinstance(section, dict):
+            continue
+        part = compact_section(section, before)
+        report.nodes_dropped += part.nodes_dropped
+        report.edges_dropped += part.edges_dropped
+        report.field_clocks_dropped += part.field_clocks_dropped
+        report.field_tombstones_dropped += part.field_tombstones_dropped
+    return report
