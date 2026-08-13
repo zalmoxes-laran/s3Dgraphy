@@ -269,7 +269,8 @@ def is_removed(payload: Dict[str, Any]) -> bool:
     mark = tombstone(payload)
     if mark is None:
         return False
-    for name in content_fields(payload):
+    # a field REMOVAL is an edit like any other: somebody acted on this node
+    for name in known_fields(payload):
         if clock_order(field_clock(payload, name), mark) > 0:
             return False
     return True
@@ -293,6 +294,74 @@ def content_fields(payload: Dict[str, Any]) -> List[str]:
     return out
 
 
+def field_tombstone(payload: Dict[str, Any], field_name: str) -> Optional[Clock]:
+    """The removal mark of ONE field, or None (P4.1b).
+
+    Same shape as the node's tombstone, one level down: the clock entry carries
+    ``removed: true``. The KEY stays — that is the whole point. An emptied field
+    that simply vanished would be indistinguishable, on the other side, from a
+    field that was never there, and the merge would hand it back.
+    """
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    clocks = data.get(FIELD_CLOCKS_KEY)
+    if not isinstance(clocks, dict):
+        return None
+    raw = clocks.get(field_name)
+    if isinstance(raw, dict) and raw.get(REMOVED_KEY):
+        return Clock.from_dict(raw)
+    return None
+
+
+def known_fields(payload: Dict[str, Any]) -> List[str]:
+    """Every field this side KNOWS ABOUT: the ones with a value, plus the ones
+    it has deliberately emptied.
+
+    The distinction `content_fields` cannot make: a removed field has no value,
+    so it is invisible to a view — and it must still be visible to the merge, or
+    the removal is forgotten the first time the two sides meet.
+    """
+    out = list(content_fields(payload))
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    clocks = data.get(FIELD_CLOCKS_KEY)
+    if isinstance(clocks, dict):
+        for name, raw in clocks.items():
+            if isinstance(raw, dict) and raw.get(REMOVED_KEY) and name not in out:
+                out.append(name)
+    return out
+
+
+#: Keys the em.json exporter lifts from the CLASS, not from an author (`symbol`,
+#: `label`). They are the same on every node of a type, so they are never a
+#: conflict — and they must not be reported as "somebody wrote this without
+#: stamping it", because nobody wrote them at all.
+DERIVED_KEYS = {"data.symbol", "data.label"}
+
+
+def unstamped_fields(payload: Dict[str, Any]) -> List[str]:
+    """Fields that carry a value and no clock, on a node that stamps its fields.
+
+    The DIAGNOSTIC behind the P4.1b contract — "the act of writing a field IS the
+    act of stamping it". On a node that records clocks, a field without one is
+    dated at the node's CREATION by the reader (P4.1's fallback), which is right
+    for a value the constructor set and never touched, and WRONG for one an edit
+    path wrote without going through `set_field`: that write is silently
+    back-dated, and the next merge loses it.
+
+    Being honest about what this can and cannot see: it reads a state, so it
+    cannot tell the two apart. The exact guard belongs where a write happens —
+    the caller knows which field it just changed (EMStudio's store does this in
+    dev). Here: everything that WOULD be dated at creation, so a human can look.
+    Empty on a node from a tool that keeps no clocks — that is the lazy fallback,
+    not a bug.
+    """
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    clocks = data.get(FIELD_CLOCKS_KEY)
+    if not isinstance(clocks, dict) or not clocks:
+        return []
+    return [name for name in content_fields(payload)
+            if name not in clocks and name not in DERIVED_KEYS]
+
+
 def get_field(payload: Dict[str, Any], field_name: str) -> Any:
     if field_name.startswith("data."):
         data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
@@ -314,18 +383,54 @@ def set_field(payload: Dict[str, Any], field_name: str, value: Any) -> None:
         payload[field_name] = value
 
 
-def set_field_clock(payload: Dict[str, Any], field_name: str, clock: Clock) -> None:
+def set_field_clock(payload: Dict[str, Any], field_name: str, clock: Clock,
+                    *, removed: bool = False) -> None:
     """Record a field's clock — LAZILY, and only when it says something.
 
     An unstamped clock is not written: an empty record would claim knowledge of
     when a value was set, and the node stamp already answers that question for
     everything nobody fought over.
+
+    `removed=True` writes the FIELD TOMBSTONE (P4.1b): same entry, plus the mark.
+    One place for "when was this field last touched", whether the touch was a
+    value or an emptying — so the merge has one thing to compare.
     """
     if not clock.stamped:
         return
     data = payload.setdefault("data", {})
     clocks = data.setdefault(FIELD_CLOCKS_KEY, {})
-    clocks[field_name] = clock.as_dict()
+    entry = clock.as_dict()
+    if removed:
+        entry[REMOVED_KEY] = True
+    clocks[field_name] = entry
+
+
+def write_field(payload: Dict[str, Any], field_name: str, value: Any,
+                clock: Clock) -> None:
+    """Write a field AND its clock, in one act (P4.1b).
+
+    The cure for "remember to stamp what you write" is not discipline, it is
+    making the mistake impossible: there is one function, and it does both. A
+    value written without its clock is back-dated to whenever the node was last
+    saved, which quietly loses somebody's edit at the next merge.
+    """
+    set_field(payload, field_name, value)
+    # writing a value UNDOES a previous emptying: the field is back, and the
+    # clock says when — the same rule as a node coming back from a tombstone
+    set_field_clock(payload, field_name, clock)
+
+
+def clear_field(payload: Dict[str, Any], field_name: str, clock: Clock) -> None:
+    """Empty a field: drop the value, keep the KEY as a tombstone (P4.1b).
+
+    Emptying is an ACT, and it has to travel as one. Without the mark the other
+    side sees a field it has and I do not, keeps its own (P4.1's rule: absence is
+    not deletion) and hands the value back — which is right for a field I never
+    had, and wrong for one I deliberately emptied. The two cases are only
+    distinguishable if the deliberate one leaves something behind.
+    """
+    set_field(payload, field_name, None)
+    set_field_clock(payload, field_name, clock, removed=True)
 
 
 def canonical(value: Any) -> str:
@@ -405,24 +510,43 @@ def merge_payloads(mine: Dict[str, Any], theirs: Dict[str, Any]) -> MergeOutcome
     outcome = MergeOutcome(payload=merged)
 
     # ── fields ───────────────────────────────────────────────────────────────
-    names = list(dict.fromkeys(content_fields(mine) + content_fields(theirs)))
+    # `known_fields`, not `content_fields`: a field somebody EMPTIED has no value
+    # and must still take part, or the emptying is forgotten the first time the
+    # two sides meet.
+    names = list(dict.fromkeys(known_fields(mine) + known_fields(theirs)))
     winning_clocks: Dict[str, Clock] = {}
     for name in names:
-        has_mine = name in content_fields(mine)
-        has_theirs = name in content_fields(theirs)
+        mine_knows = name in known_fields(mine)
+        theirs_knows = name in known_fields(theirs)
+        mine_gone = field_tombstone(mine, name) is not None
+        theirs_gone = field_tombstone(theirs, name) is not None
         v_mine, v_theirs = get_field(mine, name), get_field(theirs, name)
-        c_mine = field_clock(mine, name) if has_mine else Clock()
-        c_theirs = field_clock(theirs, name) if has_theirs else Clock()
+        c_mine = field_clock(mine, name) if mine_knows else Clock()
+        c_theirs = field_clock(theirs, name) if theirs_knows else Clock()
 
-        if not has_mine:
-            set_field(merged, name, v_theirs)
-            winning_clocks[name] = c_theirs
+        def land(side_payload, value, clock, gone):
+            """Put one side's state (a value, or an emptying) into the result."""
+            if gone:
+                clear_field(merged, name, clock)
+            else:
+                set_field(merged, name, value)
+            winning_clocks[name] = clock
+
+        # ONE side knows the field: its state lands, whatever that state is.
+        # A removal is a state — it does not lose to an absence.
+        if not mine_knows:
+            land(theirs, v_theirs, c_theirs, theirs_gone)
             continue
-        if not has_theirs:
-            set_field(merged, name, v_mine)
-            winning_clocks[name] = c_mine
+        if not theirs_knows:
+            land(mine, v_mine, c_mine, mine_gone)
             continue
-        if canonical(v_mine) == canonical(v_theirs):
+        # both know it, and say the same thing
+        if mine_gone and theirs_gone:
+            clear_field(merged, name, newer(c_mine, c_theirs))
+            winning_clocks[name] = newer(c_mine, c_theirs)
+            continue
+        if (not mine_gone and not theirs_gone
+                and canonical(v_mine) == canonical(v_theirs)):
             # the same value said twice is not a decision — keep the newer clock
             # so a later merge knows how fresh this field is
             set_field(merged, name, v_mine)
@@ -431,33 +555,40 @@ def merge_payloads(mine: Dict[str, Any], theirs: Dict[str, Any]) -> MergeOutcome
 
         order, reason = compare_clocks(c_mine, c_theirs)
         if order == 0 and reason == "unstamped":
-            # the date did not decide: the incoming value is kept, as it always
+            # the date did not decide: the incoming state is kept, as it always
             # was, and the reason says the choice was not a judgement
-            win_side, win_clock, win_value = "theirs", c_theirs, v_theirs
-            lose_clock, lose_value = c_mine, v_mine
+            win_side = "theirs"
         elif order >= 0:
-            win_side, win_clock, win_value = "mine", c_mine, v_mine
-            lose_clock, lose_value = c_theirs, v_theirs
+            win_side = "mine"
         else:
-            win_side, win_clock, win_value = "theirs", c_theirs, v_theirs
-            lose_clock, lose_value = c_mine, v_mine
+            win_side = "theirs"
+        win_clock = c_mine if win_side == "mine" else c_theirs
+        lose_clock = c_theirs if win_side == "mine" else c_mine
+        win_value = v_mine if win_side == "mine" else v_theirs
+        lose_value = v_theirs if win_side == "mine" else v_mine
+        win_gone = mine_gone if win_side == "mine" else theirs_gone
+        lose_gone = theirs_gone if win_side == "mine" else mine_gone
         win_payload = mine if win_side == "mine" else theirs
         lose_payload = theirs if win_side == "mine" else mine
-        set_field(merged, name, win_value)
-        winning_clocks[name] = win_clock
-        # the clock is written because this field WAS contested: from now on it
-        # carries its own history and no longer leans on the node stamp
-        set_field_clock(merged, name, win_clock)
+
+        land(win_payload, win_value, win_clock, win_gone)
+        # a field that was emptied and is now written again (or the reverse) is a
+        # RESURRECTION at field level — the same event the node has, one level
+        # down, and it is reported rather than done quietly
+        if lose_gone and not win_gone:
+            reason = "resurrected"
         if is_stale_copy(lose_payload, name) and not is_stale_copy(win_payload, name):
             # the loser never wrote this field: nothing of theirs was lost
             continue
         outcome.fields.append(FieldOutcome(
             node_id=node_id, field=name, reason=reason,
             winner={"by": win_clock.by, "at": win_clock.ts,
-                    "stamp": clock_source(win_payload, name), "side": win_side},
+                    "stamp": clock_source(win_payload, name), "side": win_side,
+                    "removed": win_gone},
             loser={"by": lose_clock.by, "at": lose_clock.ts,
                    "stamp": clock_source(lose_payload, name),
-                   "side": "theirs" if win_side == "mine" else "mine"},
+                   "side": "theirs" if win_side == "mine" else "mine",
+                   "removed": lose_gone},
             loser_value=lose_value,
         ))
 
@@ -468,7 +599,10 @@ def merge_payloads(mine: Dict[str, Any], theirs: Dict[str, Any]) -> MergeOutcome
         for name, raw in (data.get(FIELD_CLOCKS_KEY) or {}).items():
             if name in winning_clocks and clock_order(
                     Clock.from_dict(raw), winning_clocks[name]) == 0:
-                set_field_clock(merged, name, winning_clocks[name])
+                # …WITHOUT losing the removal mark: re-writing a plain clock over
+                # a field tombstone would quietly bring the field back
+                set_field_clock(merged, name, winning_clocks[name],
+                                removed=field_tombstone(merged, name) is not None)
 
     # ── the stamps ───────────────────────────────────────────────────────────
     # created = the EARLIER creation (a thing is made once, by the first hand);
@@ -617,7 +751,10 @@ def apply_op_to_section(section: Dict[str, Any], op: Dict[str, Any]) -> OpResult
             return OpResult(False, f"'{name}' is not an addressable field", node_id)
         current = field_clock(existing, name)
         order, reason = compare_clocks(clock, current)
-        same_value = canonical(get_field(existing, name)) == canonical(op.get("value"))
+        gone = field_tombstone(existing, name) is not None
+        wants_gone = op.get("remove") is True
+        same_value = (gone == wants_gone
+                      and canonical(get_field(existing, name)) == canonical(op.get("value")))
         if order < 0 or (order == 0 and same_value):
             # the state is newer (or this is the same op again): nothing moves
             return OpResult(False, "stale" if order < 0 else "idempotent", node_id)
@@ -625,8 +762,13 @@ def apply_op_to_section(section: Dict[str, Any], op: Dict[str, Any]) -> OpResult
             # no clocks anywhere: the arriving value is taken, and declared
             pass
         loser_value = get_field(existing, name)
-        set_field(existing, name, op.get("value"))
-        set_field_clock(existing, name, clock)
+        # ONE act, the same one `api.set_field` performs: a value with its clock,
+        # or an emptying with its tombstone. `remove: true` (or a null value with
+        # `remove`) is how an operation says "empty this field".
+        if op.get("remove") is True:
+            clear_field(existing, name, clock)
+        else:
+            write_field(existing, name, op.get("value"), clock)
         _stamp_payload(existing, clock, creation=False)
         return OpResult(True, "set", node_id, [FieldOutcome(
             node_id=node_id, field=name, reason=reason,

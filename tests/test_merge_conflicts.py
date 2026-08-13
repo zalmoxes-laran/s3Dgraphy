@@ -162,8 +162,10 @@ def test_p3b_the_conflict_names_who_overwrote_whom_and_where():
     assert {c.field for c in report.conflicts} == {"name", "description"}
     c = report.conflicts[0].as_dict()
     assert c["node_id"] == "US1"
+    # P4.1b · `removed` dice se ciò che ha vinto era un valore o uno SVUOTAMENTO
     assert c["winner"] == {"by": BRUNO, "at": "2026-08-13T11:30:00Z",
-                           "stamp": "modified_at", "side": "theirs"}
+                           "stamp": "modified_at", "side": "theirs",
+                           "removed": False}
     assert c["loser"]["by"] == ANNA and c["loser"]["at"] == "2026-08-13T10:00:00Z"
     # dove guardare: il campo, non un diff
     assert c["field_hint"] == [c["field"]]

@@ -377,3 +377,162 @@ def test_6_parity_fixture_digest_is_stable():
 #
 # La prova 7 è il `diff` dei FAILED contro il baseline noto (25) — si misura
 # lanciando la suite, non asserendo su se stessa. Il numero è nel report.
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# P4.1b — la timbratura è l'atto di scrittura, e svuotare ha il suo tombstone
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# P4.1 aveva reso il field-level vero nell'algebra e DORMIENTE nell'uso: finché
+# chi edita scriveva campi col solo timbro di nodo, due persone sullo stesso
+# nodo si risolvevano ancora al nodo (test_4c). Qui si accende.
+
+
+# ── D1 · nessuna scrittura non timbrata ─────────────────────────────────────
+
+def test_d1_writing_a_field_always_stamps_it():
+    """Non è disciplina, è che non c'è un altro modo: `set_field` fa le due cose
+    in un atto solo, quindi un valore senza clock non si può produrre."""
+    node = StratigraphicUnit("US1", name="US1", description="base")
+    api.set_field(node, "description", "muro in opus", author=ANNA, at=T2)
+    api.set_field(node, "data.dating", "II sec. d.C.", author=BRUNO, at=T3)
+
+    clocks = node.data[crdt.FIELD_CLOCKS_KEY]
+    assert clocks["description"] == {"ts": T2, "by": ANNA}
+    assert clocks["data.dating"] == {"ts": T3, "by": BRUNO}
+    assert node.description == "muro in opus" and node.data["dating"] == "II sec. d.C."
+    # e la guardia non ha niente da dire su ciò che è passato di qui
+    assert "description" not in api.unstamped_fields(node)
+    assert "data.dating" not in api.unstamped_fields(node)
+
+
+def test_d1b_an_update_field_op_stamps_too():
+    """La stessa cosa dall'altra porta: un'operazione è l'altro modo di scrivere
+    un campo, e passa per lo stesso atto."""
+    section = _section(_node("US1", created_at=T1))
+    crdt.apply_op_to_section(section, crdt.make_op(
+        "update_field", node_id="US1", field="description", value="muro",
+        ts=T2, author=ANNA))
+    node = section["nodes"][0]
+    assert node["data"][crdt.FIELD_CLOCKS_KEY]["description"] == {"ts": T2, "by": ANNA}
+    # `name` resta senza clock: l'ha messo il costruttore, non un edit — ed è il
+    # limite dichiarato della diagnostica (vede uno stato, non un gesto)
+    assert "description" not in crdt.unstamped_fields(node)
+
+
+def test_d1c_the_guard_sees_a_write_that_bypassed_the_act():
+    """La diagnostica: un campo scritto a mano su un nodo che timbra viene
+    datato alla CREAZIONE da chi legge — che è giusto per un valore del
+    costruttore e sbagliato per una modifica. Qui si vede."""
+    node = StratigraphicUnit("US1", name="US1", description="base")
+    api.set_field(node, "description", "muro", author=ANNA, at=T2)
+    node.data["dating"] = "scritto di nascosto"      # il bug: nessun clock
+    assert "data.dating" in api.unstamped_fields(node)
+
+
+# ── D2 · tombstone di CAMPO ─────────────────────────────────────────────────
+
+def test_d2_a_field_removal_later_than_the_edit_wins():
+    a = _node("US1", created_at=T1)
+    a["description"] = "muro"
+    crdt.write_field(a, "description", "muro", crdt.Clock(T1, ANNA))
+    b = json.loads(json.dumps(a))
+    crdt.clear_field(b, "description", crdt.Clock(T2, BRUNO))
+
+    out = crdt.merge_payloads(a, b)
+    assert out.payload.get("description") is None
+    assert crdt.field_tombstone(out.payload, "description") is not None
+    assert [f.reason for f in out.fields] == ["newer"]
+    assert out.fields[0].winner["removed"] is True
+
+
+def test_d2b_an_edit_later_than_the_removal_resurrects_the_field():
+    a = _node("US1", created_at=T1)
+    crdt.clear_field(a, "description", crdt.Clock(T2, BRUNO))
+    b = json.loads(json.dumps(a))
+    crdt.write_field(b, "description", "ci ripenso", crdt.Clock(T3, ANNA))
+
+    out = crdt.merge_payloads(a, b)
+    assert out.payload["description"] == "ci ripenso"
+    assert crdt.field_tombstone(out.payload, "description") is None
+    assert [f.reason for f in out.fields] == ["resurrected"]
+
+
+def test_d2c_a_field_removal_converges_in_both_orders():
+    base = _node("US1", created_at=T1)
+    crdt.write_field(base, "description", "muro", crdt.Clock(T1, ANNA))
+    a = json.loads(json.dumps(base))
+    crdt.clear_field(a, "description", crdt.Clock(T2, BRUNO))
+    b = json.loads(json.dumps(base))
+    crdt.write_field(b, "data.dating", "II sec.", crdt.Clock(T3, ANNA))
+    assert (crdt.canonical(crdt.merge_payloads(a, b).payload)
+            == crdt.canonical(crdt.merge_payloads(b, a).payload))
+
+
+# ── D3 · svuotare ≠ non aver mai avuto ──────────────────────────────────────
+
+def test_d3_an_emptied_field_does_not_come_back_from_an_absence():
+    """I due casi convivono, ed è il punto delicato di tutto il mattone:
+
+    * P4.1 · un campo che l'altro **non ha mai avuto** NON viene cancellato
+      (assenza ≠ cancellazione);
+    * P4.1b · un campo che l'altro ha **svuotato di proposito** resta vuoto.
+
+    Sono distinguibili solo perché lo svuotamento lascia un marcatore.
+    """
+    emptied = _node("US1", created_at=T1)
+    crdt.write_field(emptied, "description", "c'era", crdt.Clock(T1, ANNA))
+    crdt.clear_field(emptied, "description", crdt.Clock(T2, ANNA))
+    never_had = _node("US1", created_at=T1)      # nessuna descrizione, nessun clock
+
+    out = crdt.merge_payloads(emptied, never_had)
+    assert out.payload.get("description") is None, "lo svuotamento resta"
+    assert crdt.field_tombstone(out.payload, "description") is not None
+
+    # …e il caso di P4.1, che NON deve essere cambiato da questo mattone
+    has_it = _node("US1", created_at=T1)
+    crdt.write_field(has_it, "data.nota", "una nota", crdt.Clock(T1, ANNA))
+    plain = _node("US1", created_at=T2)
+    assert crdt.merge_payloads(has_it, plain).payload["data"]["nota"] == "una nota"
+
+
+# ── D4 · il field-level è VIVO ──────────────────────────────────────────────
+
+def test_d4_the_dormant_case_wakes_up_when_the_edit_path_stamps():
+    """Il gemello di `test_4c`, con la SOLA differenza che conta: qui si scrive
+    dall'edit-path. Stessa situazione, esito opposto — ed è la misura di che
+    cosa fa la timbratura."""
+    def side(field_name, value, at, by):
+        node = StratigraphicUnit("US1", name="US1", description="base")
+        stamp_created(node, by=ANNA, at=T1)
+        api.set_field(node, field_name, value, author=by, at=at)
+        stamp_modified(node, by=by, at=at)
+        g = Graph(graph_id="scavo")
+        g.add_node(node)
+        return container_of(g)
+
+    anna = side("description", "muro in opus", T2, ANNA)
+    bruno = side("data.dating", "II sec. d.C.", T3, BRUNO)
+    report = merge_into_container(anna, bruno)
+
+    node = anna.graphs["scavo"].find_node_by_id("US1")
+    assert node.description == "muro in opus"       # in P4.1 qui usciva "base"
+    assert node.data["dating"] == "II sec. d.C."
+    assert [c.field for c in report.conflicts] == []
+
+
+# ── D5 · parità Py↔JS della NUOVA fixture ───────────────────────────────────
+
+FIXTURE_B = (pathlib.Path(__file__).parent / "fixtures" / "crdt-parity-fields.json")
+
+
+def test_d5_field_clocks_and_field_tombstones_have_the_same_digest():
+    payload = json.loads(FIXTURE_B.read_text(encoding="utf-8"))
+    section = payload["section"]
+    crdt.apply_ops_to_section(section, payload["ops"])
+    digest = _digest(section)
+    assert digest == payload["expected_digest"], (
+        f"il digest Python è {digest}, la fixture dice {payload['expected_digest']}")
+    section2 = json.loads(FIXTURE_B.read_text(encoding="utf-8"))["section"]
+    crdt.apply_ops_to_section(section2, list(reversed(payload["ops"])))
+    assert _digest(section2) == digest, "e l'ordine inverso arriva allo stesso posto"

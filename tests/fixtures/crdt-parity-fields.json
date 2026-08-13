@@ -1,0 +1,81 @@
+{
+ "note": "P4.1b · fixture condivisa Py<->JS: clock di campo + tombstone di campo.",
+ "section": {
+  "graph_id": "scavo",
+  "name": "Scavo",
+  "nodes": [
+   {
+    "id": "US1",
+    "node_type": "US",
+    "name": "US1",
+    "description": "base",
+    "data": {
+     "created_at": "2026-08-13T10:00:00Z",
+     "created_by": "0000-0002-1825-0097"
+    }
+   },
+   {
+    "id": "US2",
+    "node_type": "US",
+    "name": "US2",
+    "description": "da svuotare",
+    "data": {
+     "created_at": "2026-08-13T10:00:00Z",
+     "created_by": "0000-0001-5109-3700"
+    }
+   }
+  ],
+  "edges": []
+ },
+ "ops": [
+  {
+   "op": "update_field",
+   "node_id": "US1",
+   "field": "description",
+   "value": "muro in opus",
+   "ts": "2026-08-13T11:00:00Z",
+   "author": "0000-0002-1825-0097"
+  },
+  {
+   "op": "update_field",
+   "node_id": "US1",
+   "field": "data.dating",
+   "value": "II sec. d.C.",
+   "ts": "2026-08-13T12:00:00Z",
+   "author": "0000-0001-5109-3700"
+  },
+  {
+   "op": "update_field",
+   "node_id": "US2",
+   "field": "description",
+   "remove": true,
+   "ts": "2026-08-13T11:00:00Z",
+   "author": "0000-0002-1825-0097"
+  },
+  {
+   "op": "update_field",
+   "node_id": "US2",
+   "field": "description",
+   "value": "vecchia",
+   "ts": "2026-08-13T10:00:00Z",
+   "author": "0000-0001-5109-3700"
+  },
+  {
+   "op": "update_field",
+   "node_id": "US2",
+   "field": "data.nota",
+   "value": "scritta dopo",
+   "ts": "2026-08-13T12:00:00Z",
+   "author": "0000-0001-5109-3700"
+  },
+  {
+   "op": "update_field",
+   "node_id": "US1",
+   "field": "description",
+   "value": "muro di fondazione",
+   "ts": "2026-08-13T11:00:00Z",
+   "author": "0000-0001-5109-3700"
+  }
+ ],
+ "expected_digest": "sha256:c52c5c4a2947"
+}

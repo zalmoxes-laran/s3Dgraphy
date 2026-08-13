@@ -240,19 +240,86 @@ def clear_stamps(node) -> None:
     _clear(node)
 
 
-# ── P4.1 · the CRDT algebra ───────────────────────────────────────────────────
+# ── P4.1 / P4.1b · the CRDT algebra, and the one way to write a field ─────────
+def set_field(node, field: str, value, *, author=None,
+              at: Optional[str] = None) -> None:
+    """Write a field AND stamp it — ONE act (P4.1b).
+
+    **This is the only public way to write a field**, and that is the point. The
+    contract field-level merging rests on ("if you write a field, stamp it") was
+    a promise in P4.1; here it becomes impossible to break, because there is one
+    function and it does both things. A value written without its clock is
+    back-dated to whenever the node was last saved, and the next merge quietly
+    loses whoever's edit that was.
+
+    `field` is addressed as `name` / `description` / `data.<key>`. Writing a
+    field that had been emptied brings it back — the field-level twin of a node
+    coming out of its tombstone.
+    """
+    from .crdt import Clock, write_field
+    from .editorial import normalize_orcid, now_iso
+
+    payload = _node_payload_view(node)
+    write_field(payload, field, value,
+                Clock(ts=at or now_iso(), by=normalize_orcid(author)))
+    _write_back(node, payload, field)
+
+
+def clear_field(node, field: str, *, author=None,
+                at: Optional[str] = None) -> None:
+    """Empty a field, leaving its TOMBSTONE — the only way to remove one (P4.1b).
+
+    Emptying is an act and has to travel as one. Dropping the key would leave the
+    other side unable to tell "she emptied it" from "I have something she never
+    had" — and P4.1's rule (absence is not deletion, so keep your value) would
+    correctly, and wrongly, hand the value back.
+    """
+    from .crdt import Clock, clear_field as _clear
+    from .editorial import normalize_orcid, now_iso
+
+    payload = _node_payload_view(node)
+    _clear(payload, field, Clock(ts=at or now_iso(), by=normalize_orcid(author)))
+    _write_back(node, payload, field)
+
+
+def _node_payload_view(node) -> Dict[str, Any]:
+    """A payload VIEW over a live node: `data` is the node's own dict, so the
+    clocks written into it land on the node rather than on a copy."""
+    data = getattr(node, "data", None)
+    if not isinstance(data, dict):
+        data = {}
+        node.data = data
+    return {
+        "id": getattr(node, "node_id", None),
+        "name": getattr(node, "name", None),
+        "description": getattr(node, "description", None),
+        "data": data,
+    }
+
+
+def _write_back(node, payload: Dict[str, Any], field: str) -> None:
+    """Put the written field back on the node object.
+
+    `name` and `description` are attributes; everything else lives in `data`,
+    which the view above already shares with the node. Some classes ALSO mirror a
+    data key as an attribute (`value`, `url`, `start_time`…) — the em.json
+    exporter lifts those, so both are set or the two would disagree.
+    """
+    if field in ("name", "description"):
+        setattr(node, field, payload.get(field))
+        return
+    if field.startswith("data."):
+        key = field[5:]
+        if hasattr(node, key):
+            data = payload.get("data") or {}
+            setattr(node, key, data.get(key))
+
+
 def stamp_field(node, field: str, *, by=None, at: Optional[str] = None) -> None:
-    """Record WHEN a single field was set, and by whom (P4.1).
+    """Record WHEN a field was set, without touching the value (P4.1).
 
-    The seam that makes field-level merging real. The node stamp answers "when
-    was this node last touched", which speaks for every field at once — so two
-    people editing different parts of the same node still collide. A field that
-    carries its own clock does not: the merge can see that you changed the
-    description and somebody else changed the dating, and keep both.
-
-    Written LAZILY, by whoever edits: nothing here stamps a field nobody
-    touched, and a node nobody fought over stays as light as it was.
-    `field` is addressed as `name` / `description` / `data.<key>`.
+    Kept for the callers that write through another path and then declare it —
+    but `set_field` is the one to use: it cannot be half-done.
     """
     from .crdt import Clock, set_field_clock
     from .editorial import normalize_orcid, now_iso
@@ -264,6 +331,15 @@ def stamp_field(node, field: str, *, by=None, at: Optional[str] = None) -> None:
     payload = {"data": data}
     set_field_clock(payload, field,
                     Clock(ts=at or now_iso(), by=normalize_orcid(by)))
+
+
+def unstamped_fields(node) -> List[str]:
+    """The dev guard (P4.1b): fields with a value and no clock, on a node that
+    stamps its fields. A non-empty answer is a BUG in an edit path — something
+    wrote a field without `set_field`, and that write is silently back-dated."""
+    from .crdt import unstamped_fields as _audit
+    from .exporter.emjson_exporter import _node_payload
+    return _audit(_node_payload(node))
 
 
 def apply_op(section: Dict[str, Any], op: Dict[str, Any]):
