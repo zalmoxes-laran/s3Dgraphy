@@ -439,6 +439,39 @@ def live_nodes(section: Dict[str, Any]):
     return _live(section)
 
 
+# ── promotion: a working model becomes a published, referenced asset ─────────
+def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
+                     media_type: Optional[str] = None,
+                     author: Optional[str] = None, at: Optional[str] = None,
+                     source_id: Optional[str] = None,
+                     link_to: Optional[str] = None,
+                     name: Optional[str] = None) -> Dict[str, Any]:
+    """Publish a resource: `residency="reference"` + url + checksum, and record
+    the genesis as a DTC transformation (crmdig:D7), attributed and dated.
+
+    The inverse of `import_geometry` and the activation of DP-76: the model stops
+    living inside a .blend and becomes an asset the study POINTS AT. Returns the
+    result as a dict (ids + warnings) — this is the surface another process
+    calls. See :mod:`s3dgraphy.publication`.
+    """
+    from .publication import promote_resource as _promote
+    return _promote(graph, resource_id, url=url, sha256=sha256,
+                    media_type=media_type, author=author, at=at,
+                    source_id=source_id, link_to=link_to, name=name).as_dict()
+
+
+def promotion_delta(graph: Graph, result: Dict[str, Any]) -> Dict[str, Any]:
+    """The nodes/edges a promotion touched, in em.json shape — a delta to send."""
+    from .publication import PromotionResult, promotion_delta as _delta
+    return _delta(graph, PromotionResult(
+        resource_id=str(result.get("resource_id") or ""),
+        process_id=str(result.get("process_id") or ""),
+        source_id=result.get("source_id"),
+        node_ids=list(result.get("node_ids") or []),
+        edge_ids=list(result.get("edge_ids") or []),
+    ))
+
+
 # ── 2D annotation → paradata chain ─────────────────────────────────────────────
 def create_annotation_paradata(graph: Graph, image_id: str,
                                region: Dict[str, Any], interpretation: str,
