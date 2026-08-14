@@ -124,6 +124,26 @@ class ResourceNode(Node):
         self.data["url"] = value
 
 
+    # ── the image layer (IIIF), DERIVED and never stored ────────────────────
+
+    def iiif_service(self, base):
+        """The IIIF Image API service for this resource, or None if it is not an
+        image (or carries no checksum to be addressed by).
+
+        Derived at call time from the asset's own digest — the object store is
+        content-addressed, so the image server needs no identifier of its own.
+        NOT written into ``data``: a service URL in the document would pin one
+        deployment's hostname into the study, and the day the server moves every
+        project would carry a dead address. See :mod:`s3dgraphy.iiif`.
+        """
+        from ..iiif import image_service
+        return image_service(self, base)
+
+    def iiif_thumbnail(self, base, width=400):
+        """A thumbnail URL — a size request, not a file we generate."""
+        from ..iiif import thumbnail_url
+        return thumbnail_url(self, base, width)
+
     def _determine_url_type(self, url):
         """
         Automatically determine the resource type from the URL/path

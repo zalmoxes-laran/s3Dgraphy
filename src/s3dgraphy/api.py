@@ -472,6 +472,58 @@ def promotion_delta(graph: Graph, result: Dict[str, Any]) -> Dict[str, Any]:
     ))
 
 
+# ── IIIF: the image layer, as a projection ────────────────────────────────────
+def iiif_manifest(graph: Graph, target_id: str, *, image_base: str,
+                  manifest_id: Optional[str] = None,
+                  sizes: Optional[Dict[str, Any]] = None,
+                  label: Optional[str] = None) -> Dict[str, Any]:
+    """A IIIF **Presentation 3** manifest for a resource or a document.
+
+    One canvas per image, with the graph's annotation regions projected onto it
+    as W3C Web Annotations. The graph is the source; the manifest is a view, and
+    nothing about it is written back. See :mod:`s3dgraphy.iiif`.
+    """
+    from .iiif import iiif_manifest as _manifest
+    return _manifest(graph, target_id, image_base=image_base,
+                     manifest_id=manifest_id, sizes=sizes, label=label)
+
+
+def iiif_image_service(resource, base: str) -> Optional[Dict[str, Any]]:
+    """The Image API service of an image resource — derived from its checksum,
+    never stored (a stored hostname is a dead address after a migration)."""
+    from .iiif import image_service
+    return image_service(resource, base)
+
+
+def iiif_thumbnail_url(resource, base: str, width: int = 400) -> Optional[str]:
+    """A thumbnail: a SIZE REQUEST on an image that is already there. There is no
+    thumbnail pipeline in this project and there should never be one."""
+    from .iiif import thumbnail_url
+    return thumbnail_url(resource, base, width)
+
+
+def iiif_region_url(resource, region, base: str, *, size: str = "max"
+                    ) -> Optional[str]:
+    """The crop of an annotated region, served by the image server — normalised
+    coordinates map straight onto IIIF's percentage region."""
+    from .iiif import region_url
+    return region_url(resource, region, base, size=size)
+
+
+def region_to_web_annotation(region, *, target: str, size=None, **kwargs
+                             ) -> Dict[str, Any]:
+    """`AnnotationRegionNode` → W3C Web Annotation (round-trippable)."""
+    from .iiif import region_to_web_annotation as _project
+    return _project(region, target=target, size=size, **kwargs)
+
+
+def web_annotation_to_region(annotation: Dict[str, Any], *, size=None,
+                             resource_id: Optional[str] = None):
+    """W3C Web Annotation → `AnnotationRegionNode`. The exact inverse."""
+    from .iiif import web_annotation_to_region as _read
+    return _read(annotation, size=size, resource_id=resource_id)
+
+
 # ── 2D annotation → paradata chain ─────────────────────────────────────────────
 def create_annotation_paradata(graph: Graph, image_id: str,
                                region: Dict[str, Any], interpretation: str,
