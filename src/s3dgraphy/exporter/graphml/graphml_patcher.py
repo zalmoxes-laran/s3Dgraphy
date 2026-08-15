@@ -111,7 +111,15 @@ class GraphMLPatcher:
             graph: In-memory Graph with current state
         """
         self.filepath = filepath
-        self.graph = graph
+        # GraphML is a dissemination surface: the patcher works on the live
+        # view, so a tombstoned node is never ADDED to the file and never
+        # updated in it (``s3dgraphy.dissemination``). Declared limit: the
+        # patcher has no removal pass at all, so a node deleted AFTER it was
+        # already written into this .graphml stays in the XML — patching keeps
+        # a file in sync by adding and updating, and removing from somebody's
+        # hand-laid yEd canvas is a different decision.
+        from ...dissemination import live_view
+        self.graph, self._hidden = live_view(graph, surface="graphml")
         self.tree: Optional[ET.ElementTree] = None
         self.root: Optional[ET.Element] = None
         self.key_map: Dict = {'node': {}, 'edge': {}}

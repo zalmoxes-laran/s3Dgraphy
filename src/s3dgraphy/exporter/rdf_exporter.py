@@ -428,17 +428,34 @@ class RDFExporter:
         "xml":         ("rdf",    "xml"),
     }
 
+    #: The two readings of an RDF projection, and they disagree about the dead.
+    #:
+    #: ``round_trip`` (default) is the isomorphic one: a tombstone is a FACT
+    #: about the graph and travels as ``EM.removedAt`` / ``EM.removedBy``, which
+    #: is what makes ttl → em.json give back what went in.
+    #: ``publish`` is a dissemination surface: the dead are ABSENT — no node, no
+    #: ``removedAt``, no edge dangling on the hole. See
+    #: :mod:`s3dgraphy.dissemination` for the per-surface policy.
+    #:
+    #: The default is round_trip on purpose: publishing is a deliberate act, and
+    #: a projection that silently dropped information would be the wrong kind of
+    #: helpful.
+    MODES = ("round_trip", "publish")
+
     def __init__(self,
                  output_path: str,
                  format: str = "turtle",
                  base_uri: str = DEFAULT_BASE_URI,
                  parent_hdt_iri: Optional[str] = None,
-                 config_dir: Optional[Path] = None):
+                 config_dir: Optional[Path] = None,
+                 mode: str = "round_trip"):
         """
         Args:
             output_path: target file path (extension auto-fixed by format).
             format: 'turtle' (default), 'n-triples', 'json-ld', 'trig', 'xml'.
             base_uri: base URI for minted node IRIs.
+            mode: 'round_trip' (default, keeps tombstones) or 'publish'
+                (drops them entirely). See :attr:`MODES`.
             parent_hdt_iri: if set, every exported EMGraph (HC16) gets a
                 triple `<emgraph> hdto:HP33i_is_proposition_set_of <parent>`
                 binding it as a proposition set of the given HC2 Heritage
@@ -454,6 +471,11 @@ class RDFExporter:
                 f"{sorted(set(self.SUPPORTED_FORMATS.keys()))}"
             )
         self.format_key = fmt
+        if mode not in self.MODES:
+            raise ValueError(
+                f"Unsupported RDF mode {mode!r}. Supported: {list(self.MODES)}"
+            )
+        self.mode = mode
         self.ext, self.rdflib_format = self.SUPPORTED_FORMATS[fmt]
         self.output_path = self._adjust_extension(output_path)
         self.base_uri = base_uri.rstrip("/") + "/"
@@ -466,6 +488,9 @@ class RDFExporter:
             "edges_skipped_deprecated": 0, "edges_unmapped": 0,
             "nodes_unmapped": 0,
             "parent_hdt_bindings": 0,
+            # what `publish` left out; stays 0 in round_trip, where nothing is
+            # left out and saying so is the point
+            "removed_hidden": 0,
         }
 
     @staticmethod
@@ -629,6 +654,13 @@ class RDFExporter:
     # ── graph-level serialization ───────────────────────────────────────────
 
     def _serialize_graph(self, g: S3DGraph, ctx) -> None:
+        # `publish` is a dissemination surface, so the dead are dropped ONCE
+        # here — before nodes, before edges, before the belief post-pass, which
+        # all read `g` and would otherwise each need their own filter.
+        if self.mode == "publish":
+            from ..dissemination import live_view
+            g, hidden = live_view(g, surface="rdf:publish")
+            self.stats["removed_hidden"] += hidden.total
         graph_iri = self._graph_iri(g)
 
         ctx.add((graph_iri, RDF.type, EM.EMGraph))
@@ -1371,14 +1403,16 @@ def export_to_rdf(output_path: str,
                   format: str = "turtle",
                   graph_ids: Optional[List[str]] = None,
                   base_uri: str = DEFAULT_BASE_URI,
-                  parent_hdt_iri: Optional[str] = None) -> str:
+                  parent_hdt_iri: Optional[str] = None,
+                  mode: str = "round_trip") -> str:
     """One-call helper: export all (or specified) graphs to RDF.
 
     If parent_hdt_iri is set, every exported EMGraph is bound to it via
-    hdto:HP33i_is_proposition_set_of.
+    hdto:HP33i_is_proposition_set_of. `mode` is 'round_trip' (default, keeps
+    tombstones) or 'publish' (drops them) — see :attr:`RDFExporter.MODES`.
     """
     exporter = RDFExporter(output_path, format=format, base_uri=base_uri,
-                           parent_hdt_iri=parent_hdt_iri)
+                           parent_hdt_iri=parent_hdt_iri, mode=mode)
     return exporter.export_graphs(graph_ids)
 
 
@@ -1386,8 +1420,9 @@ def export_single_graph_to_rdf(graph: S3DGraph,
                                output_path: str,
                                format: str = "turtle",
                                base_uri: str = DEFAULT_BASE_URI,
-                               parent_hdt_iri: Optional[str] = None) -> str:
+                               parent_hdt_iri: Optional[str] = None,
+                               mode: str = "round_trip") -> str:
     """One-call helper for an in-memory graph."""
     exporter = RDFExporter(output_path, format=format, base_uri=base_uri,
-                           parent_hdt_iri=parent_hdt_iri)
+                           parent_hdt_iri=parent_hdt_iri, mode=mode)
     return exporter.export_single_graph(graph)

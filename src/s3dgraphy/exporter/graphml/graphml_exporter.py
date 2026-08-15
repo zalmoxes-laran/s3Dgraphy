@@ -101,6 +101,22 @@ class GraphMLExporter:
                 print(f"  [volatile] stripped {strip_report['nodes']} "
                       f"injected nodes and {strip_report['edges']} edges")
 
+        # GraphML is a DISSEMINATION surface: a tombstone must not be hidden
+        # in it, it must be ABSENT (see ``s3dgraphy.dissemination`` for the
+        # per-surface policy). Filtering happens HERE, once, at the entrance:
+        # the generation phase below reads ``self.graph`` from twenty places
+        # and a per-site filter would be one forgotten site away from
+        # exporting a deleted US into yEd. From this line on, ``self.graph``
+        # is the live view — which also owns its own node/edge lists, so the
+        # synthetic content injected just below never reaches the caller's
+        # graph.
+        from ...dissemination import live_view
+        self.graph, hidden = live_view(self.graph, surface="graphml")
+        if hidden.total:
+            print(f"  [dissemination] left out {hidden.nodes} removed nodes, "
+                  f"{hidden.edges} removed edges and {hidden.dangling} edges "
+                  f"dangling on them")
+
         # Materialize continuity diamonds. The in-memory graph carries
         # bounded-life information as ``has_first_epoch`` +
         # ``survive_in_epoch`` edges; GraphML needs an explicit BR

@@ -563,8 +563,15 @@ def create_geometry_proxy(graph: Graph, unit_id: str, shape: Dict[str, Any],
 
 # ── project → TTL / RDF ────────────────────────────────────────────────────────
 def project_ttl(graph: Graph, *, base_uri: Optional[str] = None,
-                fmt: str = "turtle") -> str:
+                fmt: str = "turtle", mode: str = "round_trip") -> str:
     """Project a Graph to RDF and return it as a string (default Turtle).
+
+    `mode` picks which of the two RDF readings you want: ``round_trip``
+    (default) keeps tombstones, because the projection must give back what went
+    in; ``publish`` drops them, because a published graph is a dissemination
+    surface and a deleted US must be ABSENT from it, not marked in it. The
+    policy lives in :mod:`s3dgraphy.dissemination`; publishing is deliberate,
+    so it is never the default.
 
     Raises :class:`MissingDependency` if rdflib is not installed."""
     try:
@@ -578,7 +585,7 @@ def project_ttl(graph: Graph, *, base_uri: Optional[str] = None,
     try:
         export_single_graph_to_rdf(
             graph, str(tmp_path), format=fmt,
-            base_uri=base_uri or DEFAULT_BASE_URI)
+            base_uri=base_uri or DEFAULT_BASE_URI, mode=mode)
         return tmp_path.read_text(encoding="utf-8")
     finally:
         tmp_path.unlink(missing_ok=True)

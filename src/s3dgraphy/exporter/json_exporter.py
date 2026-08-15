@@ -88,7 +88,16 @@ class JSONExporter:
 
     def _process_graph(self, graph: Graph) -> Dict[str, Any]:
         """Process a single graph into its JSON representation."""
-        
+
+        # The Heriverse payload is a DISSEMINATION surface: a deleted US must
+        # be ABSENT from the scene, not marked in it. Filtered once here, at
+        # the entrance, so every pass below (nodes, edges, and the
+        # ``has_linked_resource`` scan inside ``_process_nodes``) sees the same
+        # live graph. Policy and predicate: ``s3dgraphy.dissemination``.
+        from ..dissemination import live_view
+        graph, _hidden = live_view(graph, surface="heriverse")
+
+
         #print(f"\nProcessing graph for JSON export:")
         #print(f"Graph name: {graph.name}")
         #print(f"Graph description: {graph.description}")
