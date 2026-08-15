@@ -472,6 +472,61 @@ def promotion_delta(graph: Graph, result: Dict[str, Any]) -> Dict[str, Any]:
     ))
 
 
+# ── narrative queries (DP-79 P4) ──────────────────────────────────────────────
+#
+# The point of authoring a study ON the graph: the interpretation and the
+# evidence are one dataset, so questions that cross them have answers. These
+# read the em.json in memory — the same content the RDF projection restates as
+# `P67_refers_to` — so there is no index to rebuild and no answer that can be
+# stale. See :mod:`s3dgraphy.narrative.query`.
+
+def narrative_citations(graph: Graph) -> List[Dict[str, Any]]:
+    """Every embed in every narrative, flattened, with its chapter/block position."""
+    from .narrative.query import citations
+    return citations(graph)
+
+
+def narratives_citing(graph: Graph, node_id: str) -> List[Dict[str, Any]]:
+    """Where a node is cited, **in reading order**.
+
+    SPARQL over the projection answers the set version of this; only the
+    property graph can answer the ordered one, because the chapters are
+    deliberately not reified in RDF.
+    """
+    from .narrative.query import narratives_citing as _q
+    return _q(graph, node_id)
+
+
+def narratives_on_retracted_sources(graph: Graph) -> List[Dict[str, Any]]:
+    """Citations that no longer stand — a withdrawn source, or a reference that
+    does not resolve at all. Reported together, separated by `reason`: they need
+    different work."""
+    from .narrative.query import narratives_on_retracted_sources as _q
+    return _q(graph)
+
+
+def interpretive_coverage(graph: Graph, *, kind: str = "epoch"
+                          ) -> List[Dict[str, Any]]:
+    """How much has been WRITTEN about each epoch (or activity), counting a
+    citation of a member as covering the whole. `narratives: 0` is the row
+    people are actually looking for."""
+    from .narrative.query import interpretive_coverage as _q
+    return _q(graph, kind=kind)
+
+
+def unexplained_reconstructions(graph: Graph) -> List[Dict[str, Any]]:
+    """3D somebody built and nobody explained: a model with a scene that no
+    narrative cites, directly or through the unit it represents."""
+    from .narrative.query import unexplained_reconstructions as _q
+    return _q(graph)
+
+
+def narrative_report(graph: Graph) -> Dict[str, Any]:
+    """All four answers in one deterministic dict."""
+    from .narrative.query import narrative_report as _q
+    return _q(graph)
+
+
 # ── the study, as a catalogue sees it ─────────────────────────────────────────
 def study_metadata(container: Any, *, study_id: Optional[str] = None
                    ) -> Dict[str, Any]:
@@ -935,6 +990,29 @@ def export_narrative_html(graph: Graph, narrative_id: str, *,
     from .exporter.html_exporter import render_html
     return render_html(bake_narrative(graph, narrative_id, base_dir=base_dir),
                        generated_at=generated_at)
+
+
+def export_narrative_ipynb(graph: Graph, narrative_id: str, *,
+                           emjson_url: Optional[str] = None) -> str:
+    """Render a narrative to a **Jupyter notebook** — the fourth output, and the
+    only LIVE one.
+
+    The other three (DocX, LaTeX, HTML) are snapshots: they resolve the embeds
+    once and freeze them. This one does the opposite — the prose becomes
+    markdown and every embed becomes a **code cell that queries the graph**, so
+    the notebook contains the questions and the reader runs them. Re-run it in a
+    year and it says what the study says then.
+
+    `emjson_url` is written into the loader cell (the Catalog's `/emjson` route,
+    typically). Without it the cell names a local file and the reader edits one
+    line. The notebook deliberately carries **no copy of the graph**: a copy is
+    what would make it a snapshot again.
+
+    Needs nothing beyond the standard library — the notebook is a dict and
+    `json` is the whole serialiser.
+    """
+    from .exporter.ipynb_exporter import export_narrative_ipynb as _e
+    return _e(graph, narrative_id, emjson_url=emjson_url)
 
 
 def export_narrative_docx(graph: Graph, narrative_id: str, *,
