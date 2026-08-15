@@ -311,6 +311,21 @@ def build_container(container: Container) -> Dict[str, Any]:
     # datamodel stamps are written in exactly ONE place.
     any_graph = container.active() or container.shelf or Graph(graph_id="empty")
     header = build_emjson(any_graph)["header"]
+    # …and everything ELSE the caller put in the header survives the write.
+    #
+    # The builder owns the keys that describe the FORMAT and nothing more. What a
+    # header also carries is the caller's: `visibility` (which decides whether a
+    # study is served without a token — em-server reads it for rooms, em-catalog
+    # for studies), `title`, `description`. Rebuilding the header from scratch
+    # DROPPED them, so a container that said "public" came back from its own file
+    # saying nothing, and the default is restricted — a study quietly
+    # unpublishing itself on save. The caller's keys go in first and the format
+    # stamps overwrite them, so a document loaded from an old file is rewritten
+    # with the CURRENT format version rather than the one it was born with.
+    if isinstance(container.header, dict) and container.header:
+        merged = dict(container.header)
+        merged.update(header)
+        header = merged
     doc: Dict[str, Any] = {"header": header, GRAPHS_KEY: graphs}
     active = container.active_graph_id or next(iter(container.graphs), None)
     if active:

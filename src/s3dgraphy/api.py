@@ -472,6 +472,26 @@ def promotion_delta(graph: Graph, result: Dict[str, Any]) -> Dict[str, Any]:
     ))
 
 
+# ── the study, as a catalogue sees it ─────────────────────────────────────────
+def study_metadata(container: Any, *, study_id: Optional[str] = None
+                   ) -> Dict[str, Any]:
+    """The catalogue card of one study, derived from its em.json container.
+
+    On the api surface because it is what another PROCESS asks for: a catalogue
+    (em-catalog, and 3DR's production one) turns containers into an index, and
+    the rule that makes the index safe is that it is a **projection** — every
+    field comes from the container, so re-reading the containers rebuilds it.
+    An indexer that had to know where a licence lives would be a second truth
+    the day it guessed wrong.
+
+    Accepts a `Container` or the raw document. See :mod:`s3dgraphy.study` for the
+    precedence of each field — and for the rule that a missing field stays
+    missing rather than being defaulted into existence.
+    """
+    from .study import study_metadata as _card
+    return _card(container, study_id=study_id)
+
+
 # ── IIIF: the image layer, as a projection ────────────────────────────────────
 def iiif_manifest(graph: Graph, target_id: str, *, image_base: str,
                   manifest_id: Optional[str] = None,
