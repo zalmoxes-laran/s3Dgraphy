@@ -185,3 +185,4 @@ docs/dev-projects/
 
 # Development plans / AI-session WIP — never commit
 .claude/
+.vscode/
