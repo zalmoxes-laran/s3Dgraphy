@@ -186,25 +186,66 @@ match exactly and case-sensitively. The same flow applies to
 - **[Examples](https://github.com/zalmoxes-laran/s3dgraphy/tree/main/examples)** - Code examples and tutorials
 - **[Extended Matrix](https://www.extendedmatrix.org)** - Framework overview
 
+## Where this sits
+
+s3Dgraphy is the **language** of the StratiGraph ecosystem, and its only
+authority on meaning: it defines the `em.json` format, merges two versions of a
+study, and produces every projection (RDF/CIDOC-CRM, GraphML, IIIF, the Heriverse
+payload, LaTeX/DOCX). Everything else — the editor, the Blender addon, the
+services — speaks through it and does not re-derive it.
+
+The rule the other repos inherit, in one line: *if an endpoint needs to compute
+something about a graph, that something belongs here.* This library has no web
+framework and no socket on purpose — what it does can be proved on a table.
+
+**The whole map:** [`ARCHITECTURE-SYSTEM.md`](../em-server/docs/ARCHITECTURE-SYSTEM.md).
+
+---
+
 ## 🔧 Development
 
 ### Setting up Development Environment
 
 ```bash
-# Clone the repository
 git clone https://github.com/zalmoxes-laran/s3dgraphy.git
 cd s3dgraphy
-
-# Install in development mode
-pip install -e .[dev]
-
-# Run tests
-pytest
-
-# Run linting
-black src/
-flake8 src/
+python3 -m venv .venv
+.venv/bin/pip install -e ".[dev]"
 ```
+
+Run the tests — from the repo root, with `src/` on the path:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m pytest tests -q
+```
+
+> **About the failures you will see.** The suite is **~1250 passing and 25
+> failing**, and those 25 are a *known baseline*, not a broken checkout: they are
+> long-standing round-trip gaps, tracked separately. What matters when you change
+> something is that **the LIST does not change** — compare the names, not the
+> count:
+>
+> ```bash
+> PYTHONPATH=src .venv/bin/python -m pytest tests -q 2>&1 | grep '^FAILED' | sort > /tmp/after.txt
+> diff /tmp/baseline.txt /tmp/after.txt
+> ```
+>
+> A new name in that diff is your regression; the same 25 names are the weather.
+
+### The CLI — the fastest way to see what the library does
+
+Every operation on the access surface is also a subcommand, with no web
+dependency. Given any `.em.json`:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m s3dgraphy.api open      study.em.json   # {"nodes": 3, "edges": 1}
+PYTHONPATH=src .venv/bin/python -m s3dgraphy.api validate  study.em.json   # {"ok": true, …}
+PYTHONPATH=src .venv/bin/python -m s3dgraphy.api project-ttl study.em.json # Turtle on stdout
+PYTHONPATH=src .venv/bin/python -m s3dgraphy.api graphml   study.em.json   # GraphML for yEd
+```
+
+`--help` lists the rest (GraphML import and conversion, narrative export to
+LaTeX/DOCX, authority resolution, the resource shelf, acquisition).
 
 ### Release Process
 
@@ -220,7 +261,10 @@ git push --follow-tags
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions. Open an issue or a pull request on
+[GitHub](https://github.com/zalmoxes-laran/s3dgraphy) — and see the
+[Development](#-development) section above for how to run the suite and read its
+known baseline.
 
 ### Areas for Contribution
 - **New Node Types**: Archaeological contexts, dating methods
