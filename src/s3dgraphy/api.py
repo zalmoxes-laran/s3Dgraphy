@@ -916,6 +916,27 @@ def bake_narrative(graph: Graph, narrative_id: str, *,
     return _b(graph, narrative_id, base_dir=base_dir)
 
 
+def export_narrative_html(graph: Graph, narrative_id: str, *,
+                          base_dir: Optional[str] = None,
+                          generated_at: str = "") -> str:
+    """Render a narrative to **one self-contained HTML file** — the format for
+    the reader who is simply handed a link or an attachment.
+
+    The third rendering of the same bake (:func:`bake_narrative`), which is why
+    it cannot disagree with the DocX or the LaTeX about what the narrative said.
+    Images are inlined as data URIs and the CSS travels in the file: a folder of
+    loose assets is a document that arrives broken the first time it is emailed.
+
+    Needs nothing beyond the standard library — unlike DocX, it cannot be
+    unavailable. `generated_at` is stamped into the footer when given; it is a
+    parameter rather than a call to the clock so the same bake renders to the
+    same bytes twice.
+    """
+    from .exporter.html_exporter import render_html
+    return render_html(bake_narrative(graph, narrative_id, base_dir=base_dir),
+                       generated_at=generated_at)
+
+
 def export_narrative_docx(graph: Graph, narrative_id: str, *,
                           base_dir: Optional[str] = None) -> bytes:
     """Render a narrative to **.docx** bytes — the format for the normal reader.
