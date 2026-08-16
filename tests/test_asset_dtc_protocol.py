@@ -159,3 +159,51 @@ def test_a_digest_nothing_points_at_is_a_lookup_error_not_a_new_node():
         em.enrich_asset_dtc(g, "sha256:" + "cd" * 32, attributor=ATTRIBUTOR,
                             license="CC-BY-4.0")
     assert kind(g, "license") == []
+
+
+# ── the ROOT of the "half data" bug, on the Python side ──────────────────────
+
+def test_a_multi_field_data_update_arrives_whole():
+    """The bug, generalised: a change to two `data` fields must arrive as two
+    field operations, and a partial update must not leave a stale sibling.
+
+    It was found on a licence (the name changed, `data.license_type` did not),
+    but the question is not about licences: it is whether the field-level CRDT
+    carries the whole `data` map. Asked here of an ordinary resource, with no
+    rights in sight, so the answer cannot be accidentally about one field."""
+    section = {"graph_id": "g", "nodes": [
+        {"id": "R1", "node_type": "resource", "name": "foto",
+         "data": {"checksum": "sha256:aa", "media_type": "image/png",
+                  "size": 10}}], "edges": []}
+
+    for field, value in (("data.media_type", "image/tiff"), ("data.size", 42),
+                         ("name", "prospetto")):
+        result = em.apply_op(section, {"op": "update_field", "node_id": "R1",
+                                       "field": field, "value": value,
+                                       "ts": "2026-08-16T20:00:00Z",
+                                       "author": ATTRIBUTOR})
+        assert result["applied"] is True, (field, result)
+
+    node = section["nodes"][0]
+    assert node["name"] == "prospetto"
+    assert node["data"]["media_type"] == "image/tiff"
+    assert node["data"]["size"] == 42, "the SECOND field is the half that was lost"
+    assert node["data"]["checksum"] == "sha256:aa", "…and the untouched sibling stays"
+
+
+def test_an_older_write_does_not_resurrect_a_stale_sibling():
+    """Field-level means per-field clocks: a late operation on one field must
+    not drag the others back to what they were when it was made."""
+    section = {"graph_id": "g", "nodes": [
+        {"id": "R1", "node_type": "resource", "name": "foto",
+         "data": {"media_type": "image/png", "size": 10}}], "edges": []}
+    em.apply_op(section, {"op": "update_field", "node_id": "R1",
+                          "field": "data.size", "value": 42,
+                          "ts": "2026-08-16T20:00:00Z", "author": ATTRIBUTOR})
+    stale = em.apply_op(section, {"op": "update_field", "node_id": "R1",
+                                  "field": "data.size", "value": 7,
+                                  "ts": "2026-08-16T10:00:00Z",
+                                  "author": AUTHOR})
+    assert stale["applied"] is False, "an older write loses"
+    assert section["nodes"][0]["data"]["size"] == 42
+    assert section["nodes"][0]["data"]["media_type"] == "image/png"
