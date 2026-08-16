@@ -547,20 +547,47 @@ def study_metadata(container: Any, *, study_id: Optional[str] = None
     return _card(container, study_id=study_id)
 
 
+# ── one asset's rights, read off the graph ────────────────────────────────────
+def asset_rights(document: Any, digest: str, *, today: Any = None
+                 ) -> Optional[Dict[str, Any]]:
+    """What the graph says about the asset with this digest — licence, embargo,
+    authors — or `None` when it has never heard of it.
+
+    On the api surface for the same reason `study_metadata` is: another PROCESS
+    asks it. An asset store must decide whether to serve bytes, and the decision
+    belongs to the graph — em-server CONSULTS this rather than keeping a second
+    copy of an embargo that lives in a document people edit.
+
+    See :mod:`s3dgraphy.rights` for how the walk works and why the rights are
+    read both directly off the resource and through its DTC chain.
+    """
+    from .rights import rights_for_digest
+    return rights_for_digest(document, digest, today=today)
+
+
 # ── IIIF: the image layer, as a projection ────────────────────────────────────
 def iiif_manifest(graph: Graph, target_id: str, *, image_base: str,
                   manifest_id: Optional[str] = None,
                   sizes: Optional[Dict[str, Any]] = None,
-                  label: Optional[str] = None) -> Dict[str, Any]:
+                  label: Optional[str] = None,
+                  document: Any = None,
+                  withhold_embargoed: bool = True) -> Dict[str, Any]:
     """A IIIF **Presentation 3** manifest for a resource or a document.
 
     One canvas per image, with the graph's annotation regions projected onto it
     as W3C Web Annotations. The graph is the source; the manifest is a view, and
     nothing about it is written back. See :mod:`s3dgraphy.iiif`.
+
+    `document` (the container this graph came from) turns on the RIGHTS half:
+    each image's licence travels in the manifest, and an image under a running
+    embargo is left out with the fact recorded. Without it the manifest is
+    exactly what it was before — a caller that knows nothing about rights is not
+    made to care.
     """
     from .iiif import iiif_manifest as _manifest
     return _manifest(graph, target_id, image_base=image_base,
-                     manifest_id=manifest_id, sizes=sizes, label=label)
+                     manifest_id=manifest_id, sizes=sizes, label=label,
+                     document=document, withhold_embargoed=withhold_embargoed)
 
 
 def iiif_image_service(resource, base: str) -> Optional[Dict[str, Any]]:

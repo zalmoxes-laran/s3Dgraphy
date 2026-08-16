@@ -429,7 +429,9 @@ def _images_of(graph: Graph, target_id: str) -> List[Any]:
 def iiif_manifest(graph: Graph, target_id: str, *, image_base: str,
                   manifest_id: Optional[str] = None,
                   sizes: Optional[Dict[str, Sequence[int]]] = None,
-                  label: Optional[str] = None) -> Dict[str, Any]:
+                  label: Optional[str] = None,
+                  document: Any = None,
+                  withhold_embargoed: bool = True) -> Dict[str, Any]:
     """A IIIF **Presentation 3** manifest for a resource or a document.
 
     One canvas per image, and on each canvas the annotations that the graph
@@ -445,8 +447,25 @@ def iiif_manifest(graph: Graph, target_id: str, *, image_base: str,
     PERCENTAGE selectors, which stay correct whatever the real size turns out to
     be.
 
+    **Rights travel with the pictures.** When `document` is given (the container
+    this graph came from), each image's licence and embargo are read off the
+    graph (`s3dgraphy.rights`) and carried in the manifest's `rights` /
+    `requiredStatement` — the IIIF fields that exist for exactly this. It is not
+    enforcement: a licence in a manifest is a statement, and share-alike cannot
+    be imposed by a JSON field. What it removes is the excuse.
+
+    And an image under a **running embargo is left out**, with the fact recorded
+    in `em:withheld` and in the warnings. That is not decoration either: the
+    image service addresses pictures by their sha256, and the only place a
+    digest comes from is a manifest — **the manifest is the capability**, so
+    omitting the canvas is what actually withholds the image from a viewer.
+    (The honest limit, stated in the report as well: somebody who already knows
+    the digest can still reach the image service directly. Closing that needs a
+    gate in front of the image server itself.)
+
     Returns the manifest as a plain dict; serialising it is the caller's job.
     """
+    from .rights import rights_for_digest
     warnings: List[str] = []
     node = graph.find_node_by_id(target_id)
     if node is None:
@@ -469,7 +488,22 @@ def iiif_manifest(graph: Graph, target_id: str, *, image_base: str,
     if description:
         manifest["summary"] = {"none": [description]}
 
-    for index, resource in enumerate(images, start=1):
+    rights_seen: List[Dict[str, Any]] = []
+    withheld: List[Dict[str, Any]] = []
+    index = 0
+    for resource in images:
+        rights = (rights_for_digest(document, image_identifier(resource))
+                  if document is not None else None)
+        if rights and rights.get("embargo_active") and withhold_embargoed:
+            withheld.append({"resource": resource.node_id,
+                             "embargo": rights.get("embargo")})
+            warnings.append(
+                f"{resource.node_id!r} is under embargo until "
+                f"{rights.get('embargo')} and is not in this manifest")
+            continue
+        if rights:
+            rights_seen.append(rights)
+        index += 1
         identifier = image_identifier(resource)
         if not identifier:
             warnings.append(
@@ -535,6 +569,32 @@ def iiif_manifest(graph: Graph, target_id: str, *, image_base: str,
                 }]
         manifest["items"].append(canvas)
 
+    if rights_seen:
+        # ONE licence in the manifest's own field when the images agree, and the
+        # per-image detail beside it when they do not — a manifest that reported
+        # only the first licence would be wrong about the rest, and one that
+        # reported none would be silent about all.
+        licences = {r["license_effective"] for r in rights_seen}
+        if len(licences) == 1:
+            only = next(iter(licences))
+            if str(only).startswith("http"):
+                manifest["rights"] = only
+            manifest["requiredStatement"] = {
+                "label": {"none": ["Licenza"]},
+                "value": {"none": [str(only)]},
+            }
+        else:
+            manifest["requiredStatement"] = {
+                "label": {"none": ["Licenza"]},
+                "value": {"none": sorted(str(l) for l in licences)},
+            }
+        credit = sorted({(a.get("orcid") or a.get("name") or "")
+                         for r in rights_seen for a in r.get("authors") or []}
+                        - {""})
+        if credit:
+            manifest["em:authors"] = credit
+    if withheld:
+        manifest["em:withheld"] = withheld
     if warnings:
         # in the document, in a namespaced key: a caller that ignores it gets a
         # valid manifest, and a caller that reads it learns what was assumed
