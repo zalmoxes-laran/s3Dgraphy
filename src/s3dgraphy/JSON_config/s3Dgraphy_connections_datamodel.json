@@ -682,7 +682,7 @@
     "has_author": {
       "name": "has_author",
       "label": "Has author",
-      "description": "Represents the connection of a node with its author. Target can be an AuthorNode (human) or AuthorAINode (AI-assisted authoring). Source covers the full range of EM node types so that the resolver can walk from any scope level down to the author.",
+      "description": "Represents the connection of a node with its author. Target can be an AuthorNode (human) or AuthorAINode (AI-assisted authoring). Source covers the full range of EM node types so that the resolver can walk from any scope level down to the author. SOURCE WIDENED 2026-08-16 (asset DTC protocol): ResourceNode joins the list. 'Who took this photograph' is exactly prov:wasAttributedTo on an information object, and the mapping is already domain-neutral — the omission was an oversight of scope, not a semantic boundary: the list exists so the resolver can walk from ANY scope down to the author, and a resource is a scope somebody attributes. It is also the shape the asset enrichment protocol needs, where the AUTHOR of the bytes (possibly absent, possibly dead) is declared by an ATTRIBUTOR who is somebody else (s3dgraphy.rights.enrich_asset_dtc, docs/asset-dtc-protocol.md).",
       "reverse": {
         "name": "is_author_of",
         "label": "Is author of"
@@ -706,7 +706,8 @@
           "PropertyNode",
           "EpochNode",
           "DTCProcessNode",
-          "NarrativeNode"
+          "NarrativeNode",
+          "ResourceNode"
         ],
         "target": [
           "AuthorNode",

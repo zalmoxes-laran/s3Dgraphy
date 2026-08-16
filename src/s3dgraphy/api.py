@@ -565,6 +565,28 @@ def asset_rights(document: Any, digest: str, *, today: Any = None
     return rights_for_digest(document, digest, today=today)
 
 
+def enrich_asset_dtc(graph: Any, checksum: str, *, attributor: Optional[str],
+                     author: Any = None, license: Any = None, embargo: Any = None,
+                     at: Optional[str] = None, author_name: Optional[str] = None,
+                     reason: Optional[str] = None) -> Dict[str, Any]:
+    """Declare an asset's rights — as an ACT, signed by whoever declares it.
+
+    The writing half of `asset_rights`. On the api surface because it is a
+    PROTOCOL other tools perform: EMStudio at upload, EMtools, the field
+    chatbot, an ECHOES/ECCCH ingest. The contract is written down once, in
+    `docs/asset-dtc-protocol.md`, so those tools do not each invent their own.
+
+    The distinction it exists for: the **author** is who made the data, the
+    **attributor** is who says so, and they are frequently not the same person —
+    attribution happens later, sometimes posthumously, usually by a cataloguer.
+    See :mod:`s3dgraphy.rights`.
+    """
+    from .rights import enrich_asset_dtc as _enrich
+    return _enrich(graph, checksum, attributor=attributor, author=author,
+                   license=license, embargo=embargo, at=at,
+                   author_name=author_name, reason=reason)
+
+
 # ── IIIF: the image layer, as a projection ────────────────────────────────────
 def iiif_manifest(graph: Graph, target_id: str, *, image_base: str,
                   manifest_id: Optional[str] = None,

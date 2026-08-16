@@ -24,6 +24,13 @@ licence without stamping it on four hundred files. Direct wins when both are
 present: the more specific statement is the one somebody made about *this*
 object.
 
+**Writing is the other half** (`enrich_asset_dtc`). Attribution is an ACT, not a
+field: somebody *declares* that a file is CC-BY, or that it was made by a
+colleague who is not in the room, or that it stays embargoed until March — and
+that somebody is not necessarily the author. So the act is signed: the AUTHOR is
+who made the data, the ATTRIBUTOR is who says so, and both travel with a
+timestamp. See `docs/asset-dtc-protocol.md` for the tool-agnostic protocol.
+
 **Nothing is invented.** A resource with no licence reads as no licence
 (`license: None`); the *default* is a separate question and it is answered where
 a default belongs — `study.DEFAULT_LICENSE`, exposed beside the fact, never in
@@ -280,3 +287,208 @@ def _collect(node_id: str, by_id: Dict[str, Any],
     if authors:
         found["authors"] = authors
     return {k: v for k, v in found.items() if v not in (None, [], "")}
+
+
+# ── writing: attribution as an ACT ───────────────────────────────────────────
+#
+# The reading half above answers "what may be done with these bytes". This half
+# is how that answer gets there, and the design decision it encodes is E.D.'s:
+#
+#     attribution is an ACT, not a field.
+#
+# Licence, author and embargo are filled in UPSTREAM (when the file is made) or
+# DOWNSTREAM — later, sometimes posthumously, and often **by somebody who is not
+# the creator**. A cataloguer states the licence of a photograph taken in 1978 by
+# a colleague who has since retired; that statement is true, useful, and it is
+# not authorship. A model with one "author" field cannot say it without lying.
+#
+# The DTC holds it because the DTC reifies acts. So:
+#
+#   * `has_author` → the AUTHOR: who made the data. An ORCID that may belong to
+#     somebody absent, or dead;
+#   * `attributed_by` + `attributed_at` on the statement → the ATTRIBUTOR: who
+#     said it, and when. The signature of the act.
+#
+# Distinct from the editorial stamps (`created_by`/`modified_by`), which record
+# the hand that touched the FILE. The attributor is a claim about the world; the
+# editorial stamp is a fact about the document. Conflating them would make
+# "somebody edited this" and "somebody vouches for this" the same sentence.
+
+def _alive_nodes(graph: Any) -> List[Any]:
+    return [n for n in getattr(graph, "nodes", []) if _alive(n)]
+
+
+def _free_id(graph: Any, base: str) -> str:
+    """`base`, or `base_2`, `base_3`… — never a tombstoned node's id reused.
+
+    Reusing the id of something that was removed is how a "new" statement ends
+    up wearing a dead node's clock (and its tombstone). Measured twice, in two
+    languages, in one night.
+    """
+    taken = {getattr(n, "node_id", None) for n in getattr(graph, "nodes", [])}
+    if base not in taken:
+        return base
+    n = 2
+    while f"{base}_{n}" in taken:
+        n += 1
+    return f"{base}_{n}"
+
+
+def enrich_asset_dtc(graph: Any, checksum: Any, *, attributor: Optional[str],
+                     author: Any = None, license: Any = None, embargo: Any = None,
+                     at: Optional[str] = None,
+                     author_name: Optional[str] = None,
+                     reason: Optional[str] = None) -> Dict[str, Any]:
+    """Declare the rights of one asset — as an act, signed by whoever declares it.
+
+    `checksum` names the bytes (with or without the `sha256:` prefix); the
+    `ResourceNode` that points at them must already be in the graph — this
+    enriches an asset, it does not invent one, and a digest nothing points at is
+    a `LookupError` rather than a node conjured to hold a licence.
+
+    Each of `author` / `license` / `embargo` is **tri-state**:
+
+    * omitted (`None`) — not touched. Enriching a licence must not silently
+      clear an embargo somebody else set;
+    * a value — declared (created, or updated in place);
+    * the **empty string** — removed. Which is a different sentence from "not
+      declared", and the file must be able to say both: `license=""` retracts a
+      statement, `license=None` leaves it alone.
+
+    `attributor` is the ORCID of whoever is making the claim, and it is
+    **required** — an unsigned attribution is a rumour. `at` is when (ISO,
+    defaulting to now), so a posthumous attribution says when it was made rather
+    than pretending to be contemporary with the file.
+
+    Returns what it did, per field, so a caller can report rather than guess.
+    Idempotent: the same call twice leaves one statement and one signature.
+    """
+    from .editorial import now_iso
+
+    wanted = normalise_digest(checksum)
+    if not wanted:
+        raise ValueError("enrich_asset_dtc needs a checksum")
+    if not attributor:
+        raise ValueError(
+            "enrich_asset_dtc needs an attributor: an attribution nobody signs "
+            "is a rumour, and the point of this act is that somebody stands "
+            "behind it")
+    stamp = at or now_iso()
+
+    resource = next(
+        (n for n in _alive_nodes(graph)
+         if normalise_digest(_data(n).get("checksum")) == wanted), None)
+    if resource is None:
+        raise LookupError(
+            f"no resource in this graph points at {wanted[:12]}…: enrich the "
+            f"asset after the ResourceNode exists, not instead of it")
+
+    changed: Dict[str, str] = {}
+    for kind, value in (("author", author), ("license", license),
+                        ("embargo", embargo)):
+        if value is None:
+            continue
+        text = str(value).strip()
+        existing = _statement(graph, resource.node_id, kind)
+        if not text:
+            if existing is not None:
+                _detach(graph, existing.node_id)
+                changed[kind] = "removed"
+            continue
+        node = existing if existing is not None else _new_statement(
+            graph, resource.node_id, kind, text)
+        node.name = _display(kind, text, author_name)
+        data = getattr(node, "data", None)
+        if not isinstance(data, dict):
+            data = {}
+            node.data = data
+        if kind == "license":
+            data["license_type"] = text
+        elif kind == "embargo":
+            data["embargo_end"] = text
+            if reason is not None:
+                data["reason"] = reason.strip()
+        else:
+            data["orcid"] = text
+        # THE SIGNATURE OF THE ACT — who says so, and when. Written on every
+        # statement, including one that only changed value: an attribution
+        # somebody revised is theirs now, not still the first person's.
+        data["attributed_by"] = str(attributor)
+        data["attributed_at"] = stamp
+        changed[kind] = "declared" if existing is None else "updated"
+
+    return {"resource_id": resource.node_id, "digest": wanted,
+            "attributor": str(attributor), "at": stamp, "changed": changed}
+
+
+def _display(kind: str, value: str, author_name: Optional[str]) -> str:
+    """What the node is CALLED. The name is the display value (DP-65 keeps it
+    there), and for an author a human name reads better than an iD — but the iD
+    is what `data.orcid` holds, because that is the identity."""
+    if kind == "author" and author_name:
+        return author_name.strip() or value
+    return value
+
+
+def _statement(graph: Any, resource_id: str, kind: str) -> Optional[Any]:
+    """The living statement of this kind on this resource, or None.
+
+    Tombstoned ones do not count and are not reused: that is the seam that bit
+    twice in one night — in the Python reader, where a removed embargo went on
+    refusing a file, and in the TypeScript writer, where re-declaring a licence
+    wrote onto the corpse of the one just removed.
+    """
+    edge_type = {"author": "has_author", "license": "has_license",
+                 "embargo": "has_embargo"}[kind]
+    node_type = {"author": "author", "license": "license",
+                 "embargo": "embargo"}[kind]
+    by_id = {n.node_id: n for n in _alive_nodes(graph)}
+    for edge in getattr(graph, "edges", []):
+        if _text(_field(edge, "edge_type", "type")) != edge_type:
+            continue
+        source = str(_field(edge, "edge_source", "source") or "")
+        target = str(_field(edge, "edge_target", "target") or "")
+        other = target if source == resource_id else (
+            source if target == resource_id else None)
+        node = by_id.get(other or "")
+        if node is not None and getattr(node, "node_type", "") == node_type:
+            return node
+    return None
+
+
+def _new_statement(graph: Any, resource_id: str, kind: str, value: str) -> Any:
+    from .nodes.author_node import AuthorNode
+    from .nodes.embargo_node import EmbargoNode
+    from .nodes.license_node import LicenseNode
+
+    node_id = _free_id(graph, f"{resource_id}_{kind}")
+    if kind == "license":
+        node = LicenseNode(node_id, name=value, license_type=value)
+    elif kind == "embargo":
+        node = EmbargoNode(node_id, name=value, embargo_end=value)
+    else:
+        # The NAME is the display value; the iD is the identity and lives in
+        # `data.orcid`. Passing the orcid as the name would put an identifier
+        # where a person's name goes, and every panel would show a number.
+        node = AuthorNode(node_id, name=value, orcid=value)
+        node.data = dict(getattr(node, "data", None) or {})
+    graph.add_node(node)
+    edge_type = {"author": "has_author", "license": "has_license",
+                 "embargo": "has_embargo"}[kind]
+    graph.add_edge(f"{resource_id}__{edge_type}__{node_id}", resource_id,
+                   node_id, edge_type)
+    return node
+
+
+def _detach(graph: Any, node_id: str) -> None:
+    """Remove a statement and the edge that carried it.
+
+    A plain removal, because this operates on a Graph in memory. Where the
+    document is SYNCED, the CRDT layer turns a removal into a tombstone
+    (`api.apply_op`) — that is the transport's job, and doing it here would put
+    two deletion models in one library.
+    """
+    graph.edges = [e for e in graph.edges
+                   if _field(e, "edge_source", "source") != node_id
+                   and _field(e, "edge_target", "target") != node_id]
+    graph.nodes = [n for n in graph.nodes if getattr(n, "node_id", None) != node_id]
