@@ -69,6 +69,66 @@ def normalise_visibility(raw: Any) -> str:
     return VISIBILITY_RESTRICTED
 
 
+#: What StratiGraph publishes under when a container says nothing. It is a
+#: DEFAULT, never a fact: see `license` vs `license_effective` in the card.
+DEFAULT_LICENSE = "CC-BY-SA-4.0"
+
+#: The two kinds of study the Catalog shows. A **landscape** is made of sites;
+#: a **site** is one place. Neither says anything about how many GRAPHS the
+#: container holds — a landscape normally has several and a site normally has
+#: one, but a site somebody split into three graphs is still a site. The kind is
+#: about the subject, the graph count is about the working method, and forcing
+#: one from the other would be a rule nobody asked for.
+KIND_SITE = "site"
+KIND_LANDSCAPE = "landscape"
+
+
+def normalise_kind(raw: Any) -> Optional[str]:
+    """`site` / `landscape` from what the container says, or None."""
+    if not isinstance(raw, str):
+        return None
+    value = raw.strip().lower()
+    if value in {KIND_SITE, "sito"}:
+        return KIND_SITE
+    if value in {KIND_LANDSCAPE, "paesaggio", "landscape_study"}:
+        return KIND_LANDSCAPE
+    return None
+
+
+def embargo_active(value: Any, today: Optional["datetime.date"] = None) -> bool:
+    """Is this embargo still running?
+
+    ONE definition, because two would drift: the room's door (em-server) and the
+    catalogue's listing both ask this, and a study hidden from a list while its
+    room lets people in — or the reverse — is worse than either behaviour alone.
+
+    A date in the future is a running embargo. Anything unparseable is **not**:
+    an embargo nobody can read is not a gate anybody could lift, and treating a
+    typo as a permanent lock would bury a study with no way to notice. What the
+    field holds in practice is an ISO date, sometimes wrapped in the prose the
+    panels show ("Until 2027-01-01"), so a date is looked for inside the text
+    rather than demanded of it.
+    """
+    import datetime
+    import re
+
+    if value in (None, "", False):
+        return False
+    if isinstance(value, datetime.datetime):
+        value = value.date()
+    if isinstance(value, datetime.date):
+        return value > (today or datetime.date.today())
+    match = re.search(r"(\d{4})-(\d{2})-(\d{2})", str(value))
+    if not match:
+        return False
+    try:
+        until = datetime.date(int(match.group(1)), int(match.group(2)),
+                              int(match.group(3)))
+    except ValueError:
+        return False
+    return until > (today or datetime.date.today())
+
+
 def _text(value: Any) -> Optional[str]:
     """graph.name / node.name may be a multilang dict or a plain string."""
     if value is None:
@@ -173,7 +233,29 @@ def _hdt_of(graph: Any) -> Dict[str, Optional[Dict[str, Optional[str]]]]:
                    "kind": _text(data.get("entity_kind"))}
     if hc1 is None and hc2 is not None and hc2.get("iri"):
         hc1 = {"id": None, "name": None, "kind": None, "iri": hc2["iri"]}
-    return {"hc1": hc1, "hc2": hc2}
+    return {"hc1": hc1, "hc2": hc2, "hc1s": _hc1_list_of(graph, hc1)}
+
+
+def _hc1_list_of(graph: Any, fallback: Optional[Dict[str, Any]] = None
+                 ) -> List[Dict[str, Optional[str]]]:
+    """EVERY heritage entity this graph names, not just the first.
+
+    A landscape is several HC1s by definition, and a site can legitimately name
+    more than one (a villa and the road it stands on). The single `hc1` above
+    stays exactly as it was — a reader written against it keeps working — and
+    this is the general answer beside it.
+    """
+    found: List[Dict[str, Optional[str]]] = []
+    for node in graph.nodes:
+        if getattr(node, "node_type", "") != "heritage_entity":
+            continue
+        data = getattr(node, "data", None) or {}
+        found.append({"id": node.node_id,
+                      "name": _text(getattr(node, "name", None)),
+                      "kind": _text(data.get("entity_kind"))})
+    if not found and fallback is not None:
+        found.append(fallback)
+    return found
 
 
 def _spatial_of(graph: Any) -> Optional[Dict[str, Any]]:
@@ -202,6 +284,40 @@ def _em_id_of(graph: Any) -> Optional[str]:
             if isinstance(data, dict):
                 return _text(data.get("em_id"))
     return None
+
+
+def _composition_of(header: Dict[str, Any]) -> List[Dict[str, Optional[str]]]:
+    """The studies a LANDSCAPE is made of — references, never copies.
+
+    A landscape does not contain its sites, it *cites* them: each entry names a
+    study by the identity the catalogue can resolve (`id` and/or `em_id`), with
+    an optional title so a listing can be drawn before the referenced studies
+    are fetched. Accepts a bare list of strings too, because that is what
+    somebody writes by hand first.
+
+    Reading it does not check that the referenced studies exist. That is the
+    catalogue's job, and a library that refused to read a container because one
+    of its references was missing would make a broken link into an unopenable
+    file.
+    """
+    raw = header.get("composition") or header.get("part_studies") or []
+    if isinstance(raw, (str, bytes)):
+        raw = [raw]
+    out: List[Dict[str, Optional[str]]] = []
+    for item in raw or []:
+        if isinstance(item, dict):
+            entry = {"id": _text(item.get("id")),
+                     "em_id": _text(item.get("em_id")),
+                     "title": _text(item.get("title"))}
+        else:
+            # one string: it is whichever identity the writer had to hand, and
+            # the catalogue resolves it against both
+            value = _text(item)
+            entry = {"id": value, "em_id": value, "title": None}
+        if entry["id"] or entry["em_id"]:
+            if entry not in out:
+                out.append(entry)
+    return out
 
 
 def study_metadata(container: Any, *, study_id: Optional[str] = None
@@ -237,6 +353,7 @@ def study_metadata(container: Any, *, study_id: Optional[str] = None
 
     license_value = embargo_value = None
     hdt: Dict[str, Optional[Dict[str, Optional[str]]]] = {"hc1": None, "hc2": None}
+    hc1s: List[Dict[str, Optional[str]]] = []
     spatial = None
     em_id = None
     for graph in ordered:
@@ -247,6 +364,9 @@ def study_metadata(container: Any, *, study_id: Optional[str] = None
         found = _hdt_of(graph)
         hdt["hc1"] = hdt["hc1"] or found["hc1"]
         hdt["hc2"] = hdt["hc2"] or found["hc2"]
+        for entity in found["hc1s"]:
+            if entity not in hc1s:
+                hc1s.append(entity)
         spatial = spatial or _spatial_of(graph)
         em_id = em_id or _em_id_of(graph)
 
@@ -268,17 +388,35 @@ def study_metadata(container: Any, *, study_id: Optional[str] = None
                           for gid, graph in container.graphs.items()},
                "active_graph_id": container.active_graph_id}
 
+    # KIND · what this study is about. Declared wins; otherwise a container that
+    # names the studies it is made of IS a landscape, and everything else reads
+    # as a site. Deliberately NOT derived from the number of graphs: see
+    # `KIND_SITE` — the kind is the subject, the graph count is the method.
+    composition = _composition_of(header)
+    kind = normalise_kind(header.get("kind")) or (
+        KIND_LANDSCAPE if composition else KIND_SITE)
+
     return {
         "id": study_id or em_id,
         "em_id": em_id,
         "title": title,
         "description": description,
         "authors": authors,
+        # WHAT THE CONTAINER SAYS — `None` when it says nothing, because a
+        # licence invented by a reader is a licence nobody granted…
         "license": license_value,
+        # …and what a reader may act on: the default StratiGraph publishes
+        # under, flagged as a default so nobody mistakes it for a grant.
+        "license_effective": license_value or DEFAULT_LICENSE,
+        "license_is_default": license_value is None,
         "embargo": embargo_value,
+        "embargo_active": embargo_active(embargo_value),
         "visibility": normalise_visibility(header.get("visibility")),
+        "kind": kind,
+        "composition": composition,
         "version": version,
         "hc1": hdt["hc1"],
+        "hc1s": hc1s,
         "hc2": hdt["hc2"],
         "spatial": spatial,
         "graph_ids": list(container.graph_ids()),
