@@ -587,6 +587,103 @@ def enrich_asset_dtc(graph: Any, checksum: str, *, attributor: Optional[str],
                    author_name=author_name, reason=reason)
 
 
+# ── ingestion in bulk: a lot, a declared chain, and who uses a file ──────────
+#
+# The plural of the act above. On the api surface for the same reason: several
+# tools ingest (EMStudio's Assets tab, EMtools, a field ingest), and a rule that
+# lived in one of them would be re-invented differently by the next.
+# See :mod:`s3dgraphy.dtc.ingest`.
+
+def bucket_acquisition(graph: Graph, resources: Any, *,
+                       acquisition_id: Optional[str] = None,
+                       name: Optional[str] = None,
+                       dtc_kind: Optional[str] = None,
+                       metadata: Optional[Dict[str, Any]] = None,
+                       author: Optional[str] = None,
+                       at: Optional[str] = None) -> Dict[str, Any]:
+    """Group N resources (ids or digests) under ONE acquisition event (D12).
+
+    The serial node: a campaign of four hundred photographs is one thing in the
+    graph, not four hundred top-level entries. The membership is the
+    `dtc_had_output` edges; `data.member_count` is a cache of their number.
+    """
+    from .dtc.ingest import DEFAULT_ACQUISITION_KIND, bucket_acquisition as _bucket
+    return _bucket(graph, list(resources or ()), acquisition_id=acquisition_id,
+                   name=name, dtc_kind=dtc_kind or DEFAULT_ACQUISITION_KIND,
+                   metadata=metadata, author=author, at=at)
+
+
+def acquisition_members(graph: Graph, acquisition_id: str) -> List[str]:
+    """The resources an acquisition brought in — live, read off the edges."""
+    from .dtc.ingest import acquisition_members as _members
+    return _members(graph, acquisition_id)
+
+
+def declare_derivation(graph: Graph, output: str, inputs: Any, *,
+                       tool: Optional[str] = None,
+                       process_id: Optional[str] = None,
+                       name: Optional[str] = None,
+                       author: Optional[str] = None,
+                       at: Optional[str] = None) -> Dict[str, Any]:
+    """Declare that `output` came out of `inputs`, with `tool` named.
+
+    DECLARED, never inferred: nobody guesses that an orthophoto came from that
+    flight because the dates line up. An input may be a resource or a whole
+    acquisition.
+    """
+    from .dtc.ingest import declare_derivation as _declare
+    return _declare(graph, output, list(inputs or ()), tool=tool,
+                    process_id=process_id, name=name, author=author, at=at)
+
+
+def derivation_chain(graph: Graph, resource: str) -> Dict[str, Any]:
+    """What made this file and what consumed it — one hop each way."""
+    from .dtc.ingest import derivation_chain as _chain
+    return _chain(graph, resource)
+
+
+def attribute_batch(graph: Graph, acquisition_id: str, *,
+                    attributor: Optional[str], author: Any = None,
+                    author_name: Optional[str] = None, license: Any = None,
+                    embargo: Any = None, reason: Optional[str] = None,
+                    at: Optional[str] = None,
+                    propagate: bool = False) -> Dict[str, Any]:
+    """Licence / author / embargo for a whole lot, signed by its attributor.
+
+    The batch twin of `enrich_asset_dtc`, hung on the acquisition — which is how
+    `asset_rights` already reads it. `propagate=True` also stamps each member,
+    which is a copy and can therefore disagree: off by default.
+    """
+    from .dtc.ingest import attribute_batch as _attribute
+    return _attribute(graph, acquisition_id, attributor=attributor,
+                      author=author, author_name=author_name, license=license,
+                      embargo=embargo, reason=reason, at=at,
+                      propagate=propagate)
+
+
+def resource_usages(graph: Graph, resource: str) -> List[Dict[str, Any]]:
+    """Every live node that refers to this asset, classified by HOW.
+
+    The question to answer before replacing a file — and the inspector's
+    "used by…". Roles: reference / annotation / chain / rights / other.
+    """
+    from .dtc.ingest import resource_usages as _usages
+    return _usages(graph, resource)
+
+
+def unused_resources(graph: Graph) -> List[Dict[str, Any]]:
+    """Files nothing points at. Not a fault — a list somebody may want."""
+    from .dtc.ingest import unused_resources as _unused
+    return _unused(graph)
+
+
+def batch_summary(graph: Graph, acquisition_id: str) -> Dict[str, Any]:
+    """One acquisition as a panel shows it: the event, its members, their
+    rights (inherited or their own). Read-only."""
+    from .dtc.ingest import batch_summary as _summary
+    return _summary(graph, acquisition_id)
+
+
 # ── IIIF: the image layer, as a projection ────────────────────────────────────
 def iiif_manifest(graph: Graph, target_id: str, *, image_base: str,
                   manifest_id: Optional[str] = None,

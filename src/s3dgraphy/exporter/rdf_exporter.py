@@ -1379,6 +1379,20 @@ class RDFExporter:
         if edge_type == "has_visual_reference":
             ctx.add((target_iri, RDF.type, CRM.E36_Visual_Item))
 
+        # A DECLARED derivation whose input is a whole ACQUISITION (connections
+        # v1.6.11): the property graph writes one edge type for "this came from
+        # that" whether the input is a file or a campaign, but the RDF cannot.
+        # crmdig:L10_had_input and prov:used both range over digital OBJECTS,
+        # and an acquisition is an EVENT — emitting them here would state
+        # something false about a class, which a reasoner then propagates.
+        # Activity → activity is prov:wasInformedBy, and that is what goes out.
+        if edge_type == "dtc_had_input":
+            target = g.find_node_by_id(edge.edge_target)
+            if getattr(target, "node_type", "").startswith("dtc_"):
+                ctx.add((source_iri, PROV.wasInformedBy, target_iri))
+                self.stats["edges_emitted"] += 1
+                return
+
         if predicate is not None:
             ctx.add((source_iri, predicate, target_iri))
             # Dual emission (generalised AP11 pattern): also assert the

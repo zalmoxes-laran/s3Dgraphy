@@ -21,6 +21,21 @@ from .residency import (
     dtc_injector_id,
     inject_dtc,
 )
+# Ingestion in bulk (2026-08-17): the plural of the acquisition seam — one event
+# over N files, one attribution over the lot, a DECLARED derivation, and the
+# reader that answers "where is this asset used?".
+from .ingest import (
+    DEFAULT_ACQUISITION_KIND,
+    DEFAULT_PROCESS_KIND,
+    acquisition_members,
+    attribute_batch,
+    batch_summary,
+    bucket_acquisition,
+    declare_derivation,
+    derivation_chain,
+    resource_usages,
+    unused_resources,
+)
 
 __all__ = [
     "DTC_RECORD_VERSION",
@@ -31,4 +46,14 @@ __all__ = [
     "inject_dtc",
     "bake_dtc",
     "dtc_injector_id",
+    "DEFAULT_ACQUISITION_KIND",
+    "DEFAULT_PROCESS_KIND",
+    "bucket_acquisition",
+    "acquisition_members",
+    "declare_derivation",
+    "derivation_chain",
+    "attribute_batch",
+    "resource_usages",
+    "unused_resources",
+    "batch_summary",
 ]

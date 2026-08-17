@@ -120,10 +120,64 @@ it is: EMStudio does exactly this (PUT the bytes → sha256 → `ResourceNode`
 call, later, from a catalogue or an ingest, is the same act with a later
 timestamp — which is the point.
 
+## The plural: a LOT, not four hundred files
+
+Nobody attributes four hundred photographs one at a time, and a protocol that
+made them do it would be obeyed once. The batch form
+(`s3dgraphy.api.attribute_batch`, `s3dgraphy/dtc/ingest.py`) is the same act
+performed on the **acquisition event** that brought the files in:
+
+```
+DTCAcquisitionNode (crmdig:D12)      ← the lot; ONE licence, ONE author
+   ├── dtc_had_output → ResourceNode  (member 1)
+   ├── dtc_had_output → ResourceNode  (member 2)   …
+   ├── has_license → LicenseNode { license_type, attributed_by, attributed_at }
+   └── has_author  → AuthorNode  { orcid, attributed_by, attributed_at }
+```
+
+Nothing new was needed to read it: `asset_rights` already walks from a digest to
+the chunk that produced it, so **each member reads the lot's licence with
+`via: "dtc"`** — inheritance, not four hundred copies of one sentence. A member
+that carries its own statement wins over the lot's, because the more specific
+statement is the one somebody made about *this* object.
+
+`propagate=True` also stamps every member individually. It is **off by default**
+and the reason is not performance: a stamped member keeps its licence when it
+leaves the campaign, but the lot then has four hundred statements to revise the
+day somebody changes their mind. Inheritance is one truth; propagation is a copy,
+and a copy is a thing that can disagree.
+
+Two granularities travel together and must not be fused:
+
+| | granularity | where it is said |
+|---|---|---|
+| **attribution** (who, which licence) | the **lot** | the acquisition event |
+| **provenance** (how it was made) | the single **output** | a `DTCProcessNode`, declared |
+
+`has_author`'s source list gained `DTCNode` on 2026-08-17 (connections v1.6.11)
+so the event can carry the author of its lot — the same widening already applied
+to `dtc_had_input` / `dtc_had_output` for the same reason.
+
+## The chain is DECLARED
+
+`s3dgraphy.api.declare_derivation` records that an output came out of its inputs,
+with the tool **named and nothing more** (`data.tool = {"name": …}`, a dict so
+version and parameters are additions rather than a migration). Nobody infers a
+derivation from matching timestamps: somebody says it, and the graph records who
+and when.
+
+An input may be a single resource — which also gets the direct
+`output ─dtc_derived_from→ input` shortcut — **or a whole acquisition**, which is
+the reason the serial node exists: one input edge for a campaign of five hundred
+photographs, not five hundred. In RDF that case projects as `prov:wasInformedBy`
+(activity → activity) rather than `prov:used` / `crmdig:L10_had_input`, which
+range over digital objects and would be a false statement about a class.
+
 ## What this is not
 
 * **Not a provenance editor.** The full DTC chain (which instrument acquired
-  what, through which process) is `docs/dtc-profile.md`.
+  what, through which process) is `docs/dtc-profile.md`. The declared chain above
+  is the minimum: an event, its inputs, and the name of the tool.
 * **Not enforcement.** What the licence *permits* is not imposed by anything
   here; em-server exposes it and transports it (`X-EM-License`, the IIIF
   `requiredStatement`) and gates only the embargo, which is a date.

@@ -383,20 +383,50 @@ def enrich_asset_dtc(graph: Any, checksum: Any, *, attributor: Optional[str],
             f"no resource in this graph points at {wanted[:12]}…: enrich the "
             f"asset after the ResourceNode exists, not instead of it")
 
+    changed = declare_statements(graph, resource.node_id,
+                                 attributor=str(attributor), author=author,
+                                 author_name=author_name, license=license,
+                                 embargo=embargo, reason=reason, at=stamp)
+
+    return {"resource_id": resource.node_id, "digest": wanted,
+            "attributor": str(attributor), "at": stamp, "changed": changed}
+
+
+def declare_statements(graph: Any, node_id: str, *, attributor: str,
+                       author: Any = None, author_name: Optional[str] = None,
+                       license: Any = None, embargo: Any = None,
+                       reason: Optional[str] = None,
+                       at: Optional[str] = None) -> Dict[str, str]:
+    """Write the three statements onto ONE node, signed. Returns what changed.
+
+    The act itself, with the digest lookup taken out of it. `enrich_asset_dtc`
+    is this plus "find the resource these bytes belong to"; batch attribution
+    (:func:`s3dgraphy.dtc.ingest.attribute_batch`) is this on the ACQUISITION,
+    which is how a whole campaign gets one licence — the reader above already
+    walks the chain to find it.
+
+    One writer, deliberately: the tri-state, the tombstone rule and the
+    signature are subtle enough once. A second copy of them for the batch case
+    is how the two would drift, and the drift would be invisible until somebody
+    lifted an embargo on a lot and it kept refusing.
+    """
+    from .editorial import now_iso
+
+    stamp = at or now_iso()
     changed: Dict[str, str] = {}
     for kind, value in (("author", author), ("license", license),
                         ("embargo", embargo)):
         if value is None:
             continue
         text = str(value).strip()
-        existing = _statement(graph, resource.node_id, kind)
+        existing = _statement(graph, node_id, kind)
         if not text:
             if existing is not None:
                 _detach(graph, existing.node_id)
                 changed[kind] = "removed"
             continue
         node = existing if existing is not None else _new_statement(
-            graph, resource.node_id, kind, text)
+            graph, node_id, kind, text)
         node.name = _display(kind, text, author_name)
         data = getattr(node, "data", None)
         if not isinstance(data, dict):
@@ -416,9 +446,7 @@ def enrich_asset_dtc(graph: Any, checksum: Any, *, attributor: Optional[str],
         data["attributed_by"] = str(attributor)
         data["attributed_at"] = stamp
         changed[kind] = "declared" if existing is None else "updated"
-
-    return {"resource_id": resource.node_id, "digest": wanted,
-            "attributor": str(attributor), "at": stamp, "changed": changed}
+    return changed
 
 
 def _display(kind: str, value: str, author_name: Optional[str]) -> str:
