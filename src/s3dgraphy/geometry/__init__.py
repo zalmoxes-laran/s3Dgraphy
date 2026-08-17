@@ -30,5 +30,17 @@ provenance mechanism would be a second paradata model to keep in step.
 
 from .proxy import GeometryProxyResult, create_geometry_proxy
 from .migrate import migrate_legacy_proxies
+# DP-76, consuming half: what a graph describes in three dimensions that LIVES
+# in the store, so a 3D tool can fetch it by digest instead of walking the graph
+# itself (and drifting the day a facet is added).
+from .store_backed import (
+    geometry_summary,
+    is_geometry,
+    is_resident,
+    record_for,
+    store_backed_geometry,
+)
 
-__all__ = ["create_geometry_proxy", "GeometryProxyResult", "migrate_legacy_proxies"]
+__all__ = ["create_geometry_proxy", "GeometryProxyResult", "migrate_legacy_proxies",
+           "store_backed_geometry", "geometry_summary", "record_for",
+           "is_geometry", "is_resident"]

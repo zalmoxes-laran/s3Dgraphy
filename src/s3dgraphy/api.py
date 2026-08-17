@@ -460,6 +460,32 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
                     source_id=source_id, link_to=link_to, name=name).as_dict()
 
 
+def store_backed_geometry(graph: Graph) -> List[Dict[str, Any]]:
+    """The geometry this graph describes that LIVES in the store — resident only.
+
+    The consuming half of DP-76, and the answer a 3D tool needs before it can
+    materialise anything: one record per (facet, resource), each with the digest
+    to fetch by and the epochs/units to bind to. On the api surface because the
+    caller is another PROCESS (EMtools in Blender, a headless publisher), and
+    because the walk belongs to the library — a consumer that re-derived
+    `has_linked_resource` would drift the day a facet is added.
+
+    `reference` resources are deliberately absent: their bytes are outside the
+    store (and outside em-server's gate), so a digest cannot fetch them and a
+    path is meaningful on one machine only. See
+    :mod:`s3dgraphy.geometry.store_backed`.
+    """
+    from .geometry.store_backed import store_backed_geometry as _geometry
+    return _geometry(graph)
+
+
+def geometry_summary(graph: Graph) -> Dict[str, Any]:
+    """What is fetchable, and what the graph describes that is NOT — so a panel
+    can show the whole truth rather than the smaller half of it."""
+    from .geometry.store_backed import geometry_summary as _summary
+    return _summary(graph)
+
+
 def promotion_delta(graph: Graph, result: Dict[str, Any]) -> Dict[str, Any]:
     """The nodes/edges a promotion touched, in em.json shape — a delta to send."""
     from .publication import PromotionResult, promotion_delta as _delta
