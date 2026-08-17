@@ -6,13 +6,16 @@ The decision (E.D., 2026-08-13): **an em.json/emj is always a container**::
       "header": {...},
       "graphs": {
         "<graph id>": { "nodes": [...], "edges": [...] },
-        "shelf":      { ... em_collection: "ShelfGraph" }
+        "shelf":      { ... em_collection: "ShelfGraph" },
+        "dtc":        { ... em_collection: "DTCCorpus" }
       },
       "active_graph_id": "<graph id>"
     }
 
-A study is one or more graphs plus its shelf; a single graph is a
-**container-of-one**. This is the shape **Heriverse already reads**, so writing
+A study is one or more graphs plus its shelf and its **documentation** (the DTC
+corpus, 2026-08-17: acquisitions, transformations and the resources they are
+about — a forest that shares its leaves, and ontologically not a matrix); a
+single graph is a **container-of-one**. This is the shape **Heriverse already reads**, so writing
 it means Heriverse does not change — the format was not invented here, it was
 adopted.
 
@@ -172,6 +175,13 @@ class Container:
 
     graphs: Dict[str, Graph] = field(default_factory=dict)
     shelf: Optional[Graph] = None
+    #: The DOCUMENTATION member (`em_collection: "DTCCorpus"`) — acquisitions,
+    #: transformations and the resources they are about. Kept out of `graphs` for
+    #: exactly the reason the shelf is: a caller iterating the study's graphs must
+    #: not have to remember to skip it, and the bug that would cause is a
+    #: provenance forest rendered as a stratigraphic matrix. See
+    #: :mod:`s3dgraphy.dtc.corpus`.
+    corpus: Optional[Graph] = None
     active_graph_id: Optional[str] = None
     header: Dict[str, Any] = field(default_factory=dict)
     layout: Dict[str, Any] = field(default_factory=dict)
@@ -210,6 +220,14 @@ def is_shelf_member(graph_section: Any) -> bool:
     # a Graph object rather than a section
     data = getattr(graph_section, "data", None)
     return isinstance(data, dict) and data.get("em_collection") == "ShelfGraph"
+
+
+def is_dtc_corpus_member(graph_section: Any) -> bool:
+    """Is this member the DTC corpus? Same rule as the shelf — the MARKER, never
+    the member id. Delegated to :func:`s3dgraphy.dtc.corpus.is_dtc_corpus` so
+    there is one definition of what a corpus is."""
+    from .dtc.corpus import is_dtc_corpus
+    return is_dtc_corpus(graph_section)
 
 
 def parse_container(doc: Dict[str, Any]) -> Tuple[Container, List[str]]:
@@ -264,6 +282,11 @@ def parse_container(doc: Dict[str, Any]) -> Tuple[Container, List[str]]:
         warnings.extend(member_warnings)
         if is_shelf_member(section):
             container.shelf = graph
+        elif is_dtc_corpus_member(section):
+            # the DOCUMENTATION member: a forest of provenance, not a matrix.
+            # Routed like the shelf so `container.graphs` stays "the study's
+            # graphs" and nothing has to remember to skip it.
+            container.corpus = graph
         else:
             container.graphs[graph.graph_id] = graph
 
@@ -277,10 +300,15 @@ def parse_container(doc: Dict[str, Any]) -> Tuple[Container, List[str]]:
                 f"falling back to the first graph")
         container.active_graph_id = next(iter(container.graphs), None)
 
-    if not container.graphs and container.shelf is not None:
+    if not container.graphs and (container.shelf is not None
+                                 or container.corpus is not None):
+        held = " and ".join(
+            [w for w in ("a shelf" if container.shelf is not None else "",
+                         "a DTC corpus" if container.corpus is not None else "")
+             if w])
         warnings.append(
-            "this container holds a shelf and no study graph — readable, but "
-            "there is nothing to draw")
+            f"this container holds {held} and no study graph — readable, but "
+            f"there is no matrix to draw")
     return container, warnings
 
 
@@ -306,10 +334,15 @@ def build_container(container: Container) -> Dict[str, Any]:
     if container.shelf is not None:
         shelf_id = container.shelf.graph_id or SHELF_MEMBER_ID
         graphs[shelf_id] = _member_section(container.shelf)
+    if container.corpus is not None:
+        from .dtc.corpus import DTC_CORPUS_MEMBER_ID
+        corpus_id = container.corpus.graph_id or DTC_CORPUS_MEMBER_ID
+        graphs[corpus_id] = _member_section(container.corpus)
 
     # The header comes from the single-graph builder, so the format/version/
     # datamodel stamps are written in exactly ONE place.
-    any_graph = container.active() or container.shelf or Graph(graph_id="empty")
+    any_graph = (container.active() or container.shelf or container.corpus
+                 or Graph(graph_id="empty"))
     header = build_emjson(any_graph)["header"]
     # …and everything ELSE the caller put in the header survives the write.
     #

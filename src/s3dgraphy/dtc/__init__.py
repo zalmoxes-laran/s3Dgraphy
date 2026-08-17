@@ -24,6 +24,18 @@ from .residency import (
 # Ingestion in bulk (2026-08-17): the plural of the acquisition seam — one event
 # over N files, one attribution over the lot, a DECLARED derivation, and the
 # reader that answers "where is this asset used?".
+# The DOCUMENTATION member (2026-08-17): the corpus is a container member of its
+# own kind — acquisitions, transformations and the resources they are about, a
+# forest that shares its leaves, ontologically NOT a stratigraphic matrix.
+from .corpus import (
+    DTC_CORPUS_COLLECTION,
+    DTC_CORPUS_MEMBER_ID,
+    corpus_of,
+    dtc_corpus_summary,
+    is_dtc_corpus,
+    mirror_resource,
+    new_corpus,
+)
 from .ingest import (
     DEFAULT_ACQUISITION_KIND,
     DEFAULT_PROCESS_KIND,
@@ -56,4 +68,11 @@ __all__ = [
     "resource_usages",
     "unused_resources",
     "batch_summary",
+    "DTC_CORPUS_COLLECTION",
+    "DTC_CORPUS_MEMBER_ID",
+    "new_corpus",
+    "is_dtc_corpus",
+    "corpus_of",
+    "dtc_corpus_summary",
+    "mirror_resource",
 ]

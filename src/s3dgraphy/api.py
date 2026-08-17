@@ -445,9 +445,19 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
                      author: Optional[str] = None, at: Optional[str] = None,
                      source_id: Optional[str] = None,
                      link_to: Optional[str] = None,
-                     name: Optional[str] = None) -> Dict[str, Any]:
-    """Publish a resource: `residency="reference"` + url + checksum, and record
-    the genesis as a DTC transformation (crmdig:D7), attributed and dated.
+                     name: Optional[str] = None,
+                     residency: str = "reference",
+                     corpus: Optional[Graph] = None) -> Dict[str, Any]:
+    """Publish a resource: url + checksum + a residency, and record the genesis
+    as a DTC transformation (crmdig:D7), attributed and dated.
+
+    `residency` says which true sentence this is — `reference` (a store the study
+    points at, the default and the original DP-76 one) or `resident` (the ROOM's
+    store: em-server is in the bytes' path, so the gate and the licence travel
+    with them). `corpus` is the offline→online moment: hand it the container's
+    DOCUMENTATION member and the D7 event is recorded THERE, with the asset
+    mirrored into it under its own id — the shared leaf between the study and its
+    provenance.
 
     The inverse of `import_geometry` and the activation of DP-76: the model stops
     living inside a .blend and becomes an asset the study POINTS AT. Returns the
@@ -457,7 +467,49 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
     from .publication import promote_resource as _promote
     return _promote(graph, resource_id, url=url, sha256=sha256,
                     media_type=media_type, author=author, at=at,
-                    source_id=source_id, link_to=link_to, name=name).as_dict()
+                    source_id=source_id, link_to=link_to, name=name,
+                    residency=residency, corpus=corpus).as_dict()
+
+
+# ── the DOCUMENTATION member: the DTC corpus ─────────────────────────────────
+#
+# A study's provenance is a graph of a different KIND — acquisitions,
+# transformations and the files they are about, a forest that shares its leaves.
+# It travels as a container member of its own (`em_collection: "DTCCorpus"`), the
+# way the shelf does. On the api surface because the tools author it: EMStudio's
+# Documentation tab, EMtools at promotion, an ingest.
+
+def dtc_corpus(container: Any, *, create: bool = True) -> Optional[Graph]:
+    """The container's documentation member — found by its marker, or made.
+
+    `create=False` answers "is there one?" without making one: a panel that
+    showed an empty corpus it had just invented would be reporting its own side
+    effect. See :mod:`s3dgraphy.dtc.corpus`.
+    """
+    from .dtc.corpus import corpus_of
+    return corpus_of(container, create=create)
+
+
+def is_dtc_corpus(graph: Any) -> bool:
+    """Is this graph (or raw member section) a DTC corpus?"""
+    from .dtc.corpus import is_dtc_corpus as _is
+    return _is(graph)
+
+
+def new_dtc_corpus(graph_id: Optional[str] = None,
+                   name: Optional[str] = None) -> Graph:
+    """An empty corpus, tagged as one — for a caller building a container."""
+    from .dtc.corpus import DTC_CORPUS_MEMBER_ID, new_corpus
+    return new_corpus(graph_id or DTC_CORPUS_MEMBER_ID, name)
+
+
+def dtc_corpus_summary(corpus: Any) -> Dict[str, Any]:
+    """What is in the corpus, in its own terms: roots (acquisitions),
+    transformations, resources, outputs, **shared leaves** (a file more than one
+    event consumed — what a matrix could not draw), orphans, and anything
+    FOREIGN that does not belong in a corpus at all."""
+    from .dtc.corpus import dtc_corpus_summary as _summary
+    return _summary(corpus)
 
 
 def store_backed_geometry(graph: Graph) -> List[Dict[str, Any]]:

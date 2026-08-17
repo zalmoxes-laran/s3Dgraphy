@@ -66,6 +66,12 @@ class PromotionResult:
     source_id: Optional[str] = None
     node_ids: List[str] = field(default_factory=list)
     edge_ids: List[str] = field(default_factory=list)
+    #: What landed in the DOCUMENTATION member rather than in the study graph.
+    #: Separate baskets because a delta spanning two container members has to say
+    #: which member each piece belongs to — a receiver that guessed would write
+    #: provenance into somebody's matrix.
+    corpus_node_ids: List[str] = field(default_factory=list)
+    corpus_edge_ids: List[str] = field(default_factory=list)
     created: bool = False
     warnings: List[str] = field(default_factory=list)
 
@@ -76,21 +82,30 @@ class PromotionResult:
             "source_id": self.source_id,
             "node_ids": list(self.node_ids),
             "edge_ids": list(self.edge_ids),
+            "corpus_node_ids": list(self.corpus_node_ids),
+            "corpus_edge_ids": list(self.corpus_edge_ids),
             "created": self.created,
             "warnings": list(self.warnings),
         }
 
 
 def _ensure_edge(graph: Graph, source: str, target: str, edge_type: str,
-                 result: PromotionResult) -> None:
+                 result: PromotionResult, *, corpus: bool = False) -> None:
+    """Create the edge unless it is there, and record it in the right basket.
+
+    `corpus=True` puts the id in `corpus_edge_ids`: a delta that spans two
+    container members has to say which member each piece belongs to, or the
+    receiver applies half of it to the wrong graph.
+    """
+    basket = result.corpus_edge_ids if corpus else result.edge_ids
     edge_id = _stable_id(f"edge|{source}|{edge_type}|{target}")
     for edge in graph.edges:
         if (edge.edge_source, edge.edge_type, edge.edge_target) == (source, edge_type, target):
-            result.edge_ids.append(getattr(edge, "edge_id", edge_id))
+            basket.append(getattr(edge, "edge_id", edge_id))
             return
     try:
         graph.add_edge(edge_id, source, target, edge_type)
-        result.edge_ids.append(edge_id)
+        basket.append(edge_id)
     except ValueError as exc:
         result.warnings.append(f"promotion: edge {edge_type} not created: {exc}")
 
@@ -101,7 +116,9 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
                      at: Optional[str] = None,
                      source_id: Optional[str] = None,
                      link_to: Optional[str] = None,
-                     name: Optional[str] = None) -> PromotionResult:
+                     name: Optional[str] = None,
+                     residency: str = "reference",
+                     corpus: Optional[Graph] = None) -> PromotionResult:
     """Publish a resource: `reference` residency, url + checksum, and a D7 event.
 
     Args:
@@ -115,6 +132,19 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
             the reference verifiable: a URL alone says where to look, not what
             you should find.
         media_type: recorded as `resource_type` when given.
+        residency: `reference` (default — the bytes are in a store the study
+            points at) or `resident` (the ROOM's own store: em-server is in their
+            path, so the gate and the licence travel with them). Both are true
+            sentences about published bytes and the caller knows which one it is
+            making; the default is the old one, so nothing already recorded
+            changes meaning.
+        corpus: the DOCUMENTATION member (`dtc.corpus`), when the promotion
+            should be recorded there. This is the offline→online moment: a
+            resource that was a file on somebody's disk becomes an asset in the
+            store, and *how it got there* belongs in the corpus rather than in
+            the middle of a stratigraphic matrix. The asset itself is mirrored
+            into the corpus **under its own id** — the shared leaf — and the D7
+            event is written THERE and not in the study graph.
         author / at: stamped on the event. The hand and the instant are the
             whole point of recording a genesis.
         source_id: the WORKING resource this was produced from, when there is
@@ -169,37 +199,71 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
         url_type = _URL_TYPE_BY_MEDIA.get(media_type)
         if url_type:
             data["url_type"] = url_type
-    # `reference` and not `resident`: the bytes live in the store now, and the
-    # study points at them. That IS the de-monolithisation (DP-76) — said in the
-    # field the model already had, rather than in a new one.
+    # WHERE THE BYTES ARE, and the two true answers.
+    #
+    # `reference` is the original DP-76 sentence: the bytes went to a store and
+    # the study POINTS at them (de-monolithisation, said in the field the model
+    # already had). `resident` is the other true one, and it is what the room's
+    # own store means: em-server holds these bytes, so the embargo gate and the
+    # licence header are in their path, and a digest fetches them from anywhere
+    # (`store_backed_geometry` lists exactly those).
+    #
+    # The default stays `reference` — changing it would rewrite the meaning of
+    # every promotion already recorded — and the caller who publishes INTO the
+    # room says `residency="resident"`.
+    wanted_residency = str(residency or "reference")
     if hasattr(resource, "set_residency"):
-        resource.set_residency("reference")
+        resource.set_residency(wanted_residency)
     else:                                      # pragma: no cover — older model
-        data["residency"] = "reference"
+        data["residency"] = wanted_residency
     result.node_ids.append(resource_id)
 
     # ── the genesis: a DTC transformation, attributed and dated ──────────────
-    process = graph.find_node_by_id(process_id)
+    #
+    # WHERE it is written is the decision the corpus introduces. Without a corpus
+    # it goes in the study graph, as it always has (nothing on anybody's disk
+    # changes). With one, the event goes in the CORPUS and the asset is mirrored
+    # there under its own id: the study keeps saying "this is my asset", the
+    # corpus says "this is how it came to be", and the id shared between the two
+    # members is what makes them one statement rather than two copies.
+    home = corpus if corpus is not None else graph
+    if corpus is not None:
+        from .dtc.corpus import mirror_resource
+        mirror_resource(corpus, resource)
+        result.corpus_node_ids.append(resource_id)
+
+    process = home.find_node_by_id(process_id)
     if process is None:
         process = DTCProcessNode(
             process_id,
             name=f"published {name or resource_id}",
             description="working model → published asset",
             dtc_kind=PROMOTION_KIND)
-        graph.add_node(process)
+        home.add_node(process)
         result.created = True
     _stamp(process, author=author, at=at)
-    result.node_ids.append(process_id)
+    (result.corpus_node_ids if corpus is not None else result.node_ids).append(
+        process_id)
 
-    _ensure_edge(graph, process_id, resource_id, "dtc_had_output", result)
+    _ensure_edge(home, process_id, resource_id, "dtc_had_output", result,
+                 corpus=corpus is not None)
     if source_id:
-        if graph.find_node_by_id(source_id) is None:
+        if home.find_node_by_id(source_id) is None and graph.find_node_by_id(source_id) is None:
             result.warnings.append(
                 f"promotion: source '{source_id}' is not in the graph; the event "
                 f"records the output only")
+        elif corpus is not None and home.find_node_by_id(source_id) is None:
+            # the working model lives in the study graph, not in the corpus. Said
+            # rather than mirrored: mirroring a .blend nobody published would put
+            # a thing in the documentation that nobody can fetch.
+            result.warnings.append(
+                f"promotion: the source '{source_id}' is in the study graph, not "
+                f"in the corpus; the corpus event records the output only")
         else:
-            _ensure_edge(graph, process_id, source_id, "dtc_had_input", result)
-            _ensure_edge(graph, resource_id, source_id, "dtc_derived_from", result)
+            _ensure_edge(home, process_id, source_id, "dtc_had_input", result,
+                         corpus=corpus is not None)
+            _ensure_edge(home, resource_id, source_id, "dtc_derived_from", result,
+                         corpus=corpus is not None)
 
     if link_to:
         if graph.find_node_by_id(link_to) is None:
