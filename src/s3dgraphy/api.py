@@ -490,6 +490,18 @@ def dtc_corpus(container: Any, *, create: bool = True) -> Optional[Graph]:
     return corpus_of(container, create=create)
 
 
+def merge_corpus(resident: Any, incoming: Any) -> Dict[str, Any]:
+    """Fold one DTC corpus into another, per UUID. Returns the report as a dict.
+
+    On the api surface because another PROCESS performs it: em-server merges a
+    project's **file** corpus into the instance's **resident** one when a study is
+    promoted or joins a room, and it must not invent a second answer to "who
+    wins". Same merge the container uses. See :mod:`s3dgraphy.dtc.corpus`.
+    """
+    from .dtc.corpus import merge_corpus as _merge
+    return _merge(resident, incoming)
+
+
 def is_dtc_corpus(graph: Any) -> bool:
     """Is this graph (or raw member section) a DTC corpus?"""
     from .dtc.corpus import is_dtc_corpus as _is

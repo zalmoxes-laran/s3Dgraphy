@@ -33,6 +33,7 @@ from .corpus import (
     corpus_of,
     dtc_corpus_summary,
     is_dtc_corpus,
+    merge_corpus,
     mirror_resource,
     new_corpus,
 )
@@ -74,5 +75,6 @@ __all__ = [
     "is_dtc_corpus",
     "corpus_of",
     "dtc_corpus_summary",
+    "merge_corpus",
     "mirror_resource",
 ]

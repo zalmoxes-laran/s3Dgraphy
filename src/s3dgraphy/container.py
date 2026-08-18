@@ -541,6 +541,12 @@ class MergeReport:
     added_edges: int = 0
     shelf_added: int = 0
     shelf_merged: int = 0
+    #: the DOCUMENTATION member (`DTCCorpus`): how many nodes arrived, and how
+    #: many were the same node seen twice. Counted separately from the graphs
+    #: because a merge that brought a colleague's provenance and one that only
+    #: brought their units are different events to a reader.
+    corpus_added: int = 0
+    corpus_merged: int = 0
     conflicts: List[Conflict] = field(default_factory=list)
     #: P4.1 · presence outcomes: how many nodes/edges came out DELETED, and how
     #: many a later edit brought back. A resurrection is deliberate and must be
@@ -843,6 +849,24 @@ def merge_into_container(container: Container, other: Container) -> MergeReport:
             # invisible for no reason a user could guess
             report.conflicts.extend(shelf_report.conflicts)
             report.warnings.extend(shelf_report.warnings)
+
+    # …and the DOCUMENTATION, which used to be dropped on the floor: a colleague
+    # whose file carried a DTC corpus had it silently discarded, so the
+    # provenance of the very assets their graphs referred to did not arrive.
+    # Same additive per-UUID merge as a graph — one photograph documented by two
+    # people is one entry.
+    if other.corpus is not None:
+        if container.corpus is None:
+            container.corpus = other.corpus
+            report.corpus_added = len(list(other.corpus.nodes))
+        else:
+            before = len(list(container.corpus.nodes))
+            corpus_report = MergeReport()
+            _merge_graph_into(container.corpus, other.corpus, corpus_report)
+            report.corpus_added = len(list(container.corpus.nodes)) - before
+            report.corpus_merged = corpus_report.merged_nodes
+            report.conflicts.extend(corpus_report.conflicts)
+            report.warnings.extend(corpus_report.warnings)
 
     if container.active_graph_id not in container.graphs:
         container.active_graph_id = next(iter(container.graphs), None)

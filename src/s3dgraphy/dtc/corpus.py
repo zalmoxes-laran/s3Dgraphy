@@ -258,3 +258,38 @@ def mirror_resource(corpus: Any, resource: Any) -> Any:
         if value not in (None, "") and data.get(key) in (None, ""):
             data[key] = value
     return existing
+
+# ── the offline half coming home ─────────────────────────────────────────────
+
+def merge_corpus(resident: Any, incoming: Any) -> Dict[str, Any]:
+    """Fold one corpus into another, per UUID. Returns a report as a dict.
+
+    The promote path: a project documented **offline** carries its DTC in its own
+    file member, and joining a room (or promoting to an instance's resident
+    corpus) must bring that documentation with it — additively, because two
+    people who photographed the same stone are describing one file and must end
+    up with one entry.
+
+    Deliberately the SAME merge the container uses (`_merge_graph_into`): OR-Set
+    for presence, LWW-per-field with the editorial stamps as clocks, edges keyed
+    by their (source, type, target) triple. A corpus is a graph, and giving it a
+    second merge algorithm would be a second answer to "who wins" — the question
+    that is hardest to change your mind about later.
+
+    Returns the counts a caller can check (`merged_nodes`, `added_nodes`,
+    `added_edges`, `conflicts`, the tombstone outcomes) rather than a boolean: a
+    merge that only says "ok" is a merge nobody can audit.
+    """
+    from ..container import MergeReport, _merge_graph_into
+
+    report = MergeReport()
+    _merge_graph_into(resident, incoming, report)
+    return {"merged_nodes": report.merged_nodes,
+            "added_nodes": report.added_nodes,
+            "added_edges": report.added_edges,
+            "removed_nodes": report.removed_nodes,
+            "resurrected_nodes": report.resurrected_nodes,
+            "removed_edges": report.removed_edges,
+            "conflicts": [c.as_dict() if hasattr(c, "as_dict") else c
+                          for c in report.conflicts],
+            "warnings": list(report.warnings)}
