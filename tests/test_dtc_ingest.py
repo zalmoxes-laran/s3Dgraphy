@@ -118,6 +118,63 @@ def test_a_tombstoned_member_is_not_a_member():
     assert acq.data["member_count"] == 2
 
 
+def test_an_all_ghost_batch_creates_NO_acquisition():
+    """The empty root. A lot whose every reference is a ghost used to be created
+    anyway, and the corpus grew a root that grouped nothing — measured on a
+    synthetic corpus, where it added a fourth root to a documentation that had
+    three."""
+    g = graph_with_files(1)
+    before = len(node_types(g, "dtc_acquisition"))
+    report = em.bucket_acquisition(g, ["ghost1", "ghost2"], name="Volo mai fatto")
+
+    assert report["created"] is False
+    assert report["acquisition_id"] is None, "no id, because there is no event"
+    assert report["count"] == 0 and report["members"] == []
+    assert report["missing"] == ["ghost1", "ghost2"], "the ghosts are reported"
+    assert any("not created" in w for w in report["warnings"])
+    assert len(node_types(g, "dtc_acquisition")) == before, "the corpus is untouched"
+
+
+def test_a_partly_ghost_batch_still_makes_the_lot_of_what_is_there():
+    """The guard is about NOTHING, not about something missing: one live file is
+    a lot, and the ghost beside it is reported (unchanged behaviour)."""
+    g = graph_with_files(2)
+    report = em.bucket_acquisition(g, ["img0", "ghost", "img1"], name="Volo parziale")
+
+    assert report["created"] is True
+    assert report["acquisition_id"] is not None
+    assert report["count"] == 2 and report["missing"] == ["ghost"]
+    assert len(node_types(g, "dtc_acquisition")) == 1
+
+
+def test_an_existing_lot_keeps_its_identity_when_a_later_batch_is_all_ghosts():
+    """Refusing to CREATE is not refusing to answer: a second drop whose files
+    are all ghosts added nothing to a REAL lot, and reporting `None` about a node
+    the caller can see would be the same lie the other way round."""
+    g = graph_with_files(1)
+    first = em.bucket_acquisition(g, ["img0"], name="Volo marzo")
+    again = em.bucket_acquisition(g, ["ghost"], name="Volo marzo")
+
+    assert again["acquisition_id"] == first["acquisition_id"]
+    assert again["created"] is False
+    assert again["count"] == 1, "still the one live file"
+    assert again["added"] == [] and again["missing"] == ["ghost"]
+    assert len(node_types(g, "dtc_acquisition")) == 1
+
+
+def test_a_batch_of_only_tombstones_creates_no_acquisition():
+    """The same guard through the OTHER door: the files exist in the document but
+    are deleted, so there is nothing alive to bucket."""
+    g = graph_with_files(2)
+    for nid in ("img0", "img1"):
+        g.find_node_by_id(nid).data[REMOVED_KEY] = {
+            "ts": "2026-08-17T10:00:00Z", "by": ME}
+    report = em.bucket_acquisition(g, ["img0", "img1"], name="lot di fantasmi")
+
+    assert report["acquisition_id"] is None and report["created"] is False
+    assert node_types(g, "dtc_acquisition") == []
+
+
 def test_a_bucket_groups_files_not_units():
     g = graph_with_files(1)
     g.add_node(StratigraphicUnit("US1", name="US1"))

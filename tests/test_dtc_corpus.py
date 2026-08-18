@@ -83,7 +83,11 @@ def test_the_corpus_stays_out_of_the_studys_graphs():
 def test_it_round_trips_through_the_file():
     container = study()
     corpus = em.dtc_corpus(container)
-    em.bucket_acquisition(corpus, [], name="Volo 2026-03")
+    # a lot needs a FILE: an acquisition that groups nothing is not created
+    # (dtc.ingest guards it), so the round trip is tested with a real member
+    corpus.add_node(ResourceNode("img0", name="IMG_0000.jpg",
+                                 checksum=digest(0), residency="resident"))
+    em.bucket_acquisition(corpus, ["img0"], name="Volo 2026-03")
 
     doc = build_container(container)
     assert "dtc" in doc["graphs"], "written back into `graphs`, where a reader looks"

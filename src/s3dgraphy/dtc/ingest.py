@@ -197,7 +197,9 @@ def bucket_acquisition(graph: Any, resources: Sequence[str], *,
     surprises people.
 
     Returns ``{acquisition_id, created, members, added, missing, count,
-    warnings}``.
+    warnings}``. With **no live member at all** and no such acquisition yet,
+    nothing is created and ``acquisition_id`` is ``None`` — an event that groups
+    no file is not an event (see the guard below).
     """
     from ..nodes import DTCAcquisitionNode
 
@@ -228,6 +230,23 @@ def bucket_acquisition(graph: Any, resources: Sequence[str], *,
         acq_id = _stable_id("acquisition|" + "|".join(sorted(members)))
 
     acq = _find(graph, acq_id)
+    # An acquisition that groups NOTHING is not an acquisition. When every
+    # reference is a ghost (a batch whose resources were never written, or were
+    # tombstoned since), creating the event anyway leaves an EMPTY ROOT in the
+    # corpus: a lot that claims to be where material entered the study while
+    # naming no file at all. Measured on a synthetic corpus — an all-ghost lot
+    # gave the DAG a fourth root nobody had documented.
+    #
+    # This refuses to CREATE, not to answer: an acquisition that already exists
+    # keeps its identity (a second batch whose refs are all ghosts is a call that
+    # added nothing to a real lot, and saying `acquisition_id: None` about a node
+    # the caller can see would be the same kind of lie in the other direction).
+    if not members and acq is None:
+        warnings.append("no live resource to bucket — acquisition not created")
+        return {"acquisition_id": None, "created": False, "members": [],
+                "added": [], "missing": missing, "count": 0,
+                "warnings": warnings}
+
     created = acq is None
     if acq is None:
         acq = DTCAcquisitionNode(
