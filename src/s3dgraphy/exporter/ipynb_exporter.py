@@ -132,10 +132,45 @@ getattr(index["{ref}"], "data", {{}})''',
 _SCENE_VIEW_TYPES = ("scene3d", "rm", "un_scene")
 
 
-def _embed_cells(block: Dict[str, Any], index_hint: str) -> List[Dict[str, Any]]:
+def _figure_markdown(view: str, ref: str, label: str, data: bytes,
+                     suffix: str) -> Dict[str, Any]:
+    """The rendered figure, inline, as a markdown image.
+
+    Base64 in the notebook rather than a file beside it: a notebook is passed
+    around as one file, and an `.ipynb` whose figures live in a sibling folder
+    arrives broken the first time somebody emails it — the same rule the HTML
+    export follows.
+
+    It sits ABOVE the live query, not instead of it: this notebook's promise is
+    that its cells ask the study rather than quote it, and a picture taken at
+    export time is a quote. Both, labelled, keeps the promise and still shows
+    the reader what the author was looking at.
+    """
+    import base64
+
+    mime = {"svg": "image/svg+xml", "png": "image/png",
+            "jpg": "image/jpeg", "jpeg": "image/jpeg",
+            "pdf": "application/pdf"}.get(
+                (suffix or "").lstrip(".").lower(), "image/png")
+    encoded = base64.b64encode(data).decode("ascii")
+    return _markdown(
+        f"**{label}** — *istantanea al momento dell'export; la cella qui sotto "
+        f"interroga lo studio adesso.*\n\n"
+        f"![{label}](data:{mime};base64,{encoded})\n")
+
+
+def _embed_cells(block: Dict[str, Any], index_hint: str,
+                 figures: Optional[Dict[str, bytes]] = None,
+                 figure_suffix: str = ".png") -> List[Dict[str, Any]]:
     ref = str(block.get("ref") or "")
     view = str(block.get("view_type") or "")
     label = f"embed · {view or 'reference'} → {ref}"
+    from ..narrative.bake import figure_key
+
+    rendered = (figures or {}).get(figure_key(view, ref))
+    before: List[Dict[str, Any]] = (
+        [_figure_markdown(view, ref, label, rendered, figure_suffix)]
+        if rendered and view not in _SCENE_VIEW_TYPES else [])
 
     if view in _SCENE_VIEW_TYPES:
         return [_markdown(
@@ -145,13 +180,16 @@ def _embed_cells(block: Dict[str, Any], index_hint: str) -> List[Dict[str, Any]]
 
     template = _CELLS.get(view)
     if template is None:
-        return [_code(f'# {label} (no query defined for this view type yet)\n'
-                      f'index.get("{ref}")')]
-    return [_code(template.format(label=label, ref=ref))]
+        return before + [_code(
+            f'# {label} (no query defined for this view type yet)\n'
+            f'index.get("{ref}")')]
+    return before + [_code(template.format(label=label, ref=ref))]
 
 
 def build_notebook(graph: Any, narrative_id: str, *,
-                   emjson_url: Optional[str] = None) -> Dict[str, Any]:
+                   emjson_url: Optional[str] = None,
+                   figures: Optional[Dict[str, bytes]] = None,
+                   figure_suffix: str = ".png") -> Dict[str, Any]:
     """The notebook, as a dict. Raises ``KeyError`` for an unknown narrative."""
     from ..narrative.query import narratives
 
@@ -230,7 +268,8 @@ def build_notebook(graph: Any, narrative_id: str, *,
                     text = f"> ⚠︎ *bozza non convalidata*\n>\n> {text}"
                 cells.append(_markdown(text + "\n"))
             elif block.get("block_type") == "embed":
-                cells.extend(_embed_cells(block, "index"))
+                cells.extend(_embed_cells(block, "index", figures,
+                                          figure_suffix))
 
     cells.append(_markdown(
         "---\n\n*Generated from a StratiGraph NarrativeNode. The cells above "
@@ -257,8 +296,11 @@ def build_notebook(graph: Any, narrative_id: str, *,
 
 
 def export_narrative_ipynb(graph: Any, narrative_id: str, *,
-                           emjson_url: Optional[str] = None) -> str:
+                           emjson_url: Optional[str] = None,
+                           figures: Optional[Dict[str, bytes]] = None,
+                           figure_suffix: str = ".png") -> str:
     """The notebook as a JSON string, ready to write or serve."""
     return json.dumps(build_notebook(graph, narrative_id,
-                                     emjson_url=emjson_url),
+                                     emjson_url=emjson_url, figures=figures,
+                                     figure_suffix=figure_suffix),
                       ensure_ascii=False, indent=1)

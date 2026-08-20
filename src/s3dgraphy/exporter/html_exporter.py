@@ -116,7 +116,12 @@ def _image_src(block: BakedBlock) -> Optional[str]:
     if image is None or not getattr(image, "data", None):
         return None
     suffix = (getattr(image, "suffix", "") or "").lstrip(".").lower() or "png"
-    mime = {"jpg": "jpeg", "jpe": "jpeg", "tif": "tiff"}.get(suffix, suffix)
+    # `image/svg` is not a media type and a browser will not draw it: SVG is
+    # `image/svg+xml`. Measured the first time a client-rendered figure (which is
+    # SVG) reached the HTML export — the data URI was there and the picture was
+    # not. The others are the usual spelling differences.
+    mime = {"jpg": "jpeg", "jpe": "jpeg", "tif": "tiff",
+            "svg": "svg+xml"}.get(suffix, suffix)
     encoded = base64.b64encode(image.data).decode("ascii")
     return f"data:image/{mime};base64,{encoded}"
 

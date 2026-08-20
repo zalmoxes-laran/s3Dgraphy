@@ -321,16 +321,45 @@ def _map_block(node: Any, graph: Any, options: Dict[str, Any]) -> BakedBlock:
 
 # ── the bake ──────────────────────────────────────────────────────────────────
 
+def figure_key(view_type: Any, ref: Any) -> str:
+    """The name a SUPPLIED figure is filed under: ``"<view_type>:<ref>"``.
+
+    Computed the same way on both sides of the wire (the client renders and
+    names, the bake looks up), and stable per (what is shown, what it shows): the
+    same epoch embedded in two chapters is ONE figure, which is also what a
+    reader expects of a printed plate.
+    """
+    return f"{str(view_type or '').strip()}:{str(ref or '').strip()}"
+
+
 def bake_narrative(graph: Any, narrative_id: str, *,
-                   base_dir: Optional[str] = None) -> BakedNarrative:
+                   base_dir: Optional[str] = None,
+                   figures: Optional[Dict[str, bytes]] = None,
+                   figure_suffix: str = ".png") -> BakedNarrative:
     """Resolve one NarrativeNode into a :class:`BakedNarrative`.
 
     ``base_dir`` is what relative image locators are resolved against — pass the
     folder of the em.json. Without it, only absolute paths resolve.
 
+    ``figures`` are images somebody ELSE rendered, keyed by :func:`figure_key`
+    (``"matrix:EP1"``), with ``figure_suffix`` naming their format. They exist
+    because of one line of the design: **a matrix is drawn by the layout engine,
+    and the layout engine lives in the client.** s3Dgraphy will not grow a
+    browser, and re-implementing the lane assignment here (swimlanes + the
+    `is_after` chain + inherited membership) would be a second engine that drifts
+    from the canvas — which is exactly the bug the narrative embeds had. So the
+    renderer the author is looking at hands its picture in, and the bake places
+    it.
+
+    A ``view_type`` that would otherwise bake to a placeholder (``matrix``,
+    ``scene3d``) becomes a real ``image`` block when its figure is supplied;
+    without one it stays the placeholder, which is the honest degradation — the
+    export never breaks and the empty space still says why.
+
     Raises ``KeyError`` when ``narrative_id`` names no narrative: baking nothing
     under a name the caller believes in would be worse than failing.
     """
+    supplied = dict(figures or {})
     node = graph.find_node_by_id(narrative_id)
     if node is None or getattr(node, "node_type", None) != "narrative":
         raise KeyError(f"no narrative node with id {narrative_id!r}")
@@ -421,6 +450,19 @@ def bake_narrative(graph: Any, narrative_id: str, *,
 
             if view_type in DEFERRED_RENDER_VIEW_TYPES:
                 label = getattr(target, "name", "") or str(ref)
+                rendered = supplied.get(figure_key(view_type, ref))
+                if rendered:
+                    # Somebody rendered it: it is a figure like any other, and
+                    # every renderer already knows how to place a `kind="image"`.
+                    baked_chapter.blocks.append(BakedBlock(
+                        kind="image", text=str(label), ref=str(ref),
+                        view_type=view_type,
+                        image=BakedImage(locator=figure_key(view_type, ref),
+                                         data=rendered,
+                                         suffix=figure_suffix,
+                                         note="reso dal client all'export"),
+                        meta={"rendered_by": "client"}))
+                    continue
                 baked_chapter.blocks.append(BakedBlock(
                     kind="placeholder",
                     text=f"{label} ({view_type})",

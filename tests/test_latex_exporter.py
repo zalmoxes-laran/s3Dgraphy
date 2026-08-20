@@ -47,19 +47,67 @@ def test_the_narrative_becomes_sections_and_prose():
     out = api.export_narrative_latex(_fixture_graph(), "NARR.portamarina")
     tex = out["tex"]
     assert "\\section*{Porta Marina" in tex
-    # every chapter of the fixture, in order
-    titles = re.findall(r"\\subsection\{([^}]+)\}", tex)
-    assert titles == ["Presentazione", "Dove si trova", "Et\\`a imperiale"
-                      if False else "Età imperiale", "Cantiere imperiale"]
+    # every chapter of the fixture, in order. In the COMPLETE document they are
+    # `\section`s: the title above them is this document's own, so numbering them
+    # as pieces of somebody else's ("0.1 … 0.4", measured on the first compiled
+    # PDF) said something untrue about the file.
+    titles = re.findall(r"\\section\{([^}]+)\}", tex)
+    assert titles == ["Presentazione", "Dove si trova", "Età imperiale",
+                      "Cantiere imperiale"]
     assert "Porta Marina è l'accesso occidentale" in tex
 
 
-def test_it_is_a_body_not_a_whole_document():
-    """An exporter that emitted `\\documentclass` would be choosing the layout of
-    somebody else's book. The output is meant to be `\\input{}`."""
+def test_the_DEFAULT_is_a_complete_compilable_document():
+    """THE MEASURED FAILURE (20 Aug 2026). The default export was a body, and a
+    body opens in a LaTeX editor as three errors — "Undefined control sequence
+    \\section", "Missing \\begin{document}", "\\guillemetleft unavailable in
+    encoding" — while the HTML export of the same narrative opened as a page. An
+    export nobody can compile is not an export, and "it is a fragment" is a fact
+    the file states in a comment that no compiler reads."""
     tex = api.export_narrative_latex(_fixture_graph(), "NARR.portamarina")["tex"]
+    assert "\\documentclass" in tex
+    assert "\\begin{document}" in tex and "\\end{document}" in tex
+    # the packages, each one earned by something the exporter emits
+    for needed in ("[utf8]{inputenc}", "[T1]{fontenc}", "{babel}",
+                   "{graphicx}", "{hyperref}"):
+        assert needed in tex, needed
+    # …and no BARE guillemets, which is the third error: an EM narrative is full
+    # of «…» and the T1 commands say the same thing without needing luck
+    assert "«" not in tex and "»" not in tex
+    assert "\\guillemotleft{}" in tex or "\\guillemotright{}" in tex
+
+
+def test_the_body_is_still_available_for_somebody_with_a_preamble():
+    """The old contract, now explicit: an exporter should not choose the layout
+    of somebody else's book — so the FRAGMENT still exists, and says what it
+    assumes instead of leaving the reader to find out by compiling."""
+    tex = api.export_narrative_latex(_fixture_graph(), "NARR.portamarina",
+                                     fragment=True)["tex"]
     assert "\\documentclass" not in tex
     assert "\\begin{document}" not in tex
+    assert "\\input{}" in tex and "fontenc" in tex
+    # under somebody else's title, a chapter is a subsection
+    assert re.findall(r"\\subsection\{([^}]+)\}", tex)
+    assert not re.findall(r"^\\section\{", tex, re.MULTILINE)
+
+
+def test_the_complete_document_carries_its_bibliography():
+    """`\\cite` with no bibliography prints "[?]" — measured on the first PDF.
+    The `.bib` is a second file the caller may never write next to the first, so
+    the complete document inlines the SAME entries."""
+    out = api.export_narrative_latex(_fixture_graph(), "NARR.portamarina")
+    tex = out["tex"]
+    assert "\\begin{thebibliography}" in tex
+    keys = set(re.findall(r"\\bibitem\{([^}]+)\}", tex))
+    cited = set(re.findall(r"\\cite\{([^}]+)\}", tex))
+    assert cited and cited <= keys, \
+        f"every \\cite must have its \\bibitem — cited {cited - keys} without one"
+    # the .bib is unchanged for whoever wants BibTeX
+    assert out["bib"].count("@") >= len(cited)
+    # a fragment does NOT invent a bibliography: it belongs to the document
+    frag = api.export_narrative_latex(_fixture_graph(), "NARR.portamarina",
+                                      fragment=True)["tex"]
+    assert "\\begin{thebibliography}" not in frag
 
 
 def test_a_chapter_anchor_becomes_a_label():

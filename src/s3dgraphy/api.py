@@ -1153,13 +1153,20 @@ def write_ai_draft(graph: Graph, target: str, text: str, *, model: str,
 
 
 # ── EM Narrative — print projection (L1) ──────────────────────────────────────
-def export_narrative_latex(graph: Graph, narrative_id: str) -> Dict[str, str]:
+def export_narrative_latex(graph: Graph, narrative_id: str, *,
+                           fragment: bool = False,
+                           figures: Optional[Dict[str, Any]] = None,
+                           figure_suffix: str = ".pdf") -> Dict[str, str]:
     """Project a NarrativeNode to LaTeX + BibTeX: ``{"tex": …, "bib": …}``.
 
     An **exporter, not a renderer**: it returns two strings and needs no LaTeX
-    engine. ``tex`` is a body to ``\\input{}`` into your own preamble (chapters →
-    ``\\section``/``\\subsection``, prose → prose, embeds → figures or
-    ``\\cite``), ``bib`` one entry per cited source with keys derived
+    engine. ``tex`` is a **complete, compilable document** — a minimal preamble
+    (inputenc/fontenc/babel/graphicx/hyperref), the chapters as ``\\section``s,
+    and the cited sources as an inline ``thebibliography`` so one file yields one
+    PDF. ``fragment=True`` returns the old BODY instead, to ``\\input{}`` into
+    your own preamble (chapters become ``\\subsection``s under your title).
+
+    ``bib`` is one entry per cited source with keys derived
     deterministically from the node ids (:func:`bib_key`), so citations and
     entries cannot drift and a re-export is stable.
 
@@ -1170,7 +1177,8 @@ def export_narrative_latex(graph: Graph, narrative_id: str) -> Dict[str, str]:
 
     Raises ``KeyError`` if ``narrative_id`` names no narrative in the graph."""
     from .exporter.latex_exporter import export_narrative_latex as _e
-    return _e(graph, narrative_id)
+    return _e(graph, narrative_id, fragment=fragment, figures=figures,
+              figure_suffix=figure_suffix)
 
 
 def bib_key(node_id: str) -> str:
@@ -1181,7 +1189,9 @@ def bib_key(node_id: str) -> str:
 
 
 def bake_narrative(graph: Graph, narrative_id: str, *,
-                   base_dir: Optional[str] = None) -> Any:
+                   base_dir: Optional[str] = None,
+                   figures: Optional[Dict[str, bytes]] = None,
+                   figure_suffix: str = ".png") -> Any:
     """Resolve a live narrative into a **static snapshot** (``BakedNarrative``).
 
     A narrative's embeds mean "whatever this node says now" — which is what makes
@@ -1202,14 +1212,22 @@ def bake_narrative(graph: Graph, narrative_id: str, *,
     ``base_dir`` is what relative image locators resolve against (normally the
     folder holding the em.json). Raises ``KeyError`` if ``narrative_id`` names no
     narrative.
+
+    ``figures`` are images a CLIENT rendered, keyed by
+    :func:`s3dgraphy.narrative.bake.figure_key` — see there for why a matrix
+    arrives from outside instead of being drawn here.
+
     """
     from .narrative.bake import bake_narrative as _b
-    return _b(graph, narrative_id, base_dir=base_dir)
+    return _b(graph, narrative_id, base_dir=base_dir, figures=figures,
+              figure_suffix=figure_suffix)
 
 
 def export_narrative_html(graph: Graph, narrative_id: str, *,
                           base_dir: Optional[str] = None,
-                          generated_at: str = "") -> str:
+                          generated_at: str = "",
+                          figures: Optional[Dict[str, bytes]] = None,
+                          figure_suffix: str = ".png") -> str:
     """Render a narrative to **one self-contained HTML file** — the format for
     the reader who is simply handed a link or an attachment.
 
@@ -1222,14 +1240,25 @@ def export_narrative_html(graph: Graph, narrative_id: str, *,
     unavailable. `generated_at` is stamped into the footer when given; it is a
     parameter rather than a call to the clock so the same bake renders to the
     same bytes twice.
+    
+    ``figures``/``figure_suffix`` carry images a CLIENT rendered (keyed by
+    :func:`s3dgraphy.narrative.bake.figure_key`, e.g. ``"matrix:EP1"``): a matrix
+    is drawn by the layout engine, the layout engine lives in the client, and this
+    library does not grow a browser. Without them the visual embeds stay
+    placeholders — the export never breaks, it just says less.
+
     """
     from .exporter.html_exporter import render_html
-    return render_html(bake_narrative(graph, narrative_id, base_dir=base_dir),
+    return render_html(bake_narrative(graph, narrative_id, base_dir=base_dir,
+                                      figures=figures,
+                                      figure_suffix=figure_suffix),
                        generated_at=generated_at)
 
 
 def export_narrative_ipynb(graph: Graph, narrative_id: str, *,
-                           emjson_url: Optional[str] = None) -> str:
+                           emjson_url: Optional[str] = None,
+                           figures: Optional[Dict[str, bytes]] = None,
+                           figure_suffix: str = ".png") -> str:
     """Render a narrative to a **Jupyter notebook** — the fourth output, and the
     only LIVE one.
 
@@ -1246,13 +1275,23 @@ def export_narrative_ipynb(graph: Graph, narrative_id: str, *,
 
     Needs nothing beyond the standard library — the notebook is a dict and
     `json` is the whole serialiser.
+    
+    ``figures``/``figure_suffix`` carry images a CLIENT rendered (keyed by
+    :func:`s3dgraphy.narrative.bake.figure_key`, e.g. ``"matrix:EP1"``): a matrix
+    is drawn by the layout engine, the layout engine lives in the client, and this
+    library does not grow a browser. Without them the visual embeds stay
+    placeholders — the export never breaks, it just says less.
+
     """
     from .exporter.ipynb_exporter import export_narrative_ipynb as _e
-    return _e(graph, narrative_id, emjson_url=emjson_url)
+    return _e(graph, narrative_id, emjson_url=emjson_url, figures=figures,
+              figure_suffix=figure_suffix)
 
 
 def export_narrative_docx(graph: Graph, narrative_id: str, *,
-                          base_dir: Optional[str] = None) -> bytes:
+                          base_dir: Optional[str] = None,
+                          figures: Optional[Dict[str, bytes]] = None,
+                          figure_suffix: str = ".png") -> bytes:
     """Render a narrative to **.docx** bytes — the format for the normal reader.
 
     Bakes first (:func:`bake_narrative`), then places the result: chapter
@@ -1268,9 +1307,18 @@ def export_narrative_docx(graph: Graph, narrative_id: str, *,
     Raises :class:`MissingDependency` if python-docx is not installed — the bake
     itself does not need it, so ``bake_narrative`` keeps working and only the
     rendering is unavailable.
+    
+    ``figures``/``figure_suffix`` carry images a CLIENT rendered (keyed by
+    :func:`s3dgraphy.narrative.bake.figure_key`, e.g. ``"matrix:EP1"``): a matrix
+    is drawn by the layout engine, the layout engine lives in the client, and this
+    library does not grow a browser. Without them the visual embeds stay
+    placeholders — the export never breaks, it just says less.
+
     """
     from .exporter.docx_exporter import render_docx
-    return render_docx(bake_narrative(graph, narrative_id, base_dir=base_dir))
+    return render_docx(bake_narrative(graph, narrative_id, base_dir=base_dir,
+                                      figures=figures,
+                                      figure_suffix=figure_suffix))
 
 
 # ── XLSX mapping ──────────────────────────────────────────────────────────────

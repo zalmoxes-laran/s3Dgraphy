@@ -33,6 +33,13 @@ CITED_VIEW_TYPES = ("source", "document")
 
 #: LaTeX's special characters, and what to write instead. Order matters:
 #: the backslash must be replaced first, or it would escape the replacements.
+#:
+#: The GUILLEMETS are here for a measured reason: an EM narrative is full of
+#: «…» (the scaffolder writes «da scrivere», embed captions quote node names
+#: that way), and the bare characters reach a compiler as "\guillemetleft
+#: unavailable in encoding" unless the document loads T1 fontenc. The T1
+#: commands say the same thing and need no luck — and the complete document this
+#: exporter now writes loads T1 anyway, so both halves agree.
 _ESCAPES = (
     ("\\", r"\textbackslash{}"),
     ("&", r"\&"),
@@ -44,6 +51,8 @@ _ESCAPES = (
     ("}", r"\}"),
     ("~", r"\textasciitilde{}"),
     ("^", r"\textasciicircum{}"),
+    ("\u00ab", r"\guillemotleft{}"),
+    ("\u00bb", r"\guillemotright{}"),
 )
 
 
@@ -190,27 +199,56 @@ def _bib_entry(node: Any) -> Tuple[str, str]:
 
 # ── the document ─────────────────────────────────────────────────────────────
 
-def _figure(node: Any, view_type: str, caption_extra: str = "") -> str:
-    """An embed the reader LOOKS at → a figure placeholder with a caption.
+#: Where a supplied figure is written, relative to `main.tex`. One folder, named
+#: after what it holds: the LaTeX export is the only one of the four that cannot
+#: be a single file (a `.tex` references its images), so it travels as a ZIP with
+#: this directory inside — and the path in the document has to match it.
+FIGURE_DIR = "fig"
 
-    Deliberately a placeholder and not an `\\includegraphics`: this exporter does
-    not know where the author will put the images, or whether the "image" is a 3D
-    scene that has to be rendered first. A `\\missingfigure`-style box would need
-    a package; a commented `\\includegraphics` line next to a real caption and
-    label lets the author drop the file in and uncomment, and meanwhile the
-    document compiles and the cross-reference works.
+
+def figure_file(view_type: Any, node_id: Any, suffix: str = ".pdf") -> str:
+    """The file name a supplied figure gets: ``fig/matrix-EP1.pdf``.
+
+    Derived from (what is shown, what it shows), like the wire key, so the file
+    beside the document and the `\\includegraphics` inside it cannot drift; and
+    sanitised, because a node id is free text and `\\includegraphics` chokes on
+    spaces and braces.
+    """
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "-", f"{view_type}-{node_id}").strip("-")
+    return f"{FIGURE_DIR}/{safe or 'figura'}{suffix}"
+
+
+def _figure(node: Any, view_type: str, caption_extra: str = "",
+            figure_path: Optional[str] = None) -> str:
+    """An embed the reader LOOKS at → a figure, with its caption.
+
+    With `figure_path` (a file the caller is writing beside the document) this is
+    a real `\\includegraphics`. Without one it stays a **commented** include next
+    to a real caption and label: the document still compiles, the cross-reference
+    still works, and the author can drop a file in and uncomment.
+
+    The placeholder used to be the ONLY behaviour, on the grounds that this
+    exporter does not know where the author will put the images. True — and the
+    consequence, measured on 20 Aug 2026, was a PDF with captions and no
+    matrices. So the caller that DOES know (the transport, which writes the ZIP)
+    passes the path, and the principle survives as the fallback.
     """
     node_id = getattr(node, "node_id", "")
     name = getattr(node, "name", "") or node_id
     caption = latex_escape(name)
     if caption_extra:
         caption = f"{caption} — {latex_escape(caption_extra)}"
+    if figure_path:
+        picture = f"  \\includegraphics[width=\\linewidth]{{{figure_path}}}\n"
+    else:
+        picture = (
+            f"  % {view_type}: {node_id} — drop the exported image in and uncomment\n"
+            f"  % \\includegraphics[width=\\linewidth]{{{node_id}}}\n")
     return (
         "\\begin{figure}[htbp]\n"
         "  \\centering\n"
-        f"  % {view_type}: {node_id} — drop the exported image in and uncomment\n"
-        f"  % \\includegraphics[width=\\linewidth]{{{node_id}}}\n"
-        f"  \\caption{{{caption}}}\n"
+        + picture
+        + f"  \\caption{{{caption}}}\n"
         f"  \\label{{{_label('fig', node_id)}}}\n"
         "\\end{figure}"
     )
@@ -223,15 +261,81 @@ def _unresolved(ref: str) -> str:
             f"\\textbf{{[riferimento non risolto: {latex_escape(ref)}]}}")
 
 
-def export_narrative_latex(graph: Any, narrative_id: str) -> Dict[str, str]:
+#: The smallest preamble that COMPILES an EM narrative, and nothing more.
+#:
+#: One package per real need, each one earned by something the exporter emits:
+#: `inputenc`/`fontenc` for the accents and the guillemets an Italian record is
+#: made of, `babel` for Italian hyphenation and captions, `graphicx` because an
+#: embed becomes a `figure`, `hyperref` because a narrative cites and cross-refs.
+#: No geometry, no fonts, no style: the file has to compile, not to be designed.
+_PREAMBLE = (
+    "\\documentclass[11pt,a4paper]{article}",
+    "\\usepackage[utf8]{inputenc}",
+    "\\usepackage[T1]{fontenc}",
+    "\\usepackage[italian]{babel}",
+    "\\usepackage{graphicx}",
+    "\\usepackage[hidelinks]{hyperref}",   # also gives \\url{} for the bibliography
+)
+
+
+def _bibitem_text(entry: str) -> str:
+    """A `\\bibitem` line rendered from the BibTeX entry this exporter built.
+
+    Read back off the entry rather than re-derived from the node: the two must
+    say the same thing, and the only way to guarantee that is to have one source.
+    Fields are already LaTeX-escaped (`_bib_entry` escaped them), so nothing is
+    escaped twice here — a URL in particular must stay verbatim.
+    """
+    fields: Dict[str, str] = {}
+    for match in re.finditer(r"(\w+)\s*=\s*\{(.*?)\},?\s*$", entry, re.MULTILINE):
+        fields[match.group(1).lower()] = match.group(2).strip()
+    bits: List[str] = []
+    if fields.get("author"):
+        bits.append(fields["author"] + ",")
+    bits.append("\\emph{" + (fields.get("title") or "senza titolo") + "}")
+    if fields.get("year"):
+        bits.append("(" + fields["year"] + ")")
+    if fields.get("note"):
+        bits.append("— " + fields["note"])
+    if fields.get("url"):
+        bits.append("\\url{" + fields["url"] + "}")
+    text = " ".join(bits)
+    # …and one full stop, not two: a note that already ends in one is a sentence
+    return text if text.endswith((".", "!", "?")) else text + "."
+
+
+def export_narrative_latex(graph: Any, narrative_id: str, *,
+                           fragment: bool = False,
+                           figures: Optional[Dict[str, Any]] = None,
+                           figure_suffix: str = ".pdf") -> Dict[str, str]:
     """Project one NarrativeNode to `{"tex": ..., "bib": ...}`.
 
-    `tex` is a BODY, not a whole document: chapters as `\\section`s, prose as
-    prose, embeds as figures or `\\cite`s. It is meant to be `\\input{}` into the
-    author's own preamble — an exporter that emitted `\\documentclass` would be
-    choosing the layout of somebody else's book.
+    **`tex` is a COMPLETE, compilable document by default** — preamble,
+    `\\begin{document}`, body, `\\end{document}`.
+    
+    It used to be a body only, to be `\\input{}` into the author's own preamble,
+    on the principle that an exporter should not choose the layout of somebody
+    else's book. The principle is right and the default was wrong: measured on
+    20 Aug 2026, the exported file opened in a LaTeX editor as three errors —
+    "Undefined control sequence \\section", "Missing \\begin{document}",
+    "\\guillemetleft unavailable in encoding" — while the HTML export of the same
+    narrative opened as a page. An export nobody can compile is not an export,
+    and "it is a fragment" is a fact the file states in a comment that a compiler
+    does not read.
+    
+    So the fragment is still available, as `fragment=True`: the same body, with a
+    header saying which packages it needs. A caller who has a preamble asks for
+    it; everybody else gets a file that works.
 
-    `bib` holds one entry per cited source, keyed by :func:`bib_key`.
+    `bib` holds one entry per cited source, keyed by :func:`bib_key`. It is
+    unchanged by this flag — a bibliography is not part of a preamble.
+
+    `figures` names which embeds have a rendered image beside the document (keys
+    from :func:`s3dgraphy.narrative.bake.figure_key`, e.g. `"matrix:EP1"`; only
+    the keys are read, the values may be the bytes or anything truthy). Those
+    become real `\\includegraphics{fig/…}`; the rest keep the commented
+    placeholder. The caller is the one writing `fig/`, which is why it is the one
+    that says what is in there — this function never touches a filesystem.
 
     Raises ``KeyError`` when `narrative_id` names no narrative in the graph:
     exporting nothing under a name the caller believes in would be worse.
@@ -255,8 +359,23 @@ def export_narrative_latex(graph: Any, narrative_id: str) -> Dict[str, str]:
 
     title = getattr(node, "name", "") or narrative_id
     lines.append(f"% EM Narrative — {narrative_id}")
-    lines.append(f"% generated by s3dgraphy.exporter.latex_exporter; "
-                 f"\\input{{}} this into your own preamble")
+    lines.append("% generated by s3dgraphy.exporter.latex_exporter")
+    if fragment:
+        # A fragment cannot compile alone, and the one thing its reader needs to
+        # know is what the body ASSUMES — said as a requirement, not as an
+        # apology.
+        lines.append("% this is a BODY to \\input{} into your own preamble; it "
+                     "needs")
+        lines.append("%   \\usepackage[T1]{fontenc}  (guillemets), "
+                     "graphicx (figures), hyperref (links)")
+        if figures:
+            lines.append(f"% …and it expects the figures in ./{FIGURE_DIR}/ "
+                         f"beside the file that \\input{{}}s this one")
+    else:
+        lines.extend(_PREAMBLE)
+        lines.append(f"\\title{{{latex_escape(title)}}}")
+        lines.append("\\date{}")
+        lines.append("\\begin{document}")
     lines.append("")
     lines.append(f"\\section*{{{latex_escape(title)}}}")
     description = getattr(node, "description", "") or ""
@@ -322,7 +441,14 @@ def export_narrative_latex(graph: Any, narrative_id: str) -> Dict[str, str]:
     for chapter in node.chapters:
         lines.append("")
         chapter_title = getattr(chapter, "title", "") or ""
-        lines.append(f"\\subsection{{{latex_escape(chapter_title)}}}")
+        # A COMPLETE document's chapters are its sections; a FRAGMENT's are
+        # subsections, because the title above them is somebody else's section.
+        # Measured on the compiled PDF: as subsections under a `\section*` title,
+        # the chapters came out numbered "0.1 … 0.4" — a numbering that says the
+        # document is a piece of another one, which for the default file is no
+        # longer true.
+        level = "subsection" if fragment else "section"
+        lines.append(f"\\{level}{{{latex_escape(chapter_title)}}}")
         anchor = getattr(chapter, "anchor", None)
         if anchor:
             # The lane a chapter narrates is structural information a reader of
@@ -366,8 +492,29 @@ def export_narrative_latex(graph: Any, narrative_id: str) -> Dict[str, str]:
                         extra = f"EPSG:{epsg}"
                 elif options.get("caption"):
                     extra = str(options["caption"])
-                lines.append(_figure(target, view_type or "embed", extra))
+                key = f"{view_type or 'embed'}:{getattr(target, 'node_id', '')}"
+                path = (figure_file(view_type or "embed",
+                                    getattr(target, "node_id", ""),
+                                    figure_suffix)
+                        if (figures or {}).get(key) else None)
+                lines.append(_figure(target, view_type or "embed", extra, path))
 
+    if not fragment and cited_order:
+        # THE BIBLIOGRAPHY TRAVELS WITH THE FILE. `\\cite` without one prints
+        # "[?]" — measured on the first compiled PDF — and the `.bib` this
+        # function also returns is a SECOND file the caller may never write next
+        # to the first. So the complete document carries a `thebibliography` with
+        # the same entries: one file in, one PDF out, the sources visible.
+        # (`bib` is unchanged for whoever does want BibTeX.)
+        lines.append("")
+        widest = max((len(k) for k in cited_order), default=1)
+        lines.append(f"\\begin{{thebibliography}}{{{'9' * min(widest, 3)}}}")
+        for key in cited_order:
+            lines.append(f"\\bibitem{{{key}}} {_bibitem_text(bib_entries[key])}")
+        lines.append("\\end{thebibliography}")
+    if not fragment:
+        lines.append("")
+        lines.append("\\end{document}")
     tex = "\n".join(lines).rstrip() + "\n"
     bib_header = ("% EM Narrative bibliography — generated by "
                   "s3dgraphy.exporter.latex_exporter\n"
