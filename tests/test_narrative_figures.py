@@ -164,6 +164,124 @@ def test_one_figure_missing_degrades_only_THAT_block():
         "the export never breaks over a figure that did not render"
 
 
+# ── the map and the timeline: figures too, and their captions survive ───────
+
+def study_with_a_map_and_a_timeline() -> dict:
+    """The same study, plus a positioned anchor and the two other visual embeds.
+
+    Measured on 20 Aug 2026: both were dropped in **silence**. The bake read the
+    supplied figures inside one branch (`scene3d`/`matrix`), so a rendered map or
+    timeline was never looked up — no message, no placeholder saying why, just a
+    figure that went in one side and did not come out the other."""
+    doc = study()
+    nodes = doc["graph"]["nodes"]
+    nodes.append({"id": "GEO1", "name": "Saggio 3", "node_type": "geo_position",
+                  "description": "",
+                  "data": {"epsg": 4326, "shift_x": 14.4839, "shift_y": 40.7489,
+                           "rotation": 12.0}})
+    narrative = next(n for n in nodes if n["id"] == "NARR")
+    narrative["data"]["chapters"][1]["blocks"] += [
+        {"block_type": "embed", "ref": "GEO1", "view_type": "map"},
+        {"block_type": "embed", "ref": "EP1", "view_type": "timeline"},
+    ]
+    return doc
+
+
+def map_and_timeline_figures() -> dict:
+    return {figure_key("map", "GEO1"): PNG,
+            figure_key("timeline", "EP1"): PNG2}
+
+
+def test_a_rendered_MAP_becomes_an_image_and_keeps_saying_where():
+    baked = bake_narrative(graph_of(study_with_a_map_and_a_timeline()), "NARR",
+                           figures=map_and_timeline_figures())
+    maps = [b for c in baked.chapters for b in c.blocks if b.view_type == "map"]
+    assert len(maps) == 1
+    block = maps[0]
+    assert block.kind == "image" and block.image is not None
+    assert block.image.data == PNG
+    # the picture is ADDED to what the map block knew, not swapped for it: a
+    # figure of a place that did not name the place would be the worse block
+    assert "40.748900, 14.483900" in block.text, block.text
+    assert block.link.startswith("https://www.openstreetmap.org/"), block.link
+    assert block.meta.get("lat") and block.meta.get("epsg") == 4326
+
+
+def test_a_rendered_TIMELINE_becomes_an_image():
+    baked = bake_narrative(graph_of(study_with_a_map_and_a_timeline()), "NARR",
+                           figures=map_and_timeline_figures())
+    tl = [b for c in baked.chapters for b in c.blocks
+          if b.view_type == "timeline"]
+    assert len(tl) == 1 and tl[0].kind == "image"
+    assert tl[0].image is not None and tl[0].image.data == PNG2
+    assert tl[0].meta.get("rendered_by") == "client"
+
+
+def test_without_them_the_map_and_the_timeline_are_what_they_were():
+    """The degradation, which is also the no-regression check: a client that
+    renders nothing must leave the old blocks exactly as they were."""
+    baked = bake_narrative(graph_of(study_with_a_map_and_a_timeline()), "NARR")
+    kinds = {b.view_type: b.kind for c in baked.chapters for b in c.blocks
+             if b.view_type in ("map", "timeline")}
+    assert kinds["map"] == "map", "coordinates and a link, as before"
+    assert kinds["timeline"] != "image", "no figure, no image block"
+    maps = [b for c in baked.chapters for b in c.blocks if b.kind == "map"]
+    assert maps and maps[0].image is None
+    assert "40.748900" in maps[0].text, "…and it still says where"
+
+
+def test_the_map_and_the_timeline_reach_the_renderers():
+    """Not only the bake: the four exports have to place them."""
+    graph = graph_of(study_with_a_map_and_a_timeline())
+    figures = map_and_timeline_figures()
+    html = em.export_narrative_html(graph, "NARR", figures=figures)
+    assert html.count("data:image/png;base64,") == 2
+    tex = em.export_narrative_latex(graph, "NARR", figures=figures)["tex"]
+    assert "fig/map-GEO1.pdf" in tex and "fig/timeline-EP1.pdf" in tex, tex
+    nb = json.loads(em.export_narrative_ipynb(graph, "NARR", figures=figures))
+    md = "\n".join("".join(c["source"]) for c in nb["cells"]
+                    if c["cell_type"] == "markdown")
+    assert md.count("data:image/png;base64,") == 2
+
+
+def test_an_anchor_with_no_coordinates_is_not_a_position_of_zero():
+    """The other half of the map degradation, found by exporting one: with no
+    shift the block used to read "0.000000, 0.000000 (WGS84)" and link to null
+    island — a position nobody recorded, printed to six decimals."""
+    doc = study_with_a_map_and_a_timeline()
+    geo = next(n for n in doc["graph"]["nodes"] if n["id"] == "GEO1")
+    geo["data"] = {"epsg": 4326, "rotation": 12.0}          # posed, unplaced
+    baked = bake_narrative(graph_of(doc), "NARR")
+    block = next(b for c in baked.chapters for b in c.blocks
+                 if b.view_type == "map")
+    assert "0.000000" not in block.text, block.text
+    assert "non registrata" in block.text
+    assert not block.link, "no link to a place nobody named"
+    assert "lat" not in block.meta and "lon" not in block.meta
+    assert block.meta.get("note")
+
+
+def test_a_map_of_the_GRAPH_reads_the_site_position():
+    """A map embed can point at the graph itself, whose position is
+    `site_position` (the symbolic site position, not the 3D shift). Measured
+    before the fix: the caption read "0.000000, 0.000000" under a figure drawn at
+    the right place — the two halves of one block disagreeing."""
+    doc = study_with_a_map_and_a_timeline()
+    doc["graph"]["nodes"].append(
+        {"id": "GSELF", "name": "Porta Marina", "node_type": "graph",
+         "description": "",
+         "data": {"site_position": {"lon": 14.4839, "lat": 40.7489,
+                                    "crs": "EPSG:4326"}}})
+    narrative = next(n for n in doc["graph"]["nodes"] if n["id"] == "NARR")
+    narrative["data"]["chapters"][1]["blocks"].append(
+        {"block_type": "embed", "ref": "GSELF", "view_type": "map"})
+    baked = bake_narrative(graph_of(doc), "NARR")
+    block = next(b for c in baked.chapters for b in c.blocks if b.ref == "GSELF")
+    assert "40.748900, 14.483900" in block.text, block.text
+    assert "0.000000" not in block.text
+    assert block.link, "…and a link a reader can follow"
+
+
 # ── the four renderings ─────────────────────────────────────────────────────
 
 def test_an_svg_figure_is_declared_as_svg_xml_or_no_browser_draws_it():

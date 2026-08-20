@@ -285,11 +285,42 @@ def _map_block(node: Any, graph: Any, options: Dict[str, Any]) -> BakedBlock:
     epsg = int(data.get("epsg") or 4326)
     x = float(data.get("shift_x") or 0.0)
     y = float(data.get("shift_y") or 0.0)
+    rotation = float(data.get("rotation") or 0.0)
+    label = getattr(node, "name", "") or getattr(node, "node_id", "")
+
+    # THE SITE POSITION (GEO1): a map embed can point at the graph itself, and a
+    # graph's position lives in `site_position` — the symbolic where-is-this-site,
+    # deliberately distinct from the 3D shift. Read here because the client reads
+    # it: with only the shift consulted, the caption said "0.000000, 0.000000"
+    # under a figure drawn at the right place (measured in an HTML export). One
+    # position, or the two halves of the same block contradict each other.
+    site = data.get("site_position")
+    if isinstance(site, dict) and not x and not y:
+        try:
+            x = float(site.get("lon"))
+            y = float(site.get("lat"))
+            epsg = 4326
+        except (TypeError, ValueError):
+            pass
+
+    # NO COORDINATES is a case, not a zero. An anchor with no shift used to bake
+    # as "0.000000, 0.000000 (WGS84)" with a link to null island — a position
+    # nobody recorded, printed to six decimals (measured in an HTML export). The
+    # same rule the EMStudio map follows, and the same one `scene_extent` states
+    # about footprints: say what is missing, do not default it.
+    if not x and not y and data.get("lat") is None and data.get("lon") is None:
+        return BakedBlock(
+            kind="map", text=f"{label} — posizione non registrata",
+            ref=getattr(node, "node_id", ""), view_type="map",
+            meta={"epsg": epsg, "rotation": rotation,
+                  "note": "il nodo non porta coordinate: nessun punto, "
+                          "nessuna mappa"})
+
     meta: Dict[str, Any] = {
         "epsg": epsg,
         "x": x,
         "y": y,
-        "rotation": float(data.get("rotation") or 0.0),
+        "rotation": rotation,
         "zoom": options.get("zoom"),
     }
     lat = lon = None
@@ -310,7 +341,6 @@ def _map_block(node: Any, graph: Any, options: Dict[str, Any]) -> BakedBlock:
         zoom = options.get("zoom") or 17
         link = (f"https://www.openstreetmap.org/?mlat={lat:.6f}"
                 f"&mlon={lon:.6f}#map={zoom}/{lat:.6f}/{lon:.6f}")
-    label = getattr(node, "name", "") or getattr(node, "node_id", "")
     if lat is not None and lon is not None:
         text = f"{label} — {lat:.6f}, {lon:.6f} (WGS84)"
     else:
@@ -444,25 +474,44 @@ def bake_narrative(graph: Any, narrative_id: str, *,
                     ref=str(ref or ""), view_type=view_type))
                 continue
 
+            # A figure the CLIENT rendered, if one arrived for this block. Read
+            # once, here, for EVERY view type rather than inside one branch: the
+            # bake's job is to place a picture, not to hold an opinion about
+            # which views are allowed to have one. (It held that opinion until
+            # the map and the timeline got renderers, and the figures were
+            # dropped in silence — nothing said no, the lookup simply never ran.)
+            rendered = supplied.get(figure_key(view_type, ref)) if ref else None
+
+            figure = BakedImage(locator=figure_key(view_type, ref),
+                                data=rendered, suffix=figure_suffix,
+                                note="reso dal client all'export") \
+                if rendered else None
+
             if view_type == "map":
-                baked_chapter.blocks.append(_map_block(target, graph, options))
+                block = _map_block(target, graph, options)
+                if rendered:
+                    # The picture ON TOP of what the map block already knows: its
+                    # caption keeps the coordinates and their frame, and the link
+                    # stays followable. A figure of a place that did not say which
+                    # place would be a worse block than the text it replaced.
+                    block.kind = "image"
+                    block.image = figure
+                    block.meta["rendered_by"] = "client"
+                baked_chapter.blocks.append(block)
+                continue
+
+            if rendered:
+                # Somebody rendered it: it is a figure like any other, and every
+                # renderer already knows how to place a `kind="image"`.
+                label = getattr(target, "name", "") or str(ref)
+                baked_chapter.blocks.append(BakedBlock(
+                    kind="image", text=str(label), ref=str(ref),
+                    view_type=view_type, image=figure,
+                    meta={"rendered_by": "client"}))
                 continue
 
             if view_type in DEFERRED_RENDER_VIEW_TYPES:
                 label = getattr(target, "name", "") or str(ref)
-                rendered = supplied.get(figure_key(view_type, ref))
-                if rendered:
-                    # Somebody rendered it: it is a figure like any other, and
-                    # every renderer already knows how to place a `kind="image"`.
-                    baked_chapter.blocks.append(BakedBlock(
-                        kind="image", text=str(label), ref=str(ref),
-                        view_type=view_type,
-                        image=BakedImage(locator=figure_key(view_type, ref),
-                                         data=rendered,
-                                         suffix=figure_suffix,
-                                         note="reso dal client all'export"),
-                        meta={"rendered_by": "client"}))
-                    continue
                 baked_chapter.blocks.append(BakedBlock(
                     kind="placeholder",
                     text=f"{label} ({view_type})",
