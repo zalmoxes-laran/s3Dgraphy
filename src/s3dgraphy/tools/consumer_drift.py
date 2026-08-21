@@ -91,18 +91,28 @@ def _version(path: Path) -> Optional[str]:
         return None
 
 
-def _key(version: Optional[str]) -> Tuple[int, ...]:
+def version_key(version: Optional[str]) -> Tuple[int, ...]:
     """A comparable tuple, tolerant of anything that is not `a.b.c`.
 
     An unparseable version sorts LOWEST rather than raising: a consumer whose
     file says something unexpected is behind until somebody looks, which is the
     safe direction for a report nobody is watching closely.
+
+    Public because the CONNECTOR HANDSHAKE compares the same way
+    (:mod:`s3dgraphy.contract.connector`): a connector that declares a datamodel
+    version is a consumer arriving at run time instead of sitting in a checkout,
+    and answering "behind / aligned / ahead" twice, with two comparisons, is how
+    the two answers start disagreeing.
     """
     parts: List[int] = []
     for chunk in str(version or "").split("."):
         digits = "".join(c for c in chunk if c.isdigit())
         parts.append(int(digits) if digits else 0)
     return tuple(parts) or (0,)
+
+
+#: the name this module used before the handshake needed it too
+_key = version_key
 
 
 def find_root(explicit: Optional[str] = None) -> Path:
