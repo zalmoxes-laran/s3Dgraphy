@@ -22,7 +22,8 @@ from s3dgraphy.api import load_emjson_file
 from s3dgraphy.graph import Graph
 from s3dgraphy.narrative import (build_narrative, get_template, list_templates,
                                  register_template)
-from s3dgraphy.narrative.site_story import PLACEHOLDER
+from s3dgraphy.narrative.site_story import (DEFAULT_LANG, PLACEHOLDER,
+                                            build_site_story, phrase)
 from s3dgraphy.nodes.document_node import DocumentNode
 from s3dgraphy.nodes.epoch_node import EpochNode
 from s3dgraphy.nodes.narrative_node import NarrativeNode
@@ -78,7 +79,7 @@ def test_a_template_is_just_a_registered_function():
 def test_the_shape_is_the_one_the_spec_describes(portamarina):
     n = build_narrative(portamarina, "site_story")
     assert [c.title for c in n.chapters] == [
-        "Presentazione", "Dove si trova", "Età imperiale", "Cantiere imperiale"]
+        "Presentation", "Where it is", "Età imperiale", "Cantiere imperiale"]
     # intro and geo are settled by construction; the lane chapters are drafts
     assert [c.canonical for c in n.chapters] == [True, True, False, False]
     assert n.chapters[2].anchor == "EP.imperiale"     # an epoch lane
@@ -141,7 +142,7 @@ def test_no_coordinates_no_geo_chapter():
     g.add_node(StratigraphicUnit("US.1", "US1"))
     g.add_edge("e1", "US.1", "EP.1", "has_first_epoch")
     n = build_narrative(g, "site_story")
-    assert "Dove si trova" not in [c.title for c in n.chapters]
+    assert "Where it is" not in [c.title for c in n.chapters]
 
 
 def test_an_empty_lane_gets_no_chapter():
@@ -169,7 +170,7 @@ def test_all_prose_is_a_visible_placeholder(portamarina):
     prose = [b.text for c in n.chapters for b in c.blocks
              if b.block_type == "prose"]
     assert prose
-    assert all(t.startswith("[da scrivere:") and t.endswith("]") for t in prose)
+    assert all(t.startswith("[to be written:") and t.endswith("]") for t in prose)
 
 
 # ── regeneration must not destroy work ────────────────────────────────────────
@@ -241,8 +242,8 @@ def test_regeneration_does_not_duplicate_the_canonical_chapters(portamarina):
     n = build_narrative(portamarina, "site_story")
     build_narrative(portamarina, "site_story", existing=n)
     titles = [c.title for c in n.chapters]
-    assert titles.count("Presentazione") == 1
-    assert titles.count("Dove si trova") == 1
+    assert titles.count("Presentation") == 1
+    assert titles.count("Where it is") == 1
 
 
 # ── activities: the actions performed in antiquity ────────────────────────────
@@ -293,7 +294,7 @@ def test_an_activity_without_an_account_gets_a_placeholder():
     g.add_node(ActivityNodeGroup("ACT.1", "Costruzione"))
     n = build_narrative(g, "site_story")
     text = n.chapter_by_anchor("ACT.1").blocks[0].text
-    assert text.startswith("[da scrivere:") and "Costruzione" in text
+    assert text.startswith("[to be written:") and "Costruzione" in text
 
 
 def test_regenerating_preserves_an_edited_activity_chapter():
@@ -315,3 +316,32 @@ def test_regenerating_preserves_an_edited_activity_chapter():
     chapter = n.chapter_by_anchor("ACT.1")
     assert chapter.blocks[0].text == "Scritto a mano."
     assert {b.ref for b in _embeds(chapter, "us")} == {"US.1", "US.2"}
+
+
+def test_the_template_writes_in_the_language_it_is_asked_for(portamarina):
+    """What a scaffolder writes becomes CONTENT — chapter titles and placeholder
+    prose are fields of the em.json — so it is generated in the language asked
+    for, and English is what happens when nobody asks (the decision the UI made
+    on 21 Aug 2026: nothing is given a language it did not ask for).
+
+    Re-translating it afterwards is NOT this template's business: those strings
+    belong to the author the moment they are written."""
+    graph = portamarina
+
+    english = build_site_story(graph)
+    titles = [c.title for c in english.chapters]
+    assert "Presentation" in titles and "Where it is" in titles
+    assert "la storia del sito" not in (english.name or "")
+    written = [b.text for c in english.chapters for b in c.blocks
+               if b.block_type == "prose" and b.text.startswith("[")]
+    assert written and all(t.startswith("[to be written:") for t in written)
+
+    italian = build_site_story(graph, lang="it")
+    it_titles = [c.title for c in italian.chapters]
+    assert "Presentazione" in it_titles and "Dove si trova" in it_titles
+    assert "la storia del sito" in (italian.name or "")
+
+    # a language the table does not carry falls back to English rather than
+    # mixing two languages in one document
+    greek = build_site_story(graph, lang="el")
+    assert "Presentation" in [c.title for c in greek.chapters]
