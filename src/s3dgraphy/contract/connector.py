@@ -62,8 +62,14 @@ CAPABILITY_LAYERS: Mapping[str, Tuple[str, ...]] = {
     # construction — a selection is not a fact about a study, and putting it in
     # the document would make every glance an edit somebody has to merge.
     "interaction": ("link-selection", "presence"),
-    # ASSETS: bytes live in a content-addressed store; the graph points at them
-    "asset": ("attach-asset", "resolve-asset", "materialize-3D", "publish-3D"),
+    # ASSETS: bytes live in a content-addressed store; the graph points at them.
+    # `resolve-preview` is the thumbnail/derivative of the same bytes, and it is
+    # its own capability because a client that may show a contact sheet without
+    # downloading originals is a real arrangement (a Heriverse card, a catalogue
+    # page). It is NOT a weaker gate: a preview of an embargoed photograph is the
+    # photograph, and `contract.consumer` refuses both on the same date.
+    "asset": ("attach-asset", "resolve-asset", "resolve-preview",
+              "materialize-3D", "publish-3D"),
     # INGEST: one-shot, and a PROPOSAL — see `volatile` on the delta
     "ingest": ("ingest-batch",),
     # SEMANTICS: resolve an identifier against an authority
