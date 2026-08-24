@@ -35,9 +35,26 @@ class ResourceNode(Node):
     #: into my own store, so the comparison travels with my study, offline too.
     RESIDENCIES = ("reference", "resident")
 
+    #: WHAT THIS RESOURCE IS FOR, in the argument. Two values, and **orthogonal
+    #: to everything else about it** (E.D. 2026-08-24):
+    #:
+    #: * `comparandum` — brought in to be compared against. A photograph of
+    #:   another site, yes; but equally a model of *my own* study that I am
+    #:   holding up next to this one;
+    #: * `internal_source` — evidence inside this study's own reasoning. A URI
+    #:   on somebody else's server can be exactly that.
+    #:
+    #: So the role is **not derivable** from `scope` (the three fences) nor from
+    #: `residency` (where the bytes are): an own-study asset can be a
+    #: comparandum, an external URI can be an internal source. That is why it is
+    #: written and never computed — and why there is no `effective_role`: a role
+    #: nobody stated is UNSET, not a default. Guessing one would put a claim
+    #: about somebody's argument into their file.
+    ROLES = ("comparandum", "internal_source")
+
     def __init__(self, node_id, name="Unnamed Link", url="", url_type="External link",
                  description="No description", checksum=None, scope=None,
-                 residency=None):
+                 residency=None, role=None):
         """
         Inizializza una nuova istanza di ResourceNode.
 
@@ -54,6 +71,8 @@ class ResourceNode(Node):
                 bytes here to hash, and its identity is already the URI.
             scope (str, opzionale): one of :attr:`SCOPES`.
             residency (str, opzionale): one of :attr:`RESIDENCIES`.
+            role (str, opzionale): one of :attr:`ROLES` — what the resource is
+                FOR in the argument, orthogonal to scope and residency.
 
         The three new fields are **additive and optional**, and they are written
         ONLY when given. Absent means UNKNOWN, not false: every resource written
@@ -75,6 +94,8 @@ class ResourceNode(Node):
             self.set_scope(scope)
         if residency is not None:
             self.set_residency(residency)
+        if role is not None:
+            self.set_role(role)
 
     # ── the three fences, and where the bytes live ──────────────────────────
 
@@ -93,6 +114,23 @@ class ResourceNode(Node):
             raise ValueError(
                 f"residency must be one of {list(self.RESIDENCIES)}, got {residency!r}")
         self.data["residency"] = residency
+
+    def set_role(self, role):
+        """Set what this resource is FOR. Raises on an unknown value, same reason
+        as the other two: a third role invented at a call site would be a word
+        the filters can never match, and this axis is deliberately two-valued —
+        if a third case turns up it gets declared, not slipped in."""
+        if role not in self.ROLES:
+            raise ValueError(
+                f"role must be one of {list(self.ROLES)}, got {role!r}")
+        self.data["role"] = role
+
+    def role(self):
+        """The stated role, or None. **No fallback on purpose** — unlike
+        :meth:`effective_scope`, there is no sane reading of an unstated role:
+        neither "comparandum" nor "internal source" is what a resource is by
+        default, and answering one would invent the claim."""
+        return self.data.get("role") or None
 
     def effective_scope(self):
         """The scope to USE when none was recorded.

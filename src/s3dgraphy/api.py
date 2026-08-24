@@ -2060,13 +2060,80 @@ def add_to_shelf(shelf: Graph, locator: str, *, resource_id: Optional[str] = Non
                  name: Optional[str] = None, url_type: Optional[str] = None,
                  description: Optional[str] = None,
                  resource_type: Optional[str] = None,
-                 origin: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Add a resource to the shelf (reuse-not-duplicate by ``resource_id``);
-    ``origin`` = the capability/origin envelope, preserved. Returns the entry."""
+                 origin: Optional[Dict[str, Any]] = None,
+                 checksum: Optional[str] = None,
+                 scope: Optional[str] = None,
+                 residency: Optional[str] = None,
+                 role: Optional[str] = None,
+                 media_type: Optional[str] = None,
+                 size: Optional[int] = None,
+                 access: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Add a resource to the shelf (reuse-not-duplicate by ``resource_id`` **or**
+    by ``checksum`` — the same bytes are the same resource); ``origin`` = the
+    capability/origin envelope, preserved. Returns the entry.
+
+    The shelf's own axes are optional and written ONLY when given, because absent
+    means unstated:
+
+    * ``scope`` — the three fences (``own-study`` / ``own-HDT`` / ``other-HDT``);
+    * ``residency`` — ``reference`` (it stays at home) / ``resident`` (I copied it);
+    * ``role`` — what it is FOR: ``comparandum`` / ``internal_source``.
+      **Orthogonal to the other two**: an own-study asset can be a comparandum
+      and an external URI can be a source inside this study's argument, so this
+      is stated and never derived from the fence.
+
+    (These four were already the core's; the api simply did not pass them on, so
+    a caller on this surface could not state a fence at all.)"""
     from .shelf import add_to_shelf as _a
     return _a(shelf, locator, resource_id=resource_id, name=name,
               url_type=url_type, description=description,
-              resource_type=resource_type, origin=origin)
+              resource_type=resource_type, origin=origin, checksum=checksum,
+              scope=scope, residency=residency, role=role,
+              media_type=media_type, size=size, access=access)
+
+
+def resource_roles() -> Tuple[str, ...]:
+    """The two roles a shelf entry may declare, from the class that validates
+    them — so a UI enumerates instead of hardcoding: ``("comparandum",
+    "internal_source")``. Deliberately two; a third case gets declared."""
+    from .nodes.resource_node import ResourceNode
+    return tuple(ResourceNode.ROLES)
+
+
+def shelf_entry_status(subject: Any, resource_id: str) -> Dict[str, Any]:
+    """``{resource_id, in_use, role, mode, used_by}`` for one shelf entry.
+
+    ``subject`` is a Container (the honest unit — a resource is hatted into a
+    STUDY graph while it sits on the SHELF), a Graph, or a list of them.
+
+    DERIVED, not stored: ``in_use`` is the hatting reference-check (the same one
+    the remove-cleanup trusts), and ``mode`` is that fact spelled for a badge
+    (``used_in_graph`` / ``only_shelf``). A stored flag would be wrong the first
+    time somebody deleted the RM that used a photograph."""
+    from .shelf import shelf_entry_status as _s
+    return _s(subject, resource_id)
+
+
+def shelf_table(subject: Any, shelf: Optional[Graph] = None
+                ) -> List[Dict[str, Any]]:
+    """The shelf as **EM Data rows** — one dict per entry, keyed by
+    :func:`shelf_table_columns`.
+
+    A read-model in the em_data formalism (typed columns, like the Units/Epochs/
+    Documents sheets), derived from the ShelfGraph on every call: change the
+    shelf and the table changes. It is NOT a sheet of ``em_data.xlsx`` — that
+    importer fails fast on a missing sheet, so adding one would invalidate every
+    workbook that exists; the shelf's round-trip is the em.json, which already
+    carries it."""
+    from .shelf import shelf_table as _t
+    return _t(subject, shelf)
+
+
+def shelf_table_columns() -> Tuple[str, ...]:
+    """The Shelf sheet's columns, in reading order (what it is → what it is for →
+    where it lives). Same role as :func:`em_data_columns` for the other sheets."""
+    from .shelf import SHELF_COLUMNS
+    return tuple(SHELF_COLUMNS)
 
 
 def list_shelf(shelf: Graph) -> List[Dict[str, Any]]:
@@ -2238,6 +2305,35 @@ def fs_acquisition_record(path: str) -> Dict[str, Any]:
     ``fs`` mapping from a local ``path`` — the local project-folder acquisition source."""
     from .acquisition import fs_record
     return fs_record(path)
+
+
+def uri_acquisition_record(uri: str, *, protocol: Optional[str] = None,
+                           access: Any = None, name: Optional[str] = None,
+                           media_type: Optional[str] = None,
+                           repo_id: Optional[str] = None) -> Dict[str, Any]:
+    """Build a raw record for the ``uri`` mapping from a **bare URI** — the asset
+    nobody downloads.
+
+    Somebody pastes a link and what enters the shelf is the URI plus the protocol
+    it is reached through: ``access = {"mode": "open"|"subscribe", "endpoint"?}``
+    (or just the mode as a string). **No bytes are copied and no object store is
+    touched** — that is the point, and the difference from
+    :func:`fs_acquisition_record`.
+
+    Feed it to :func:`apply_acquisition_mapping` with ``"uri"`` and then to
+    :func:`acquire_from_descriptor`: the resource id is derived from the URI, so
+    pasting the same link twice does not grow a second entry."""
+    from .acquisition import uri_record
+    return uri_record(uri, protocol=protocol, access=access, name=name,
+                      media_type=media_type, repo_id=repo_id)
+
+
+def access_modes() -> Tuple[str, ...]:
+    """How a URI-only resource is reached: ``("open", "subscribe")``. Not a
+    rights statement — ``rights.license`` says what you may DO with the object,
+    this says whether you can reach it at all."""
+    from .acquisition import ACCESS_MODES
+    return tuple(ACCESS_MODES)
 
 
 def acquisition_schema() -> Dict[str, Any]:

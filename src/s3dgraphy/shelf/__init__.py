@@ -25,6 +25,7 @@ from .core import (
     DEFAULT_SHELF_ID,
     FACETS,
     SHELF_COLLECTION,
+    SHELF_COLUMNS,
     add_to_shelf,
     attach_candidates,
     hat_as_document,
@@ -38,8 +39,11 @@ from .core import (
     load_shelf,
     new_shelf,
     remove_from_shelf,
+    referrers,
     remove_resource,
     save_shelf,
+    shelf_entry_status,
+    shelf_table,
 )
 
 __all__ = [
@@ -61,4 +65,9 @@ __all__ = [
     "hat_as_visual_resource",
     "FACETS",
     "attach_candidates",
+    # derived reads (Traccia A): what a row is FOR and whether it is used
+    "shelf_entry_status",
+    "referrers",
+    "shelf_table",
+    "SHELF_COLUMNS",
 ]

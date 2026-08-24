@@ -92,9 +92,19 @@ def acquire_from_descriptor(descriptor: Any, shelf: Any = None
     name = desc.asset.get("name") or (ref.rstrip("/").rsplit("/", 1)[-1] if ref else rid[:8])
     origin = desc.origin()
 
-    # 1) Resource on the shelf (reuse-not-duplicate; origin preserved)
+    # 1) Resource on the shelf (reuse-not-duplicate; origin preserved).
+    #
+    # `media_type` / `size` / `access` are written only when the descriptor
+    # carried them — the fs mapping knows a file's size, a bare URI does not, and
+    # a resource that never said its size must not start claiming zero. They are
+    # here because they are what the shelf TABLE shows: without them the column
+    # would be empty for every entry and a reader would think the shelf lost it.
     entry = add_to_shelf(shelf, ref, resource_id=rid, name=name,
-                         resource_type=_resource_type(desc), origin=origin)
+                         resource_type=_resource_type(desc), origin=origin,
+                         media_type=desc.asset.get("media_type") or None,
+                         size=desc.asset.get("size") or None,
+                         access=origin.get("access"),
+                         role=desc.asset.get("role") or None)
 
     # 2) acquisition event — a distinct DTC event type (crmdig:D12), literals for
     #    the opaque upstream source (Tier 0: no genesis sub-graph)

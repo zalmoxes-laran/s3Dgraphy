@@ -1,0 +1,22 @@
+{
+  "mapping_version": "0",
+  "source": "uri",
+  "tier": 0,
+  "_comment": "Per-source acquisition mapping for a BARE URI — the asset nobody downloads. Somebody pastes a link (a IIIF manifest, a Zenodo record, a Sketchfab model, a colleague's WebDAV folder) and what enters the shelf is the URI plus the protocol you reach it through: asset.access = {mode: subscribe|open, endpoint?}. NO BYTES ARE COPIED and no object store is touched — that is the whole point of this mapping, and the difference from fs.json, which acquires a local file. Build the raw record with s3dgraphy.acquisition.uri_record(uri, protocol=..., access=...), then apply_mapping('uri', record). The acquisition method is uri_reference: the URI is what was acquired, not the object, and calling it 'download' would record a retrieval that never happened.",
+  "descriptor_defaults": {
+    "schema_version": "0",
+    "source": {"repo_id": "uri", "capabilities": []},
+    "acquisition": {"agent": "emtools-shelf@0", "method": "uri_reference"},
+    "rights": {"license": "unknown"}
+  },
+  "field_map": {
+    "asset.ref": "uri",
+    "asset.name": "name",
+    "asset.media_type": "media_type",
+    "asset.access": "access",
+    "asset.protocol": "protocol",
+    "source.repo_id": "repo_id",
+    "source.record_id": "record_id",
+    "source.record_url": "record_url"
+  }
+}

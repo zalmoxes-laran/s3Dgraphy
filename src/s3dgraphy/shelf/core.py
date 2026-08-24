@@ -103,9 +103,15 @@ def _entry(node: Any) -> Dict[str, Any]:
     # UI badge shows what to act on (effective), while "did anybody actually say
     # this?" is what tells a curated entry from an inherited assumption. Folding
     # them into one field would quietly turn every legacy resource into a claim.
-    for key in ("checksum", "scope", "residency"):
+    for key in ("checksum", "scope", "residency", "media_type", "size",
+                "access"):
         if d.get(key):
             entry[key] = d[key]
+    # THE ROLE, and it is reported RAW: no `effective_role` beside it, unlike the
+    # two fences below. A resource whose role nobody stated is unset, and an
+    # "effective" reading would be this function inventing a claim about
+    # somebody's argument (see ResourceNode.ROLES).
+    entry["role"] = d.get("role") or None
     entry["effective_scope"] = (
         node.effective_scope() if hasattr(node, "effective_scope")
         else d.get("scope") or "own-study")
@@ -140,7 +146,11 @@ def add_to_shelf(shelf: Any, locator: str, *, resource_id: Optional[str] = None,
                  origin: Optional[Dict[str, Any]] = None,
                  checksum: Optional[str] = None,
                  scope: Optional[str] = None,
-                 residency: Optional[str] = None) -> Dict[str, Any]:
+                 residency: Optional[str] = None,
+                 role: Optional[str] = None,
+                 media_type: Optional[str] = None,
+                 size: Optional[int] = None,
+                 access: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Add a resource to the shelf and return its entry.
 
     Reuse-not-duplicate, on TWO keys. If ``resource_id`` is already present the
@@ -151,8 +161,17 @@ def add_to_shelf(shelf: Any, locator: str, *, resource_id: Optional[str] = None,
 
     ``origin`` is the capability/origin envelope (``repo``, ``capabilities``,
     ``scope``, …) preserved for downstream tier badges. ``scope`` /
-    ``residency`` are the shelf's own axes (see ResourceNode) and are written
-    only when given."""
+    ``residency`` / ``role`` are the shelf's own axes (see ResourceNode) and are
+    written only when given — absent means UNSTATED, never a default.
+
+    ``role`` is **orthogonal** to ``scope`` and ``residency``: it says what the
+    resource is FOR in the argument (a comparandum, or a source inside this
+    study's own reasoning), and an own-study asset can be the first while an
+    external URI can be the second.
+
+    ``media_type`` / ``size`` / ``access`` are what a URI-only or acquired entry
+    knows about itself and the table shows; also written only when given, because
+    a resource that never said its size must not start claiming zero."""
     from ..nodes.resource_node import ResourceNode
     rid = resource_id or str(uuid.uuid4())
     # dedup by CONTENT first: the same bytes under another id are not a second
@@ -166,6 +185,16 @@ def add_to_shelf(shelf: Any, locator: str, *, resource_id: Optional[str] = None,
                 twin.set_scope(scope) if hasattr(twin, "set_scope") else d.__setitem__("scope", scope)
             if residency is not None:
                 twin.set_residency(residency) if hasattr(twin, "set_residency") else d.__setitem__("residency", residency)
+            # …and the role, on the entry that was already curated: a re-drag
+            # that says "this one is a comparandum" is a statement about the
+            # resource, and dropping it here would make the same call behave
+            # differently depending on whether the bytes had been seen before.
+            if role is not None:
+                twin.set_role(role) if hasattr(twin, "set_role") else d.__setitem__("role", role)
+            for key, value in (("media_type", media_type), ("size", size),
+                               ("access", access)):
+                if value is not None:
+                    d[key] = value
             return _entry(twin)
     node = shelf.find_node_by_id(rid)
     if node is None or getattr(node, "node_type", None) != _LINK_TYPE:
@@ -189,6 +218,12 @@ def add_to_shelf(shelf: Any, locator: str, *, resource_id: Optional[str] = None,
         node.set_scope(scope) if hasattr(node, "set_scope") else d.__setitem__("scope", scope)
     if residency is not None:
         node.set_residency(residency) if hasattr(node, "set_residency") else d.__setitem__("residency", residency)
+    if role is not None:
+        node.set_role(role) if hasattr(node, "set_role") else d.__setitem__("role", role)
+    for key, value in (("media_type", media_type), ("size", size),
+                       ("access", access)):
+        if value is not None:
+            d[key] = value
     return _entry(node)
 
 
@@ -243,7 +278,8 @@ def instantiate_from_shelf(shelf: Any, resource_id: str, target_graph: Any):
                     description=str(getattr(src, "description", "") or ""))
     # carry the capability/origin (+ resource_type / dtc_kind) — do not strip
     d = _data(node)
-    for k in ("resource_type", "origin", "dtc_kind"):
+    for k in ("resource_type", "origin", "dtc_kind", "role", "checksum",
+              "scope", "residency", "media_type", "size", "access"):
         if k in sd:
             d[k] = sd[k]
     target_graph.add_node(node)
@@ -649,12 +685,11 @@ def remove_resource(graph: Any, resource_id: str) -> Dict[str, Any]:
     node = graph.find_node_by_id(resource_id)
     if node is None or getattr(node, "node_type", None) != _LINK_TYPE:
         return {"removed": False, "referenced": False, "events_removed": 0}
-    # referenced by a non-acquisition node? → keep it (and its event)
-    for e in graph.edges:
-        if e.edge_target == resource_id:
-            src = graph.find_node_by_id(e.edge_source)
-            if src is not None and getattr(src, "node_type", None) != _ACQ_TYPE:
-                return {"removed": False, "referenced": True, "events_removed": 0}
+    # referenced by a non-acquisition node? → keep it (and its event). THE SAME
+    # check `shelf_entry_status` reports, and literally the same function: "is
+    # this in use?" must not have two answers depending on who asks.
+    if referrers(graph, resource_id):
+        return {"removed": False, "referenced": True, "events_removed": 0}
     # acquisition events that output this resource
     acq_ids = {e.edge_source for e in graph.edges
                if e.edge_type == "dtc_had_output" and e.edge_target == resource_id}
@@ -670,3 +705,187 @@ def remove_resource(graph: Any, resource_id: str) -> Dict[str, Any]:
             graph.remove_node(aid)
             events_removed += 1
     return {"removed": True, "referenced": False, "events_removed": events_removed}
+
+
+# ── in use, or only on the shelf? ────────────────────────────────────────────
+#
+# A DERIVED fact, never a stored one. The shelf could perfectly well keep an
+# `in_use` flag, and it would be wrong within a week: somebody deletes the RM
+# that used a photograph and the flag still says yes. So it is computed from the
+# edges, every time, and the computation is the one the remove-cleanup already
+# trusted — one reference-check, two callers.
+
+def referrers(graph: Any, resource_id: str) -> List[Dict[str, Any]]:
+    """Who USES this resource in ``graph``: the non-acquisition nodes pointing at
+    it, as ``[{node_id, node_type, edge}]``.
+
+    The acquisition event is excluded on purpose — a D12 saying "this arrived
+    from Zenodo" is how the resource got here, not somebody using it in an
+    argument. A shelf entry nobody hatted has exactly that one edge, which is
+    why counting edges would answer "in use" for every entry ever acquired.
+    """
+    out: List[Dict[str, Any]] = []
+    for e in getattr(graph, "edges", []) or []:
+        if e.edge_target != resource_id:
+            continue
+        src = graph.find_node_by_id(e.edge_source)
+        if src is None or getattr(src, "node_type", None) == _ACQ_TYPE:
+            continue
+        out.append({"node_id": e.edge_source,
+                    "node_type": getattr(src, "node_type", ""),
+                    "node_name": str(getattr(src, "name", "") or ""),
+                    "edge": e.edge_type})
+    return out
+
+
+def _graphs_of(subject: Any) -> List[Any]:
+    """The graphs to look in — a Graph, a list of them, or a Container.
+
+    A container is the honest unit: a resource is hatted into a STUDY graph while
+    it sits on the SHELF graph, so asking one graph alone gives the wrong answer
+    half the time (the shelf says "unused" for something the matrix is built on).
+    """
+    if subject is None:
+        return []
+    if isinstance(subject, (list, tuple, set)):
+        return [g for g in subject if g is not None]
+    graphs = getattr(subject, "graphs", None)
+    if isinstance(graphs, dict):                       # a Container
+        out = list(graphs.values())
+        for extra in (getattr(subject, "shelf", None),
+                      getattr(subject, "corpus", None)):
+            if extra is not None:
+                out.append(extra)
+        return out
+    return [subject]
+
+
+def shelf_entry_status(subject: Any, resource_id: str) -> Dict[str, Any]:
+    """``{resource_id, in_use, role, mode, used_by}`` — the two things a shelf
+    row needs beyond its own fields, and neither is stored.
+
+    * ``in_use`` — is this resource referenced by anything that is not its
+      acquisition event, anywhere in ``subject`` (a Graph, a list, or a
+      Container)? That is the hatting reference-check (:func:`referrers`);
+    * ``role`` — what it is FOR, as STATED (``comparandum`` /
+      ``internal_source`` / ``None``). Read, never inferred: the role is the one
+      axis nothing can compute.
+
+    ``mode`` is the pair spelled as one word for a UI badge —
+    ``used_in_graph`` / ``only_shelf`` — and it is exactly ``in_use``, not a
+    third state to keep in step.
+    """
+    graphs = _graphs_of(subject)
+    used_by: List[Dict[str, Any]] = []
+    role = None
+    for graph in graphs:
+        node = graph.find_node_by_id(resource_id)
+        if node is not None and getattr(node, "node_type", None) == _LINK_TYPE:
+            # the role travels with the resource; the first graph that holds it
+            # answers (instantiate_from_shelf copies it across, so they agree)
+            role = role or (_data(node).get("role") or None)
+        for ref in referrers(graph, resource_id):
+            ref["graph_id"] = str(getattr(graph, "graph_id", "") or "")
+            used_by.append(ref)
+    in_use = bool(used_by)
+    return {"resource_id": resource_id, "in_use": in_use, "role": role,
+            "mode": "used_in_graph" if in_use else "only_shelf",
+            "used_by": used_by}
+
+
+# ── the EM Data table of a shelf ─────────────────────────────────────────────
+#
+# EM Data is the tabular face of an em.json (`Units`/`Epochs`/`Authors`/
+# `Documents`/`Claims`, each sheet a tuple of typed columns — see
+# `UnifiedXLSXImporter._COLUMNS`). A shelf is a member of the same document and
+# deserves the same face, so this is one more sheet in that formalism.
+#
+# It is a READ-MODEL. Rows are derived from the ShelfGraph on every call, the
+# way EMStudio's EM-Data view derives its rows from the store — change the shelf
+# and the table changes; nothing here is a second place where a shelf lives.
+#
+# It is deliberately NOT added to `UnifiedXLSXImporter._SHEETS`: that tuple is
+# what the importer REQUIRES of an em_data.xlsx and it fails fast on a missing
+# sheet, so putting `Shelf` in it would invalidate every workbook in existence.
+# The shelf's round-trip is the em.json, which already carries it.
+
+#: The Shelf sheet's columns, in the order a reader reads them: what it is, then
+#: what it is for, then where it lives. Same shape as the other sheets' column
+#: tuples so a writer can enumerate this from one place.
+SHELF_COLUMNS = (
+    "ID", "NAME", "MEDIA_TYPE", "RESIDENCE", "LOCATOR", "ROLE", "MODE",
+    "SIZE", "SCOPE", "RESIDENCY", "ACCESS", "CHECKSUM",
+)
+
+
+def _residence(locator: str, entry: Dict[str, Any]) -> str:
+    """WHERE THE BYTES ARE, in the three words a person uses: ``disk`` ·
+    ``minio`` · ``uri``.
+
+    Read off the LOCATOR, because that is the only thing that knows. Note what
+    this is not: it is not the recorded ``residency`` axis
+    (``reference``/``resident``, which says whether I copied the object into my
+    own store). The two answer different questions and the table carries both —
+    a resident copy served over https reads ``uri`` here and ``resident``
+    there, and folding them would lose one of the two.
+    """
+    from ..resources import classify_locator
+
+    kind = classify_locator(locator or "")
+    if kind == "s3_uri":
+        return "minio"
+    if kind == "http_url":
+        # …unless the origin says the object store is where it came from: an
+        # asset promoted into MinIO and handed back as a presigned URL is in
+        # MinIO, whatever its link looks like.
+        repo = str(((entry.get("origin") or {}) if isinstance(entry.get("origin"), dict)
+                    else {}).get("repo") or "").lower()
+        return "minio" if repo in ("minio", "s3", "em-server") else "uri"
+    return "disk"
+
+
+def shelf_table(subject: Any, shelf: Any = None) -> List[Dict[str, Any]]:
+    """The shelf as EM Data rows — one dict per entry, keyed by
+    :data:`SHELF_COLUMNS`.
+
+    ``subject`` is a Container (its ``shelf`` is read and its graphs answer the
+    in-use question), or a shelf Graph. Pass ``shelf`` explicitly to table a
+    shelf against graphs it is not attached to.
+
+    Derived on every call; see the note above on why this is not a sheet of
+    ``em_data.xlsx``.
+    """
+    graphs = _graphs_of(subject)
+    the_shelf = shelf if shelf is not None else getattr(subject, "shelf", None)
+    if the_shelf is None:
+        the_shelf = next((g for g in graphs if is_shelf(g)), None)
+    if the_shelf is None:
+        return []
+    if not any(g is the_shelf for g in graphs):
+        graphs = list(graphs) + [the_shelf]
+
+    rows: List[Dict[str, Any]] = []
+    for entry in list_shelf(the_shelf):
+        status = shelf_entry_status(graphs, entry["id"])
+        access = entry.get("access") or (
+            (entry.get("origin") or {}).get("access")
+            if isinstance(entry.get("origin"), dict) else None)
+        mode = str((access or {}).get("mode") or "") if access else ""
+        rows.append({
+            "ID": entry["id"],
+            "NAME": entry.get("name") or "",
+            "MEDIA_TYPE": entry.get("media_type") or "",
+            "RESIDENCE": _residence(entry.get("locator") or "", entry),
+            "LOCATOR": entry.get("locator") or "",
+            # STATED, so an unset role reads as empty rather than as a guess
+            "ROLE": entry.get("role") or "",
+            "MODE": status["mode"],
+            "SIZE": entry.get("size") or "",
+            # the EFFECTIVE fence (a shelf UI filters on what to act on), while
+            # RESIDENCY below is what was actually recorded
+            "SCOPE": entry.get("effective_scope") or "",
+            "RESIDENCY": entry.get("residency") or "",
+            "ACCESS": mode,
+            "CHECKSUM": entry.get("checksum") or "",
+        })
+    return rows

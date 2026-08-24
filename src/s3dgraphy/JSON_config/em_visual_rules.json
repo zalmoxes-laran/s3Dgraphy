@@ -840,7 +840,8 @@
     "acquisition": {
       "download": { "label": "Download", "glyph": null, "description": "Retrieval of a digital object from a remote (opaque, Tier-0) repository." },
       "ingest": { "label": "Ingest", "glyph": null, "description": "Generic ingestion of a digital object into the study." },
-      "local_import": { "label": "Local import", "glyph": null, "description": "Acquisition from the local file system (project-folder search) — the local analog of remote acquisition." }
+      "local_import": { "label": "Local import", "glyph": null, "description": "Acquisition from the local file system (project-folder search) — the local analog of remote acquisition." },
+      "uri_reference": { "label": "URI reference", "glyph": null, "description": "The URI was acquired, not the object: the resource stays where it is and is reached through its own access protocol (an open link, or one you subscribe to). No bytes were copied — calling this a download would record a retrieval that never happened." }
     },
     "output": {
       "pointcloud": { "label": "Point cloud", "glyph": "02_pointcloud", "description": "Produced point cloud." },

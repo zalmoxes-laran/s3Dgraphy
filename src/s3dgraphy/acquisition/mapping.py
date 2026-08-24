@@ -25,7 +25,7 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 _MAPPINGS_DIR = (Path(__file__).resolve().parent.parent
                  / "JSON_config" / "acquisition_mappings")
@@ -81,6 +81,77 @@ _FS_MEDIA_TYPES = {
     "3ds": "model/x-3ds", "dae": "model/vnd.collada+xml",
     "usd": "model/vnd.usd", "usdz": "model/vnd.usdz+zip",
 }
+
+
+#: How you get to a resource you did not copy. TWO modes, because the practical
+#: question a colleague asks is binary: can I click this, or do I have to ask
+#: for access?
+#:
+#: * ``open`` — the link is freely reachable;
+#: * ``subscribe`` — you subscribe/register/are granted access first (an
+#:   institutional repository, a shared drive, a IIIF endpoint behind a login).
+#:
+#: This is deliberately NOT a rights statement: `rights.license` says what you
+#: may do with the object, `access.mode` says whether you can reach it at all.
+#: A CC-BY image behind a login is both, and conflating them would make one of
+#: the two unaskable.
+ACCESS_MODES = ("open", "subscribe")
+
+
+def uri_record(uri: str, *, protocol: Optional[str] = None,
+               access: Optional[Any] = None, name: Optional[str] = None,
+               media_type: Optional[str] = None,
+               repo_id: Optional[str] = None) -> Dict[str, Any]:
+    """Build a raw record for the ``uri`` mapping from a bare **URI**.
+
+    The asset nobody downloads: somebody pastes a link and what enters the shelf
+    is the URI plus the protocol it is reached through. **No bytes are copied**
+    and no object store is touched — that is the point, and the difference from
+    :func:`fs_record`.
+
+    ``access`` is ``{"mode": "open"|"subscribe", "endpoint": …}``, or just the
+    mode as a string (the common case). ``record_id`` is the URI itself, so
+    re-acquiring the same link lands on the same stable Resource id and the shelf
+    does not grow a second entry — the idempotence the fs record gets from the
+    absolute path.
+
+    Returns ``{uri, name, protocol, media_type, access, repo_id, record_id,
+    record_url}``.
+    """
+    import mimetypes
+    from urllib.parse import urlsplit
+
+    text = (uri or "").strip()
+    if not text:
+        raise ValueError("a URI-only entry needs a URI")
+    parts = urlsplit(text)
+    scheme = (protocol or parts.scheme or "").lower() or "http"
+    if isinstance(access, str):
+        access = {"mode": access}
+    access = dict(access or {})
+    mode = str(access.get("mode") or "open").lower()
+    if mode not in ACCESS_MODES:
+        raise ValueError(f"access.mode must be one of {list(ACCESS_MODES)}, "
+                         f"got {access.get('mode')!r}")
+    access["mode"] = mode
+    tail = parts.path.rstrip("/").rsplit("/", 1)[-1]
+    guessed = media_type or (_FS_MEDIA_TYPES.get(tail.rsplit(".", 1)[-1].lower())
+                             if "." in tail else None) \
+        or (mimetypes.guess_type(tail)[0] if "." in tail else None) or ""
+    return {
+        "uri": text,
+        # The host is the honest name when the tail is not a filename: a record
+        # page ends in an id, and "12345" is not what anybody is looking for.
+        "name": name or (tail if "." in tail else (parts.netloc or text)),
+        "protocol": scheme,
+        "media_type": guessed,
+        "access": access,
+        # …and the repo is the HOST unless told otherwise, so two links from the
+        # same institution group together without anybody configuring a repo.
+        "repo_id": repo_id or (parts.netloc or "uri"),
+        "record_id": text,
+        "record_url": text,
+    }
 
 
 def fs_record(path: str) -> Dict[str, Any]:

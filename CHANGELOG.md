@@ -4,6 +4,41 @@ All notable changes to **s3dgraphy** are documented here.
 
 ## [Unreleased]
 
+### Added (2026-08-24 — Shelf, Traccia A: role · URI-only · modes · EM Data table)
+Four **additive** things on the shelf substrate that already exists. Nothing was
+rebuilt and `LinkNode` was NOT renamed (breaking, coordinated, still deferred).
+
+- **`role` on a shelf resource** — `ResourceNode.ROLES = ("comparandum",
+  "internal_source")` + `set_role()` / `role()`, and it is **orthogonal** to the
+  three fences and to residency: an own-study asset can be a comparandum, an
+  external URI can be a source inside this study's own argument. Stated, never
+  derived, and there is deliberately **no `effective_role`** — an unstated role is
+  unset, not a default. Written by `add_to_shelf(role=…)`, reported by
+  `list_shelf`, carried by `instantiate_from_shelf`, persisted in the em.json.
+- **URI-only acquisition** — `JSON_config/acquisition_mappings/uri.json` +
+  `acquisition.uri_record()` + `api.uri_acquisition_record()`: pasting a link
+  makes a shelf entry that is the URI plus `access = {mode: open|subscribe,
+  endpoint?}` and a D12 event. **No bytes are copied and no object store is
+  touched**; the resource id is derived from the URI, so pasting it twice is one
+  entry. New declared acquisition kind **`uri_reference`** in
+  `em_visual_rules.json` (`download` would have recorded a retrieval that never
+  happened) — consumers re-vendoring the rules pick it up.
+- **`shelf_entry_status()`** — `{in_use, role, mode, used_by}`, DERIVED: `in_use`
+  is the hatting reference-check, and it is literally the function the
+  remove-cleanup already trusted (`referrers()`), so "is this in use?" has one
+  answer. `mode` is `used_in_graph` / `only_shelf`, not a third state to keep in
+  step.
+- **`shelf_table()`** — the ShelfGraph as **EM Data rows** (typed columns, like
+  the Units/Epochs/Documents sheets): name · media_type · residence[disk|minio|uri]
+  · locator · role · mode · size · scope · residency · access · checksum. A
+  read-model derived on every call, and deliberately **not** a sheet of
+  `em_data.xlsx` (that importer fails fast on a missing sheet; the shelf's
+  round-trip is the em.json).
+- `api.add_to_shelf` now forwards `checksum` / `scope` / `residency` / `role` /
+  `media_type` / `size` / `access` to the core, which already accepted them — a
+  caller on the `api` surface could not state a fence at all before.
+
+
 ### Changed (2026-08-05 — BUGFIX-CONN3, connections datamodel → v1.6.7)
 - Closes the two silent follow-ups of CONN2 (a legacy import edge and a shelf
   attach that both went quietly wrong once `has_visual_reference` moved to a

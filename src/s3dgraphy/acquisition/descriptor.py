@@ -97,9 +97,27 @@ class AcquisitionDescriptor:
 
     def origin(self) -> Dict[str, Any]:
         """The capability/origin envelope carried onto the shelf entry (for
-        downstream tier badges): repo + capabilities + scope."""
-        return {
+        downstream tier badges): repo + capabilities + scope, and — when the
+        asset says so — how it is REACHED.
+
+        ``access`` rides in the origin rather than in a channel of its own
+        because that is exactly what it is: a fact about where this resource came
+        from and how to get back to it. A URI-only entry has no bytes here, so
+        its origin is the only place that can answer "and how do I open it?".
+        """
+        out: Dict[str, Any] = {
             "repo": self.source.get("repo_id"),
             "capabilities": self.capabilities(),
             "scope": (self.payload_graph or {}).get("scope"),  # None in Tier 0
         }
+        access = self.asset.get("access")
+        if access:
+            out["access"] = (dict(access) if isinstance(access, dict)
+                             else {"mode": str(access)})
+        if self.asset.get("protocol"):
+            out["protocol"] = self.asset.get("protocol")
+        return out
+
+    def access(self) -> Optional[Dict[str, Any]]:
+        """``{mode, endpoint?}`` when the asset declared how it is reached."""
+        return self.origin().get("access")

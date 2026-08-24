@@ -16,7 +16,8 @@ from .descriptor import (
     AcquisitionError,
     schema,
 )
-from .mapping import apply_mapping, available_mappings, fs_record, load_mapping
+from .mapping import (ACCESS_MODES, apply_mapping, available_mappings,
+                      fs_record, load_mapping, uri_record)
 from .acquire import acquire_from_descriptor
 
 __all__ = [
@@ -28,5 +29,8 @@ __all__ = [
     "apply_mapping",
     "available_mappings",
     "fs_record",
+    # the asset nobody downloads: a URI plus how you reach it
+    "uri_record",
+    "ACCESS_MODES",
     "acquire_from_descriptor",
 ]
