@@ -546,17 +546,28 @@ def _matches(family: List[str], allowed: List[str]) -> bool:
 # field carries samples, and that is the whole reason this function exists rather
 # than a `SELECT name FROM pragma_table_info`.
 
+#: extension → format. DATA, and exported, because it is not only this module's
+#: business: a file PICKER (a native dialog's filter, a file browser's greying)
+#: has to know which files are mappable, and a picker with its own list would be
+#: a second answer to "can this be a source?" — the same rule as the node types.
+SOURCE_EXTENSIONS = {
+    "db": "sqlite", "sqlite": "sqlite", "sqlite3": "sqlite",
+    "xlsx": "xlsx", "xlsm": "xlsx",
+    "csv": "csv", "tsv": "csv",
+    "xml": "xml", "rdf": "xml", "xsd": "xml",
+}
+
+
 def detect_format(path: str) -> str:
     """The format of a source, from its extension. Honest fallback: `xlsx`, the
     one this library has always assumed."""
     ext = str(path).rsplit(".", 1)[-1].lower() if "." in str(path) else ""
-    if ext in ("db", "sqlite", "sqlite3"):
-        return "sqlite"
-    if ext in ("xml", "rdf", "xsd"):
-        return "xml"
-    if ext in ("csv", "tsv"):
-        return "csv"
-    return "xlsx"
+    return SOURCE_EXTENSIONS.get(ext, "xlsx")
+
+
+def source_extensions() -> Dict[str, str]:
+    """`{extension: format}` — what a picker may offer, from one place."""
+    return dict(SOURCE_EXTENSIONS)
 
 
 def source_fields(path: str, *, format_type: Optional[str] = None,

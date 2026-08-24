@@ -2427,6 +2427,14 @@ def mapping_apply(mapping: Dict[str, Any], source: str, *, graph: Any = None,
                          mapping_name=mapping_name)
 
 
+def mapping_source_extensions() -> Dict[str, str]:
+    """`{extension: format}` for the sources a mapping can describe — so a file
+    picker's filter and a file browser's greying come from the library instead of
+    a list written beside them."""
+    from .mappings.authoring import source_extensions
+    return source_extensions()
+
+
 def mapping_property_node_type() -> str:
     """The node type a PROPERTY column produces, read from the datamodel — so an
     editor says "this field is a property" without typing a class name."""
