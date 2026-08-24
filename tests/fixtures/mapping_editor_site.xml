@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A minimal XML source in the shape the WP3 table (Vassallo) brings: a site
+     with stratigraphic units, each with an interpretation and a period. Small on
+     purpose: what is under test is the mapping, not the parsing of a big file. -->
+<site name="Ercolano · Insula VI" code="ERC">
+  <us id="1" period="II sec. d.C.">
+    <descrizione>Strato di crollo con tegole</descrizione>
+    <interpretazione>Crollo del tetto</interpretazione>
+    <rapporti>
+      <copre>2</copre>
+    </rapporti>
+  </us>
+  <us id="2" period="I sec. d.C.">
+    <descrizione>Piano pavimentale in cocciopesto</descrizione>
+    <interpretazione>Pavimento della bottega</interpretazione>
+  </us>
+  <us id="3" period="I sec. d.C.">
+    <descrizione>Muro in opera reticolata</descrizione>
+    <interpretazione>Muro perimetrale</interpretazione>
+  </us>
+</site>

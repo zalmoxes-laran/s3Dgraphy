@@ -15,6 +15,36 @@ from typing import Dict, Any, Optional
 # Configurazione logging opzionale per debug
 logger = logging.getLogger(__name__)
 
+def _isna(value) -> bool:
+    """Is this a missing value? — WITHOUT requiring pandas.
+
+    The two row-cleaning helpers below used `pd.isna`, and that made the whole
+    mapping layer depend on pandas even for sources that have nothing to do with
+    a dataframe. Measured: applying an **XML** mapping through the em-bridge
+    failed with `No module named 'pandas'` on every record — and the bridge
+    sidecar excludes pandas ON PURPOSE (it is a 12 MB dependency for the xlsx
+    path alone, see EMStudio's `build-bridge.sh`). So an XML import was
+    impossible in exactly the build meant to run it.
+
+    pandas is still used when it is THERE, because it knows about `NaT`, masked
+    values and numpy scalars, and a hand-rolled check would quietly disagree with
+    it on a dataframe. Absent, the float-NaN identity (`x != x`) is the whole of
+    what a non-dataframe source can produce.
+    """
+    try:
+        import pandas as pd                        # noqa: PLC0415 — optional
+    except ImportError:
+        return value != value if isinstance(value, float) else False
+    try:
+        result = pd.isna(value)
+    except (TypeError, ValueError):
+        return False
+    # pd.isna on a list/array answers elementwise; a row value that is a
+    # sequence is not "missing", and `bool(array)` would raise
+    return bool(result) if isinstance(result, bool) or getattr(
+        result, "ndim", 0) == 0 else False
+
+
 class BaseImporter(ABC):
     """
     Abstract base class for all importers.
@@ -250,11 +280,9 @@ class BaseImporter(ABC):
 
     def _is_invalid_id(self, value) -> bool:
         """Check if a value is invalid (NaN, None, empty string)."""
-        import pandas as pd
-        
         if value is None:
             return True
-        if pd.isna(value):
+        if _isna(value):
             return True
         if str(value).strip() == '':
             return True
@@ -265,9 +293,7 @@ class BaseImporter(ABC):
 
     def _clean_value_for_ui(self, value):
         """Clean any value to be safe for Blender UI (always returns string)."""
-        import pandas as pd
-        
-        if value is None or pd.isna(value):
+        if value is None or _isna(value):
             return ""
         
         # Convert to string and clean

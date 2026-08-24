@@ -2342,6 +2342,109 @@ def acquisition_schema() -> Dict[str, Any]:
     return schema()
 
 
+# ── MAPPING AUTHORING: the surface a mapping EDITOR is built on ──────────────
+#
+# The RICH mapping layer, not the acquisition one (`apply_acquisition_mapping`
+# above is the other thing, and the two must not be confused — see
+# `mappings/authoring.py`'s docstring). These five functions are what EMStudio's
+# mapping editor calls over the bridge, and what a chatbot or a script calls
+# directly: one surface, three consumers, no second implementation of "what may
+# this field become".
+
+def mapping_source_fields(path: str, *, format_type: Optional[str] = None,
+                          table: Optional[str] = None,
+                          record_path: Optional[str] = None,
+                          samples: int = 3) -> Dict[str, Any]:
+    """What is in a source, with EXAMPLE VALUES — the list an editor draws.
+
+    A table gives columns; an XML gives paths (`@id`, `rapporti/copre`) plus the
+    repeated elements that are candidates for one RECORD. Samples are the point:
+    half the columns in an archaeological table are called `d_interpretativa`,
+    and the only way to know what one holds is to look at three of its values."""
+    from .mappings.authoring import source_fields
+    return source_fields(path, format_type=format_type, table=table,
+                         record_path=record_path, samples=samples)
+
+
+def mapping_target_catalog(*, include_direct: bool = True) -> List[Dict[str, Any]]:
+    """The CIDOC classes a field may be mapped to, each already resolved to the
+    EM node type that implements it — or marked `cidoc_direct` when none does.
+
+    CIDOC-first with the retro-map (E.D. 2026-08-24): the bridge between the two
+    vocabularies is not a new table, it is the `mapping.cidoc` field the
+    datamodels already declare for every type, read backwards."""
+    from .mappings.authoring import target_catalog
+    return target_catalog(include_direct=include_direct)
+
+
+def mapping_cidoc_index() -> Dict[str, Any]:
+    """The raw inverse index: `{cidoc_class → [candidates]}` and
+    `{cidoc_property → [edges]}`, plus the edges mapped only through an
+    extension property. Many-to-one on purpose — one CIDOC class can be the
+    reading of several EM types."""
+    from .mappings.authoring import cidoc_index
+    return cidoc_index()
+
+
+def mapping_allowed_edges(source_type: Optional[str] = None,
+                          target_type: Optional[str] = None
+                          ) -> List[Dict[str, Any]]:
+    """The edges the datamodel allows between two node types, with their CIDOC
+    property. THE SAME `allowed_connections` the canvas's edge picker reads, so a
+    relation authored in a mapping cannot be one the graph would refuse."""
+    from .mappings.authoring import allowed_edges
+    return allowed_edges(source_type, target_type)
+
+
+def mapping_validate(mapping: Dict[str, Any]) -> Dict[str, Any]:
+    """`{ok, errors, warnings}` for a mapping — structural AND datamodel-checked:
+    a relation whose edge is not allowed between the two resolved types is an
+    ERROR here rather than a failure at import time, long after the person who
+    authored it left the screen."""
+    from .mappings.authoring import validate_mapping
+    return validate_mapping(mapping)
+
+
+def mapping_normalize(mapping: Dict[str, Any]) -> Dict[str, Any]:
+    """A copy of the mapping with its CIDOC choices resolved to EM node types
+    (and the ones nothing implements marked `cidoc_direct`)."""
+    from .mappings.authoring import normalize_mapping
+    return normalize_mapping(mapping)
+
+
+def mapping_apply(mapping: Dict[str, Any], source: str, *, graph: Any = None,
+                  mode: str = "volatile", mapping_name: Optional[str] = None
+                  ) -> Dict[str, Any]:
+    """Run a mapping over a source: `mode="volatile"` (an auxiliary in the graph,
+    out of the saved document until a bake) or `mode="bake"` (written in).
+
+    Named `mapping_apply` and not `apply_mapping` on purpose: this surface
+    already has `apply_acquisition_mapping`, and two different acts sharing one
+    verb is how somebody ends up calling the wrong one. The module-level function
+    IS `apply_mapping` (`mappings.authoring`), where there is no ambiguity."""
+    from .mappings.authoring import apply_mapping
+    return apply_mapping(mapping, source, graph=graph, mode=mode,
+                         mapping_name=mapping_name)
+
+
+def mapping_property_node_type() -> str:
+    """The node type a PROPERTY column produces, read from the datamodel — so an
+    editor says "this field is a property" without typing a class name."""
+    from .mappings.authoring import property_node_type
+    return property_node_type()
+
+
+def mapping_schema_version() -> str:
+    from .mappings.authoring import SCHEMA_VERSION
+    return SCHEMA_VERSION
+
+
+def mapping_formats() -> Tuple[str, ...]:
+    """The source formats a mapping can describe."""
+    from .mappings.authoring import FORMATS
+    return tuple(FORMATS)
+
+
 # ── connection resolution: REPORT-ONLY (S1) ───────────────────────────────────
 # `Graph.validate_connection` is permissive by construction (it resolves the
 # datamodel's CLASS names through the node_type-keyed map). These two ops measure
