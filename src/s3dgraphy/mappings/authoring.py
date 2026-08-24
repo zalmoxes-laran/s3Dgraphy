@@ -203,7 +203,10 @@ def validate_mapping(mapping: Dict[str, Any]) -> Dict[str, Any]:
     if fmt not in FORMATS:
         errors.append(f"source_settings.format_type {fmt!r} is not one of "
                       f"{list(FORMATS)}")
-    if fmt in ("sqlite", "xlsx", "csv") and not (
+    # …and a csv has NEITHER a table nor a sheet: it is one table in one file, so
+    # asking for the name of it was a warning nobody could act on (measured on a
+    # perfectly good csv mapping).
+    if fmt in ("sqlite", "xlsx") and not (
             settings.get("table_name") or settings.get("sheet_name") is not None):
         warnings.append(f"a {fmt} source usually names its table/sheet "
                         f"(source_settings.table_name / sheet_name)")
@@ -274,14 +277,15 @@ def validate_mapping(mapping: Dict[str, Any]) -> Dict[str, Any]:
         # (honoured by the XML importer); saying so here is what makes it
         # findable, because the duplicate is not visibly wrong in the output.
         tgt_column = columns.get(relation.get("target_column")) or {}
-        if (edge_type and edge_type not in _IMPORTER_SKIPS_PROPERTY
+        skipped = _importer_skips_property()
+        if (edge_type and edge_type not in skipped
                 and not tgt_column.get("property_name")
                 and not tgt_column.get("is_relation")
                 and not tgt_column.get("is_id")):
             warnings.append(
                 f"relations[{i}]: column {relation.get('target_column')!r} will "
                 f"ALSO become a property (the importer only skips "
-                f"{len(_IMPORTER_SKIPS_PROPERTY)} stratigraphic edges) — add "
+                f"{len(skipped)} stratigraphic edges by default) — add "
                 f"\"is_relation\": true to that column to keep it edge-only")
         if edge_type and src_type and tgt_type:
             legal = {e["edge_type"] for e in allowed_edges(src_type, tgt_type)}
@@ -293,15 +297,19 @@ def validate_mapping(mapping: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": not errors, "errors": errors, "warnings": warnings}
 
 
-#: The edges whose target column `base_importer._process_properties` already
-#: leaves alone. Mirrored, not imported, because it is a literal set inside a
-#: method there — and mirrored rather than widened, because widening it would
-#: change what every mapping on disk produces, which is E.D.'s call and not a
-#: night's.
-_IMPORTER_SKIPS_PROPERTY = frozenset({
-    "overlies", "is_overlain_by", "cuts", "is_cut_by", "fills", "is_filled_by",
-    "abuts", "is_abutted_by", "is_bonded_to", "is_physically_equal_to",
-})
+def _importer_skips_property() -> frozenset:
+    """The edges whose target column the importer already leaves alone.
+
+    IMPORTED now, not mirrored: it used to be a copy of a literal set that lived
+    twice inside `base_importer`, and three copies of one rule are three rules
+    waiting to disagree. Lazy because `authoring` must stay importable without
+    the importer's dependencies.
+    """
+    try:
+        from ..importer.base_importer import STRATIGRAPHIC_EDGE_TYPES
+        return frozenset(STRATIGRAPHIC_EDGE_TYPES)
+    except Exception:                              # noqa: BLE001
+        return frozenset()
 
 
 def _resolved_type(column: Dict[str, Any], index: Dict[str, Any]
@@ -389,12 +397,20 @@ def cidoc_index() -> Dict[str, Any]:
             cidoc = str(mapping.get("cidoc") or "").strip()
             if not cidoc:
                 continue
+            declared = str(mapping.get("cidoc_extension")
+                           or mapping.get("extension_name") or "")
             classes.setdefault(cidoc, []).append({
                 "em_type": _em_type_for(section, key, entry),
                 "class": str(entry.get("class") or key),
                 "cidoc": cidoc,
-                "extension": str(mapping.get("cidoc_extension")
-                                 or mapping.get("extension_name") or "CIDOC-CRM"),
+                "extension": declared or _extension_of(cidoc),
+                # …and WHICH of the two answered. The edges declare their
+                # extension; the node entries (today) do not, so theirs is read
+                # off the identifier — `A8` is CRMarchaeo, `crmdig:D12` is
+                # CRMdig, `E31` is the CRM trunk. Saying which is which is what
+                # makes it a stopgap instead of a fact: the day a node entry
+                # declares `cidoc_extension`, that wins and this stops being used.
+                "extension_inferred": not declared,
                 "section": section,
                 "path": "/".join(path + (key,)),
                 "label": str(entry.get("label") or entry.get("class") or key),
@@ -424,6 +440,113 @@ def cidoc_index() -> Dict[str, Any]:
         "classes_without_em": [],
         "properties_without_em": [],
     }
+
+
+#: identifier prefix → the ontology that defines it. The CIDOC family's own
+#: naming convention, not a copy of anything in the datamodel: `A` is CRMarchaeo,
+#: `S` CRMsci, `D` CRMdig, `E`/`P` the CRM trunk. Used ONLY where the datamodel
+#: has not declared an extension (see `extension_inferred`).
+_EXTENSION_BY_PREFIX = {
+    "A": "CRMarchaeo", "S": "CRMsci", "D": "CRMdig", "SP": "CRMgeo",
+    "I": "CRMinf", "J": "CRMinf", "E": "CIDOC-CRM", "P": "CIDOC-CRM",
+}
+
+#: …and the qualified forms, which say it outright.
+_EXTENSION_BY_QUALIFIER = {
+    "crmdig": "CRMdig", "crmarchaeo": "CRMarchaeo", "crmsci": "CRMsci",
+    "crmgeo": "CRMgeo", "crminf": "CRMinf", "prov": "PROV-O",
+    "hdto": "HDT-O", "hdt-o": "HDT-O", "em": "CRMs3D", "crm": "CIDOC-CRM",
+}
+
+
+def _extension_of(cidoc: str) -> str:
+    """Which ontology a CIDOC identifier belongs to, when nobody declared it."""
+    text = str(cidoc).strip()
+    if ":" in text:
+        return _EXTENSION_BY_QUALIFIER.get(text.split(":", 1)[0].lower(),
+                                           "CIDOC-CRM")
+    head = text.split()[0] if text else ""
+    # letters first, then the number: `SP5` is CRMgeo, `S4` CRMsci, `A8`
+    # CRMarchaeo — so the key is the leading LETTERS, not a fixed width.
+    letters = ""
+    for char in head:
+        if char.isalpha():
+            letters += char
+        else:
+            break
+    return _EXTENSION_BY_PREFIX.get(letters.upper()) \
+        or _EXTENSION_BY_PREFIX.get(letters[:1].upper()) or "CIDOC-CRM"
+
+
+@lru_cache(maxsize=1)
+def ontologies() -> Dict[str, Dict[str, Any]]:
+    """The ontologies this datamodel speaks, with their VERSIONS.
+
+    `referenced_ontology_versions` is where the node datamodel already declares
+    them — the same block EMStudio's "Reference ontologies" panel prints. Read,
+    never restated: while E.D. refines the CIDOC / HDT-O mapping the versions
+    move, and a picker with its own copy would keep showing last month's.
+    """
+    node_dm = _load(_NODE_DATAMODEL)
+    block = node_dm.get("referenced_ontology_versions") or {}
+    return {name: dict(info) for name, info in block.items()
+            if not name.startswith("_") and isinstance(info, dict)}
+
+
+def target_groups(*, include_direct: bool = True) -> List[Dict[str, Any]]:
+    """The target catalog, GROUPED BY ONTOLOGY — what a picker draws.
+
+    The grouping key is the datamodel's own `cidoc_extension`
+    (CIDOC-CRM · CRMarchaeo · CRMdig · PROV-O · HDT-O …), so this is a curated
+    subset of CIDOC — exactly what the datamodel declares and not one class more.
+    There is no OWL parsing here and no dependency on a checkout of the
+    ontologies: the datamodel is the source, and when it grows a class the picker
+    grows a row.
+
+    Each group carries its ontology's version when the datamodel states one, so a
+    person picking `A2 Stratigraphic Volume Unit` can see it is CRMarchaeo 2.1.1
+    they are committing to.
+    """
+    versions = ontologies()
+    groups: Dict[str, Dict[str, Any]] = {}
+    for entry in target_catalog(include_direct=include_direct):
+        name = str(entry.get("extension") or "CIDOC-CRM")
+        group = groups.setdefault(name, {
+            "ontology": name,
+            "version": str((versions.get(name) or {}).get("version") or ""),
+            "source": str((versions.get(name) or {}).get("source") or ""),
+            "targets": [],
+        })
+        group["targets"].append(entry)
+    # CIDOC-CRM first (it is the trunk), then the extensions alphabetically —
+    # a stable order, because a picker whose groups move is a picker you re-read
+    ordered = sorted(groups.values(), key=lambda g: (g["ontology"] != "CIDOC-CRM",
+                                                     g["ontology"]))
+    for group in ordered:
+        group["count"] = len(group["targets"])
+    return ordered
+
+
+def edge_groups(source_type: Optional[str] = None,
+                target_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    """The same grouping for the EDGES — the CIDOC property beside each EM edge,
+    under the ontology that defines it."""
+    versions = ontologies()
+    groups: Dict[str, Dict[str, Any]] = {}
+    for edge in allowed_edges(source_type, target_type):
+        name = str(edge.get("cidoc_extension") or "") or "unmapped"
+        group = groups.setdefault(name, {
+            "ontology": name,
+            "version": str((versions.get(name) or {}).get("version") or ""),
+            "edges": [],
+        })
+        group["edges"].append(edge)
+    ordered = sorted(groups.values(), key=lambda g: (g["ontology"] != "CIDOC-CRM",
+                                                     g["ontology"] == "unmapped",
+                                                     g["ontology"]))
+    for group in ordered:
+        group["count"] = len(group["edges"])
+    return ordered
 
 
 def target_catalog(*, include_direct: bool = True) -> List[Dict[str, Any]]:
@@ -787,9 +910,15 @@ def _xml_leaves(record, prefix: str = "") -> Dict[str, str]:
 #: sentence naming what IS supported instead of an AttributeError.
 _IMPORTERS = {
     "xml": ("..importer.xml_importer", "XMLImporter"),
+    "csv": ("..importer.csv_importer", "CSVImporter"),
     "xlsx": ("..importer.mapped_xlsx_importer", "MappedXLSXImporter"),
     "sqlite": ("..importer.pyarchinit_importer", "PyArchInitImporter"),
 }
+
+#: The importers that take a mapping DICT (`mapping=`) rather than a registered
+#: name. They are the ones written for the editor, where the mapping is what is
+#: on screen and has not been filed yet.
+_INLINE_IMPORTERS = ("xml", "csv")
 
 
 def apply_mapping(mapping: Dict[str, Any], source: str, *,
@@ -815,16 +944,6 @@ def apply_mapping(mapping: Dict[str, Any], source: str, *,
                 "nodes_added": 0, "edges_added": 0}
     normalized = normalize_mapping(mapping)
     fmt = format_of(normalized)
-    if fmt == "csv":
-        # DECLARED: there is no csv importer in this library, and writing a
-        # fourth one tonight would be a fourth place the mapping rules live.
-        # A csv is read as a table by the xlsx path only when a caller converts
-        # it; until then the refusal says so instead of half-working.
-        return {"ok": False, "mode": mode, "rows": 0, "nodes_added": 0,
-                "edges_added": 0, "warnings": verdict["warnings"],
-                "errors": ["csv apply is not implemented: this library has no csv "
-                           "importer yet (the fields/authoring side does work). "
-                           "Save the sheet as .xlsx, or map the sqlite/xml source."]}
     if fmt not in _IMPORTERS:
         return {"ok": False, "mode": mode, "rows": 0, "nodes_added": 0,
                 "edges_added": 0, "warnings": verdict["warnings"],
@@ -844,7 +963,7 @@ def apply_mapping(mapping: Dict[str, Any], source: str, *,
     importer_class = getattr(module, class_name)
     warnings: List[str] = list(verdict["warnings"])
     try:
-        if fmt == "xml":
+        if fmt in _INLINE_IMPORTERS:
             importer = importer_class(source, mapping=normalized,
                                       existing_graph=target)
         else:
@@ -860,6 +979,13 @@ def apply_mapping(mapping: Dict[str, Any], source: str, *,
             importer = importer_class(source, mapping_name,
                                       existing_graph=target)
             importer.mapping = normalized
+            # WHERE to write vs whether to CREATE — the same two things the XML
+            # and csv importers keep apart, and the table importers do not:
+            # passing them a graph sets their "enrich only" mode, so every row
+            # was skipped as "not found in existing graph" and the apply reported
+            # ok with an EMPTY graph. Measured by the csv↔xlsx parity test, which
+            # is exactly the failure a parity test exists to catch.
+            importer._use_existing_graph = False
         importer.parse()
         warnings.extend(getattr(importer, "warnings", []) or [])
     except Exception as exc:                       # noqa: BLE001 — surfaced, not raised
@@ -881,7 +1007,13 @@ def apply_mapping(mapping: Dict[str, Any], source: str, *,
             data[VOLATILE_KEY] = stamp
     return {
         "ok": True, "mode": mode, "format": fmt,
-        "rows": int(getattr(importer, "rows_read", 0) or 0),
+        # ROWS READ, whatever the producer counted them as. The importers
+        # written for the editor keep `rows_read`; the table ones keep the rows
+        # themselves for their second passes (`_stored_rows`). Reading only the
+        # first made an xlsx apply report "0 records" over a graph it had just
+        # built out of three — a number that is worse than no number.
+        "rows": int(getattr(importer, "rows_read", 0)
+                    or len(getattr(importer, "_stored_rows", []) or [])),
         "nodes_added": len(added_nodes),
         "edges_added": len(added_edges),
         "volatile": mode == "volatile",

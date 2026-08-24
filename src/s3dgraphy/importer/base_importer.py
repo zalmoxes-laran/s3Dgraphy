@@ -15,6 +15,31 @@ from typing import Dict, Any, Optional
 # Configurazione logging opzionale per debug
 logger = logging.getLogger(__name__)
 
+#: The edges whose target column is ALREADY an edge and must not also become a
+#: PropertyNode. Ten stratigraphic relations, and until now the list lived twice
+#: inside this file (once in `_process_properties`, once in
+#: `_process_stratigraphic_relations`) plus a mirrored copy in
+#: `mappings/authoring.py`. One name, imported by all three: two copies of a rule
+#: are two rules waiting to disagree.
+STRATIGRAPHIC_EDGE_TYPES = frozenset({
+    "overlies", "is_overlain_by", "cuts", "is_cut_by",
+    "fills", "is_filled_by", "abuts", "is_abutted_by",
+    "is_bonded_to", "is_physically_equal_to",
+})
+
+
+def _as_integer_text(value) -> str:
+    """`"2.0"` → `"2"`, anything else unchanged.
+
+    A spreadsheet's id is a NUMBER to pandas the moment one cell in the column is
+    blank, and "2.0" is not what anybody wrote in it.
+    """
+    text = str(value).strip()
+    if text.endswith(".0") and text[:-2].lstrip("-").isdigit():
+        return text[:-2]
+    return text
+
+
 def _isna(value) -> bool:
     """Is this a missing value? — WITHOUT requiring pandas.
 
@@ -479,14 +504,22 @@ class BaseImporter(ABC):
             skip_columns = set()
 
             # 1. Relationship columns (handled in _process_stratigraphic_relations)
-            STRATIGRAPHIC_EDGE_TYPES = {
-                'overlies', 'is_overlain_by', 'cuts', 'is_cut_by',
-                'fills', 'is_filled_by', 'abuts', 'is_abutted_by',
-                'is_bonded_to', 'is_physically_equal_to'
-            }
             for rel in self.mapping.get('relations', []):
                 if rel.get('edge_type') in STRATIGRAPHIC_EDGE_TYPES:
                     skip_columns.add(rel['target_column'])
+            # …and any column that DECLARES itself a relation. Opt-in, and that
+            # is the whole design: a column saying `is_relation: true` names
+            # another record, so it is an edge and nothing else. Without the flag
+            # nothing changes — no mapping on disk declares it today, so every
+            # existing import produces byte-identical output (measured).
+            #
+            # The alternative was widening the ten stratigraphic edges above to
+            # every edge type, which would have silently changed what every
+            # mapping on disk produces. The flag is the version of this change
+            # that can be adopted one mapping at a time.
+            for col_name, col_config in self.mapping.get('column_mappings', {}).items():
+                if col_config.get('is_relation'):
+                    skip_columns.add(col_name)
 
             # 2. Epoch columns and their START/END companions (handled in _process_epochs)
             epoch_base_columns = set()
@@ -661,16 +694,26 @@ class BaseImporter(ABC):
         if not hasattr(self, '_stored_rows') or not self._stored_rows:
             return
 
-        # Build lookup: relationship columns → edge_type (only stratigraphic)
-        STRATIGRAPHIC_EDGE_TYPES = {
-            'overlies', 'is_overlain_by', 'cuts', 'is_cut_by',
-            'fills', 'is_filled_by', 'abuts', 'is_abutted_by',
-            'is_bonded_to', 'is_physically_equal_to'
-        }
+        # Build lookup: relationship columns → edge_type. Two ways in, and the
+        # second is the opt-in:
+        #
+        #  * one of the ten STRATIGRAPHIC edges — how it has always worked;
+        #  * a column that DECLARES `is_relation: true` — then whatever edge the
+        #    mapping names is created, `is_after` and `has_documentation`
+        #    included. Skipping this half would make the flag a way to LOSE data:
+        #    the column stops becoming a property (above) and, without this,
+        #    would not become an edge either. "Edge-only" has to mean the edge
+        #    exists.
+        columns = self.mapping.get('column_mappings', {})
         rel_columns = {}
         for rel in relations:
-            if rel.get('edge_type') in STRATIGRAPHIC_EDGE_TYPES:
-                rel_columns[rel['target_column']] = rel['edge_type']
+            target = rel.get('target_column')
+            edge_type = rel.get('edge_type')
+            if not target or not edge_type:
+                continue
+            declared = bool((columns.get(target) or {}).get('is_relation'))
+            if edge_type in STRATIGRAPHIC_EDGE_TYPES or declared:
+                rel_columns[target] = edge_type
 
         if not rel_columns:
             return
@@ -693,6 +736,17 @@ class BaseImporter(ABC):
                         continue
 
                     target_node = self._find_node_by_name(target_id)
+                    if target_node is None:
+                        # PANDAS TYPES COLUMNS, and a relation column with one
+                        # blank cell becomes float64 — so `2` arrives as `2.0`
+                        # and matches no node called "2". Measured by the
+                        # csv↔xlsx parity test: the same data, the same mapping,
+                        # one edge missing on the spreadsheet side.
+                        #
+                        # Retried ONLY where a warning was about to be emitted,
+                        # so no import that works today can change.
+                        target_node = self._find_node_by_name(
+                            _as_integer_text(target_id))
                     if target_node:
                         edge_id = f"{source_node.node_id}_{edge_type}_{target_node.node_id}"
                         if not self.graph.find_edge_by_id(edge_id):

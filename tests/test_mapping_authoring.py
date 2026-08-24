@@ -462,14 +462,22 @@ def test_an_unknown_mode_is_a_programming_error():
         api.mapping_apply(xml_mapping(), SITE_XML, mode="maybe")
 
 
-def test_csv_apply_refuses_with_the_reason():
-    """Declared, not half-done: there is no csv importer in this library, and the
-    authoring side works. The refusal says both."""
+def test_csv_apply_is_no_longer_refused():
+    """It WAS a declared limit ("csv apply is not implemented"), closed in the
+    second round by a row-producer that adds no rules of its own — see
+    `test_mapping_csv_and_relations.py` for the csv↔xlsx parity that proves it.
+    Here only the dispatch: csv is a format `apply` knows."""
+    from s3dgraphy.mappings.authoring import _IMPORTERS
+
+    assert "csv" in _IMPORTERS
     mapping = xml_mapping()
-    mapping["source_settings"] = {"format_type": "csv", "table_name": "us"}
-    report = api.mapping_apply(mapping, "whatever.csv")
+    mapping["source_settings"] = {"format_type": "csv"}
+    report = api.mapping_apply(mapping, "/nowhere/whatever.csv")
+    # it fails because the FILE is not there, not because the format is refused
     assert report["ok"] is False
-    assert any("csv" in e and "not implemented" in e for e in report["errors"])
+    assert not any("not implemented" in e for e in report["errors"])
+    assert any("FileNotFoundError" in e or "No such file" in e
+               for e in report["errors"]), report["errors"]
 
 
 def test_a_table_apply_asks_for_the_registered_name():

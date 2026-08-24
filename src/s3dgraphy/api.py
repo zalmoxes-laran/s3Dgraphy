@@ -2427,6 +2427,38 @@ def mapping_apply(mapping: Dict[str, Any], source: str, *, graph: Any = None,
                          mapping_name=mapping_name)
 
 
+def mapping_target_groups(*, include_direct: bool = True
+                          ) -> List[Dict[str, Any]]:
+    """The target catalog GROUPED BY ONTOLOGY — CIDOC-CRM · CRMarchaeo · CRMdig ·
+    CRMgeo · CRMinf · HDT-O · PROV-O — each group with the version the datamodel
+    declares for it.
+
+    A curated subset of CIDOC by construction: exactly what the datamodel
+    declares and not one class more. No OWL is parsed and no checkout of the
+    ontologies is read — so when E.D. refines the CIDOC/HDT-O mapping, the picker
+    follows on its own."""
+    from .mappings.authoring import target_groups
+    return target_groups(include_direct=include_direct)
+
+
+def mapping_edge_groups(source_type: Optional[str] = None,
+                        target_type: Optional[str] = None
+                        ) -> List[Dict[str, Any]]:
+    """The same grouping for the edges: the CIDOC property beside each EM edge,
+    under the ontology that defines it. `unmapped` holds the edges the datamodel
+    maps only through an extension property."""
+    from .mappings.authoring import edge_groups
+    return edge_groups(source_type, target_type)
+
+
+def mapping_ontologies() -> Dict[str, Dict[str, Any]]:
+    """The ontologies this datamodel speaks, with versions and sources — the same
+    `referenced_ontology_versions` block EMStudio's Reference-ontologies panel
+    prints."""
+    from .mappings.authoring import ontologies
+    return ontologies()
+
+
 def mapping_source_extensions() -> Dict[str, str]:
     """`{extension: format}` for the sources a mapping can describe — so a file
     picker's filter and a file browser's greying come from the library instead of
