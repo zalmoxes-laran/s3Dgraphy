@@ -182,3 +182,5 @@ cython_debug/
 # user-facing manual content. The Sphinx manual lives in the parent
 # docs/ tree alongside this folder.
 docs/dev-projects/
+.claude/
+.vscode/
