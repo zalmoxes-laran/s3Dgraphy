@@ -133,7 +133,7 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
             you should find.
         media_type: recorded as `resource_type` when given.
         residency: `reference` (default — the bytes are in a store the study
-            points at) or `resident` (the ROOM's own store: em-server is in their
+            points at) or `resident` (the ROOM's own store: StratiGraph Server is in their
             path, so the gate and the licence travel with them). Both are true
             sentences about published bytes and the caller knows which one it is
             making; the default is the old one, so nothing already recorded
@@ -204,7 +204,7 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
     # `reference` is the original DP-76 sentence: the bytes went to a store and
     # the study POINTS at them (de-monolithisation, said in the field the model
     # already had). `resident` is the other true one, and it is what the room's
-    # own store means: em-server holds these bytes, so the embargo gate and the
+    # own store means: StratiGraph Server holds these bytes, so the embargo gate and the
     # licence header are in their path, and a digest fetches them from anywhere
     # (`store_backed_geometry` lists exactly those).
     #

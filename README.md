@@ -198,7 +198,7 @@ The rule the other repos inherit, in one line: *if an endpoint needs to compute
 something about a graph, that something belongs here.* This library has no web
 framework and no socket on purpose — what it does can be proved on a table.
 
-**The whole map:** [`ARCHITECTURE-SYSTEM.md`](../em-server/docs/ARCHITECTURE-SYSTEM.md).
+**The whole map:** [`ARCHITECTURE-SYSTEM.md`](../stratigraph-server/docs/ARCHITECTURE-SYSTEM.md).
 
 ---
 

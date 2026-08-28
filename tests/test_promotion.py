@@ -174,7 +174,7 @@ def test_the_delta_is_em_json_and_carries_the_reference():
 
 
 def test_the_api_surface_returns_plain_dicts():
-    """`api` is what another PROCESS calls (em-server, EMtools): what crosses
+    """`api` is what another PROCESS calls (StratiGraph Server, EMtools): what crosses
     that line has to be JSON, not a dataclass."""
     graph = _graph_with_working_resource()
     result = api.promote_resource(graph, "res-us101", url=URL, sha256=DIGEST,

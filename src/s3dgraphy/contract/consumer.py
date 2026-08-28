@@ -22,13 +22,13 @@ answer, and neither of them arises when somebody writes into their own study:
 
 * **is this caller allowed to read it at all?** A study is `public` (published:
   anybody, with no token) or `restricted` (login *and* a grant). The rule is
-  em-server's `access.effective_visibility`, applied here so a library caller and
+  StratiGraph Server's `access.effective_visibility`, applied here so a library caller and
   the room's door cannot drift apart;
 * **may these particular bytes go out?** An asset's licence and embargo are
   stated in the graph — :mod:`s3dgraphy.rights` — and an embargo is a refusal
   **with the date**, to a consumer exactly as to a browser. While it runs, the
   file is for the people working on the study (editor and above); the sentence is
-  the one em-server's asset gate already says, so a viewer refused through
+  the one StratiGraph Server's asset gate already says, so a viewer refused through
   Heriverse and a viewer refused over HTTP are told the same thing.
 
 **Read-only is enforced, not trusted.** A consumer that declared `write-graph`
@@ -53,7 +53,7 @@ out, and both would otherwise be a small scandal in a public scene:
   and a viewer showing somebody's un-accepted folder as findings would publish a
   claim nobody made.
 
-**What this module does NOT do.** It does not push: the transport is em-server's
+**What this module does NOT do.** It does not push: the transport is StratiGraph Server's
 relay (P4.2/P4.3), which already speaks the wire. :class:`Subscription` is the
 contract's side of a subscription — what a consumer is owed and what must never
 reach it — and the socket that carries it is somebody else's job. It also does
@@ -104,7 +104,7 @@ def is_consumer(descriptor: ConnectorDescriptor) -> bool:
 
 # ── who may read: the room's rule, one implementation ────────────────────────
 
-#: The four roles, in order — the same order and the same names as em-server's
+#: The four roles, in order — the same order and the same names as StratiGraph Server's
 #: `access.Role`, which RESOLVES them (from a token, an ACL, a group). Nothing
 #: here resolves anything: it asks whether a role that was already resolved
 #: carries a read or a write, and the answer is a comparison rather than a table
@@ -120,7 +120,7 @@ def role_rank(role: Optional[str]) -> int:
 
     A viewer was GRANTED something. Somebody with no role was not, and in a
     restricted study those two must not come out the same — that distinction is
-    the whole content of "a viewer is not one thing" (em-server's `access`
+    the whole content of "a viewer is not one thing" (StratiGraph Server's `access`
     module says it at length).
     """
     try:
@@ -143,7 +143,7 @@ def may_read(visibility: Any, role: Optional[str] = None) -> bool:
     a grant.
 
     An embargo is *not* handled here even though it also gates reading: a study
-    under embargo behaves as restricted whatever it says (em-server's
+    under embargo behaves as restricted whatever it says (StratiGraph Server's
     `effective_visibility`), and the caller passes the visibility that rule
     already produced — one place decides, and it is not two.
     """
@@ -171,7 +171,7 @@ class ServeRefusals:
     no_grant: str = ("this study is {visibility} and this caller holds no role "
                      "in it — a consumer reads what it was granted, and nothing "
                      "was")
-    #: The sentence em-server's asset gate already says, on purpose: a viewer
+    #: The sentence StratiGraph Server's asset gate already says, on purpose: a viewer
     #: refused through a Heriverse scene and the same viewer refused over HTTP
     #: are told the same thing, including WHEN it opens.
     embargoed: str = ("this asset is under embargo until {until} — until then it "
@@ -344,7 +344,7 @@ def serve_asset(document: Any, digest: Any, descriptor: ConnectorDescriptor, *,
     *what is served*, never *whether the embargo applies*.
 
     An asset the graph says nothing about is **served**, with `rights: None` —
-    the same behaviour as em-server's gate, and the honest one: "I know nothing
+    the same behaviour as StratiGraph Server's gate, and the honest one: "I know nothing
     about this digest" is not "this digest is embargoed", and refusing would make
     every unregistered byte in the store disappear. What is NOT done is inventing
     a licence for it: no rights means no `license_effective` either, because a
@@ -375,7 +375,7 @@ def serve_asset(document: Any, digest: Any, descriptor: ConnectorDescriptor, *,
 
     # …and on the way out the licence TRAVELS. Not enforcement — a share-alike
     # cannot be imposed by a field — but nobody gets to say they were not told.
-    # These are the same four facts em-server puts in its `X-EM-*` headers.
+    # These are the same four facts StratiGraph Server puts in its `X-EM-*` headers.
     if rights:
         base["license"] = rights.get("license_effective")
         base["license_is_default"] = rights.get("license_is_default")
@@ -390,7 +390,7 @@ def serve_asset(document: Any, digest: Any, descriptor: ConnectorDescriptor, *,
 class Subscription:
     """One consumer's subscription — the contract's side of `subscribe`.
 
-    Not a socket. The transport is em-server's relay (P4.2/P4.3), which already
+    Not a socket. The transport is StratiGraph Server's relay (P4.2/P4.3), which already
     speaks this wire and already fans out to whoever is in the room; what this
     holds is the part a relay must not decide on its own: *which changes a
     consumer is owed*.

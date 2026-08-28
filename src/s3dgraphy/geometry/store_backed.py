@@ -12,7 +12,7 @@ receive a list — not walk `has_linked_resource` itself and discover next year
 that RMSF exists.
 
 **Resident only, and that is a design line, not a shortcut.** A `resident`
-resource is bytes in the room's content-addressed store: em-server is in their
+resource is bytes in the room's content-addressed store: StratiGraph Server is in their
 path, so the embargo gate and the licence header apply to them, and a digest is
 enough to fetch them from anywhere. A `reference` resource is somebody's NAS or
 somebody's laptop: the graph knows a locator, nothing can verify it from here,

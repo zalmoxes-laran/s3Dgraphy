@@ -81,7 +81,7 @@ def normalise_digest(value: Any) -> Optional[str]:
 def _sections(document: Any) -> List[Dict[str, Any]]:
     """Every graph in whatever was handed in — a container, a document, a Graph.
 
-    Callers hold different things: em-server holds a raw container dict (and
+    Callers hold different things: StratiGraph Server holds a raw container dict (and
     parsing it on every asset request would be a cost with no payer), a library
     caller holds a `Graph`. Both are walked here, in their own shape, rather
     than converted — a conversion would be the second reader this module exists

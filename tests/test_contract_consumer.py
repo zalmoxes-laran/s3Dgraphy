@@ -25,7 +25,7 @@ one sentence of that (2026-08-22, with E.D.):
 
 What is NOT here, and is somebody else's half: the adapter inside Heriverse
 (3DR's repository — this file holds the SPEC it implements against) and the
-socket that carries a subscription (em-server's relay, which already speaks the
+socket that carries a subscription (StratiGraph Server's relay, which already speaks the
 wire).
 """
 
@@ -318,7 +318,7 @@ def test_an_asset_the_graph_has_never_heard_of_is_served_without_a_licence():
     """The honest half. "I know nothing about this digest" is not "this digest is
     embargoed" — and it is not "this digest is CC-BY" either: no rights means no
     `license`, because a default presented as a fact is worse than an absence.
-    (Same behaviour as em-server's gate, deliberately: one rule.)"""
+    (Same behaviour as StratiGraph Server's gate, deliberately: one rule.)"""
     out = serve_asset(with_asset(), "sha256:" + "cd" * 32, heriverse(),
                       role="viewer")
     assert out.ok and out.data["rights"] is None
@@ -329,7 +329,7 @@ def test_the_licence_travels_with_the_bytes():
     out = serve_asset(with_asset(license="CC-BY-SA-4.0"), DIGEST, heriverse(),
                       role="viewer")
     assert out.ok
-    # the same four facts em-server puts in its X-EM-* headers
+    # the same four facts StratiGraph Server puts in its X-EM-* headers
     assert out.data["license"] == "CC-BY-SA-4.0"
     assert out.data["license_is_default"] is False
     assert out.data["digest"] == DIGEST.split(":")[-1]

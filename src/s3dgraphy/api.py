@@ -3,7 +3,7 @@
 A single, documented set of **pure operations** over the Extended Matrix graph:
 load/parse, validate, project → TTL/RDF, GraphML/XLSX interop, authority
 resolution. This is the stable contract that the local **em-bridge** sidecar and
-the future **em-server** (HTTP) both drive — the library itself stays pure:
+the future **StratiGraph Server** (HTTP) both drive — the library itself stays pure:
 
   * NO web framework here (no FastAPI/uvicorn/HTTP). Transports wrap this surface.
   * Heavy/optional deps (lxml for GraphML, pandas for XLSX, rdflib for RDF) are
@@ -349,7 +349,7 @@ def apply_op(section: Dict[str, Any], op: Dict[str, Any]) -> Dict[str, Any]:
 
     Returns a **dict** (`{applied, reason, node_id, fields}`), not the internal
     dataclass: this is the api surface, which is what another PROCESS talks to
-    (em-server puts the answer straight on a socket). Handing a caller across
+    (StratiGraph Server puts the answer straight on a socket). Handing a caller across
     that boundary an object it has to know the shape of is how a library leaks
     into a transport.
     """
@@ -453,7 +453,7 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
 
     `residency` says which true sentence this is — `reference` (a store the study
     points at, the default and the original DP-76 one) or `resident` (the ROOM's
-    store: em-server is in the bytes' path, so the gate and the licence travel
+    store: StratiGraph Server is in the bytes' path, so the gate and the licence travel
     with them). `corpus` is the offline→online moment: hand it the container's
     DOCUMENTATION member and the D7 event is recorded THERE, with the asset
     mirrored into it under its own id — the shared leaf between the study and its
@@ -493,7 +493,7 @@ def dtc_corpus(container: Any, *, create: bool = True) -> Optional[Graph]:
 def merge_corpus(resident: Any, incoming: Any) -> Dict[str, Any]:
     """Fold one DTC corpus into another, per UUID. Returns the report as a dict.
 
-    On the api surface because another PROCESS performs it: em-server merges a
+    On the api surface because another PROCESS performs it: StratiGraph Server merges a
     project's **file** corpus into the instance's **resident** one when a study is
     promoted or joins a room, and it must not invent a second answer to "who
     wins". Same merge the container uses. See :mod:`s3dgraphy.dtc.corpus`.
@@ -535,7 +535,7 @@ def store_backed_geometry(graph: Graph) -> List[Dict[str, Any]]:
     `has_linked_resource` would drift the day a facet is added.
 
     `reference` resources are deliberately absent: their bytes are outside the
-    store (and outside em-server's gate), so a digest cannot fetch them and a
+    store (and outside StratiGraph Server's gate), so a digest cannot fetch them and a
     path is meaningful on one machine only. See
     :mod:`s3dgraphy.geometry.store_backed`.
     """
@@ -623,7 +623,7 @@ def study_metadata(container: Any, *, study_id: Optional[str] = None
     """The catalogue card of one study, derived from its em.json container.
 
     On the api surface because it is what another PROCESS asks for: a catalogue
-    (em-catalog, and 3DR's production one) turns containers into an index, and
+    (StratiGraph Catalog, and 3DR's production one) turns containers into an index, and
     the rule that makes the index safe is that it is a **projection** — every
     field comes from the container, so re-reading the containers rebuilds it.
     An indexer that had to know where a licence lives would be a second truth
@@ -645,7 +645,7 @@ def asset_rights(document: Any, digest: str, *, today: Any = None
 
     On the api surface for the same reason `study_metadata` is: another PROCESS
     asks it. An asset store must decide whether to serve bytes, and the decision
-    belongs to the graph — em-server CONSULTS this rather than keeping a second
+    belongs to the graph — StratiGraph Server CONSULTS this rather than keeping a second
     copy of an embargo that lives in a document people edit.
 
     See :mod:`s3dgraphy.rights` for how the walk works and why the rights are

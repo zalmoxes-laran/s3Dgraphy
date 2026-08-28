@@ -74,7 +74,7 @@ def test_the_author_is_not_the_attributor_and_the_act_is_signed():
 
 def test_the_reader_sees_what_the_writer_wrote():
     """Enrichment the one reader cannot see is enrichment that changed nothing —
-    and that reader is what em-server consults before serving bytes."""
+    and that reader is what StratiGraph Server consults before serving bytes."""
     g = graph_with_asset()
     em.enrich_asset_dtc(g, DIGEST, attributor=ATTRIBUTOR, author=AUTHOR,
                         author_name="Bruno Rossi", license="CC-BY-4.0",

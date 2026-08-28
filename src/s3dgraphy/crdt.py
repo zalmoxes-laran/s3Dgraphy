@@ -926,7 +926,7 @@ def compact_section(section: Dict[str, Any], before: Clock) -> CompactionReport:
 
     **THE PRECONDITION, and it is the whole safety argument**: `before` must be a
     point every participant has passed, so that no operation older than it can
-    still arrive. The caller is the one who can know that (em-server takes the
+    still arrive. The caller is the one who can know that (StratiGraph Server takes the
     minimum watermark across connected clients); this function trusts it, and a
     caller who passes a `before` that is too recent will let a late operation win
     against a fallback instead of against the real clock. That is why the

@@ -53,7 +53,7 @@ from typing import Any, Dict, List, Optional
 from .container import Container, content_digest, parse_container
 
 #: What `header.visibility` may say, and what it means here. The spec writes
-#: `public|private`; the rooms of em-server write `public|restricted`. One
+#: `public|private`; the rooms of StratiGraph Server write `public|restricted`. One
 #: concept, two spellings in the wild — read both, answer in one, never invent a
 #: third. Anything unknown reads as restricted, which is the safe direction:
 #: the failure modes are not symmetric.
@@ -98,7 +98,7 @@ def normalise_kind(raw: Any) -> Optional[str]:
 def embargo_active(value: Any, today: Optional["datetime.date"] = None) -> bool:
     """Is this embargo still running?
 
-    ONE definition, because two would drift: the room's door (em-server) and the
+    ONE definition, because two would drift: the room's door (StratiGraph Server) and the
     catalogue's listing both ask this, and a study hidden from a list while its
     room lets people in — or the reverse — is worse than either behaviour alone.
 

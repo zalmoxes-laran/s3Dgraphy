@@ -43,7 +43,7 @@ limit. Only a field they both wrote is a decision, and it is reported per field.
 
 What this module deliberately does NOT do:
 
-* **real-time transport.** The relay (em-server: fan-out + op-log + presence) is
+* **real-time transport.** The relay (StratiGraph Server: fan-out + op-log + presence) is
   P4.2, and the client is P4.3. The algebra converges without a coordinator,
   which is exactly why it can be built and proved first, on a table.
 * **tombstone GC.** Deletions stay as marks; compacting them belongs to the
@@ -348,7 +348,7 @@ def build_container(container: Container) -> Dict[str, Any]:
     #
     # The builder owns the keys that describe the FORMAT and nothing more. What a
     # header also carries is the caller's: `visibility` (which decides whether a
-    # study is served without a token — em-server reads it for rooms, em-catalog
+    # study is served without a token — StratiGraph Server reads it for rooms, StratiGraph Catalog
     # for studies), `title`, `description`. Rebuilding the header from scratch
     # DROPPED them, so a container that said "public" came back from its own file
     # saying nothing, and the default is restricted — a study quietly

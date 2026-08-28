@@ -1,6 +1,6 @@
 """P1-F — the access-API surface (s3dgraphy.api): pure ops, stable contract.
 
-Covers the operations em-bridge / em-server drive. Format-specific ops are
+Covers the operations em-bridge / StratiGraph Server drive. Format-specific ops are
 skipped if their optional dep is absent (rdflib for TTL, lxml for GraphML)."""
 
 import json

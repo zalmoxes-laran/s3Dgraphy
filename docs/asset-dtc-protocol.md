@@ -108,7 +108,7 @@ The call returns what it did, per field, so a tool can report rather than guess:
    file in the Python reader, and re-declaring a licence wrote onto the corpse of
    the one just removed in the TypeScript writer.)
 6. **The rights are read back by one reader** (`asset_rights`), which is what
-   `em-server` consults before serving the bytes. Enrichment that this reader
+   `StratiGraph Server` consults before serving the bytes. Enrichment that this reader
    cannot see is enrichment that changed nothing.
 
 ## Where the act is normally triggered
@@ -179,7 +179,7 @@ range over digital objects and would be a false statement about a class.
   what, through which process) is `docs/dtc-profile.md`. The declared chain above
   is the minimum: an event, its inputs, and the name of the tool.
 * **Not enforcement.** What the licence *permits* is not imposed by anything
-  here; em-server exposes it and transports it (`X-EM-License`, the IIIF
+  here; StratiGraph Server exposes it and transports it (`X-EM-License`, the IIIF
   `requiredStatement`) and gates only the embargo, which is a date.
 * **Not identity verification.** Whether an ORCID belongs to who says it does is
   the identity layer's question (`claim now, verify later`), unchanged.

@@ -14,7 +14,7 @@ What this adds to :mod:`s3dgraphy.contract.core`:
   than inferred because the same capability (say ``publish-3D``) means a
   different thing on each side;
 * **how it reaches us** (``transport``) — direct (a socket on this machine), lan
-  (a paired host on the network), cloud (through a room on em-server). A
+  (a paired host on the network), cloud (through a room on StratiGraph Server). A
   connector lists what it CAN do; the session picks;
 * **what it speaks** (``versions``) — the em.json schema, the connections
   datamodel, this connector API. The handshake below refuses a mismatch with the
