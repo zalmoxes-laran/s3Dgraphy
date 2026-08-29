@@ -274,11 +274,17 @@ def test_every_group_carries_the_version_the_datamodel_declares():
 
 
 def test_the_edges_group_with_the_datamodels_real_counts():
-    """These numbers ARE the datamodel's: 31 CIDOC-CRM · 8 CRMarchaeo ·
-    3 CRMdig · 6 HDT-O · 2 PROV-O, plus the 2 mapped only through an extension
-    property (`heritage_part_of`, `includes_study`)."""
+    """These numbers ARE the datamodel's: 32 CIDOC-CRM · 8 CRMarchaeo ·
+    4 CRMdig · 6 HDT-O · 2 PROV-O, plus the 2 mapped only through an extension
+    property (`heritage_part_of`, `includes_study`).
+
+    Grew by two on 2026-08-29 with the georeferencing edges of the photogrammetry
+    connector: `has_registration_transform` (CIDOC-CRM P67i) and `has_gcp_set`
+    (CRMdig L21). Updating this number is the point of the test — a datamodel
+    that grows without anybody noticing is how a consumer starts reading an edge
+    nobody documented."""
     groups = {g["ontology"]: g["count"] for g in api.mapping_edge_groups()}
-    assert groups == {"CIDOC-CRM": 31, "CRMarchaeo": 8, "CRMdig": 3,
+    assert groups == {"CIDOC-CRM": 32, "CRMarchaeo": 8, "CRMdig": 4,
                       "HDT-O": 6, "PROV-O": 2, "unmapped": 2}, groups
     filtered = {g["ontology"]: [e["edge_type"] for e in g["edges"]]
                 for g in api.mapping_edge_groups("US", "US")}

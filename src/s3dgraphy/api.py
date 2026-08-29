@@ -774,6 +774,71 @@ def batch_summary(graph: Graph, acquisition_id: str) -> Dict[str, Any]:
     return _summary(graph, acquisition_id)
 
 
+# ── photogrammetry: what a reconstruction MEANS ──────────────────────────────
+#
+# The MEANING, not the machinery. Driving an engine (REST, a task queue, an
+# archive) is node-side plumbing and lives in StratiGraph Server; what is on this
+# surface is the semantic contract it calls with the result. A second engine —
+# COLMAP, MicMac, Aïoli — is a second driver calling the same function.
+
+def build_photogrammetry_delta(*, input_resources, output_model,
+                               transform=None, gcp_set=None,
+                               author: Optional[str] = None,
+                               mode: str = "local", **kwargs) -> Dict[str, Any]:
+    """The DTC provenance of one reconstruction, as a delta somebody applies.
+
+    `output_model` is a :class:`~s3dgraphy.photogrammetry.ProducedModel` (or
+    build one with :func:`produced_model`): the bytes are already published when
+    this is called, and their checksum is what the resource points at.
+
+    `mode` is `"local"` (scaled and oriented in a site frame — honestly NOT
+    georeferenced) or `"absolute"` (registered against ground control points).
+    The two are different SHAPES in the graph, not a flag, and the refusals that
+    keep them apart are in :mod:`s3dgraphy.photogrammetry.delta`.
+
+    Returns a dict — ids, the delta, the warnings — because the caller is on the
+    other side of an HTTP boundary.
+    """
+    from .photogrammetry import build_photogrammetry_delta as _build
+    return _build(input_resources=input_resources, output_model=output_model,
+                  transform=transform, gcp_set=gcp_set, author=author,
+                  mode=mode, **kwargs).as_dict()
+
+
+def produced_model(checksum: str, *, url: Optional[str] = None,
+                   media_type: Optional[str] = None,
+                   residency: str = "resident",
+                   name: Optional[str] = None,
+                   node_id: Optional[str] = None):
+    """The output of a reconstruction, described. Built here so a caller does
+    not import the class to state four facts."""
+    from .photogrammetry import ProducedModel
+    return ProducedModel(checksum=checksum, url=url, media_type=media_type,
+                         residency=residency, name=name, node_id=node_id)
+
+
+def gcp_set(node_id: str, points, *, crs: Optional[str] = None,
+            name: str = "Ground control points"):
+    """A control set, validated on construction. Raises on a point that
+    controls nothing (no id, no world coordinate, an observation with no image
+    or no pixel) — before an engine spends an hour on it."""
+    from .nodes.georeferencing_node import GCPSetNode
+    return GCPSetNode(node_id, name=name, points=list(points), crs=crs)
+
+
+def registration_transform(node_id: str = "registration", *,
+                           rotation=None, translation=None, scale: float = 1.0,
+                           crs: Optional[str] = None, rms: Optional[float] = None,
+                           residuals=None, name: str = "Registration"):
+    """A placement, stated. Optional: `build_photogrammetry_delta` makes the
+    canonical one for the mode when none is given — pass one only when the
+    engine reported real parameters."""
+    from .nodes.georeferencing_node import RegistrationTransformNode
+    return RegistrationTransformNode(node_id, name=name, rotation=rotation,
+                                     translation=translation, scale=scale,
+                                     crs=crs, rms=rms, residuals=residuals)
+
+
 # ── IIIF: the image layer, as a projection ────────────────────────────────────
 def iiif_manifest(graph: Graph, target_id: str, *, image_base: str,
                   manifest_id: Optional[str] = None,

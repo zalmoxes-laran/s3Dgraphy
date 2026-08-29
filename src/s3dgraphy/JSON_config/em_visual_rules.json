@@ -1,6 +1,6 @@
 {
   "formal_language": "EM",
-  "version": "1.6.14",
+  "version": "1.6.16",
   "_note_material_vs_qualia_color": [
     "DUE COSE DIVERSE CHE SI CHIAMANO ENTRAMBE color. Non confonderle: e gia successo.",
     "1) QUI, in node_styles.<tipo>.style.material.rgba_color — il COLORE DEL MATERIALE BLENDER del proxy 3D, in float LINEARI. UNA sola chiave: `rgba_color`. Fino a S8 il file ne usava due (`color` sui 13 tipi stratigrafici, `rgba_color` sugli altri) e get_material_color() ne leggeva una sola, restituendo None per 21 tipi su 38; ora sono unificate e la vecchia `color` e letta solo come tolleranza verso file scritti prima. Un tipo che non diventa mai una mesh NON ha material affatto (i contenitori di gruppo, e da S7 i dieci nodi che rendono per icona): per loro get_material_color() torna None, ed e corretto.",
@@ -9,6 +9,8 @@
     "In breve: qui si decide di che colore DISEGNARE una US; li si registra di che colore ERA."
   ],
   "_changelog": {
+    "1.6.16": "Asset declarations made TRUE. Four styles named a 2D file that is not there — SE.png, TSU.svg, serUSD.svg and unknown.png (which never existed) — and GRAPH named two, so it drew no icon at all. icons.ts returns null for a missing file and the canvas quietly draws the shape, so all five failed silently. Now: graph.svg authored (neutral gray, three nodes and their edges, the meta-container), unknown points at the generic_node.svg that exists, the three stale halves name the file that is there. Enforced by tests/test_visual_assets.py; the 16 unmodelled .glb are REPORTED (there and in sync-datamodels.sh), not asserted \u2014 a placeholder that looks official is harder to notice than an absence.",
+    "1.6.15": "Georeferencing gets its symbol on the canvas: node_styles GCP (GCPSetNode, crosshair) and RGT (RegistrationTransformNode, axes + rotation arc), in the same #FF6600 reference family as GEO/SS/LINK, each with its own 2D icon. ADDITIVE. Also 1.6.14-era: dtc_kinds.process.photogrammetry. Note the limit of a per-TYPE rule: whether a transform is georeferenced or a site-local frame is an INSTANCE fact (data.crs) and is read from the has_gcp_set edge, not from the style.",
     "1.6.14": "BUGFIX-GLYPH follow-up (2026-08-05, E.D.): SE now renders its GLYPH in the scene (the new SE.svg, a stratigraphic-section box with a writable middle band) instead of a bare triangle, so a name can be written inside it. Added SE to 2d_render_glyph_types (aspect 1.331 from the SVG viewBox) and switched SE 2d_icon_prefer to vector (the raster SE.png is the stale stipple; the new symbol is the SVG). Dropped the interim shape_bbox=square. The shape:triangle stays declared for other consumers but the 2D scene draws the glyph. NOTE: verify the SVG carries a light background for dark-canvas legibility (like combiner.svg).",
     "1.6.13": "BUGFIX-GLYPH (2026-08-05): SE (StratigraphicEvent) gains shape_bbox=\"square\" on its style, like BR. Its triangle was drawn in the wide default 90x32 box, leaving the connect handle far from the glyph; a square bbox (side = min(w,h)) makes the triangle sit in a ~32x32 box with the handle adjacent, matching BR (diamond, square) and the glyph types. No shape_scale: unlike BR (a 0.7 marker) the SE triangle stays full-size. The SCENE representation of SE remains the triangle shape, not the raster icon (S10/POL5 decision unchanged).",
     "1.6.12": "EM3 - `2d_render_glyph_types` guadagna una tabella `aspect`: la larghezza del box di un nodo-glifo e la sua ALTEZZA per l'aspect del disegno, quindi tutti i glifi hanno la stessa altezza e differiscono solo in larghezza (regola E.D.). Default 1.0 = quadrato, che e cio che sono gli undici glifi DTC dopo l'autocrop di POL4 ed extractor/combiner per costruzione; l'unico davvero non quadrato oggi e `author` (0.875 = 448/512). I numeri sono STATICI e misurati una volta dai file: un aspect letto da naturalWidth a runtime farebbe dipendere il layout da quando un bitmap finisce di decodificare (box che salta, due run diversi sullo stesso documento). Il prezzo di un numero statico e che puo diventare stantio se un asset viene ridisegnato: da questa versione sync-datamodels.sh ri-misura ogni file vendorato e AVVISA se una dichiarazione sbaglia di oltre il 2%.",
@@ -224,7 +226,7 @@
     "serUSD": {
       "3d_file": "src/3D/serUSD.glb",
       "2d_file_rast": "src/2D/serUSD.png",
-      "2d_file_vect": "src/2D/serUSD.svg",
+      "2d_file_vect": "src/2D/serUSD.png",
       "style": {
         "material": {
           "rgba_color": {
@@ -287,7 +289,7 @@
     "TSU": {
       "3d_file": "src/3D/TSU.glb",
       "2d_file_rast": "src/2D/TSU.png",
-      "2d_file_vect": "src/2D/TSU.svg",
+      "2d_file_vect": "src/2D/TSU.png",
       "style": {
         "material": {
           "rgba_color": {
@@ -332,7 +334,7 @@
     "SE": {
       "_comment": "Stratigraphic Event: l'ATTO che crea, modifica o distrugge un'unita — un terremoto che fa cadere l'intonaco, una demolizione, l'inizio di un cantiere. Non e materia, e un processo, e per questo non appartiene a nessuna delle famiglie cromatiche della materia (rosso reale, verde/blu virtuale, arancio documentario, giallo special find, grigio negativo). Prende il TEAL della famiglia attivita: un ActivityNodeGroup e un fascio di atti e porta gia la linguetta ciano #CCFFFF, quindi il ciano e l'unico colore del linguaggio che dice gia 'e successo qualcosa' invece di 'qualcosa c'e'. Curato in S10 (2026-08-02): fino ad allora SE portava il segnaposto #BC0000 mai scelto, che per giunta contraddiceva il proprio bordo nero, e il node datamodel dichiarava il simbolo 'to be defined'. Il nero di BR e stato scartato di proposito: un material nero rende un proxy illeggibile in viewport, e i proxy SE si vedono (Heriverse li disegna fra i suoi stratigraphicTypes). POL5 (2026-08-04): l'ICONA e il raster (`2d_icon_prefer: raster`), come per NARR e per la stessa ragione — SE.svg e un tratteggio vettorializzato da 284 KB per un glifo che nessun renderer disegna oltre i 30 px. Il vettore resta dichiarato perche esiste; il flag dice quale dei due DISEGNARE. Il PNG a 256 px e reso DA quell'SVG, quindi i due non possono divergere. Nel grafo SE resta comunque un TRIANGOLO disegnato (shape), non l'icona: il raster serve a palette ed elenchi.",
       "3d_file": "src/3D/SE.glb",
-      "2d_file_rast": "src/2D/SE.png",
+      "2d_file_rast": "src/2D/SE.svg",
       "2d_file_vect": "src/2D/SE.svg",
       "2d_icon_prefer": "vector",
       "style": {
@@ -490,7 +492,7 @@
     "GRAPH": {
       "_comment": "Top-level container node representing the EM graph itself. Anchor for graph-wide metadata propagation (default author, license, embargo, epoch). Rendered as a dashed rounded rectangle to read as a meta-container, neutral gray to stay visually distinct from stratigraphic and paradata nodes. Graphml palette prefix: 'G.'.",
       "file_3d": "src/3D/graph.glb",
-      "2d_file_rast": "src/2D/graph.png",
+      "2d_file_rast": "src/2D/graph.svg",
       "2d_file_vect": "src/2D/graph.svg",
       "style": {
         "material": {
@@ -539,6 +541,32 @@
         "fill_color": "#FFFFFF",
         "border_style": "solid",
         "shape": "chain"
+      },
+      "label_position": "over"
+    },
+    "GCP": {
+      "_comment": "Ground control points — the EVIDENCE behind a registration: which point was seen on which photograph at which pixel, and where it is in the world. The NODE IS THE SET, never the single GCP (data.points), which is why the icon shows one target among several marks. Same orange as the other reference/georeferencing nodes (GEO, SS, LINK) because it is that family; the crosshair shape distinguishes measurement-of-a-place from position-of-a-site. Graphml palette prefix: 'GC.'.",
+      "file_3d": "src/3D/gcp_set.glb",
+      "2d_file_rast": "src/2D/gcp_set.svg",
+      "2d_file_vect": "src/2D/gcp_set.svg",
+      "style": {
+        "border_color": "#FF6600",
+        "fill_color": "#FFFFFF",
+        "border_style": "solid",
+        "shape": "crosshair"
+      },
+      "label_position": "over"
+    },
+    "RGT": {
+      "_comment": "Registration transform — the SOLUTION: the 7-parameter similarity that places a produced model, with its RMS. Drawn as axes plus a rotation arc. NOTE, and it is a limit of a per-TYPE rule: whether a given transform is georeferenced (data.crs set) or a site-local frame (crs null) is an INSTANCE fact and cannot be encoded here — a reader tells the two modes apart by the presence of the has_gcp_set edge, which is why that edge exists. Graphml palette prefix: 'RG.'.",
+      "file_3d": "src/3D/registration_transform.glb",
+      "2d_file_rast": "src/2D/registration_transform.svg",
+      "2d_file_vect": "src/2D/registration_transform.svg",
+      "style": {
+        "border_color": "#FF6600",
+        "fill_color": "#FFFFFF",
+        "border_style": "solid",
+        "shape": "axes"
       },
       "label_position": "over"
     },
@@ -628,7 +656,7 @@
     },
     "unknown": {
       "file_3d": "src/3D/unknown.glb",
-      "file_2d": "src/2D/unknown.png",
+      "file_2d": "src/2D/generic_node.svg",
       "style": {
         "border_color": "#FF0000",
         "fill_color": "#FFFFFF",
@@ -835,6 +863,11 @@
       "topographic": { "label": "Topographic survey", "glyph": "01_topographicnetwork", "description": "Total-station / topographic-network acquisition." }
     },
     "process": {
+      "photogrammetry": {
+        "label": "Photogrammetry",
+        "glyph": "03_mesh",
+        "description": "Structure-from-motion reconstruction: a cluster of photographs becomes a 3D model. A specific kind of transformation, named because what a reader needs to know about a mesh is which family of process made it \u2014 and because the placement (RegistrationTransform) only means something for this one."
+      },
       "transformation": { "label": "Transformation", "glyph": "00_transformation", "description": "A processing/transformation step turning inputs into produced digital objects." }
     },
     "acquisition": {

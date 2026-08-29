@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!-- EM · GCPSetNode. A survey target seen from above: the crosshair is one control point, the three small marks around it are the SET — the node is the set, never the single GCP. Drawn for Extended Matrix, same licence as the datamodel. -->
+<circle cx="256" cy="248" r="96" fill="#FFFFFF" stroke="#FF6600" stroke-width="26"/>
+<circle cx="256" cy="248" r="26" fill="#FF6600"/>
+<path fill="#FF6600" d="M242 96h28v72h-28zM242 328h28v72h-28zM104 234h72v28h-72zM336 234h72v28h-72z"/>
+<circle cx="72" cy="432" r="26" fill="#FF6600"/>
+<circle cx="256" cy="464" r="26" fill="#FF6600"/>
+<circle cx="440" cy="432" r="26" fill="#FF6600"/>
+</svg>

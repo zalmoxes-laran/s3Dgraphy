@@ -1,6 +1,6 @@
 {
- "s3Dgraphy_data_model_version": "1.6.3",
- "description": "s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings. v1.6.3 re-reads SemanticShapeNode as a PAYLOAD carrier: the proxy of a unit is now a PropertyNode of qualia type 'geometry' that points at the shape (has_semantic_shape), so the proxy inherits the paradata chain it never had. Breaking for consumers that read the proxy as a standalone SemanticShape. v1.6.2 adds AnnotationRegionNode (em:AnnotationRegion, subclass of crm:E36_Visual_Item): the geometry of a 2D annotation in NORMALISED image space, distinct from SemanticShapeNode (3D scene geometry, crmgeo:SP5) - the semantics of the 2D annotator, defined before any canvas exists. v1.6.0 inaugurates a systematic CIDOC-CRM mapping revision: complete audit of all node types against CIDOC-CRM, CRMarchaeo, CRMinf, CRMdig, CRMsci, CRMgeo; replacement of legacy 'cidoc_s3d' pseudo-class names (invented strings without IRI or superclass declaration) with formal em:/s3d: IRIs declared as proper subclasses of CRM classes; introduction of CRMinf as primary (not alternative) for the paradata chain (ParadataNode, PropertyNode interpretive case, ExtractorNode, CombinerNode); introduction of PROV-O for AuthorNode to cover both human and AI agents; alignment with the Heritage Digital Twin Ontology (HDT-O) for containment / granularity properties; LocationNodeGroup (v1.5.3) adopted as the reference pattern (CIDOC-native composition via P2_has_type → E55 Type instances, with explicit extension_status and rationale). Companion deliverables: em.ttl (formal EM extension ontology, dereferenceable via w3id.org/em/) and hdto_extension.ttl (HDT-O granularity properties: contains_HDT, contains_SU, isPrimary). v1.5.4 added RSF (Reused Special Find — spolia) as a stratigraphic subtype, octagon with red border, family=real, is_series=false. Originating DP: DP-26 (spolia project, last DP before the EM 1.5 cut). v1.5.3 added LocationNodeGroup (E53 Place + E55 Type) for spatial / locational membership orthogonal to ActivityNodeGroup (intention) and EpochNode (time). v1.5.2 added family + is_series classification metadata on stratigraphic subtypes.",
+ "s3Dgraphy_data_model_version": "1.6.4",
+ "description": "s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings. v1.6.4 adds the ADDITIVE georeferencing_nodes section (GCPSetNode = em:GCPSet, RegistrationTransformNode = em:RegistrationTransform, both subclasses of crm:E73_Information_Object with their own extension URIs so the RDF projection stays bijective): the CONTROL and the SOLUTION that place a produced model in the world, introduced with the photogrammetry processing connector. The two modes of that connector are the SHAPE of the graph (a transform with a CRS that has_gcp_set points at = absolute; a transform with crs=null and no control set = a site-local frame; no transform at all = nobody placed it), never a flag. No existing family changed. v1.6.3 re-reads SemanticShapeNode as a PAYLOAD carrier: the proxy of a unit is now a PropertyNode of qualia type 'geometry' that points at the shape (has_semantic_shape), so the proxy inherits the paradata chain it never had. Breaking for consumers that read the proxy as a standalone SemanticShape. v1.6.2 adds AnnotationRegionNode (em:AnnotationRegion, subclass of crm:E36_Visual_Item): the geometry of a 2D annotation in NORMALISED image space, distinct from SemanticShapeNode (3D scene geometry, crmgeo:SP5) - the semantics of the 2D annotator, defined before any canvas exists. v1.6.0 inaugurates a systematic CIDOC-CRM mapping revision: complete audit of all node types against CIDOC-CRM, CRMarchaeo, CRMinf, CRMdig, CRMsci, CRMgeo; replacement of legacy 'cidoc_s3d' pseudo-class names (invented strings without IRI or superclass declaration) with formal em:/s3d: IRIs declared as proper subclasses of CRM classes; introduction of CRMinf as primary (not alternative) for the paradata chain (ParadataNode, PropertyNode interpretive case, ExtractorNode, CombinerNode); introduction of PROV-O for AuthorNode to cover both human and AI agents; alignment with the Heritage Digital Twin Ontology (HDT-O) for containment / granularity properties; LocationNodeGroup (v1.5.3) adopted as the reference pattern (CIDOC-native composition via P2_has_type → E55 Type instances, with explicit extension_status and rationale). Companion deliverables: em.ttl (formal EM extension ontology, dereferenceable via w3id.org/em/) and hdto_extension.ttl (HDT-O granularity properties: contains_HDT, contains_SU, isPrimary). v1.5.4 added RSF (Reused Special Find — spolia) as a stratigraphic subtype, octagon with red border, family=real, is_series=false. Originating DP: DP-26 (spolia project, last DP before the EM 1.5 cut). v1.5.3 added LocationNodeGroup (E53 Place + E55 Type) for spatial / locational membership orthogonal to ActivityNodeGroup (intention) and EpochNode (time). v1.5.2 added family + is_series classification metadata on stratigraphic subtypes.",
  "components": [
   "CIDOC-CRM",
   "CRMarchaeo",
@@ -1569,6 +1569,56 @@
     "name": "P1_is_identified_by",
     "description": "P3_has_note",
     "dtc_kind": "P2_has_type"
+   }
+  }
+ },
+ "georeferencing_nodes": {
+  "_section_note": "GEOREFERENCING — how a produced model got INTO the world, as two distinct things that fail differently: GCPSetNode = the CONTROL (evidence: which point was seen on which photograph at which pixel, and where it is in the world, in which CRS, with what uncertainty) — it can exist before any model and survives being reused by a second reconstruction; RegistrationTransformNode = the SOLUTION (the 7-parameter similarity the bundle adjustment settled on, with its RMS/residuals) — it is what the model is placed by and what gets REPLACED when better coordinates arrive, the old one staying in the graph because moving a model is provenance. The TWO MODES of the photogrammetry design are the SHAPE of the graph, not a flag: absolute = a transform with a crs that has_gcp_set points at; local = a transform with a scale and crs=null (scaled and oriented in a site frame, honestly NOT georeferenced); no transform at all = nobody placed it. Distinct from GeoPositionNode (where a STUDY/site is) and from SemanticShapeNode (3D geometry of a unit): this section is about the REGISTRATION ACT's evidence and result. Attached to the produced Resource, so the DTC genesis (crmdig:D7, dtc_had_input/dtc_had_output) is not duplicated here. Gated OUT of the stratigrapher palette, like dtc_nodes and hdto_nodes. Added 2026-08-29 with the photogrammetry processing connector; ADDITIVE — no existing family changed.",
+  "GCPSetNode": {
+   "class": "GCPSetNode",
+   "parent": "Node",
+   "abbreviation": "GCP",
+   "label": "Ground control points",
+   "description": "The set of ground control points a registration was (or will be) solved from. data.points is a list of {id, world:[x,y,z], observations:[{image, pixel:[x,y]}], uncertainty?}; data.crs names the frame the world coordinates are in (null = a site-local grid, which is a different statement from absent). Minimum 3 observed non-collinear points for a similarity to be determined — reported by `solvable`, enforced by the runner, never at construction (a set being assembled in the field is legitimately incomplete).",
+   "s3Dgraphy_file": "georeferencing_node.py",
+   "mapping": {
+    "cidoc": "crm:E73_Information_Object",
+    "cidoc_s3d": null,
+    "alternative": "prov:Entity",
+    "rationale": "A control set is an INFORMATION OBJECT: a documented list of measured places and where each was observed. It is not itself a Place (crm:E53) nor a Measurement (crmsci:S21) — it CARRIES both. The individual observations stay payload literals in v1 and the explicit refinement is declared, not implied: each point would explode into an crmsci:S21_Measurement of an crm:E53_Place observed on a crmdig:D1 photograph. Doing that now would create three nodes per control point in a graph nobody yet reads that way."
+   },
+   "em_extension": {
+    "uri": "em:GCPSet",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "crm:E73_Information_Object"
+    ],
+    "extension_status": "proposed",
+    "rationale": "Named in the EM extension because 'the set of control points behind this registration' is the unit archaeologists actually hand each other, and CIDOC has no class for it above E73."
+   }
+  },
+  "RegistrationTransformNode": {
+   "class": "RegistrationTransformNode",
+   "parent": "Node",
+   "abbreviation": "RGT",
+   "label": "Registration transform",
+   "description": "The 7-parameter similarity (rotation 3x3 row-major, translation [x,y,z], positive scale) that places a produced model, with data.rms and data.residuals — the error bar, stored beside the claim rather than in a log nobody keeps. data.crs is the frame the model lands IN; null means a site-local frame (mode 'local'), which is NOT the same sentence as an absent transform. Re-registration is a NEW node produced by a NEW crmdig:D7; the superseded one is never edited.",
+   "s3Dgraphy_file": "georeferencing_node.py",
+   "mapping": {
+    "cidoc": "crm:E73_Information_Object",
+    "cidoc_s3d": null,
+    "alternative": "prov:Entity",
+    "rationale": "The transform is an information object that DESCRIBES a mapping between two spatial reference systems (crmgeo:SP4_Spatial_Coordinate_Reference_System). CIDOC/CRMgeo models coordinate systems and geometric expressions but has no class for the parameterised map between two of them, so E73 is the honest superclass and the specificity lives in em:RegistrationTransform. It is deliberately NOT an event: the ACT of registering is the crmdig:D7 that produced this object."
+   },
+   "em_extension": {
+    "uri": "em:RegistrationTransform",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "crm:E73_Information_Object"
+    ],
+    "extension_status": "proposed",
+    "relates": "two crmgeo:SP4_Spatial_Coordinate_Reference_System",
+    "rationale": "Proposed rather than asserted: the natural CRM-native alternative is to leave the parameters as literals on the D7 event, which loses the ability to point at 'the placement' as a thing that gets superseded — and superseding it is the whole reason mode (b) exists."
    }
   }
  },

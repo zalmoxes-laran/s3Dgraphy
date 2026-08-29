@@ -1081,6 +1081,22 @@
    "label": {
     "en": "Annotation Region"
    }
+  },
+  "GCPSetNode": {
+   "description": {
+    "en": "The set of ground control points a registration was (or will be) solved from. data.points is a list of {id, world:[x,y,z], observations:[{image, pixel:[x,y]}], uncertainty?}; data.crs names the frame the world coordinates are in (null = a site-local grid, which is a different statement from absent). Minimum 3 observed non-collinear points for a similarity to be determined — reported by `solvable`, enforced by the runner, never at construction (a set being assembled in the field is legitimately incomplete)."
+   },
+   "label": {
+    "en": "Ground control points"
+   }
+  },
+  "RegistrationTransformNode": {
+   "description": {
+    "en": "The 7-parameter similarity (rotation 3x3 row-major, translation [x,y,z], positive scale) that places a produced model, with data.rms and data.residuals — the error bar, stored beside the claim rather than in a log nobody keeps. data.crs is the frame the model lands IN; null means a site-local frame (mode 'local'), which is NOT the same sentence as an absent transform. Re-registration is a NEW node produced by a NEW crmdig:D7; the superseded one is never edited."
+   },
+   "label": {
+    "en": "Registration transform"
+   }
   }
  }
 }

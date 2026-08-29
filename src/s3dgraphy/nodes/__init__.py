@@ -54,6 +54,11 @@ from .semantic_shape_node import SemanticShapeNode
 # the SCENE (SP5, where a thing is), this one is E36 Visual Item (which part of
 # which picture). See the class docstring for why one class could not be both.
 from .annotation_region_node import AnnotationRegionNode, AnnotationRegionError
+# Georeferencing (2026-08-29, photogrammetry connector): the CONTROL and the
+# SOLUTION that place a reconstructed model in the world. Additive — no existing
+# family changed.
+from .georeferencing_node import (GCPSetNode, RegistrationTransformNode,
+                                  GeoreferencingError)
 # DTC substrate profile (ECHOES). Two event classes: DTCProcessNode (genesis /
 # transformation, crmdig:D7) and DTCAcquisitionNode (acquisition / ingestion,
 # crmdig:D12 ⊂ D7). Both the INPUT and the OUTPUT are Resources (ResourceNode, E73/D1)
@@ -128,6 +133,9 @@ __all__ = [
     "ProjectNode",
     "SemanticShapeNode",
     "AnnotationRegionNode",
+    "GCPSetNode",
+    "RegistrationTransformNode",
+    "GeoreferencingError",
     "AnnotationRegionError",
     "DTCNode",
     "DTCProcessNode",

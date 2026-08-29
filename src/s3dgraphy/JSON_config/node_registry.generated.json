@@ -1,6 +1,6 @@
 {
  "_generated": "by `python -m s3dgraphy.tools.sync_node_datamodel` — DO NOT hand-edit. The flat class hierarchy (parent/node_type/description) is derived from the Python Node subclasses; hand-authored semantics and CIDOC mappings live in s3Dgraphy_node_datamodel.json.",
- "s3Dgraphy_data_model_version": "1.6.3",
+ "s3Dgraphy_data_model_version": "1.6.4",
  "node_types": {
   "ActivityNodeGroup": {
    "parent": "GroupNode",
@@ -76,6 +76,11 @@
    "parent": "GroupNode",
    "node_type": "FunctionalUnitNodeGroup",
    "description": "Typed aggregation of the stratigraphic units that make up one"
+  },
+  "GCPSetNode": {
+   "parent": "Node",
+   "node_type": "gcp_set",
+   "description": "The ground control points a registration was (or will be) solved from."
   },
   "GeoPositionNode": {
    "parent": "Node",
@@ -156,6 +161,11 @@
    "parent": "ParadataNode",
    "node_type": "property",
    "description": "Nodo che rappresenta una proprietà associata a un altro nodo."
+  },
+  "RegistrationTransformNode": {
+   "parent": "Node",
+   "node_type": "registration_transform",
+   "description": "The similarity that places a model — 7 parameters and what they cost."
   },
   "RepresentationModelDocNode": {
    "parent": "RepresentationNode",
