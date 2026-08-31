@@ -37,6 +37,17 @@ from .corpus import (
     mirror_resource,
     new_corpus,
 )
+# The NEIGHBOURHOOD (2026-09-02): `derivation_chain` answers one hop each way and
+# says a full transitive walk is «a different question (and a different screen)».
+# This is that walk — and the rule that keeps it local is about EDGES, not about
+# a node's degree: only the chain is traversed, and anything reached by a `has_*`
+# is an attribute of the node you are on.
+from .neighbourhood import (
+    CHAIN_EDGES,
+    DEFAULT_HOPS,
+    neighbourhood,
+    neighbourhood_of_digest,
+)
 from .ingest import (
     DEFAULT_ACQUISITION_KIND,
     DEFAULT_PROCESS_KIND,
@@ -77,4 +88,8 @@ __all__ = [
     "dtc_corpus_summary",
     "merge_corpus",
     "mirror_resource",
+    "CHAIN_EDGES",
+    "DEFAULT_HOPS",
+    "neighbourhood",
+    "neighbourhood_of_digest",
 ]
