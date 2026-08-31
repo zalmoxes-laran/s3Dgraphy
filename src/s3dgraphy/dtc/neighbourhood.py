@@ -47,10 +47,46 @@ from typing import Any, Dict, List, Set
 from .ingest import _USAGE_ROLES, _alive, _data, _find
 from .residency import EDGE_DERIVED_FROM, EDGE_HAD_INPUT, EDGE_HAD_OUTPUT
 
-#: The three edges the chain is MADE of. Imported, never re-spelled: they are
-#: structural constants of the profile and one more copy is one more thing to
-#: keep in step.
-CHAIN_EDGES = (EDGE_HAD_INPUT, EDGE_HAD_OUTPUT, EDGE_DERIVED_FROM)
+#: The edges the chain is MADE of — READ from the connections datamodel, which
+#: marks them ``"dtc_role": "chain"``.
+#:
+#: It used to be a tuple of three imported constants, and the client had a
+#: `startsWith("dtc_")` beside it. Two rules with one name: the prefix presumed
+#: every future ``dtc_*`` edge would be chain, so a ``dtc_annotated_by`` that was
+#: CONTEXT would have been a corridor on one side and not on the other. Now the
+#: datamodel says it once and both sides read it — the same discipline the
+#: ``dtc_kinds`` vocabulary already follows.
+#:
+#: The constants stay where they are (`residency.py`) and keep their job: WRITING
+#: an edge needs a name. Classifying needs a set, and a set is data.
+def _chain_edges() -> tuple:
+    """The marked edges, or the historical three when nothing is marked.
+
+    The fallback is deliberate and it is not a second list: a vendored datamodel
+    from before the marker (1.6.12 and earlier) would otherwise make this walk
+    traverse NOTHING — and a walk that quietly returns one node is worse than a
+    walk that answers the way it always did. When the marker exists the marker
+    decides; the day it does not, the three names are the correct historical
+    answer, and they are already imported for the writing side.
+    """
+    try:
+        from ..edges import get_connections_datamodel
+
+        edge_types = getattr(get_connections_datamodel(), "_canonical_edges", None)
+        if isinstance(edge_types, dict):
+            marked = tuple(
+                name for name, definition in edge_types.items()
+                if isinstance(definition, dict)
+                and definition.get("dtc_role") == "chain"
+            )
+            if marked:
+                return marked
+    except Exception:                              # noqa: BLE001
+        pass
+    return (EDGE_HAD_INPUT, EDGE_HAD_OUTPUT, EDGE_DERIVED_FROM)
+
+
+CHAIN_EDGES = _chain_edges()
 
 #: How far the walk may go. A SAFETY NET and not a filter: with the context
 #: already excluded the graph stays local by itself, so this only has to stop a

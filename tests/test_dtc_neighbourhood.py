@@ -267,3 +267,61 @@ def test_a_kind_of_context_NOBODY_CLASSIFIED_is_not_traversable():
     assert "place" in [c["id"] for c in context]
     assert next(c for c in context if c["id"] == "place")["role"] == "context", \
         "an edge nobody classified must default to context, never to chain"
+
+
+# ── 6 · the classification lives in the datamodel, not in the code ──────────
+
+def test_the_chain_edges_are_READ_from_the_datamodel():
+    """Not a tuple in the source: the datamodel marks them `dtc_role: "chain"`,
+    and both this walk and the client read that one place."""
+    from s3dgraphy.edges import get_connections_datamodel
+
+    marked = {name for name, definition
+              in get_connections_datamodel()._canonical_edges.items()
+              if isinstance(definition, dict)
+              and definition.get("dtc_role") == "chain"}
+    assert marked == set(CHAIN_EDGES)
+    assert marked == {"dtc_had_input", "dtc_had_output", "dtc_derived_from"}
+
+
+def test_a_dtc_edge_that_is_NOT_marked_is_not_traversed():
+    """The whole point of the marker, and the failure it prevents.
+
+    A `dtc_*` edge that is CONTEXT — an annotation, a note, a tool one day — must
+    not be a corridor. A classification by PREFIX would have walked it; a
+    classification by MARKER does not, and adding the edge is a JSON entry.
+    """
+    from s3dgraphy.dtc.neighbourhood import _chain_edges
+
+    # the datamodel as it would be with a new, UNMARKED dtc_* edge in it
+    edge_types = {
+        "dtc_had_input": {"dtc_role": "chain"},
+        "dtc_had_output": {"dtc_role": "chain"},
+        "dtc_derived_from": {"dtc_role": "chain"},
+        "dtc_annotated_by": {"label": "annotated by"},      # no dtc_role
+    }
+    marked = tuple(n for n, d in edge_types.items() if d.get("dtc_role") == "chain")
+    assert "dtc_annotated_by" not in marked
+    # …and the reader agrees with that arithmetic on the REAL datamodel
+    assert "dtc_annotated_by" not in _chain_edges()
+
+
+def test_the_fallback_is_the_historical_three_and_never_nothing(monkeypatch):
+    """A vendored datamodel from before the marker must not make the walk
+    traverse nothing: a walk that quietly returns one node is worse than one that
+    answers the way it always did."""
+    # `import s3dgraphy.dtc.neighbourhood as nb` does NOT give the module: the
+    # package exports a FUNCTION with that name, and the `as` binding is a
+    # getattr on the package. Worth ten minutes to somebody one day, so it is
+    # written here rather than discovered again.
+    from importlib import import_module
+
+    nb = import_module("s3dgraphy.dtc.neighbourhood")
+
+    class Empty:
+        _canonical_edges = {"dtc_had_input": {}, "has_author": {}}
+
+    monkeypatch.setattr("s3dgraphy.edges.get_connections_datamodel",
+                        lambda *a, **k: Empty())
+    assert nb._chain_edges() == ("dtc_had_input", "dtc_had_output",
+                                 "dtc_derived_from")
