@@ -227,7 +227,15 @@ def _hdt_of(graph: Any) -> Dict[str, Optional[Dict[str, Optional[str]]]]:
         data = getattr(node, "data", None) or {}
         if kind == "hdt" and hc2 is None:
             hc2 = {"id": node.node_id, "name": _text(getattr(node, "name", None)),
-                   "iri": _text(data.get("heritage_entity_iri"))}
+                   "iri": _text(data.get("heritage_entity_iri")),
+                   # The state the twin DECLARES, and the key it was merged out
+                   # of, carried instead of inferred. Without these the register
+                   # derives «provisional» from the ABSENCE of an iri — equivalent
+                   # only while the writer is EMStudio, which enforces
+                   # `registered ⟺ key`; a document from any other tool would be
+                   # read charitably rather than accurately.
+                   "hdt_status": _text(data.get("hdt_status")),
+                   "hdt_merged_from": _text(data.get("hdt_merged_from"))}
         elif kind == "heritage_entity" and hc1 is None:
             hc1 = {"id": node.node_id, "name": _text(getattr(node, "name", None)),
                    "kind": _text(data.get("entity_kind"))}
