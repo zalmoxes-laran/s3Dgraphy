@@ -90,6 +90,62 @@ sistematicamente la peggiore possibile, misurato:
 La mtime di uno snapshot è **quando la stanza è stata salvata l'ultima volta**,
 cioè l'istante dell'ultima scrittura. Per una stanza che qualcuno ha toccato è
 per costruzione **più tarda di ogni scrittura vera che contiene**.
+
+════════════════════════════════════════════════════════════════════════════════
+## E ALLORA DA DOVE VIENE T0 — LA NASCITA DEL PROGRAMMA
+
+La fonte che regge non descrive il file e non descrive la stanza: descrive il
+**programma che ha prodotto il documento**. Nessun documento può essere più
+vecchio del programma che lo ha scritto, quindi
+
+> **T0 = l'istante in cui è nata la versione che compare in `header.generator`.**
+
+è ≤ di ogni cosa che il documento contiene **per costruzione**, non per fortuna.
+È una data più antica del vero — modesta — ed è **provabile in due pezzi**: la
+versione sta dentro il documento, e la data di quella versione sta nella storia
+del repo che l'ha rilasciata.
+
+Misurato sul corpus, la candidata regge dove le altre no:
+
+    fonte                    regge su   che cosa afferma
+    ──────────────────────────────────────────────────────────────────────────
+    generator + storia git      7 / 7   «prodotto da un programma che prima di
+                                         questo istante non esisteva»
+    sidecar più vecchio         5 / 7   «di questa stanza esisteva già un file»
+    room.created_at             6 / 7   una DICHIARAZIONE, e nel corpus è un
+                                        letterale a mezzanotte in tutti e 6
+    prima operazione            1 / 7   è la prima scrittura, non la precede
+    mtime del documento         4 / 7   l'ultimo salvataggio: la peggiore
+
+`declared_generator` legge la prima metà — la versione — e **si ferma lì**.
+Datare una versione vuole la storia di un repo, che questo modulo non ha e non
+deve avere: la seconda metà la mette chi chiama.
+
+════════════════════════════════════════════════════════════════════════════════
+## CIÒ CHE NON È UNA DATA DI REGISTRAZIONE
+
+Un documento EM è pieno di date, e quasi nessuna serve qui. Una `EpochNode`
+porta `start_time` / `end_time`, e dicono **quando è esistita la cosa**, non
+quando qualcuno l'ha scritta. Nel corpus:
+
+    portamarina    EpochNode «IV d.C.»    start_time  300
+    aiano          EpochNode «periodo 1 Fase 1»       350
+    (minimo del corpus)                              -100
+
+Usarne una come T0 metterebbe un timbro dell'anno 300 su un record del 2026 e
+farebbe vincere il legacy su ogni scrittura futura, per sempre. Il cancello non
+lo vedrebbe: 300 è ben *prima* di ogni scrittura vera, quindi `check_date`
+tacerebbe.
+
+**Il pericolo peggiore è quello che sembra plausibile**: `portamarina` ha una
+`EpochNode` chiamata «y2018» che va da **1950 a 2018**. Un T0 di «2018» supera
+qualunque controllo di buon senso di un essere umano — ed è la datazione di un
+muro. Per questo `earliest_real_write` guarda **solo** `created_at`, e nessuna
+euristica su «campi che sembrano date» entra in questo modulo.
+
+*(La stessa trappola, dal vivo: il censimento con cui ho cercato le candidate
+segnalava 28 «anni» in `aiano`. Erano `y_pos = 1982.62744140625`, la coordinata
+verticale di un nodo sulla tela.)*
 """
 
 from __future__ import annotations
@@ -163,6 +219,31 @@ def unstamped(document: Dict[str, Any]) -> Tuple[List[str], List[str]]:
             if not (isinstance(attrs, dict) and attrs.get(CREATED_AT)):
                 archi.append(_edge_id(edge))
     return nodi, archi
+
+
+def declared_generator(document: Dict[str, Any]
+                       ) -> Optional[Tuple[str, str]]:
+    """Il programma che il documento dichiara di avere per padre: `(tool, versione)`.
+
+    La metà di T0 che sta **dentro** il documento. L'altra metà — quando quella
+    versione è nata — sta nella storia del repo che l'ha rilasciata, e non è
+    affare di questo modulo: qui non si aprono repo.
+
+    `None` quando il documento non lo dichiara, che nel corpus è il caso delle
+    stanze generate da uno script di semina: lì la paternità si prova
+    altrimenti (rigenerando il documento e confrontandolo), e resta più debole
+    perché non è il documento a dirla.
+    """
+    header = document.get("header")
+    if not isinstance(header, dict):
+        return None
+    generator = header.get("generator")
+    if not isinstance(generator, dict):
+        return None
+    tool, version = generator.get("tool"), generator.get("version")
+    if not tool or not version:
+        return None
+    return str(tool), str(version)
 
 
 def earliest_real_write(document: Dict[str, Any],

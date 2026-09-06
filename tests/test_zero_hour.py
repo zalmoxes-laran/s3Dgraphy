@@ -286,3 +286,118 @@ def test_DUE_IMPORTAZIONI_IN_GIORNI_DIVERSI_si_ordinano():
     verso, ragione = compare_clocks(Clock("2026-09-01T00:00:00Z"),
                                     Clock("2026-08-31T00:00:00Z"))
     assert (verso, ragione) == (1, "newer")
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 5 OTTOBRE — da dove viene T0, e cosa NON è una data di registrazione
+#
+# Il 4 ottobre il corpus non fu timbrato perché nessuna fonte reggeva il
+# cancello. La fonte che regge non descrive il file e non descrive la stanza:
+# descrive il **programma** che ha prodotto il documento. Misurata sul corpus,
+# regge 7 volte su 7 dove la mtime ne reggeva 4.
+# ════════════════════════════════════════════════════════════════════════════
+
+
+def _con_generatore(version="1.6.0.dev16"):
+    """La forma vera dell'header dei quattro documenti EM_CaseStudies."""
+    doc = _legacy()
+    doc["header"]["generator"] = {"tool": "s3dgraphy", "version": version}
+    return doc
+
+
+def test_IL_DOCUMENTO_DICE_DA_QUALE_PROGRAMMA_VIENE():
+    assert oz.declared_generator(_con_generatore()) == (
+        "s3dgraphy", "1.6.0.dev16")
+
+
+def test_E_QUANDO_NON_LO_DICE_non_si_indovina():
+    #: le tre forme che il corpus contiene davvero: header senza `generator`
+    #: (le tre stanze seminate), e le due mezze forme che un file rotto darebbe
+    assert oz.declared_generator(_legacy()) is None
+    mezzo = _legacy()
+    mezzo["header"]["generator"] = {"tool": "s3dgraphy"}
+    assert oz.declared_generator(mezzo) is None
+    storto = _legacy()
+    storto["header"]["generator"] = "s3dgraphy 1.6.0.dev16"
+    assert oz.declared_generator(storto) is None
+
+
+def test_LA_NASCITA_DEL_PROGRAMMA_PRECEDE_TUTTO_e_il_cancello_la_accetta():
+    """T0 = quando è nata `1.6.0.dev16`, misurato in git: 2026-08-24T20:50:37Z.
+
+    Il documento è stato salvato una settimana dopo (mtime 2026-08-31) e la
+    stanza dichiara di essere nata il 2026-09-04. La nascita del programma sta
+    prima di tutte e due — è più antica del vero, cioè modesta.
+    """
+    nascita_del_programma = "2026-08-24T20:50:37Z"
+    doc = _con_generatore()
+    doc["graphs"]["g"]["nodes"][0]["data"][oz.CREATED_AT] = VIVO
+    doc["graphs"]["g"]["nodes"][0]["data"][oz.CREATED_BY] = ANNA
+
+    #: il limite è la nascita DICHIARATA della stanza, che qui viene prima
+    #: della scrittura viva: `earliest_real_write` prende il minimo, ed è la
+    #: cosa giusta perché nessuna scrittura può precedere la stanza.
+    limite = oz.earliest_real_write(doc, room_created_at="2026-09-04T00:00:00Z")
+    assert limite == "2026-09-04T00:00:00Z"
+    copia, tocco = oz.dated(doc, nascita_del_programma, not_after=limite,
+                            where="sarmizegetusa")
+    assert tocco.total == 4                      # i due nodi e i due archi
+    assert oz.unstamped(copia) == ([], [])
+
+    #: e la mtime dello stesso documento, al suo posto, sarebbe passata anche
+    #: lei qui — la differenza non è che il cancello la ferma, è che la nascita
+    #: del programma è vera anche quando il file viene ricopiato.
+    assert nascita_del_programma < "2026-08-31T21:06:41Z" < limite
+
+
+# ── e ciò che NON è una data di registrazione ───────────────────────────────
+
+
+def _con_una_epoca(start, end, nome):
+    """Una `EpochNode` come quelle del corpus: dice quando è esistita la cosa."""
+    doc = _legacy()
+    doc["graphs"]["g"]["nodes"].append(
+        {"id": "ep1", "node_type": "EpochNode", "name": nome,
+         "data": {"start_time": start, "end_time": end}})
+    return doc
+
+
+def test_UNA_DATAZIONE_ARCHEOLOGICA_NON_ENTRA_nel_limite():
+    """`portamarina` ha «IV d.C.» da 300 a 399. Non è una scrittura."""
+    doc = _con_una_epoca(300, 399, "IV d.C.")
+    assert oz.earliest_real_write(doc) is None
+    #: e nemmeno quando nel documento una scrittura vera c'è: il limite è
+    #: quella, non l'anno 300
+    doc["graphs"]["g"]["nodes"][0]["data"][oz.CREATED_AT] = VIVO
+    assert oz.earliest_real_write(doc) == VIVO
+
+
+def test_E_IL_DANNO_SE_QUALCUNO_LA_USASSE_il_cancello_NON_lo_vede():
+    """La prova che l'esclusione deve stare a monte: qui il cancello tace.
+
+    `portamarina` ha davvero una `EpochNode` chiamata «y2018» che va da 1950 a
+    2018 — una datazione che a un essere umano sembra una data di registrazione
+    plausibile. Timbrare con quella passa il cancello (2018 è *prima* di ogni
+    scrittura vera) e da quel momento il legacy batte tutto, per sempre.
+    """
+    doc = _con_una_epoca(1950, 2018, "y2018")
+    doc["graphs"]["g"]["nodes"][0]["data"][oz.CREATED_AT] = VIVO
+    doc["graphs"]["g"]["nodes"][0]["data"][oz.CREATED_BY] = ANNA
+    limite = oz.earliest_real_write(doc)
+
+    dallanno = "2018-01-01T00:00:00Z"
+    oz.check_date(dallanno, not_after=limite, where="portamarina")   # …tace.
+
+    #: ed ecco cosa avrebbe lasciato passare: un valore vivo contro un legacy
+    #: timbrato nel 2018 vince ancora — ma un legacy timbrato nel 300 no.
+    dal_quarto_secolo = "0300-01-01T00:00:00Z"
+    oz.check_date(dal_quarto_secolo, not_after=limite)               # …tace anche qui.
+    assert compare_clocks(Clock(ts=VIVO, by=ANNA),
+                          Clock(ts=dal_quarto_secolo))[0] == 1
+
+    #: Il danno non è nell'ordinamento: è nella frase. Il grafo direbbe che quel
+    #: nodo è stato registrato nel IV secolo, e nessun cancello può accorgersene
+    #: perché la data è, tecnicamente, sicura. L'unica difesa è a monte, ed è
+    #: comportamentale: il limite guarda `created_at` e nient'altro — provato
+    #: qui sopra e nel test precedente, non cercando parole nel sorgente.
+    assert oz.earliest_real_write(doc) == VIVO
