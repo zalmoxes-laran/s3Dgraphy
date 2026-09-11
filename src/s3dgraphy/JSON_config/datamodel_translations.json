@@ -1097,6 +1097,14 @@
    "label": {
     "en": "Registration transform"
    }
+  },
+  "RepresentationModelNodeGroup": {
+   "description": {
+    "en": "Typed aggregation of the representation models that form ONE named set published under a single Document — «Survey 2015» under D.01, «Reconstruction» under D.09 (EM16-RMNG, meeting of 2026-09-10). Until then the RM container lived only as EM Tools' `scene.rm_containers` PropertyGroup, so the grouping that gives the set its meaning was invisible to anyone reading the graph. IT SITS BESIDE, IT DOES NOT REPLACE: every member keeps its own epoch edges (has_first_epoch / survive_in_epoch) and the Document keeps its DIRECT has_representation_model edges to each model — the group is added on top and never put in between, so a consumer that ignores it reads exactly what it read before. Membership is the TAG axis 'is_in_representation_model_group', like is_in_functional_unit and is_in_location, but 1:1 and not m:n: a mesh belongs to exactly one container, the rule already in force on the Blender side where `mesh_names` is authoritative. A group may legally be EMPTY and may legally have NO Document: both are states the RM Manager UI already shows. NOT a FunctionalUnitNodeGroup (that aggregates stratigraphic units into a building component; these members are models, not units); NOT an ActivityNodeGroup (nothing happened here and the set has no formation event of its own); NOT the Document, which stays the documentary anchor — deleting the container removes the group and not the Document."
+   },
+   "label": {
+    "en": "RM Container"
+   }
   }
  }
 }

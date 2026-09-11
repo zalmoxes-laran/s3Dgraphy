@@ -72,6 +72,7 @@ __all__ = [
     "ParadataNodeGroup",
     "TimeBranchNodeGroup",
     "LocationNodeGroup",
+    "RepresentationModelNodeGroup",
     "ParadataNode", 
     "DocumentNode", 
     "CombinerNode",

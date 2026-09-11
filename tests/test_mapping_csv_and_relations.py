@@ -274,7 +274,7 @@ def test_every_group_carries_the_version_the_datamodel_declares():
 
 
 def test_the_edges_group_with_the_datamodels_real_counts():
-    """These numbers ARE the datamodel's: 32 CIDOC-CRM · 8 CRMarchaeo ·
+    """These numbers ARE the datamodel's: 33 CIDOC-CRM · 8 CRMarchaeo ·
     4 CRMdig · 6 HDT-O · 2 PROV-O, plus the 2 mapped only through an extension
     property (`heritage_part_of`, `includes_study`).
 
@@ -282,9 +282,17 @@ def test_the_edges_group_with_the_datamodels_real_counts():
     connector: `has_registration_transform` (CIDOC-CRM P67i) and `has_gcp_set`
     (CRMdig L21). Updating this number is the point of the test — a datamodel
     that grows without anybody noticing is how a consumer starts reading an edge
-    nobody documented."""
+    nobody documented.
+
+    Grew by ONE on 2026-09-10 (EM16-RMNG): `is_in_representation_model_group`,
+    membership of a representation model in an RM container, mapped
+    P46i_forms_part_of / P46_is_composed_of — mereological, exactly like
+    `is_in_functional_unit` (DP-72), whose rationale this one cites. That
+    mapping says nothing about where `digital representation of` grafts (the
+    RM↔thing relation, left open as D3 in the 2026-09-10 spec): this is the
+    group↔member relation, a different question."""
     groups = {g["ontology"]: g["count"] for g in api.mapping_edge_groups()}
-    assert groups == {"CIDOC-CRM": 32, "CRMarchaeo": 8, "CRMdig": 4,
+    assert groups == {"CIDOC-CRM": 33, "CRMarchaeo": 8, "CRMdig": 4,
                       "HDT-O": 6, "PROV-O": 2, "unmapped": 2}, groups
     filtered = {g["ontology"]: [e["edge_type"] for e in g["edges"]]
                 for g in api.mapping_edge_groups("US", "US")}

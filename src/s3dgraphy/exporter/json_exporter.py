@@ -182,7 +182,14 @@ class JSONExporter:
             "semantic_shapes": {},
             "representation_models": {},
             "representation_model_doc": {},
-            "representation_model_sf": {}
+            "representation_model_sf": {},
+            # EM16-RMNG: the named sets of representation models (RM
+            # containers). Its own bucket, for the same reason
+            # `location_node_groups` got one: a consumer that groups models by
+            # container should not have to tell it apart from an activity or a
+            # time branch inside a shared "groups" dict. Empty on every graph
+            # that has no containers, so nothing changes for existing readers.
+            "representation_model_groups": {}
         }
         
         # Prima fase: elabora tutti i nodi ed edge del grafo
@@ -272,6 +279,18 @@ class JSONExporter:
                 # ``node.data`` / ``node.attributes`` automatically.
                 node_data = self._prepare_node_data(node)
                 nodes["location_node_groups"][node.node_id] = node_data
+
+            elif node.node_type == "RepresentationModelNodeGroup":
+                # EM16-RMNG. Same shape as the LocationNodeGroup branch just
+                # above, and added for the same reason it was: without a branch
+                # of its own the node falls off the end of this elif chain and
+                # is SILENTLY DROPPED from the export. A group is written even
+                # when it is empty and even when no Document points at it —
+                # both are legal states of a container (the "grey" one the RM
+                # Manager already shows), and a reader is better served by an
+                # empty named set than by its absence.
+                node_data = self._prepare_node_data(node)
+                nodes["representation_model_groups"][node.node_id] = node_data
 
             elif node.node_type == "property":
                 node_data = self._prepare_node_data(node)

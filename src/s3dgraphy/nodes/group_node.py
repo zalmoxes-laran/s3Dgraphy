@@ -242,3 +242,76 @@ class FunctionalUnitNodeGroup(GroupNode):
         # binding to a target ontology (CRMvr V5) is separate work.
         if geometry_type_ref is not None:
             self.attributes['geometry_type_ref'] = geometry_type_ref
+
+class RepresentationModelNodeGroup(GroupNode):
+    """Typed aggregation of the representation models that form ONE named set
+    under a single Document — «Survey 2015» under D.01, «Reconstruction» under
+    D.09 (EM16-RMNG, riunione E.D. / S. Berto del 10-09-2026).
+
+    Why it exists
+    -------------
+    An RM container has lived only on the Blender side, as the
+    ``scene.rm_containers`` PropertyGroup: the grouping that gives the set its
+    meaning was invisible to anyone reading the graph. This class is the
+    graph-side citizen of that same idea, so the set can be named, carried and
+    read outside Blender.
+
+    THE RULE THAT GOVERNS IT: IT SITS BESIDE, IT DOES NOT REPLACE
+    -------------------------------------------------------------
+    The group does **not** take the place of the bond between a single
+    representation model and its epoch. Every member keeps its own
+    ``has_first_epoch`` / ``survive_in_epoch`` / ``has_representation_model``
+    edges exactly as before, and the Document keeps its DIRECT edges to each
+    model. The group is added on top; it is never put in between.
+
+    That is what makes it additive in the strict sense: a consumer that knows
+    nothing about this class reads precisely what it read before and simply
+    ignores one extra node. The form «epoch → RM group → many RM» will be
+    possible when Heriverse and EM Studio can handle it, and is deliberately
+    NOT prepared for here.
+
+    Shape
+    -----
+    ::
+
+        Epoch     ──(existing edges, untouched)──▶  RM, RM, RM
+        Document  ──has_representation_model──▶     RM, RM, RM      (direct, kept)
+        Document  ──has_representation_model──▶     RMNodeGroup     (new)
+                          └── is_in_representation_model_group ◀──  RM, RM, RM
+
+    Membership is a **tag**, on the same axis as ``is_in_functional_unit``
+    (DP-72) and ``is_in_location``: the member carries the edge towards the
+    group, the group claims nothing of the member. Unlike those two, membership
+    here is **1:1** — a mesh belongs to exactly one container, which is the rule
+    already in force on the Blender side (``rm_manager/containers.py``) and is
+    what makes ``mesh_names`` authoritative there.
+
+    Legal states, both of which the UI already shows
+    -----------------------------------------------
+    - **empty** — a group with no members, the "grey" state of a container just
+      created;
+    - **unattached** — a group no Document points at.
+
+    Both must be representable in the graph, so neither is validated away.
+
+    What it is NOT
+    --------------
+    - Not a **FunctionalUnitNodeGroup** (DP-72), which aggregates STRATIGRAPHIC
+      units into a building component. Its members are models, not units.
+    - Not an **ActivityNodeGroup**: nothing happened here, and the set has no
+      formation event of its own.
+    - Not a **LocationNodeGroup**: it answers neither *where* nor *what
+      component*, but *which set of models a document publishes*.
+    - Not the Document. The Document is the documentary anchor and stays where
+      it is; deleting the container removes the group and NOT the Document
+      (the behaviour ``unregister_container`` already has).
+    """
+
+    node_type = "RepresentationModelNodeGroup"
+
+    def __init__(self, node_id, name, description="", y_pos=0.0):
+        # The sisters' signature exactly, and nothing more: a container has a
+        # stable id and a user label, and every other fact about it (which
+        # Document, which members) is an EDGE. Adding fields here would move
+        # part of the topology into the node.
+        super().__init__(node_id, name, description=description, y_pos=y_pos)

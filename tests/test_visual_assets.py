@@ -78,12 +78,25 @@ def test_every_node_type_the_canvas_draws_resolves_to_a_FILE():
     # spelled out in `icons.ts::FILE_ALIAS` rather than in the datamodel.
     # Declared sharing, not a gap.
     shared = {"BR", "serUSVn", "serUSVs"}
-    # A KNOWN GAP: two of the four group types have no drawing and draw nothing.
-    # Their siblings do (`ActivityNodeGroup.svg`, `ParadataNodeGroup.svg`), so
-    # this is an unfinished family rather than a design decision — and finishing
-    # it is an act of EM iconography with an author, not a thing to fill in from
-    # a test. Named here so the number can only go DOWN.
-    known_gap = {"LocationNodeGroup", "TimeBranchNodeGroup"}
+    # A KNOWN GAP: three of the five group types have no drawing and draw
+    # nothing. Their siblings do (`ActivityNodeGroup.svg`,
+    # `ParadataNodeGroup.svg`), so this is an unfinished family rather than a
+    # design decision — and finishing it is an act of EM iconography with an
+    # author, not a thing to fill in from a test. Named here so the number can
+    # only go DOWN.
+    #
+    # …AND ON 2026-09-10 IT WENT UP BY ONE, which is worth recording rather
+    # than smoothing over. `RepresentationModelNodeGroup` (EM16-RMNG) arrived
+    # with its GraphML/style identity complete — group shape, RM-family
+    # title-tab (#FF6600) — and no icon, because choosing one is the authored
+    # act this comment reserves. Two forms were available and both were
+    # declined on purpose: drawing a new mark (forbidden here), and declaring
+    # `file_2d` onto an existing file — legitimate in this datamodel (`UL`,
+    # `USN`, `USNt` all share `src/2D/US.png` that way) but still a choice
+    # about what the mark MEANS. Left to E.D., and flagged in the EM16-RMNG
+    # report under openings.
+    known_gap = {"LocationNodeGroup", "TimeBranchNodeGroup",
+                 "RepresentationModelNodeGroup"}
     assert set(unresolved) <= shared | known_gap, (
         f"these node types would draw NO icon at all: "
         f"{sorted(set(unresolved) - shared - known_gap)}")

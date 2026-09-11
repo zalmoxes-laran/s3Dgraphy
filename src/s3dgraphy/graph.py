@@ -1057,6 +1057,7 @@ class Graph:
     #                            cannot be a swimlane box.
     CONTAINMENT_EDGE = "is_part_of"
     FUNCTIONAL_UNIT_EDGE = "is_in_functional_unit"
+    RM_GROUP_EDGE = "is_in_representation_model_group"
 
     def _edges_by(self, node_id, edge_type, incoming):
         """The `edge_type` edges where `node_id` is the target (incoming) or the
@@ -1118,6 +1119,46 @@ class Graph:
             if node is not None:
                 out.append(node)
         return out
+
+    # ── RM containers (EM16-RMNG) ────────────────────────────────────────
+    #
+    # Mirrors the Functional-Unit accessors above, with ONE difference that is
+    # semantic and not stylistic: membership here is 1:1, not m:n. A mesh
+    # belongs to exactly one container — the rule already in force on the
+    # Blender side — so the question "which group is this model in?" has one
+    # answer, and the accessor says so by returning a node or None instead of a
+    # list. Returning a list would have invited callers to handle a case the
+    # model forbids.
+
+    def get_representation_model_groups(self):
+        """Every RepresentationModelNodeGroup in the graph (EM16-RMNG)."""
+        from .nodes.group_node import RepresentationModelNodeGroup
+        return self.get_nodes_by_type(RepresentationModelNodeGroup.node_type)
+
+    def get_representation_model_group_members(self, group_id, node_type=None):
+        """The models tagged into this container with
+        `is_in_representation_model_group`. Optionally filtered by node_type."""
+        out = []
+        for edge in self._edges_by(group_id, self.RM_GROUP_EDGE, incoming=True):
+            node = self.find_node_by_id(edge.edge_source)
+            if node is not None and (node_type is None or node.node_type == node_type):
+                out.append(node)
+        return out
+
+    def get_representation_model_group_of(self, node_id):
+        """The container a model belongs to, or None.
+
+        Singular by design: one mesh, one container. When a graph somehow
+        carries more than one membership edge (a hand-edited file, a merge),
+        the FIRST is returned and the anomaly is left visible to the caller
+        rather than silently reconciled here — `sync_rm_containers` on the
+        Blender side is the place that reports divergences.
+        """
+        for edge in self._edges_by(node_id, self.RM_GROUP_EDGE, incoming=False):
+            node = self.find_node_by_id(edge.edge_target)
+            if node is not None:
+                return node
+        return None
 
     def get_functional_unit_epochs(self, fu_id):
         """The epochs a Functional Unit spans — DERIVED from its members, since a

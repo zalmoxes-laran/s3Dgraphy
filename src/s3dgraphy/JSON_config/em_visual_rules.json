@@ -1,6 +1,6 @@
 {
   "formal_language": "EM",
-  "version": "1.6.16",
+  "version": "1.6.17",
   "_note_material_vs_qualia_color": [
     "DUE COSE DIVERSE CHE SI CHIAMANO ENTRAMBE color. Non confonderle: e gia successo.",
     "1) QUI, in node_styles.<tipo>.style.material.rgba_color — il COLORE DEL MATERIALE BLENDER del proxy 3D, in float LINEARI. UNA sola chiave: `rgba_color`. Fino a S8 il file ne usava due (`color` sui 13 tipi stratigrafici, `rgba_color` sugli altri) e get_material_color() ne leggeva una sola, restituendo None per 21 tipi su 38; ora sono unificate e la vecchia `color` e letta solo come tolleranza verso file scritti prima. Un tipo che non diventa mai una mesh NON ha material affatto (i contenitori di gruppo, e da S7 i dieci nodi che rendono per icona): per loro get_material_color() torna None, ed e corretto.",
@@ -9,7 +9,7 @@
     "In breve: qui si decide di che colore DISEGNARE una US; li si registra di che colore ERA."
   ],
   "_changelog": {
-    "1.6.16": "Asset declarations made TRUE. Four styles named a 2D file that is not there — SE.png, TSU.svg, serUSD.svg and unknown.png (which never existed) — and GRAPH named two, so it drew no icon at all. icons.ts returns null for a missing file and the canvas quietly draws the shape, so all five failed silently. Now: graph.svg authored (neutral gray, three nodes and their edges, the meta-container), unknown points at the generic_node.svg that exists, the three stale halves name the file that is there. Enforced by tests/test_visual_assets.py; the 16 unmodelled .glb are REPORTED (there and in sync-datamodels.sh), not asserted \u2014 a placeholder that looks official is harder to notice than an absence.",
+    "1.6.16": "Asset declarations made TRUE. Four styles named a 2D file that is not there — SE.png, TSU.svg, serUSD.svg and unknown.png (which never existed) — and GRAPH named two, so it drew no icon at all. icons.ts returns null for a missing file and the canvas quietly draws the shape, so all five failed silently. Now: graph.svg authored (neutral gray, three nodes and their edges, the meta-container), unknown points at the generic_node.svg that exists, the three stale halves name the file that is there. Enforced by tests/test_visual_assets.py; the 16 unmodelled .glb are REPORTED (there and in sync-datamodels.sh), not asserted — a placeholder that looks official is harder to notice than an absence.",
     "1.6.15": "Georeferencing gets its symbol on the canvas: node_styles GCP (GCPSetNode, crosshair) and RGT (RegistrationTransformNode, axes + rotation arc), in the same #FF6600 reference family as GEO/SS/LINK, each with its own 2D icon. ADDITIVE. Also 1.6.14-era: dtc_kinds.process.photogrammetry. Note the limit of a per-TYPE rule: whether a transform is georeferenced or a site-local frame is an INSTANCE fact (data.crs) and is read from the has_gcp_set edge, not from the style.",
     "1.6.14": "BUGFIX-GLYPH follow-up (2026-08-05, E.D.): SE now renders its GLYPH in the scene (the new SE.svg, a stratigraphic-section box with a writable middle band) instead of a bare triangle, so a name can be written inside it. Added SE to 2d_render_glyph_types (aspect 1.331 from the SVG viewBox) and switched SE 2d_icon_prefer to vector (the raster SE.png is the stale stipple; the new symbol is the SVG). Dropped the interim shape_bbox=square. The shape:triangle stays declared for other consumers but the 2D scene draws the glyph. NOTE: verify the SVG carries a light background for dark-canvas legibility (like combiner.svg).",
     "1.6.13": "BUGFIX-GLYPH (2026-08-05): SE (StratigraphicEvent) gains shape_bbox=\"square\" on its style, like BR. Its triangle was drawn in the wide default 90x32 box, leaving the connect handle far from the glyph; a square bbox (side = min(w,h)) makes the triangle sit in a ~32x32 box with the handle adjacent, matching BR (diamond, square) and the glyph types. No shape_scale: unlike BR (a 0.7 marker) the SE triangle stays full-size. The SCENE representation of SE remains the triangle shape, not the raster icon (S10/POL5 decision unchanged).",
@@ -29,7 +29,8 @@
     "1.5.3": "Fix USD / serUSD material colour: RGB was (0.549, 0.103, 0.0) = #8C1A00 (red), should be #D86400 (orange) to match the canonical USD documentary colour used in the GraphML palette template, node_registry defaults and document_variant_styles.observable. USD border_color also corrected from #8C1A00 to #D86400 (serUSD border was already correct).",
     "1.5.2": "Added RSF (Reused Special Find / spolia) node style — octagon, red border (#9B3333), white fill. Sibling of SF/VSF, distinguished by border colour. Originating DP: DP-26.",
     "1.5.1": "Added LocationNodeGroup node style (dashed roundrectangle, kind-based border colour) and is_in_location edge style with primary_modifier override.",
-    "1.5.0": "Initial EM 1.5 visual rules."
+    "1.5.0": "Initial EM 1.5 visual rules.",
+    "1.6.17": "Added RepresentationModelNodeGroup node style (EM16-RMNG): the group family's dashed roundrectangle with the RM family's #FF6600 title-tab, and the is_in_representation_model_group edge style. Additive only — no existing style touched, and the epoch↔RM / Document→RM edges keep the rendering they had."
   },
   "2d_render_glyph_types": {
     "_comment": "Node types the 2D renderer draws as a CENTRED GLYPH (their official icon) instead of a shape. Their box is HEIGHT-DRIVEN: the height is the engine node height and the width is that height times the `aspect` below (EM2 made them square; EM3 generalised the square to a per-glyph aspect). Keyed by RUNTIME node_type, deliberately: this block is read both by EMStudio's icons.ts and by its Rust layout engine, and a list keyed by node_type needs no alias table on either side (`node_styles` is keyed by the short abbreviation, EXT/COMB/..., which the engine does not know). Added in 1.6.11 (EM2) because the fact had been living as a hand-written set inside icons.ts, and the layout engine needs the same fact to give those nodes a height-driven box: a glyph drawn 32 wide inside a 90x32 box leaves empty margins, and the connect handle — anchored to the right edge of the box — ends up floating away from the glyph. NB two things this does NOT include. (1) `document` and `property`: they are drawn with custom geometry (a sheet with a folded corner, a bracketed text annotation) that is NOT square, and squaring their box would crush the text. (2) DTC nodes: their glyph is chosen per NODE from `data.dtc_kind` and not from the type, so a consumer decides that node by node — a plain `link` is not a glyph, a `link` with a dtc_kind is.",
@@ -790,6 +791,18 @@
           "description": "Interpretive / semantic identity (basilica, room A, courtyard)."
         }
       }
+    },
+    "RepresentationModelNodeGroup": {
+      "_comment": "Group-folder rendering for an RM container (EM16-RMNG): the named set of representation models a Document publishes — «Survey 2015» under D.01. Shape and frame are the GROUP family's, unchanged and deliberately not reinvented (roundrectangle, neutral grey fill, dashed black border) — what identifies the family is the group title-tab colour, exactly as cyan identifies ActivityNodeGroup, peach ParadataNodeGroup, green TimeBranchNodeGroup and grey LocationNodeGroup. The tab here carries #FF6600, which is the RM family's OWN border colour (see the RM / RMDoc / RMSF styles): the box reads as «a group of representation models» without a new shape and without a new colour being invented. Verified free before use: #FF6600 was not in use as a label_background by any other style, and is not among the colours the GraphML importer keys on.",
+      "style": {
+        "shape": "roundrectangle",
+        "fill_color": "#F5F5F5",
+        "border_color": "#000000",
+        "border_style": "dashed",
+        "border_width": 1.0,
+        "label_background": "#FF6600",
+        "label_position": "top"
+      }
     }
   },
   "document_roles": {
@@ -811,7 +824,7 @@
     }
   },
   "document_variant_styles": {
-    "_comment": "Axis 3 of the three-axis Canonical-Document classification (EM 1.6). Declares how the document's Representation Model (RM) is spatialized in the 3D scene. Q-C (EM 1.6): the axis is a scale of METRIC AUTHORITY OF PLACEMENT, and it is authoritative on the **RMDoc** — the spatial instance — not on the Document. The Document's existence is certain; what has degrees is its spatialisation, which is what the RMDoc IS (proxy:US :: RMSF:SF :: RM:state :: RMDoc:Document). The position itself (X,Y,Z + rotation) lives on the RMDoc and nowhere else; the Document may mirror the value on its yEd border for diagram convenience, but it carries no position. The ladder, from most to least metric authority: reality_based \u2192 observable \u2192 asserted \u2192 symbolic. `em_based` is not a rung of that ladder but a provenance statement (the asset IS an EM-derived reconstruction). Temporality is a separate matter: it is an attribution, certain or argued through a paradata chain, never a grade on this axis. The 'geometry' property drives both the GraphML DocumentNode border colour (in yEd) and the RM contour colour in the 3D viewport (per the v1.6 toggle). Documents without an RM (e.g. PDF articles, bibliographies) omit the geometry property entirely — no node, no colour. Border WIDTH carries the canonical/instance distinction: width >= 3.0 is the canonical document, anything thinner is a use-instance. The COLOUR classifies the canonical document's geometry-axis category. A black thick border means 'canonical without geometry classification' (canonical_unknown). Renamed from 'master' in schema 2: every digital document is a copy, so 'master' misread as 'original vs copies'; what the flag marks is the document drawn at its own creation, vs the instances that re-use it. Kept in sync with the reference nodes in templates/em_palette_template.graphml.",
+    "_comment": "Axis 3 of the three-axis Canonical-Document classification (EM 1.6). Declares how the document's Representation Model (RM) is spatialized in the 3D scene. Q-C (EM 1.6): the axis is a scale of METRIC AUTHORITY OF PLACEMENT, and it is authoritative on the **RMDoc** — the spatial instance — not on the Document. The Document's existence is certain; what has degrees is its spatialisation, which is what the RMDoc IS (proxy:US :: RMSF:SF :: RM:state :: RMDoc:Document). The position itself (X,Y,Z + rotation) lives on the RMDoc and nowhere else; the Document may mirror the value on its yEd border for diagram convenience, but it carries no position. The ladder, from most to least metric authority: reality_based → observable → asserted → symbolic. `em_based` is not a rung of that ladder but a provenance statement (the asset IS an EM-derived reconstruction). Temporality is a separate matter: it is an attribution, certain or argued through a paradata chain, never a grade on this axis. The 'geometry' property drives both the GraphML DocumentNode border colour (in yEd) and the RM contour colour in the 3D viewport (per the v1.6 toggle). Documents without an RM (e.g. PDF articles, bibliographies) omit the geometry property entirely — no node, no colour. Border WIDTH carries the canonical/instance distinction: width >= 3.0 is the canonical document, anything thinner is a use-instance. The COLOUR classifies the canonical document's geometry-axis category. A black thick border means 'canonical without geometry classification' (canonical_unknown). Renamed from 'master' in schema 2: every digital document is a copy, so 'master' misread as 'original vs copies'; what the flag marks is the document drawn at its own creation, vs the instances that re-use it. Kept in sync with the reference nodes in templates/em_palette_template.graphml.",
     "default": {
       "border_color": "#000000",
       "border_style": "solid",
@@ -858,32 +871,92 @@
   "dtc_kinds": {
     "_comment": "DATA-DRIVEN, EXPANDABLE per-kind vocabulary for the DTC substrate profile (ECHOES). Mirrors the Master-Document axis vocabularies above (document_roles/content_natures): the three base kinds (input/process/output) each list specific kinds seeded from the 2017 DTC palette. Adding a new kind (e.g. audio, spectroscopy) is a JSON entry here (+ a glyph) — NOT a code change; the DTC node classes validate against these keys via s3dgraphy.utils.get_dtc_kinds(). `glyph` names the 2017 DTC SVG (wired in the later glyph/visual-manager slice; recorded here as data only).",
     "input": {
-      "photo": { "label": "Photograph", "glyph": "09_photos", "description": "Photographic acquisition (single image or set)." },
-      "laserscanner": { "label": "Laser scan", "glyph": "10_laserscanner", "description": "Terrestrial/close-range laser scanning acquisition." },
-      "topographic": { "label": "Topographic survey", "glyph": "01_topographicnetwork", "description": "Total-station / topographic-network acquisition." }
+      "photo": {
+        "label": "Photograph",
+        "glyph": "09_photos",
+        "description": "Photographic acquisition (single image or set)."
+      },
+      "laserscanner": {
+        "label": "Laser scan",
+        "glyph": "10_laserscanner",
+        "description": "Terrestrial/close-range laser scanning acquisition."
+      },
+      "topographic": {
+        "label": "Topographic survey",
+        "glyph": "01_topographicnetwork",
+        "description": "Total-station / topographic-network acquisition."
+      }
     },
     "process": {
       "photogrammetry": {
         "label": "Photogrammetry",
         "glyph": "03_mesh",
-        "description": "Structure-from-motion reconstruction: a cluster of photographs becomes a 3D model. A specific kind of transformation, named because what a reader needs to know about a mesh is which family of process made it \u2014 and because the placement (RegistrationTransform) only means something for this one."
+        "description": "Structure-from-motion reconstruction: a cluster of photographs becomes a 3D model. A specific kind of transformation, named because what a reader needs to know about a mesh is which family of process made it — and because the placement (RegistrationTransform) only means something for this one."
       },
-      "transformation": { "label": "Transformation", "glyph": "00_transformation", "description": "A processing/transformation step turning inputs into produced digital objects." }
+      "transformation": {
+        "label": "Transformation",
+        "glyph": "00_transformation",
+        "description": "A processing/transformation step turning inputs into produced digital objects."
+      }
     },
     "acquisition": {
-      "download": { "label": "Download", "glyph": null, "description": "Retrieval of a digital object from a remote (opaque, Tier-0) repository." },
-      "ingest": { "label": "Ingest", "glyph": null, "description": "Generic ingestion of a digital object into the study." },
-      "local_import": { "label": "Local import", "glyph": null, "description": "Acquisition from the local file system (project-folder search) — the local analog of remote acquisition." },
-      "uri_reference": { "label": "URI reference", "glyph": null, "description": "The URI was acquired, not the object: the resource stays where it is and is reached through its own access protocol (an open link, or one you subscribe to). No bytes were copied — calling this a download would record a retrieval that never happened." }
+      "download": {
+        "label": "Download",
+        "glyph": null,
+        "description": "Retrieval of a digital object from a remote (opaque, Tier-0) repository."
+      },
+      "ingest": {
+        "label": "Ingest",
+        "glyph": null,
+        "description": "Generic ingestion of a digital object into the study."
+      },
+      "local_import": {
+        "label": "Local import",
+        "glyph": null,
+        "description": "Acquisition from the local file system (project-folder search) — the local analog of remote acquisition."
+      },
+      "uri_reference": {
+        "label": "URI reference",
+        "glyph": null,
+        "description": "The URI was acquired, not the object: the resource stays where it is and is reached through its own access protocol (an open link, or one you subscribe to). No bytes were copied — calling this a download would record a retrieval that never happened."
+      }
     },
     "output": {
-      "pointcloud": { "label": "Point cloud", "glyph": "02_pointcloud", "description": "Produced point cloud." },
-      "mesh": { "label": "Mesh", "glyph": "03_mesh", "description": "Produced 3D mesh model." },
-      "dem": { "label": "DEM", "glyph": "07_DEM", "description": "Digital Elevation Model." },
-      "orthophoto": { "label": "Orthophoto", "glyph": "08_ortophoto", "description": "Produced orthophoto / orthomosaic." },
-      "points": { "label": "Points", "glyph": "04_points", "description": "Vector point features." },
-      "lines": { "label": "Lines", "glyph": "05_lines", "description": "Vector line features." },
-      "polygons": { "label": "Polygons", "glyph": "06_polygons", "description": "Vector polygon features." }
+      "pointcloud": {
+        "label": "Point cloud",
+        "glyph": "02_pointcloud",
+        "description": "Produced point cloud."
+      },
+      "mesh": {
+        "label": "Mesh",
+        "glyph": "03_mesh",
+        "description": "Produced 3D mesh model."
+      },
+      "dem": {
+        "label": "DEM",
+        "glyph": "07_DEM",
+        "description": "Digital Elevation Model."
+      },
+      "orthophoto": {
+        "label": "Orthophoto",
+        "glyph": "08_ortophoto",
+        "description": "Produced orthophoto / orthomosaic."
+      },
+      "points": {
+        "label": "Points",
+        "glyph": "04_points",
+        "description": "Vector point features."
+      },
+      "lines": {
+        "label": "Lines",
+        "glyph": "05_lines",
+        "description": "Vector line features."
+      },
+      "polygons": {
+        "label": "Polygons",
+        "glyph": "06_polygons",
+        "description": "Vector polygon features."
+      }
     }
   },
   "edge_style": {
@@ -1069,6 +1142,15 @@
         "width": 1.5
       },
       "label": "Included in Timebranch"
+    },
+    "is_in_representation_model_group": {
+      "_comment": "Membership of a representation model in an RM container (EM16-RMNG). Dashed like the other membership edges that are TAGS rather than structure (has_representation_model, has_property), and carrying the RM family's #FF6600 so the line reads as part of the same family as the group's title-tab. NOTE: is_in_functional_unit has no entry in this block — a pre-existing gap, reported and not fixed here.",
+      "style": {
+        "color": "#FF6600",
+        "line_style": "dashed",
+        "width": 1.5
+      },
+      "label": "Is in Representation Model Group"
     }
   }
 }
