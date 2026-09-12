@@ -144,11 +144,27 @@ class ResourceNode(Node):
 
     def effective_residency(self):
         """The residency to USE when none was recorded: a remote URI is a
-        reference (the bytes are somebody else's), anything else is resident."""
+        reference (the bytes are somebody else's), anything else is resident.
+
+        NIGHT-RIM2/B1 · un locator ``blend://`` (i byte dentro un file
+        .blend) è **resident**: il file ce l'ho, i byte sono miei. Lo dice
+        già il ripiego — non è remoto, quindi cade nel ramo giusto — ma
+        adesso è scritto invece che dedotto dal fatto che l'elenco dei
+        remoti non lo contiene: il giorno che qualcuno aggiunge uno schema a
+        quell'elenco, non deve farlo per sbaglio anche per questo.
+
+        NON deciso, e non l'ho deciso io (elenco delle questioni aperte,
+        voce C): se una risorsa dentro un .blend **non ancora pubblicata**
+        meriti uno stato terzo, tipo «solo qui, non pubblicabile», invece di
+        essere una ``resident`` come le altre. Qui c'è il minimo che non
+        pregiudica quella scelta.
+        """
         recorded = self.data.get("residency")
         if recorded:
             return recorded
         url = str(self.data.get("url") or "")
+        if url.startswith("blend://"):
+            return "resident"
         return "reference" if url.startswith(("http://", "https://", "s3://")) else "resident"
 
     @property
