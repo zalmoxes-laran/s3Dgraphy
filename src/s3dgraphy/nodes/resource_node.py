@@ -53,7 +53,7 @@ class ResourceNode(Node):
     ROLES = ("comparandum", "internal_source")
 
     def __init__(self, node_id, name="Unnamed Link", url="", url_type="External link",
-                 description="No description", checksum=None, scope=None,
+                 description="", checksum=None, scope=None,
                  residency=None, role=None):
         """
         Inizializza una nuova istanza di ResourceNode.
@@ -63,7 +63,22 @@ class ResourceNode(Node):
             name (str, opzionale): Nome del collegamento. Defaults to "Unnamed Link".
             url (str, opzionale): URL del collegamento. Defaults to "".
             url_type (str, opzionale): Tipo di URL. Defaults to "External link".
-            description (str, opzionale): Descrizione del collegamento. Defaults to "No description".
+            description (str, opzionale): Descrizione del collegamento.
+                Default **vuoto**, e nessun auto-riempimento (NIGHT-RIM3/B3.3,
+                decisione 11 di E.D.). Prima il default era la sentinella
+                `"No description"` e il costruttore scriveva
+                `description or f"Link to {name}"`: due modi diversi di
+                inventare un dato che nessuno aveva scritto.
+
+                Perché conta più di quanto sembri: quella sentinella finiva
+                su disco come se fosse un valore, e al SECONDO giro di
+                round-trip em.json non sopravviveva — diventava
+                «Link to <nome>». Cambiando la descrizione cambia l'impronta
+                sha256 del documento, e da quel checksum dipende il calcolo
+                della staleness (B4). Un campo che si riscrive da solo
+                rendeva "stantio" un documento che nessuno aveva toccato.
+
+                Vale per i nodi NUOVI: i dati esistenti non si migrano.
             checksum (str, opzionale): content digest, ``"sha256:<hex>"``. The
                 ALGORITHM travels with the value on purpose — a bare hex string
                 is unreadable in two years, and a checksum nobody can verify is
@@ -86,7 +101,8 @@ class ResourceNode(Node):
         self.data = {
             "url": url,
             "url_type": url_type or self._determine_url_type(url),
-            "description": description or f"Link to {name}"
+            #: nessun `or`: vuoto vuol dire vuoto, non «inventane una»
+            "description": description
         }
         if checksum:
             self.data["checksum"] = str(checksum)

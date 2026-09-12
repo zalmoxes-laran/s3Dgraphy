@@ -141,8 +141,20 @@ def test_un_grafo_con_una_risorsa_blend_fa_round_trip_isomorfo(tmp_path):
     assert risorse[0].data.get("url") == loc
     assert parse_blend_locator(risorse[0].data["url"])[2] == nome_cattivo
 
-    #: e riscrivendolo il LOCATOR è byte per byte lo stesso — che è ciò che
-    #: questa prova deve garantire
+    #: e riscrivendolo si ottiene lo STESSO DOCUMENTO, digest compreso.
+    #:
+    #: GIRATA da NIGHT-RIM3/B3.3. Ieri notte questa prova asseriva il
+    #: DIFETTO: `ResourceNode.__init__` aveva `description="No description"`
+    #: come default e scriveva `description or f"Link to {name}"`, quindi una
+    #: sentinella finiva su disco come dato e al secondo giro diventava
+    #: «Link to …», spostando l'impronta sha256 del documento. Asserire un
+    #: difetto è meglio che ignorarlo, ma è una prova che si aspetta il
+    #: male: adesso il default è vuoto, non c'è auto-riempimento, e la prova
+    #: chiede il bene.
+    #:
+    #: Il digest conta perché su di lui poggia il calcolo della staleness
+    #: (B4): un campo che si riscrive da solo rendeva «stantio» un documento
+    #: che nessuno aveva toccato.
     di_nuovo = export_emjson(riletto, str(tmp_path / "g2.em.json"))
     primo = json.load(open(percorso, encoding="utf-8"))
     secondo = json.load(open(di_nuovo, encoding="utf-8"))
@@ -152,31 +164,8 @@ def test_un_grafo_con_una_risorsa_blend_fa_round_trip_isomorfo(tmp_path):
         return next(n for n in nodi if n["id"] == "US101_res")
 
     assert risorsa(primo)["data"]["url"] == risorsa(secondo)["data"]["url"] == loc
-
-    #: …e tutto il resto del documento è identico TRANNE la `description`
-    #: della risorsa. NON è un difetto di questo giro: `ResourceNode.__init__`
-    #: ha `description="No description"` come DEFAULT e poi scrive
-    #: `description or f"Link to {name}"`, cioè un valore-sentinella finisce
-    #: su disco come se fosse un dato. Al secondo giro quel valore non
-    #: sopravvive e il ripiego produce «Link to risorsa interna».
-    #:
-    #: Lo asserisco invece di ignorarlo: così è documentato, e il giorno che
-    #: qualcuno sistema il default questa prova diventa rossa e lo dice.
-    def grafo_senza_descrizioni(doc):
-        """Nodi e archi, che è ciò che «isomorfo» significa per un grafo.
-
-        Non il documento intero: l'intestazione porta un'IMPRONTA sha256 del
-        contenuto, quindi cambia a valle di qualunque differenza — e
-        confrontarla direbbe solo che qualcosa è cambiato, non cosa.
-        """
-        import copy
-        g = copy.deepcopy(doc["graphs"]["prova_blend"])
-        for n in g.get("nodes", []):
-            n.get("data", {}).pop("description", None)
-        return {"nodes": sorted(g.get("nodes", []), key=lambda n: n["id"]),
-                "edges": sorted(g.get("edges", []), key=lambda e: e["id"])}
-
-    assert (json.dumps(grafo_senza_descrizioni(primo), sort_keys=True)
-            == json.dumps(grafo_senza_descrizioni(secondo), sort_keys=True))
-    assert risorsa(primo)["data"]["description"] == "No description"
-    assert risorsa(secondo)["data"]["description"] == "Link to risorsa interna"
+    #: la descrizione non nasce più da sola
+    assert risorsa(primo)["data"].get("description", "") == ""
+    assert risorsa(secondo)["data"].get("description", "") == ""
+    #: …e quindi il DOCUMENTO INTERO è stabile, impronta compresa
+    assert json.dumps(primo, sort_keys=True) == json.dumps(secondo, sort_keys=True)
