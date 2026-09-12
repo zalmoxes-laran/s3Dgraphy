@@ -192,26 +192,21 @@ class JSONExporter:
             "representation_model_groups": {}
         }
         
-        # Prima fase: elabora tutti i nodi ed edge del grafo
-        rm_links = {}  # Dizionario per memorizzare relazioni RM -> Link
-        
-        # Raccogli prima tutte le relazioni has_linked_resource
-        for edge in graph.edges:
-            if edge.edge_type == "has_linked_resource":
-                source_node = graph.find_node_by_id(edge.edge_source)
-                target_node = graph.find_node_by_id(edge.edge_target)
-                
-                if source_node and target_node and target_node.node_type == "resource":
-                    if source_node.node_id not in rm_links:
-                        rm_links[source_node.node_id] = []
-                    
-                    rm_links[source_node.node_id].append({
-                        "link_id": target_node.node_id,
-                        "url": target_node.data.get("url", "") if hasattr(target_node, "data") else "",
-                        "url_type": target_node.data.get("url_type", "") if hasattr(target_node, "data") else ""
-                    })
-                    #print(f"Found link relationship: {source_node.node_id} -> {target_node.node_id}")
-        
+        # R4 (13/14-09-2026) · qui c'era `rm_links`, una mappa RM → risorse
+        # costruita attraversando ogni arco `has_linked_resource`.
+        #
+        # È stata tolta, e la ragione è più forte di «nessuno la legge»:
+        # **non veniva scritta da nessuna parte.** Era una variabile locale
+        # riempita e poi buttata via — un giro completo su tutti gli archi a
+        # ogni export, il cui unico effetto era il tempo che costava. Chi
+        # sospettava che Heriverse la aspettasse aveva un dubbio ragionevole e
+        # una risposta sbagliata: Heriverse prende il modello attraversando
+        # `has_linked_resource` (`src/Heriverse.js`), che è il modo nativo del
+        # grafo, e quella mappa non è mai arrivata in nessun project.json.
+        #
+        # Scriverla adesso darebbe due fonti per lo stesso fatto, destinate a
+        # divergere alla prima modifica di una delle due (decisione 16).
+
         # Ora elabora tutti i nodi
         for node in graph.nodes:
             # Gestisci ogni tipo di nodo in modo specifico

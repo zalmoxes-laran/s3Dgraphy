@@ -52,9 +52,54 @@ class ResourceNode(Node):
     #: about somebody's argument into their file.
     ROLES = ("comparandum", "internal_source")
 
+    #: WHICH SIDE OF A DERIVATION this resource is on (E.D. 2026-09-13, §15).
+    #:
+    #: * `master` — kept because it is the source the others are made FROM.
+    #:   Losing it is losing something: nothing can remake it.
+    #: * `distribution` — made so that somebody else can consume it. Losing it
+    #:   costs a button: it is remade from its master.
+    #:
+    #: **It is not a three-rung ladder.** It is a role in a PAIR, and a chain
+    #: can hold several masters: the photogrammetric original on an external
+    #: disk *and* the working mesh inside the .blend are both masters, tied to
+    #: each other by a derivation. Asking "which rung is this on" has no answer;
+    #: asking "is this the source or the thing made from it" always does.
+    #:
+    #: **«Published» is not a tier**: it is the STATE of a distribution whose
+    #: locator resolves to something reachable and which carries a checksum. A
+    #: third value would have made publication a property of the bytes instead
+    #: of a property of where they got to.
+    #:
+    #: Why the axis has to exist at all: the contract must **declare** what a
+    #: resource is instead of letting every consumer deduce it. Heriverse was
+    #: guessing with "it has a checksum, so it is the published one" — a rule
+    #: that is right by accident and wrong the first time somebody records a
+    #: digest for a working file.
+    #:
+    #: Orthogonal to `scope`, `residency` and `role`, and `role` is NOT the
+    #: place for it: that axis is already `comparandum` / `internal_source` by
+    #: E.D.'s decision of 24-08-2026, and its own docstring says a third value
+    #: invented at a call site would be "a word".
+    TIERS = ("master", "distribution")
+
+    #: HOW THE BYTES ARE SHAPED, because a consumer has to know before it can
+    #: decide whether it can open them.
+    #:
+    #: * `file` — one file;
+    #: * `directory` — a tree, served as it lies;
+    #: * `archive` — a tree in a container (a zip).
+    #:
+    #: The zip is a first-class citizen and not a packaging accident: **a
+    #: tileset travels as a zip**, because a directory of some thousands of
+    #: tiles destroys disks and bandwidth alike. A consumer must read that from
+    #: the data, not guess it from an extension — guessing from `.zip` works
+    #: until the day somebody serves an archive without one, and fails silently.
+    PACKAGINGS = ("file", "directory", "archive")
+
     def __init__(self, node_id, name="Unnamed Link", url="", url_type="External link",
                  description="", checksum=None, scope=None,
-                 residency=None, role=None):
+                 residency=None, role=None, tier=None, packaging=None,
+                 size_bytes=None, primitives=None, preferred=None):
         """
         Inizializza una nuova istanza di ResourceNode.
 
@@ -88,6 +133,26 @@ class ResourceNode(Node):
             residency (str, opzionale): one of :attr:`RESIDENCIES`.
             role (str, opzionale): one of :attr:`ROLES` — what the resource is
                 FOR in the argument, orthogonal to scope and residency.
+            tier (str, opzionale): one of :attr:`TIERS` — the source side or
+                the made-from side of a derivation.
+            packaging (str, opzionale): one of :attr:`PACKAGINGS` — file,
+                directory or archive.
+            size_bytes (int, opzionale): the weight. A measured fact, and one of
+                the two things that let a consumer pick between LOD siblings.
+            primitives (dict, opzionale): counts of whatever this is made of —
+                ``{"vertices": n, "faces": n}`` for a mesh, ``{"points": n}``
+                for a cloud, ``{"tiles": n}`` for a tileset. Recorded only when
+                it is known at zero cost; an open dict rather than two fixed
+                fields **on purpose**, because a point cloud has no faces and a
+                fixed pair would be the same ageing enumeration in disguise.
+            preferred (bool, opzionale): a SUGGESTION between candidates that
+                are equally valid — never a gate. See :meth:`set_preferred`.
+
+        Why measures and not a level enumeration: `lod0`/`lod1`/`lod2` is a
+        vocabulary that ages the moment somebody adds a level in the middle, and
+        it means different things in different pipelines. A weight and a
+        primitive count are measured facts, they never age, and they are what a
+        consumer with a bandwidth budget actually needs to compare.
 
         The three new fields are **additive and optional**, and they are written
         ONLY when given. Absent means UNKNOWN, not false: every resource written
@@ -112,6 +177,14 @@ class ResourceNode(Node):
             self.set_residency(residency)
         if role is not None:
             self.set_role(role)
+        if tier is not None:
+            self.set_tier(tier)
+        if packaging is not None:
+            self.set_packaging(packaging)
+        if size_bytes is not None or primitives is not None:
+            self.set_measures(size_bytes=size_bytes, primitives=primitives)
+        if preferred is not None:
+            self.set_preferred(preferred)
 
     # ── the three fences, and where the bytes live ──────────────────────────
 
@@ -147,6 +220,141 @@ class ResourceNode(Node):
         neither "comparandum" nor "internal source" is what a resource is by
         default, and answering one would invent the claim."""
         return self.data.get("role") or None
+
+    # ── which side of a derivation, and how the bytes are shaped ────────────
+
+    def set_tier(self, tier):
+        """Set the derivation side. Raises on an unknown value, same reason as
+        the other axes: a third tier invented at a call site would be a word no
+        filter can ever match, and this axis is deliberately a PAIR — if a third
+        case turns up it gets declared, not slipped in."""
+        if tier not in self.TIERS:
+            raise ValueError(
+                f"tier must be one of {list(self.TIERS)}, got {tier!r}")
+        self.data["tier"] = tier
+
+    def set_packaging(self, packaging):
+        """Set how the bytes are shaped. Raises on an unknown value, same reason."""
+        if packaging not in self.PACKAGINGS:
+            raise ValueError(
+                f"packaging must be one of {list(self.PACKAGINGS)}, "
+                f"got {packaging!r}")
+        self.data["packaging"] = packaging
+
+    def set_measures(self, size_bytes=None, primitives=None):
+        """Record the weight and, when it is free to know, the primitive counts.
+
+        Both are optional and written only when given: a zero is a measurement
+        and an absence is not, and an empty file and an unmeasured one are not
+        the same thing.
+
+        Counts are validated as non-negative integers but the KEYS are not
+        enumerated: "vertices"/"faces" for a mesh, "points" for a cloud,
+        "tiles" for a tileset. Fixing the keys here would be the ageing
+        enumeration this axis exists to avoid; requiring them to be counts is
+        what keeps the field comparable.
+        """
+        if size_bytes is not None:
+            try:
+                weight = int(size_bytes)
+            except (TypeError, ValueError, OverflowError):
+                # OverflowError is in the list because `int(float("inf"))`
+                # raises it and not ValueError: without this an infinity would
+                # leave this method by a door it does not document, and a
+                # caller catching ValueError would never see it.
+                raise ValueError(
+                    f"size_bytes must be an integer number of bytes, "
+                    f"got {size_bytes!r}")
+            if weight < 0:
+                raise ValueError(f"size_bytes cannot be negative, got {weight}")
+            self.data["size_bytes"] = weight
+        if primitives is not None:
+            if not isinstance(primitives, dict):
+                raise ValueError(
+                    f"primitives must be a dict of counts, got {primitives!r}")
+            counted = {}
+            for what, how_many in primitives.items():
+                try:
+                    n = int(how_many)
+                except (TypeError, ValueError, OverflowError):
+                    raise ValueError(
+                        f"primitives[{what!r}] must be a count, got {how_many!r}")
+                if n < 0:
+                    raise ValueError(
+                        f"primitives[{what!r}] cannot be negative, got {n}")
+                counted[str(what)] = n
+            self.data["primitives"] = counted
+
+    def set_preferred(self, preferred=True):
+        """Mark this one as the suggestion between equally valid candidates.
+
+        **A suggestion, never a gate.** A consumer must be able to ignore it and
+        still work: it exists for the case where two distributions are both
+        loadable and somebody who knows the study has an opinion about which one
+        to open first. Written only when True — a `preferred: false` on every
+        other resource would turn a hint into a vote, and an absent hint into a
+        negative one.
+        """
+        if preferred:
+            self.data["preferred"] = True
+        else:
+            self.data.pop("preferred", None)
+
+    def tier(self):
+        """The stated tier, or None. No invention — see :meth:`effective_tier`
+        for the reading a consumer may make."""
+        return self.data.get("tier") or None
+
+    def packaging(self):
+        """The stated packaging, or None."""
+        return self.data.get("packaging") or None
+
+    def is_preferred(self):
+        """Whether somebody suggested this one. A hint, and never a gate."""
+        return bool(self.data.get("preferred"))
+
+    def effective_tier(self):
+        """The tier to USE when none was recorded.
+
+        The reading: a locator into a .blend is a **master** — those bytes exist
+        so that Blender can remake things from them, and no viewer can serve
+        them — and anything else is a **distribution**, because what a study
+        pointed at before this axis existed was the thing it had exported to be
+        consumed.
+
+        **Why this has a fallback and :meth:`role` does not.** A role is a claim
+        about somebody's ARGUMENT, and answering one nobody made would put words
+        in their mouth. A tier is a fact about BYTES that every consumer has to
+        decide about anyway before it can open anything — Heriverse was already
+        deciding it, privately, with "it has a checksum". Refusing to read one
+        here does not prevent the guess: it only scatters it, differently, into
+        each consumer.
+
+        Like :meth:`effective_scope`, this is a READING made by the caller and
+        not a default written into ``data``: the document still says nothing.
+        """
+        recorded = self.data.get("tier")
+        if recorded:
+            return recorded
+        return "master" if str(self.data.get("url") or "").startswith("blend://") \
+            else "distribution"
+
+    def effective_packaging(self):
+        """The packaging to USE when none was recorded — a reading, from the
+        shape of the locator: a `.zip` is an archive, a trailing slash is a
+        directory, everything else is one file.
+
+        Deliberately weak, and that is the point of `set_packaging` existing: an
+        archive served without a `.zip` in its name reads as a file here, and
+        the only cure is for whoever made it to SAY so.
+        """
+        recorded = self.data.get("packaging")
+        if recorded:
+            return recorded
+        url = str(self.data.get("url") or "")
+        if url.lower().endswith(".zip"):
+            return "archive"
+        return "directory" if url.endswith("/") else "file"
 
     def effective_scope(self):
         """The scope to USE when none was recorded.

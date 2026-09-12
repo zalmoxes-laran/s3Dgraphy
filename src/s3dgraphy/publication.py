@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from .graph import Graph
 from .nodes import DTCProcessNode, ResourceNode
@@ -63,7 +63,11 @@ class PromotionResult:
 
     resource_id: str
     process_id: str
+    #: The first source, kept for every caller that was written when a promotion
+    #: could only have one. `source_ids` is the whole truth — a tileset accretes
+    #: N tiles, and reporting one of them would name a winner nobody picked.
     source_id: Optional[str] = None
+    source_ids: List[str] = field(default_factory=list)
     node_ids: List[str] = field(default_factory=list)
     edge_ids: List[str] = field(default_factory=list)
     #: What landed in the DOCUMENTATION member rather than in the study graph.
@@ -80,6 +84,7 @@ class PromotionResult:
             "resource_id": self.resource_id,
             "process_id": self.process_id,
             "source_id": self.source_id,
+            "source_ids": list(self.source_ids),
             "node_ids": list(self.node_ids),
             "edge_ids": list(self.edge_ids),
             "corpus_node_ids": list(self.corpus_node_ids),
@@ -115,9 +120,14 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
                      author: Optional[str] = None,
                      at: Optional[str] = None,
                      source_id: Optional[str] = None,
+                     source_ids: Optional[Sequence[str]] = None,
                      link_to: Optional[str] = None,
                      name: Optional[str] = None,
                      residency: str = "reference",
+                     tier: Optional[str] = "distribution",
+                     packaging: Optional[str] = None,
+                     size_bytes: Optional[int] = None,
+                     primitives: Optional[Dict[str, Any]] = None,
                      corpus: Optional[Graph] = None) -> PromotionResult:
     """Publish a resource: `reference` residency, url + checksum, and a D7 event.
 
@@ -151,6 +161,22 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
             one to name. Absent is honest — often the source is a .blend nobody
             has published, and inventing a node for it would put a thing in the
             graph that nobody can fetch.
+        source_ids: SEVERAL working resources, when the derivation is N:1. A
+            Cesium tileset is the case that needs it: it stands in for a whole
+            container, accreting some hundreds of tiles into one rigid entity,
+            so its genesis has N inputs and the DTC already carries that
+            natively. `source_id` stays as the one-source shorthand and the two
+            are merged, de-duplicated, in the order given.
+        tier: which side of the derivation the published resource is on
+            (:attr:`ResourceNode.TIERS`). Defaults to `distribution`, because
+            that is what publishing normally means — the thing made so somebody
+            else can consume it. Pass `None` to leave an existing tier alone:
+            archiving a MASTER into a store is a real gesture too, and forcing
+            `distribution` on it would record a falsehood.
+        packaging / size_bytes / primitives: the declared facts that let a
+            consumer CHOOSE (R1). A tileset published as a zip must say
+            `packaging="archive"`, because reading it off the extension works
+            until somebody serves an archive without one.
         link_to: the node the published asset DEPICTS (typically the
             stratigraphic unit whose mesh was exported), attached with the
             existing `has_linked_resource` — the same hinge the shelf uses. An
@@ -216,6 +242,24 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
         resource.set_residency(wanted_residency)
     else:                                      # pragma: no cover — older model
         data["residency"] = wanted_residency
+
+    # WHAT IT IS, declared rather than left to be deduced (R1).
+    #
+    # «Published» is not a tier: it is the STATE of a distribution whose locator
+    # is reachable and which carries a checksum — both of which this function
+    # has just written. The tier says which side of the derivation these bytes
+    # are on, and it is exactly what a consumer needs in order not to guess
+    # ("it has a checksum, so it is the published one" is right by accident).
+    if tier is not None:
+        if hasattr(resource, "set_tier"):
+            resource.set_tier(tier)
+        else:                                  # pragma: no cover — older model
+            data["tier"] = tier
+    if packaging is not None and hasattr(resource, "set_packaging"):
+        resource.set_packaging(packaging)
+    if (size_bytes is not None or primitives is not None) \
+            and hasattr(resource, "set_measures"):
+        resource.set_measures(size_bytes=size_bytes, primitives=primitives)
     result.node_ids.append(resource_id)
 
     # ── the genesis: a DTC transformation, attributed and dated ──────────────
@@ -247,22 +291,31 @@ def promote_resource(graph: Graph, resource_id: str, *, url: str, sha256: str,
 
     _ensure_edge(home, process_id, resource_id, "dtc_had_output", result,
                  corpus=corpus is not None)
-    if source_id:
-        if home.find_node_by_id(source_id) is None and graph.find_node_by_id(source_id) is None:
+    # ONE list, de-duplicated and order-preserving: `source_id` is the
+    # one-source shorthand for `source_ids`, and a caller that passes both is
+    # not making two statements.
+    sorgenti = []
+    for candidato in [source_id] + list(source_ids or []):
+        testo = str(candidato or "").strip()
+        if testo and testo not in sorgenti:
+            sorgenti.append(testo)
+    result.source_ids = list(sorgenti)
+    for sorgente in sorgenti:
+        if home.find_node_by_id(sorgente) is None and graph.find_node_by_id(sorgente) is None:
             result.warnings.append(
-                f"promotion: source '{source_id}' is not in the graph; the event "
+                f"promotion: source '{sorgente}' is not in the graph; the event "
                 f"records the output only")
-        elif corpus is not None and home.find_node_by_id(source_id) is None:
+        elif corpus is not None and home.find_node_by_id(sorgente) is None:
             # the working model lives in the study graph, not in the corpus. Said
             # rather than mirrored: mirroring a .blend nobody published would put
             # a thing in the documentation that nobody can fetch.
             result.warnings.append(
-                f"promotion: the source '{source_id}' is in the study graph, not "
+                f"promotion: the source '{sorgente}' is in the study graph, not "
                 f"in the corpus; the corpus event records the output only")
         else:
-            _ensure_edge(home, process_id, source_id, "dtc_had_input", result,
+            _ensure_edge(home, process_id, sorgente, "dtc_had_input", result,
                          corpus=corpus is not None)
-            _ensure_edge(home, resource_id, source_id, "dtc_derived_from", result,
+            _ensure_edge(home, resource_id, sorgente, "dtc_derived_from", result,
                          corpus=corpus is not None)
 
     if link_to:
