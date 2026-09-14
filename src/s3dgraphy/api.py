@@ -732,6 +732,54 @@ def derivation_chain(graph: Graph, resource: str) -> Dict[str, Any]:
     return _chain(graph, resource)
 
 
+# ── the STAMP: one step, written to stand alone ──────────────────────────────
+#
+# The three doors onto `s3dgraphy.stamp`. They are here for the same reason
+# `promote_resource` and `declare_derivation` are: this surface is what EMtools'
+# bake and StratiGraph Server drive, and an operation reachable only by importing
+# a package is an operation the next tool re-implements.
+
+def emit_stamp(graph: Graph, resource_ref: str, *,
+               revision: Optional[int] = None,
+               room: Optional[str] = None) -> Dict[str, Any]:
+    """The record of the step that produced this artifact — a `<asset>.stamp.json`.
+
+    **Pure**: no filesystem, no clock. One agent, one process, N inputs, ONE
+    artifact; inputs are NAMED and never opened, which is what stops a stamp from
+    being the whole chain in every link. `"from": []` is a complete declaration
+    (born here), not an error.
+    """
+    from .stamp import emit_stamp as _emit
+    return _emit(graph, resource_ref, revision=revision, room=room)
+
+
+def absorb_stamp(graph: Graph, stamp: Dict[str, Any], *,
+                 dry_run: bool = False) -> Dict[str, Any]:
+    """Re-attach a stamp to a graph — a merge by UUID, with one refusal.
+
+    Two stamps for the same artifact that contradict each other in SUBSTANCE
+    (different parents, different process) are not an error: they are a
+    discovery. The graph is left untouched, both contents come back in the
+    result, and **no winner is chosen** — that decision belongs to a person.
+    Two that differ only in the instant are the same fact recorded twice and are
+    deduplicated.
+    """
+    from .stamp import absorb_stamp as _absorb
+    return _absorb(graph, stamp, dry_run=dry_run).as_dict()
+
+
+def stamp_identity(stamp: Dict[str, Any]) -> Dict[str, Any]:
+    """How strong this stamp's identity is — and what an interface may claim.
+
+    `sha256:` PROVES these are those bytes; `emstruct1:` (a datablock inside a
+    .blend, which has no canonical bytes) only tells you it CHANGED. The chain is
+    strong at the published end and soft at the authorial one, and the difference
+    is asked of this function rather than of the string.
+    """
+    from .stamp import stamp_identity as _identity
+    return _identity(stamp)
+
+
 def attribute_batch(graph: Graph, acquisition_id: str, *,
                     attributor: Optional[str], author: Any = None,
                     author_name: Optional[str] = None, license: Any = None,

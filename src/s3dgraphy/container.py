@@ -809,6 +809,25 @@ def _merge_edge_tombstones(mine: Any, theirs: Any, report: MergeReport) -> None:
     report.removed_edges += 1
 
 
+def merge_graph_into(target: Graph, incoming: Graph,
+                     report: Optional[MergeReport] = None) -> MergeReport:
+    """La porta pubblica su :func:`_merge_graph_into` — un grafo dentro un altro.
+
+    Aggiunta quando il timbro (`s3dgraphy.stamp`) ha avuto bisogno di piegare un
+    frammento dentro un grafo: un timbro riassorbito **è** un merge per UUID, e
+    scriverne un secondo nel modulo del timbro avrebbe voluto dire due algoritmi
+    per «lo stesso nodo visto due volte» — che è la malattia che i tombstone e
+    l'algebra CRDT sono costati per curare una volta sola.
+
+    Non cambia niente di come il merge funziona: è lo stesso corpo, con un nome
+    che si può chiamare da fuori e un `report` che si può omettere quando chi
+    chiama ne vuole uno nuovo.
+    """
+    outcome = report if report is not None else MergeReport()
+    _merge_graph_into(target, incoming, outcome)
+    return outcome
+
+
 def merge_into_container(container: Container, other: Container) -> MergeReport:
     """Take in another project's graphs — the offline "integrate later".
 
