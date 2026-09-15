@@ -66,7 +66,9 @@ differiscono solo nell'istante sono lo stesso fatto registrato due volte, e si d
     "at": "2026-09-15T20:14:07Z"
   },
   "declared": { "license": "CC-BY-NC", "embargo_until": "2025-12-31",
-                "as_of": "2026-09-15T20:14:07Z" },
+                "as_of": "2026-09-15T20:14:07Z",
+                "by": { "id": "https://orcid.org/0000-0002-5065-7970",
+                        "label": "Emanuel Demetrescu" } },
   "registry": { "graph_id": "graph:6af9866e…", "label": "Great Temple",
                 "revision": 47, "room": "em.localhost/aiano" }
 }
@@ -115,6 +117,11 @@ l'ORCID va omessa, non duplicata.
 **`declared` atterra su `data.declared` del nodo del passo e NON si materializza** in un `LicenseNode` con
 `has_license`: materializzarlo farebbe decidere il cancello vivo a un file arrivato per posta, non riassorbirlo
 romperebbe il giro completo.
+
+**`declared` porta `by`, cioè chi lo ha dichiarato.** `rights.py` fa questa distinzione con cura — l'autore è
+chi ha fatto il dato, l'**attributore** è chi lo dice, e l'atto è firmato — e senza di essa un timbro che
+afferma «CC-BY-NC al 15 settembre» perde metà di ciò che serve per **contestarlo**: si sa cosa è stato
+dichiarato e non da chi. Vale anche qui la regola delle etichette: una `label` che ripete l'id va omessa.
 
 **`registry` lo passa chi emette**: `revision` e `room` non stanno nel grafo, e se assenti restano assenti.
 
@@ -252,5 +259,8 @@ grafo e serializzato usciva in un manifesto IIIF.
 **Resta aperto**, e non è piccolo: `None` da `rights_for_digest` significa «non conosco questo digest» e i
 due cancelli lo trattano come via libera. Oggi è coerente col significato documentato, ma è un fallimento
 aperto per costruzione — chi decide se un cancello debba chiudersi sull'ignoto è E.D., non una riga.
+
+**Deciso il 15-09-2026 e non ancora implementato**: `declared.by`, l'attributore — emerso costruendo TIMBRO2,
+deciso subito perché senza di esso una dichiarazione di licenza non è contestabile. Va nel commit che lo emette.
 
 Un formato dichiarato e non implementato è peggio di uno non deciso, perché qualcuno ci costruisce sopra.
