@@ -1,4 +1,4 @@
-"""DTCAcquisitionNode — a DTC ACQUISITION chunk: the digital event by which an
+"""DTCAcquisitionNode — a DTC ACQUISITION step: the digital event by which an
 asset ENTERS this study from an (opaque, Tier-0) external source.
 
 Distinct from :class:`DTCProcessNode` (genesis/transformation, crmdig:D7): an

@@ -57,8 +57,11 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from .emit import (EDGE_HAD_INPUT, EDGE_HAD_OUTPUT, SIZE_KEY, STAMP_VERSION,
-                   clean_stamp, emit_stamp, find_resource)
+from dtcstamp import (BadStamp, Disagreement, STAMP_VERSION, clean_stamp,
+                      compare_stamps, read_stamp, substance, validate_stamp)
+
+from .emit import (EDGE_HAD_INPUT, EDGE_HAD_OUTPUT, SIZE_KEY, emit_stamp,
+                   find_resource)
 
 #: L'arco diretto uscita → ingresso, la scorciatoia che il substrato scrive
 #: accanto alla coppia input/output. Stesso nome di `dtc.residency`.
@@ -73,21 +76,17 @@ DEFAULT_PROCESS_KIND = "transformation"
 IGNORED_PATHS = ("by.at", "declared.as_of", "registry", "_notes")
 
 
-class BadStamp(ValueError):
-    """Il timbro non è leggibile come tale."""
-
-
-@dataclass
-class Disagreement:
-    """Un punto in cui i due timbri non vanno d'accordo. **Senza un vincitore.**"""
-
-    path: str
-    mine: Any
-    theirs: Any
-
-    def as_dict(self) -> Dict[str, Any]:
-        return {"path": self.path, "mine": self.mine, "theirs": self.theirs}
-
+# ── quello che il FORMATO sa fare, e che non sta più qui ─────────────────────
+#
+# `BadStamp`, `validate_stamp`, `read_stamp`, `substance`, `compare_stamps` e
+# `Disagreement` sono importati da `dtcstamp` e **ri-esportati con questi nomi**:
+# non hanno mai avuto bisogno di un grafo — leggono e confrontano JSON — e chi
+# scrive un addon per Blender non deve installare pandas per confrontare due
+# verbali. I nomi restano raggiungibili da qui perché `from
+# s3dgraphy.stamp.absorb import BadStamp` è un import che qualcuno ha scritto.
+#
+# Quello che resta in questo modulo ha bisogno di un grafo, ed è la ragione per
+# cui il modulo esiste ancora: costruire il frammento e fonderlo.
 
 @dataclass
 class AbsorbResult:
@@ -133,128 +132,6 @@ class AbsorbResult:
             "added_edges": self.added_edges,
             "warnings": list(self.warnings),
         }
-
-
-# ── leggere il file ──────────────────────────────────────────────────────────
-
-def read_stamp(path: str) -> Dict[str, Any]:
-    """Legge `<asset>.stamp.json`. L'unica funzione che tocca un filesystem."""
-    with open(path, "r", encoding="utf-8") as handle:
-        return validate_stamp(json.load(handle))
-
-
-def validate_stamp(stamp: Any) -> Dict[str, Any]:
-    """Il minimo perché sia un timbro, e le frasi per quando non lo è.
-
-    Si controlla la **versione** e l'**identità dell'uscita**, e nient'altro: un
-    validatore che pretendesse `how` rifiuterebbe il passo vuoto, che è metà del
-    mondo reale.
-    """
-    if not isinstance(stamp, dict):
-        raise BadStamp(f"a stamp is a JSON object, got {type(stamp).__name__}")
-    version = stamp.get("stamp")
-    if version is None:
-        raise BadStamp(
-            "no `stamp` version key: this may be an em.json fragment, which is a "
-            "different species — a stamp is a record and not a document to merge, "
-            "edit and version")
-    if version != STAMP_VERSION:
-        raise BadStamp(
-            f"stamp version {version!r}: this build reads version "
-            f"{STAMP_VERSION}")
-    itself = stamp.get("self")
-    if not isinstance(itself, dict) or not str(itself.get("resource_id") or "").strip():
-        raise BadStamp(
-            "a stamp with no `self.resource_id` names no artifact: it is the "
-            "output that gives the record its identity")
-    return stamp
-
-
-# ── la sostanza, e il confronto ──────────────────────────────────────────────
-
-def substance(stamp: Dict[str, Any]) -> Dict[str, Any]:
-    """I fatti del timbro, ridotti a una forma confrontabile.
-
-    Le liste che non hanno un ordine — i genitori, il software — diventano
-    **insiemi ordinati canonicamente**: un tileset che esce da N mesh non
-    cambia fatto se le mesh sono elencate in un altro ordine, e chiamarlo
-    disaccordo sarebbe rumore.
-    """
-    itself = dict(stamp.get("self") or {})
-    how = dict(stamp.get("how") or {})
-    by = dict(stamp.get("by") or {})
-    declared = dict(stamp.get("declared") or {})
-
-    out: Dict[str, Any] = {}
-    out["self.digest"] = itself.get("digest")
-    out["self.digest_covers"] = itself.get("digest_covers")
-    out["self.media_type"] = itself.get("media_type")
-    out["self.format"] = itself.get("format")
-    out["self.packaging"] = itself.get("packaging")
-    out["self.tier"] = itself.get("tier")
-    out["self.measures"] = itself.get("measures")
-
-    # I genitori per identità, mai per etichetta: la `label` è cortesia.
-    parents = stamp.get("from")
-    if isinstance(parents, list):
-        out["from"] = sorted(
-            _parent_key(p) for p in parents if isinstance(p, dict))
-    else:
-        out["from"] = None
-
-    out["how.process_id"] = how.get("process_id")
-    out["how.technique"] = how.get("technique")
-    out["how.dtc_kind"] = how.get("dtc_kind")
-    out["how.parameters"] = how.get("parameters")
-    software = how.get("software")
-    out["how.software"] = (sorted(_canonical(s) for s in software)
-                           if isinstance(software, list) else None)
-
-    operator = by.get("operator")
-    out["by.operator"] = _canonical(operator) if operator else None
-
-    out["declared.license"] = declared.get("license")
-    out["declared.embargo_until"] = declared.get("embargo_until")
-    return out
-
-
-def _parent_key(parent: Dict[str, Any]) -> str:
-    return "|".join([str(parent.get("resource_id") or ""),
-                     str(parent.get("digest") or ""),
-                     str(parent.get("kind") or "")])
-
-
-def _canonical(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, ensure_ascii=False,
-                      separators=(",", ":"))
-
-
-def compare_stamps(mine: Dict[str, Any], theirs: Dict[str, Any]
-                   ) -> List[Disagreement]:
-    """I punti in cui due timbri sullo stesso artefatto non vanno d'accordo.
-
-    **Il silenzio non è un disaccordo**: serve che tutti e due parlino. L'unica
-    eccezione è `from` quando c'è un `how` a firmarla — lì la lista vuota È una
-    dichiarazione («nato qui») e tacere è un'altra cosa. Vedi il docstring del
-    modulo.
-    """
-    a, b = substance(mine), substance(theirs)
-    mine_claims_origin = bool(mine.get("how"))
-    theirs_claims_origin = bool(theirs.get("how"))
-    out: List[Disagreement] = []
-    for path in a:
-        left, right = a.get(path), b.get(path)
-        if path == "from":
-            # una lista vuota parla solo se un `how` la firma
-            left_speaks = left is not None and (left or mine_claims_origin)
-            right_speaks = right is not None and (right or theirs_claims_origin)
-            if not (left_speaks and right_speaks):
-                continue
-        elif left in (None, "", {}, []) or right in (None, "", {}, []):
-            continue
-        if left != right:
-            out.append(Disagreement(path=path, mine=left, theirs=right))
-    return out
 
 
 # ── costruire il frammento ───────────────────────────────────────────────────

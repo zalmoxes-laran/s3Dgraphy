@@ -1,6 +1,6 @@
 """DTCNode — abstract base for the DTC substrate profile (ECHOES deliverable).
 
-The **Digital Twin Chain (DTC)** captures the DIGITAL PROVENANCE that *produces*
+The **Data Transformation Chain (DTC)** captures the DIGITAL PROVENANCE that *produces*
 documents: input **Resources** (raw acquisitions) → a **Process** event →
 output **Resources** (produced files: mesh/orthophoto/table…). It is distinct
 from EM-paradata (interpretation *on* a document = CRMinf / HDT-O HC17): DTC is
@@ -27,8 +27,12 @@ sentence — including this one.
 
 Naming (Option A): EM-native ``...Node`` class; the CIDOC/CRMdig + PROV-O mapping
 lives in ``em_extension`` (no D-numbers in the UI). Gated out of the stratigrapher
-palette (like the HDT-O nodes). One node = a **Chunk**; the assembled provenance
-= a **Chain**.
+palette (like the HDT-O nodes). **Three referents, three words**: the **chain**
+is the whole, a **step** is the single transformation, and a **stamp** is the file
+that records one — *a stamp attests one step of a chain*. One node here is one
+**step**. («Chunk» was the word before, and it named the same thing; it is gone
+because a reader needed a glossary to know that a chunk and a step were not two
+different things.)
 
 The process (and each participating Resource) carries a ``dtc_kind`` — a specific
 kind drawn from a DATA-DRIVEN, expandable vocabulary (``dtc_kinds`` in
@@ -49,7 +53,7 @@ DTC_KINDS = get_dtc_kinds()
 
 
 class DTCNode(Node):
-    """Abstract base for a DTC chain chunk. Concrete subclasses set ``node_type``
+    """Abstract base for one STEP of a DTC chain. Concrete subclasses set ``node_type``
     and ``dtc_base`` (which vocabulary axis in ``dtc_kinds`` validates ``dtc_kind``).
     Not instantiated directly and not in the stratigrapher palette."""
 

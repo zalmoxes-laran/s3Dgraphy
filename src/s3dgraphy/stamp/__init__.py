@@ -3,9 +3,24 @@
 Un agente, con un processo e dei parametri, consuma uno o più ingressi e produce
 **un** artefatto. Non è un formato nuovo e non introduce nessun tipo di nodo: i
 nodi che cita — risorsa, processo con parametri, agente, licenza, embargo — sono
-già tipi di s3Dgraphy, e il substrato DTC (`nodes/dtc_node.py`) dice da sempre che
-«one node = a Chunk; the assembled provenance = a Chain». **Il timbro è quel
-chunk, scritto per uscire dal perimetro.**
+già tipi di s3Dgraphy, e il substrato DTC (`nodes/dtc_node.py`) dice da sempre
+che un nodo è un anello e la provenienza assemblata è la catena. **Tre referenti,
+tre parole**: la *chain* è l'insieme, uno **step** è la singola trasformazione,
+uno **stamp** è il file che ne registra uno — *a stamp attests one step of a
+chain*. Il timbro è quello step, scritto per uscire dal perimetro.
+
+## Metà di questo pacchetto vive altrove, e la riga che li divide
+
+Il **formato** — leggere, scrivere, validare, confrontare, risalire, e la forza
+di un'identità — è in **`dtcstamp`**: un modulo solo, senza dipendenze, che si
+copia accanto al proprio codice. Chi scrive un addon per Blender o uno script
+per Metashape non installerà mai pandas, lxml e networkx per scrivere due
+kilobyte di JSON, ed è tutta lì la ragione dell'estrazione.
+
+Quello che resta qui è **ciò che ha bisogno di un grafo**, e sono due cose:
+costruire un timbro leggendo nodi e archi, e rifonderlo dentro un grafo. Il
+resto è importato e ri-esportato con gli stessi nomi, perché `from
+s3dgraphy.stamp import …` è un import che qualcuno ha scritto.
 
 Tre moduli e una divisione che è un contratto:
 
@@ -17,10 +32,11 @@ Tre moduli e una divisione che è un contratto:
   **non si sceglie un vincitore**.
 * :mod:`.hints` — le piste, che sono un'altra cosa: un registro mutevole, plurale
   e non autorevole, in un file separato e **mai coperto da nessun digest**. Una
-  pista `private` non esce mai.
+  pista `private` non esce mai. **Traslocato in `dtcstamp`**: non ha mai avuto
+  bisogno di un grafo.
 * :mod:`.identity` — quanto è forte un'identità: `sha256:` **dimostra**,
   `emstruct1:` **confronta**. La differenza fra «è lei» e «è cambiata», chiesta a
-  una funzione invece che a un `startswith`.
+  una funzione invece che a un `startswith`. **Traslocato in `dtcstamp`**.
 
 I nomi dei file sono `<asset>.stamp.json` e `<asset>.hints.json`, in inglese
 perché escono da casa nostra. Non `em.json` (specie diversa: inviterebbe a

@@ -1,4 +1,4 @@
-"""DTCProcessNode — a DTC PROCESS chunk: the transformation/processing event that
+"""DTCProcessNode — a DTC PROCESS step: the transformation/processing event that
 turns inputs into produced digital objects.
 
 Projection: crmdig:D7_Digital_Machine_Event (⊂ prov:Activity). Its inputs/outputs

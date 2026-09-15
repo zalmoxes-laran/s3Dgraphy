@@ -48,12 +48,19 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional, Sequence
 
-from .identity import identity_strength, is_verifiable
-
-#: La versione del formato. Un intero e non una stringa semver: il timbro è un
-#: verbale, non una libreria, e l'unica domanda che un lettore gli fa è «so
-#: leggere questa forma?».
-STAMP_VERSION = 1
+# ── quello che il FORMATO sa fare, e che non sta più qui ─────────────────────
+#
+# Traslocato in `dtcstamp` e **ri-esportato con questi nomi**: la versione del
+# formato, la pulizia delle note, il nome del file, la scrittura su disco e la
+# forza dell'identità non hanno mai avuto bisogno di un grafo, e chi scrive un
+# addon per Blender non deve installare pandas per scrivere un `.stamp.json`.
+#
+# Quello che resta in questo modulo È la funzione che ha bisogno di un grafo:
+# `emit_stamp`, che legge nodi e archi e ne fa un verbale. È la ragione per cui
+# il modulo esiste ancora, e la riga che divide i due repo.
+from dtcstamp import (STAMP_VERSION, clean_stamp, identity_strength,
+                      is_verifiable, is_verifiable_stamp, split_identity,
+                      stamp_filename, stamp_identity, write_stamp)
 
 #: Gli archi della catena, con i nomi che il substrato usa già. Importati e non
 #: riscritti: sono l'unica definizione di «questo processo ha prodotto quello».
@@ -216,8 +223,6 @@ def find_resource(graph: Any, ref: str) -> Optional[Any]:
 
 
 def _split(value: str):
-    from .identity import split_identity
-
     return split_identity(value)
 
 
@@ -563,6 +568,8 @@ def _declared_block(graph: Any, resource: Any,
     Quando il grafo vivo non dice niente si ripiega su ciò che il verbale aveva
     già registrato (`data.declared`, scritto dal riassorbimento): è quello che
     chiude il giro completo senza che `declared` diventi mai un diritto vivo.
+
+    E porta **`by`**, l'attributore: vedi :func:`_attributor_block`.
     """
     digest = _text(_data(resource).get("checksum"))
     if not digest:
@@ -577,8 +584,54 @@ def _declared_block(graph: Any, resource: Any,
     _put(block, "embargo_until", found.get("embargo"))
     if block:
         _put(block, "as_of", at)
+        _put(block, "by", _attributor_block(graph, found.get("attributed_by")))
         return block
     return _recorded_declaration(graph, resource)
+
+
+def _attributor_block(graph: Any, signatures: Any) -> Optional[Dict[str, Any]]:
+    """Chi ha DICHIARATO questa licenza — l'attributore, non l'autore.
+
+    Senza di lui un timbro che afferma «CC-BY-NC al 15 settembre» perde metà di
+    ciò che serve per **contestarlo**: si sa cosa è stato dichiarato e non da chi.
+    `rights.py` fa la distinzione con cura da sempre — l'autore è chi ha fatto il
+    dato, l'attributore è chi lo dice, e l'atto è firmato — e fino a stanotte
+    quella firma si fermava al grafo.
+
+    **Una firma sola o nessuna.** Licenza ed embargo possono essere stati
+    dichiarati da due persone diverse, e in quel caso non si sceglie: scrivere
+    uno dei due nomi accanto a una dichiarazione che tiene insieme le due
+    affermazioni direbbe una cosa falsa su metà di esse. Tacere lascia chi legge
+    davanti a un `declared` non firmato, che è esattamente ciò che è — e il
+    grafo, che le firme le ha tutte, resta il posto dove guardare.
+
+    Vale la regola delle etichette: una `label` che ripete l'id va omessa.
+    """
+    if not isinstance(signatures, list) or len(signatures) != 1:
+        return None
+    orcid = _text((signatures[0] or {}).get("orcid"))
+    if not orcid:
+        return None
+    entry: Dict[str, Any] = {"id": f"https://orcid.org/{orcid}"}
+    _put(entry, "label", _courtesy(_name_of_orcid(graph, orcid), orcid,
+                                   f"author:{orcid}"))
+    return entry
+
+
+def _name_of_orcid(graph: Any, orcid: str) -> Optional[str]:
+    """Come si chiama, se un nodo autore di questo grafo lo dice.
+
+    Una cortesia per un lettore umano e niente di più: l'attributore è
+    identificato dall'iD, e un nome che non c'è si tace invece di essere
+    inventato dall'id (che è come `by.operator.label` era arrivato a dire
+    «author:0000-…»).
+    """
+    for node in _nodes(graph):
+        if getattr(node, "node_type", None) not in ("author", "author_ai"):
+            continue
+        if _text(_data(node).get("orcid")) == orcid:
+            return _text(getattr(node, "name", None))
+    return None
 
 
 def _recorded_declaration(graph: Any, resource: Any) -> Dict[str, Any]:
@@ -689,50 +742,3 @@ def emit_stamp(graph: Any, resource_ref: str, *,
     return stamp
 
 
-def clean_stamp(stamp: Dict[str, Any]) -> Dict[str, Any]:
-    """Il timbro **senza le note**, che è quello che esce.
-
-    Le note sono per chi emette. Un file che lascia il perimetro non deve
-    portarsi dietro i dubbi di chi l'ha scritto travestiti da contenuto.
-    """
-    return {k: v for k, v in stamp.items() if not str(k).startswith("_")}
-
-
-def stamp_filename(stamp: Dict[str, Any], *, asset: Optional[str] = None) -> str:
-    """`<asset>.stamp.json`.
-
-    Il nome dell'asset quando c'è, altrimenti l'id della risorsa: mai `em.json`
-    (specie diversa — inviterebbe a fondere, editare e versionare un verbale) e
-    mai `dtc.json` (prometterebbe una catena e consegna un anello).
-    """
-    base = str(asset or (stamp.get("self") or {}).get("resource_id") or "stamp")
-    safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in base)
-    return f"{safe}.stamp.json"
-
-
-def write_stamp(stamp: Dict[str, Any], path: str) -> str:
-    """Scrive il timbro su disco. **L'unica funzione di questo modulo che tocca
-    un filesystem**, e sta separata perché l'emissione si possa provare senza.
-
-    `indent=1` e `ensure_ascii=False` come l'esportatore em.json: un timbro si
-    legge a occhio e si guarda in un diff.
-    """
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(clean_stamp(stamp), handle, ensure_ascii=False, indent=1)
-        handle.write("\n")
-    return path
-
-
-def stamp_identity(stamp: Dict[str, Any]) -> Dict[str, Any]:
-    """Quanto è forte l'identità di questo timbro — vedi :mod:`.identity`.
-
-    Sta qui, e non lasciato a chi legge, perché è la domanda che un'interfaccia
-    deve fare **prima** di scrivere «verificato» accanto a una riga.
-    """
-    from .identity import describe_identity
-
-    return describe_identity((stamp.get("self") or {}).get("digest"))
-
-
-def is_verifiable_stamp(stamp: Dict[str, Any]) -> bool:
-    return is_verifiable((stamp.get("self") or {}).get("digest"))

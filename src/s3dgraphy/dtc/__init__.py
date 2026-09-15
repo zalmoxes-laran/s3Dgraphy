@@ -1,4 +1,4 @@
-"""s3dgraphy.dtc — DTC (Digital Twin Chain) residency ops (ECHOES, R3).
+"""s3dgraphy.dtc — DTC (Data Transformation Chain) residency ops (ECHOES, R3).
 
 Provenance is a property of the DATA: a DTC can live WITH the asset store
 (referenced by the knowledge graph) rather than baked into em.json, and be baked

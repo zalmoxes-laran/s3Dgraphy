@@ -124,7 +124,7 @@
   },
   "DTCAcquisitionNode": {
    "description": {
-    "en": "A DTC ACQUISITION chunk: the digital event by which an asset ENTERS this study from an (opaque, Tier-0) external source — a data-transfer / ingestion event, DISTINCT from the genesis DTCProcessNode. Projected as crmdig:D12_Data_Transfer_Event (a subclass of D7_Digital_Machine_Event, ⊂ prov:Activity): 'events that transfer a digital object from one digital carrier to another; normally the digital object remains the same' — the object arrives opaque, no genesis is asserted. Tier 0: single-ring chain — the acquisition event --dtc_had_output[prov:generated]--> the acquired Resource (ResourceNode); the upstream root is an opaque external entity recorded as literals on data (repo/record/agent/retrieved_at/rights), not a genesis sub-graph. data.dtc_kind from the `acquisition` axis (download / ingest / local_import). Keeps genesis != acquisition as distinct TYPES inside the one DTC substrate.",
+    "en": "A DTC ACQUISITION step: the digital event by which an asset ENTERS this study from an (opaque, Tier-0) external source — a data-transfer / ingestion event, DISTINCT from the genesis DTCProcessNode. Projected as crmdig:D12_Data_Transfer_Event (a subclass of D7_Digital_Machine_Event, ⊂ prov:Activity): 'events that transfer a digital object from one digital carrier to another; normally the digital object remains the same' — the object arrives opaque, no genesis is asserted. Tier 0: single-ring chain — the acquisition event --dtc_had_output[prov:generated]--> the acquired Resource (ResourceNode); the upstream root is an opaque external entity recorded as literals on data (repo/record/agent/retrieved_at/rights), not a genesis sub-graph. data.dtc_kind from the `acquisition` axis (download / ingest / local_import). Keeps genesis != acquisition as distinct TYPES inside the one DTC substrate.",
     "validated_it": false,
     "validated_el": false,
     "validated_he": false,
@@ -146,7 +146,7 @@
   },
   "DTCProcessNode": {
    "description": {
-    "en": "A DTC PROCESS chunk: the transformation/processing event that turns inputs into produced digital objects (data.dtc_kind from the `process` axis, e.g. transformation). Projected as a crmdig:D7_Digital_Machine_Event / prov:Activity; its inputs and outputs are the dtc_had_input (prov:used) and dtc_had_output (prov:generated) edges.",
+    "en": "A DTC PROCESS step: the transformation/processing event that turns inputs into produced digital objects (data.dtc_kind from the `process` axis, e.g. transformation). Projected as a crmdig:D7_Digital_Machine_Event / prov:Activity; its inputs and outputs are the dtc_had_input (prov:used) and dtc_had_output (prov:generated) edges.",
     "validated_it": false,
     "validated_el": false,
     "validated_he": false,

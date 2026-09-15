@@ -503,7 +503,7 @@ def attribute_batch(graph: Any, acquisition_id: str, *,
 
     One statement for the lot, hung on the EVENT — which is exactly how
     :func:`s3dgraphy.rights.rights_for_digest` already reads it: a file that says
-    nothing about itself inherits from the chunk that brought it in, so four
+    nothing about itself inherits from the step that brought it in, so four
     hundred photographs get one licence without four hundred copies of it.
 
     ``propagate=True`` also stamps every member individually

@@ -136,7 +136,7 @@ DTCAcquisitionNode (crmdig:D12)      ← the lot; ONE licence, ONE author
 ```
 
 Nothing new was needed to read it: `asset_rights` already walks from a digest to
-the chunk that produced it, so **each member reads the lot's licence with
+the step that produced it, so **each member reads the lot's licence with
 `via: "dtc"`** — inheritance, not four hundred copies of one sentence. A member
 that carries its own statement wins over the lot's, because the more specific
 statement is the one somebody made about *this* object.

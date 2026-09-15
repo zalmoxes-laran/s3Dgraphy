@@ -46,7 +46,7 @@ from typing import Any, Dict, List, Optional
 from .crdt import is_removed
 from .study import DEFAULT_LICENSE, embargo_active
 
-#: How a resource reaches the DTC chunk that carries its rights. `has_linked_resource`
+#: How a resource reaches the DTC step that carries its rights. `has_linked_resource`
 #: is the generic reference (P67); the two `dtc_*` edges are the chain's own
 #: input/output. All three are followed in BOTH directions, because "the process
 #: that produced this file" and "the file this process produced" are the same
@@ -214,7 +214,12 @@ def rights_for_digest(document: Any, digest: Any, *,
     ``embargo`` / ``embargo_active`` — the date, and the verdict TODAY (computed
     at call time and never stored: an embargo that expired this morning is over
     this morning, whatever an index remembers)
-    ``authors`` — `[{name, orcid}]`
+    ``authors`` — `[{name, orcid}]`: who MADE the data
+    ``attributed_by`` — `[{orcid, at}]`: who SAID so, and when. A different
+    question from ``authors`` and frequently a different person — see
+    `docs/asset-dtc-protocol.md`. A **list**, because the licence and the embargo
+    can have been signed by two people and flattening them onto one would invent
+    a fact; empty when nobody signed.
     ``via`` — ``"resource"`` or ``"dtc"``: where the rights were found, so a
     reader can tell a statement about this file from one inherited from the
     chain that produced it.
@@ -256,13 +261,17 @@ def rights_for_digest(document: Any, digest: Any, *,
                 "embargo": embargo_value,
                 "embargo_active": embargo_active(embargo_value, today=today),
                 "authors": (found or {}).get("authors") or [],
+                # CHI HA DICHIARATO, che non è chi ha fatto. Una lista, perché
+                # licenza ed embargo possono essere stati firmati da due persone
+                # diverse e appiattirli su una sarebbe inventare.
+                "attributed_by": (found or {}).get("attributed_by") or [],
                 "via": via,
             }
     return None
 
 
 def _chain_neighbours(node_id: str, edges: List[Any]) -> List[str]:
-    """The DTC chunks this resource is attached to, from either end."""
+    """The DTC steps this resource is attached to, from either end."""
     out: List[str] = []
     for edge in edges:
         kind = _text(_field(edge, "edge_type", "type"))
@@ -296,8 +305,10 @@ def _collect(node_id: str, by_id: Dict[str, Any],
             continue
         if role == "license":
             found.setdefault("license", _license_of(node))
+            _sign(found, node)
         elif role == "embargo":
             found.setdefault("embargo", _embargo_of(node))
+            _sign(found, node)
         else:
             entry = _author_of(node)
             if entry.get("name") or entry.get("orcid"):
@@ -306,6 +317,30 @@ def _collect(node_id: str, by_id: Dict[str, Any],
     if authors:
         found["authors"] = authors
     return {k: v for k, v in found.items() if v not in (None, [], "")}
+
+
+def _sign(found: Dict[str, Any], node: Any) -> None:
+    """Chi ha firmato questa dichiarazione, raccolto **senza sceglierne uno**.
+
+    L'ATTRIBUTORE è chi dice, e non è l'autore: una catalogatrice dichiara la
+    licenza di una fotografia scattata nel 1978 da un collega in pensione, e
+    quella dichiarazione è vera, utile, e non è paternità. Il protocollo
+    (`docs/asset-dtc-protocol.md`) la firma su ogni singola dichiarazione, quindi
+    licenza ed embargo possono avere due firmatari diversi.
+
+    Qui si raccolgono **tutti**, e chi legge decide: nominarne uno quando sono
+    due sarebbe una bugia per omissione, ed è la ragione per cui questa funzione
+    accumula invece di `setdefault`.
+    """
+    data = _data(node)
+    who = _text(data.get("attributed_by"))
+    if not who:
+        return
+    when = _text(data.get("attributed_at"))
+    signatures = found.setdefault("attributed_by", [])
+    entry = {"orcid": who, "at": when} if when else {"orcid": who}
+    if entry not in signatures:
+        signatures.append(entry)
 
 
 # ── writing: attribution as an ACT ───────────────────────────────────────────

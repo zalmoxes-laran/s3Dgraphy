@@ -40,7 +40,7 @@
   "DTCNode": {
    "parent": "Node",
    "node_type": null,
-   "description": "Abstract base for a DTC chain chunk. Concrete subclasses set ``node_type``"
+   "description": "Abstract base for one STEP of a DTC chain. Concrete subclasses set ``node_type``"
   },
   "DTCProcessNode": {
    "parent": "DTCNode",

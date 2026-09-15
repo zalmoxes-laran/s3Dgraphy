@@ -1,6 +1,6 @@
 # DTC substrate profile in s3Dgraphy (ECHOES deliverable)
 
-The **Digital Twin Chain (DTC)** profile captures the **digital provenance that
+The **Data Transformation Chain (DTC)** profile captures the **digital provenance that
 PRODUCES documents**: raw acquisitions → processing → produced digital objects.
 
 > **Funding seam.** The DTC profile is the identifiable **ECHOES** deliverable.
@@ -16,7 +16,7 @@ DTC is *how the digital objects themselves came to be*. The two meet at the docu
 that shared-UUID identity is a later slice; the model does not preclude it).
 
 Naming (**Option A**): EM-native `...Node` classes; the CIDOC/CRMdig + PROV-O mapping
-lives in `em_extension` (no D-numbers in the UI). **Chunk** = one node; **Chain** = the
+lives in `em_extension` (no D-numbers in the UI). **Step** = one node; **Chain** = the
 assembled provenance. Gated OUT of the stratigrapher palette (like the HDT-O nodes) —
 the dedicated `dtc_nodes` datamodel section is the machine-readable grouping.
 

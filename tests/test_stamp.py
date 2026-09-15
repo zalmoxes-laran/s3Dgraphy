@@ -908,3 +908,117 @@ def test_S6_IL_CONTROESEMPIO_il_cancello_si_apriva_davvero():
     assert come_decidono(None) is False, (
         "è questo: su None NON si trattiene, quindi un lettore che non vede "
         "l'embargo è un cancello che si apre")
+
+
+# ── EXTRACT1 · `declared.by`, l'attributore ─────────────────────────────────
+#
+# L'autore è chi HA FATTO il dato; l'attributore è chi LO DICE, adesso, e i due
+# sono frequentemente persone diverse — una catalogatrice dichiara la licenza di
+# una fotografia scattata nel 1978 da un collega in pensione. `rights.py` fa
+# questa distinzione da sempre e la firma su ogni dichiarazione; fino a stanotte
+# la firma si fermava al grafo, e un timbro che affermava «CC-BY-NC al 15
+# settembre» non diceva da chi — cioè non era contestabile.
+
+def _grafo_con_un_asset(digest):
+    from s3dgraphy import api
+
+    doc = {"header": {"format": "em.json", "version": "1.0"},
+           "graph": {"graph_id": "g", "nodes": [
+               {"id": "res:a", "node_type": "resource", "name": "x.jpg",
+                "data": {"checksum": digest}}], "edges": []}}
+    grafo, _ = api.load_emjson(doc)
+    api.bucket_acquisition(grafo, ["res:a"], name="dep", dtc_kind="ingest",
+                           at="2026-09-15T10:00:00Z")
+    return grafo
+
+
+def test_E1_declared_porta_chi_ha_dichiarato():
+    from s3dgraphy import api
+
+    digest = "sha256:" + "a" * 64
+    grafo = _grafo_con_un_asset(digest)
+    api.enrich_asset_dtc(grafo, digest, attributor="0000-0002-1825-0097",
+                         license="CC-BY-4.0", at="2026-09-15T10:00:00Z")
+    declared = api.emit_stamp(grafo, "res:a")["declared"]
+    assert declared["license"] == "CC-BY-4.0"
+    assert declared["by"] == {"id": "https://orcid.org/0000-0002-1825-0097"}
+    # NESSUNA label: il nome non si sa, e l'id del nodo (`author:0000-…`) è
+    # l'identificatore un'altra volta. Vale la regola delle etichette.
+    assert "label" not in declared["by"]
+
+
+def test_E1_la_label_compare_solo_quando_c_e_un_nome_vero():
+    from s3dgraphy import api
+    from s3dgraphy.nodes.author_node import AuthorNode
+
+    digest = "sha256:" + "b" * 64
+    grafo = _grafo_con_un_asset(digest)
+    grafo.add_node(AuthorNode(node_id="author:0000-0002-1825-0097",
+                              name="Dev Utente", orcid="0000-0002-1825-0097"))
+    api.enrich_asset_dtc(grafo, digest, attributor="0000-0002-1825-0097",
+                         license="CC-BY-4.0", at="2026-09-15T10:00:00Z")
+    declared = api.emit_stamp(grafo, "res:a")["declared"]
+    assert declared["by"]["label"] == "Dev Utente"
+
+
+def test_E1_IL_CONTROESEMPIO_con_DUE_firmatari_non_se_ne_sceglie_uno():
+    """Licenza ed embargo firmati da due persone: `by` **non si scrive**.
+
+    È il controesempio che deve far fallire l'asserzione comoda («c'è sempre un
+    attributore»): scrivere uno dei due nomi accanto a un `declared` che tiene
+    insieme le due affermazioni direbbe una cosa falsa su metà di esse. E il
+    grafo, che le firme le ha tutte e due, resta il posto dove guardare.
+    """
+    from s3dgraphy import api
+    from s3dgraphy.rights import rights_for_digest
+
+    digest = "sha256:" + "c" * 64
+    grafo = _grafo_con_un_asset(digest)
+    api.enrich_asset_dtc(grafo, digest, attributor="0000-0002-1825-0097",
+                         license="CC-BY-4.0", at="2026-09-15T10:00:00Z")
+    api.enrich_asset_dtc(grafo, digest, attributor="0000-0002-5065-7970",
+                         embargo="2099-12-31", at="2026-09-15T11:00:00Z")
+    declared = api.emit_stamp(grafo, "res:a")["declared"]
+    assert declared["license"] == "CC-BY-4.0"
+    assert declared["embargo_until"] == "2099-12-31"
+    assert "by" not in declared, "con due firmatari non si sceglie"
+
+    firme = rights_for_digest(grafo, digest)["attributed_by"]
+    assert sorted(f["orcid"] for f in firme) == ["0000-0002-1825-0097",
+                                                 "0000-0002-5065-7970"]
+
+
+def test_E1_l_attributore_sopravvive_al_giro_completo():
+    """Riassorbito e riemesso, `declared.by` è ancora lì.
+
+    Senza questo il campo sarebbe utile una volta sola: il timbro che arriva da
+    fuori porta la firma, la si assorbe, e il timbro che si riemette da quel
+    grafo l'avrebbe persa — cioè la contestabilità si consumerebbe al primo
+    passaggio di mano.
+    """
+    from s3dgraphy import api
+
+    digest = "sha256:" + "d" * 64
+    grafo = _grafo_con_un_asset(digest)
+    api.enrich_asset_dtc(grafo, digest, attributor="0000-0002-1825-0097",
+                         license="CC-BY-4.0", at="2026-09-15T10:00:00Z")
+    timbro = {k: v for k, v in api.emit_stamp(grafo, "res:a").items()
+              if not k.startswith("_")}
+
+    altro, _ = api.load_emjson({"header": {"format": "em.json", "version": "1.0"},
+                                "graph": {"graph_id": "h", "nodes": [],
+                                          "edges": []}})
+    api.absorb_stamp(altro, timbro)
+    assert api.emit_stamp(altro, "res:a")["declared"]["by"] == {
+        "id": "https://orcid.org/0000-0002-1825-0097"}
+
+
+def test_E1_un_asset_senza_dichiarazioni_non_inventa_un_firmatario():
+    from s3dgraphy import api
+
+    digest = "sha256:" + "e" * 64
+    grafo = _grafo_con_un_asset(digest)
+    timbro = api.emit_stamp(grafo, "res:a")
+    # nessun `declared`, quindi a maggior ragione nessun `by`: un attributore
+    # senza una dichiarazione da firmare non è una firma, è un nome messo lì
+    assert "by" not in (timbro.get("declared") or {})

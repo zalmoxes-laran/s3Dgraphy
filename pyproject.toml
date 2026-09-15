@@ -51,6 +51,12 @@ dependencies = [
     "lxml>=4.9.0",              # used by graphml importer/exporter
     "openpyxl>=3.0.0",          # used by xlsx_importer
     "networkx>=3.0",            # used by temporal/inference_engine.py
+    # The stamp FORMAT — read, write, compare, walk — extracted so that a
+    # Blender add-on or a Metashape script can use it without installing any of
+    # the four above. It has zero dependencies of its own and is one module, so
+    # it can also simply be copied; s3dgraphy depends on it rather than
+    # vendoring it, because two copies of a format rule drift.
+    "dtcstamp>=0.1.0",
 ]
 
 [project.urls]
