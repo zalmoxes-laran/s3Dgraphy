@@ -315,6 +315,9 @@ def declare_derivation(graph: Any, output: str, inputs: Sequence[str], *,
                        tool: Optional[str] = None,
                        process_id: Optional[str] = None,
                        dtc_kind: Optional[str] = DEFAULT_PROCESS_KIND,
+                       technique: Optional[str] = None,
+                       parameters: Optional[Dict[str, Any]] = None,
+                       software: Optional[Sequence[Dict[str, Any]]] = None,
                        name: Optional[str] = None,
                        author: Optional[str] = None,
                        at: Optional[str] = None) -> Dict[str, Any]:
@@ -332,9 +335,24 @@ def declare_derivation(graph: Any, output: str, inputs: Sequence[str], *,
     shortcut to write — ``dtc_derived_from`` runs between files, and a batch is
     an event. Reported, not faked.
 
-    **The tool is named and nothing else.** ``data.tool = {"name": …}`` is a
-    dict on purpose: version, parameters and a container digest are the natural
-    next keys, and a caller that adds them does not have to migrate a string.
+    **What the step declares, declared HERE.** ``technique``, ``parameters`` and
+    ``software`` used to have no parameter at all, so every caller that wanted
+    them wrote them onto ``event.data`` by hand after the call — EMStudio's
+    bridge did exactly that, and measured on 15-09-2026 it was four fields. A
+    seam like that invites each client to learn the internal shape of a node,
+    and the longer it stays the more people walk through it.
+
+    They are the three fields the stamp format names beside ``dtc_kind``:
+    ``technique`` is the free word of whoever did the gesture («decimation»,
+    which is NOT in the controlled vocabulary and must not enter it),
+    ``parameters`` is how that technique was applied, and ``software`` is a LIST
+    because a real chain names two (the tool and the library) and carries the
+    **commit**, since «EM Tools 1.6» does not say which build.
+
+    ``data.tool`` stays written alongside, as the first entry's name: the
+    inspector cards and ``derivation_chain`` read it, and a call that filled
+    ``software`` while leaving ``tool`` empty would make an interface that
+    worked go quiet.
 
     Idempotent: the process id is derived from (output, sorted inputs, tool), so
     declaring the same derivation twice converges on one event.
@@ -400,6 +418,20 @@ def declare_derivation(graph: Any, output: str, inputs: Sequence[str], *,
         merged = dict(existing) if isinstance(existing, dict) else {}
         merged["name"] = tool.strip()
         data["tool"] = merged
+    if technique and str(technique).strip():
+        data["technique"] = str(technique).strip()
+    if isinstance(parameters, dict) and parameters:
+        data["parameters"] = dict(parameters)
+    if software:
+        entries = [dict(item) for item in software if isinstance(item, dict)]
+        if entries:
+            data["software"] = entries
+            first = entries[0]
+            if first.get("name") and not data.get("tool"):
+                # `tool` è la scheda che le interfacce leggono già; si compila
+                # dal primo software SOLO se nessuno l'ha detta, perché un `tool`
+                # passato a mano è una scelta di chi chiama e non va soppiantata.
+                data["tool"] = dict(first)
 
     _ensure_edge(graph, pid, out_node.node_id, EDGE_HAD_OUTPUT, warnings)
     for node in resolved:

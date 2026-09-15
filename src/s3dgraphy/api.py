@@ -712,18 +712,40 @@ def acquisition_members(graph: Graph, acquisition_id: str) -> List[str]:
 def declare_derivation(graph: Graph, output: str, inputs: Any, *,
                        tool: Optional[str] = None,
                        process_id: Optional[str] = None,
+                       dtc_kind: Optional[str] = None,
+                       technique: Optional[str] = None,
+                       parameters: Optional[Dict[str, Any]] = None,
+                       software: Optional[Any] = None,
                        name: Optional[str] = None,
                        author: Optional[str] = None,
                        at: Optional[str] = None) -> Dict[str, Any]:
-    """Declare that `output` came out of `inputs`, with `tool` named.
+    """Declare that `output` came out of `inputs`, with the act declared.
 
     DECLARED, never inferred: nobody guesses that an orthophoto came from that
     flight because the dates line up. An input may be a resource or a whole
     acquisition.
+
+    **The four fields this door used to swallow.** Until 15-09-2026 it forwarded
+    neither `dtc_kind` (which the function underneath already accepted) nor
+    `technique` / `parameters` / `software` (which it did not accept at all), so
+    a caller that wanted them wrote them onto the event node BY HAND after the
+    call. That is a seam that teaches every client the internal shape of a node,
+    and this surface exists precisely so that nobody has to know it.
+
+    `dtc_kind` defaults to None **here and not to the vocabulary's default**: a
+    door that re-stated the default would be a second place to keep it, and the
+    function underneath already has one. Passing None means "you decide".
     """
     from .dtc.ingest import declare_derivation as _declare
+
+    extra: Dict[str, Any] = {}
+    if dtc_kind is not None:
+        extra["dtc_kind"] = dtc_kind
     return _declare(graph, output, list(inputs or ()), tool=tool,
-                    process_id=process_id, name=name, author=author, at=at)
+                    process_id=process_id, technique=technique,
+                    parameters=parameters,
+                    software=list(software) if software else None,
+                    name=name, author=author, at=at, **extra)
 
 
 def derivation_chain(graph: Graph, resource: str) -> Dict[str, Any]:

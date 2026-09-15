@@ -640,3 +640,271 @@ def test_il_frammento_non_porta_in_dote_una_posizione_geografica():
     absorb_stamp(arrivo, timbro)
     dopo = {n.node_id for n in arrivo.nodes if n.node_type == "geo_position"}
     assert dopo == suoi, "è arrivata una posizione geografica di qualcun altro"
+
+
+# ── TIMBRO2 · chiudere la distanza fra il formato dichiarato e quello emesso ──
+
+def test_S1_la_voce_from_porta_la_DIMENSIONE():
+    """`size_bytes` sulla voce `from`: **l'indice del recupero**.
+
+    Riconoscere un file costa poco perché il suo timbro dichiara la dimensione e
+    il filtro scarta senza leggere un byte. Senza la stessa cifra qui, cercare un
+    genitore smarrito costerebbe hashare tutto — e l'asimmetria rendeva la
+    ricerca di un genitore la strada cara, cioè esattamente quella che serve
+    quando qualcuno ha riordinato nel Finder.
+    """
+    graph = _grafo_con_un_ingresso()
+    graph.find_node_by_id("res:nuvola").data["size_bytes"] = 84213760
+    parent = clean_stamp(emit_stamp(graph, "res:mesh"))["from"][0]
+    assert parent["size_bytes"] == 84213760
+    assert set(parent) == {"resource_id", "digest", "size_bytes", "label"}
+
+
+def test_S1_un_genitore_SENZA_dimensione_nota_non_e_un_errore():
+    """Additivo vuol dire questo: il campo manca e il timbro è valido lo stesso.
+
+    Tre modi di non avere una dimensione, e nessuno dei tre è un difetto: la
+    risorsa non la dichiara (scritta prima che il campo esistesse), è una
+    campagna che non ha byte da pesare, o qualcuno ha messo nel campo una cosa
+    che una dimensione non è.
+    """
+    graph = _grafo_con_un_ingresso()
+    assert "size_bytes" not in graph.find_node_by_id("res:nuvola").data
+    parent = clean_stamp(emit_stamp(graph, "res:mesh"))["from"][0]
+    assert "size_bytes" not in parent
+    assert parent["digest"] == SHA_IN, "…e il resto della voce è intatto"
+
+    # un booleano NON è una dimensione: `True` passerebbe per 1 in Python, e
+    # «1 byte» in un timbro perché qualcuno ha scritto un flag nel campo
+    # sbagliato è peggio del campo assente
+    for storto in (True, -5, "84213760", None, 3.5):
+        graph.find_node_by_id("res:nuvola").data["size_bytes"] = storto
+        parent = clean_stamp(emit_stamp(graph, "res:mesh"))["from"][0]
+        assert "size_bytes" not in parent, f"{storto!r} non è una dimensione"
+
+    graph.find_node_by_id("res:nuvola").data["size_bytes"] = 0
+    parent = clean_stamp(emit_stamp(graph, "res:mesh"))["from"][0]
+    assert parent["size_bytes"] == 0, "zero È una misura, e va detta"
+
+
+def test_S2_i_fatti_del_lotto_arrivano_in_how_acquisition():
+    """Da un `bucket_acquisition` VERO, e una volta sola.
+
+    L'apparecchio e le circostanze non sono `parameters` — quello vuol dire
+    «come la tecnica è stata applicata» — ed è la distinzione che CRM3D fa fra
+    `L12 happened on device` e `L13 used parameters`. Finché non avevano una
+    casa ripiegavano su `parameters`, cioè si travestivano da parametro.
+    """
+    from s3dgraphy.dtc.ingest import bucket_acquisition
+
+    graph = Graph(graph_id="graph:volo", name="Aiano")
+    for i in range(3):
+        graph.add_node(ResourceNode(f"res:s{i}", name=f"IMG_{i}.JPG",
+                                    checksum="sha256:" + f"{i:02x}" * 32,
+                                    size_bytes=180000 + i))
+    bucket_acquisition(graph, [f"res:s{i}" for i in range(3)],
+                       name="Volo 2026-03", dtc_kind="local_import",
+                       metadata={"camera": "DJI Mavic 3E", "lens": "24mm",
+                                 "folder": "volo_marzo"},
+                       author=ORCID, at="2026-03-14T09:00:00Z")
+    how = clean_stamp(emit_stamp(graph, "res:s0"))["how"]
+
+    assert how["acquisition"] == {"camera": "DJI Mavic 3E", "lens": "24mm",
+                                  "folder": "volo_marzo"}
+    # UNA VOLTA SOLA: non anche in `parameters`
+    assert "parameters" not in how
+    # …e la conta dei membri NON è un fatto del rilievo: è una cache di un numero
+    assert "member_count" not in how["acquisition"]
+    # …né i timbri editoriali, né l'asse controllato
+    for fuori in ("created_by", "created_at", "dtc_kind"):
+        assert fuori not in how["acquisition"], fuori
+
+
+def test_S2_il_blocco_e_APERTO_e_un_processo_normale_non_lo_porta():
+    """Ciò che conta cambia col tipo di strumento: uno scanner non ha un
+    obiettivo e un georadar ha una frequenza. Un elenco chiuso avrebbe scartato
+    in silenzio il campo che serve al terzo strumento.
+
+    E un passo che non è un'acquisizione non si inventa il blocco.
+    """
+    graph = Graph(graph_id="graph:gpr")
+    graph.add_node(ResourceNode("res:out", name="out", checksum=SHA_OUT))
+    graph.add_node(ResourceNode("res:in", name="in", checksum=SHA_IN))
+    from s3dgraphy.dtc.ingest import bucket_acquisition
+    bucket_acquisition(graph, ["res:out"], name="GPR 2026",
+                       dtc_kind="local_import",
+                       metadata={"frequenza_mhz": 400, "antenna": "shielded"},
+                       at="2026-01-01T00:00:00Z")
+    how = clean_stamp(emit_stamp(graph, "res:out"))["how"]
+    assert how["acquisition"] == {"frequenza_mhz": 400, "antenna": "shielded"}
+
+    # un passo derivato NON porta un blocco acquisition
+    graph2 = _grafo_con_un_ingresso()
+    assert "acquisition" not in clean_stamp(emit_stamp(graph2, "res:mesh"))["how"]
+
+
+def test_S3_unetichetta_che_ripete_lidentificatore_e_omessa():
+    """Vale per OGNI label del timbro, non solo per l'operatore."""
+    from s3dgraphy.nodes.author_node import AuthorNode
+
+    graph = Graph(graph_id="graph:uuid-che-nessuno-legge")
+    # il GRAFO si chiama come il suo id
+    graph.name = "graph:uuid-che-nessuno-legge"
+    # l'INGRESSO si chiama come il suo id
+    graph.add_node(ResourceNode("res:nuvola", name="res:nuvola", checksum=SHA_IN))
+    promote_resource(graph, "res:mesh", url="s3://b/m.glb", sha256=SHA_OUT,
+                     source_id="res:nuvola", name="mesh", at="2026-01-01T00:00:00Z")
+    # l'AUTORE si chiama come il suo ORCID
+    graph.add_node(AuthorNode("author:x", name=ORCID, orcid=ORCID))
+    processo = [n for n in graph.nodes if n.node_type == "dtc_process"][0]
+    graph.add_edge("e:a", processo.node_id, "author:x", "has_author")
+
+    stamp = clean_stamp(emit_stamp(graph, "res:mesh"))
+    assert "label" not in stamp["from"][0], "l'ingresso ridiceva il resource_id"
+    assert "label" not in stamp["by"]["operator"], "l'operatore ridiceva l'ORCID"
+    assert "label" not in stamp["registry"], "il grafo ridiceva il graph_id"
+    # …e l'identificatore c'è comunque: si omette la cortesia, mai l'identità
+    assert stamp["from"][0]["resource_id"] == "res:nuvola"
+    assert stamp["by"]["operator"]["id"].endswith(ORCID)
+
+
+def test_S3_IL_CONTROESEMPIO_un_nome_vero_sopravvive():
+    """Una guardia che togliesse ogni label sarebbe indistinguibile da questa
+    finché nessuno prova il caso opposto. Qui il nome c'è e deve restare."""
+    from s3dgraphy.nodes.author_node import AuthorNode
+
+    graph = _grafo_con_un_ingresso()
+    graph.add_node(AuthorNode("author:x", name="Emanuel Demetrescu", orcid=ORCID))
+    processo = [n for n in graph.nodes if n.node_type == "dtc_process"][0]
+    graph.add_edge("e:a", processo.node_id, "author:x", "has_author")
+    stamp = clean_stamp(emit_stamp(graph, "res:mesh"))
+    assert stamp["by"]["operator"]["label"] == "Emanuel Demetrescu"
+    assert stamp["from"][0]["label"] == "GT16 · rilievo 2015, nuvola"
+    assert stamp["registry"]["label"] == "Great Temple"
+
+
+def test_S3_anche_le_vesti_diverse_dello_stesso_id_sono_una_ripetizione():
+    """`https://orcid.org/0000-…` e `author:0000-…` sono due vestiti della stessa
+    stringa: un confronto per uguaglianza secca li avrebbe lasciati passare
+    tutti e due, ed è così che l'etichetta arrivò a dire `author:0000-…`."""
+    from s3dgraphy.nodes.author_node import AuthorNode
+
+    graph = _grafo_con_un_ingresso()
+    graph.add_node(AuthorNode("author:x", name=f"author:{ORCID}", orcid=ORCID))
+    processo = [n for n in graph.nodes if n.node_type == "dtc_process"][0]
+    graph.add_edge("e:a", processo.node_id, "author:x", "has_author")
+    assert "label" not in clean_stamp(emit_stamp(graph, "res:mesh"))["by"]["operator"]
+
+
+def test_S4_declare_derivation_inoltra_cio_che_il_passo_dichiara():
+    """La cucitura chiusa: nessun chiamante deve più scrivere sul nodo a mano."""
+    from s3dgraphy import api
+
+    graph = Graph(graph_id="graph:cucitura")
+    graph.add_node(ResourceNode("res:in", name="in", checksum=SHA_IN))
+    graph.add_node(ResourceNode("res:out", name="out", checksum=SHA_OUT))
+    api.declare_derivation(
+        graph, "res:out", ["res:in"], process_id="proc:1",
+        dtc_kind="photogrammetry", technique="decimation",
+        parameters={"target_faces": 50000},
+        software=[{"name": "EM Tools", "version": "1.6.0-dev.8",
+                   "commit": "9555447"}],
+        at="2026-01-01T00:00:00Z")
+    how = clean_stamp(emit_stamp(graph, "res:out"))["how"]
+    assert how["dtc_kind"] == "photogrammetry"
+    assert how["technique"] == "decimation"
+    assert how["parameters"] == {"target_faces": 50000}
+    assert how["software"][0]["commit"] == "9555447"
+    # …e `tool` resta compilata, perché le schede che esistono la leggono
+    assert graph.find_node_by_id("proc:1").data["tool"]["name"] == "EM Tools"
+
+
+def test_S4_un_tool_passato_a_mano_NON_viene_soppiantato_dal_software():
+    """Una scelta di chi chiama non si sovrascrive con un derivato."""
+    from s3dgraphy import api
+
+    graph = Graph(graph_id="graph:tool")
+    graph.add_node(ResourceNode("res:in", name="in", checksum=SHA_IN))
+    graph.add_node(ResourceNode("res:out", name="out", checksum=SHA_OUT))
+    api.declare_derivation(graph, "res:out", ["res:in"], process_id="proc:1",
+                           tool="MeshLab",
+                           software=[{"name": "EM Tools", "version": "1.6"}],
+                           at="2026-01-01T00:00:00Z")
+    assert graph.find_node_by_id("proc:1").data["tool"]["name"] == "MeshLab"
+
+
+def test_S4_un_dtc_kind_SCONOSCIUTO_non_entra_nel_vocabolario():
+    """Chiudere una cucitura non deve allargare un recinto.
+
+    Due comportamenti diversi e tutti e due voluti: chi **scrive** un evento con
+    un genere che non esiste sbaglia e lo sente subito (il costruttore solleva);
+    un **timbro arrivato da fuori** con un genere sconosciuto cade sul default,
+    perché un file di qualcun altro non allarga il nostro vocabolario.
+    """
+    from s3dgraphy import api
+    from s3dgraphy.nodes.dtc_node import DTC_KINDS
+    from s3dgraphy.stamp import stamp_to_graph
+
+    prima = list(DTC_KINDS["process"])
+    graph = Graph(graph_id="graph:vocab")
+    graph.add_node(ResourceNode("res:in", name="in", checksum=SHA_IN))
+    graph.add_node(ResourceNode("res:out", name="out", checksum=SHA_OUT))
+    with pytest.raises(ValueError):
+        api.declare_derivation(graph, "res:out", ["res:in"],
+                               dtc_kind="inventato_stanotte",
+                               at="2026-01-01T00:00:00Z")
+    assert list(DTC_KINDS["process"]) == prima, "il vocabolario non si è allargato"
+
+    # …e dal lato del riassorbimento: cade sul default, non entra
+    timbro = {"stamp": 1, "self": {"resource_id": "res:x", "digest": SHA_OUT},
+              "from": [], "how": {"process_id": "p", "dtc_kind": "inventato_stanotte"}}
+    frammento = stamp_to_graph(timbro)
+    assert frammento.find_node_by_id("p").data["dtc_kind"] == "transformation"
+    assert list(DTC_KINDS["process"]) == prima
+
+
+def test_S6_un_em_json_a_grafo_singolo_non_legge_piu_zero_sezioni():
+    """IL CANCELLO. Un embargo scritto nel grafo e serializzato usciva.
+
+    `rights._sections` cercava `graphs` (plurale) mentre `build_emjson` scrive
+    `graph` (singolare): su un em.json a grafo singolo trovava ZERO sezioni e
+    rispondeva `None`. E `None` non è inerte — i due chiamanti che decidono se
+    trattenere scrivono `if rights and rights.get("embargo_active")`, quindi su
+    `None` **non trattengono**.
+    """
+    from s3dgraphy import api, rights as R
+    from s3dgraphy.exporter.emjson_exporter import build_emjson
+    from s3dgraphy.nodes.embargo_node import EmbargoNode
+
+    graph = Graph(graph_id="graph:embargo")
+    graph.add_node(ResourceNode("res:foto", name="foto.jpg", checksum=SHA_OUT))
+    graph.add_node(EmbargoNode("emb:1", name="2099-12-31",
+                               embargo_end="2099-12-31"))
+    graph.add_edge("e", "res:foto", "emb:1", "has_embargo")
+    documento = build_emjson(graph)
+    assert "graph" in documento and "graphs" not in documento
+
+    assert len(R._sections(documento)) == 1, "zero sezioni = nessun diritto visto"
+    letto = api.asset_rights(documento, SHA_OUT)
+    assert letto is not None, "«non so niente» su un embargo che c'è"
+    assert letto["embargo_active"] is True
+    # e la forma container continua a funzionare
+    assert len(R._sections({"graphs": {"a": {"nodes": [], "edges": []}}})) == 1
+
+
+def test_S6_IL_CONTROESEMPIO_il_cancello_si_apriva_davvero():
+    """Il difetto riprodotto, con la riga di codice dei chiamanti.
+
+    Non «il lettore rispondeva None», che è un dettaglio: **che cosa ne facevano
+    i chiamanti**. `iiif.iiif_manifest` e `contract.consumer` scrivono tutti e
+    due `if rights and rights.get("embargo_active")`. Con `None` quella
+    condizione è falsa, e un'immagine sotto embargo entra nel manifesto.
+    """
+    def come_decidono(rights):
+        # la riga vera dei due chiamanti, copiata
+        return bool(rights and rights.get("embargo_active"))
+
+    assert come_decidono({"embargo_active": True}) is True
+    assert come_decidono(None) is False, (
+        "è questo: su None NON si trattiene, quindi un lettore che non vede "
+        "l'embargo è un cancello che si apre")

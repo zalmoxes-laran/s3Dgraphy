@@ -118,6 +118,67 @@ def _text(value: Any) -> Optional[str]:
     return text or None
 
 
+def _courtesy(label: Any, *identifiers: Any) -> Optional[str]:
+    """Un'etichetta che RIPETE l'identificatore non è un'etichetta: si omette.
+
+    `label` è cortesia per un umano — un nome che dice qualcosa a chi legge — e
+    quando quel nome È l'identificatore la cortesia diventa rumore che si finge
+    informazione. Misurato su timbri veri: `by.operator.label` diceva
+    «0000-0002-5065-7970», cioè l'ORCID una seconda volta; e togliendo il nome al
+    nodo autore diventava «author:0000-0002-…», cioè l'identificatore una terza.
+
+    Il confronto guarda anche **l'ultimo segmento**, perché è lì che i due si
+    incontrano: `https://orcid.org/0000-…` e `author:0000-…` sono due vestiti
+    della stessa stringa, e un confronto per uguaglianza secca li avrebbe
+    lasciati passare tutti e due.
+
+    Vale per OGNI etichetta del timbro e non solo per l'operatore: un ingresso
+    chiamato come il suo `resource_id` e un grafo chiamato come il suo
+    `graph_id` sono lo stesso difetto in due posti diversi.
+    """
+    text = _text(label)
+    if not text:
+        return None
+    seen = {text.lower(), _tail(text)}
+    for identifier in identifiers:
+        other = _text(identifier)
+        if not other:
+            continue
+        if other.lower() in seen or _tail(other) in seen:
+            return None
+    return text
+
+
+def _tail(value: str) -> str:
+    """L'ultimo segmento di un identificatore, dopo `/` o `:`.
+
+    Serve solo al confronto qui sopra, e per questo non normalizza altro: non è
+    una funzione di identità — quella è `identity.split_identity`, e mescolare le
+    due farebbe decidere a una cortesia una cosa che riguarda le impronte.
+    """
+    return value.rsplit("/", 1)[-1].rsplit(":", 1)[-1].strip().lower()
+
+
+def _size_of(node: Any) -> Optional[int]:
+    """La dimensione dichiarata di una risorsa, o None — e **None è una
+    risposta**, non un difetto.
+
+    Una campagna di acquisizione non ha byte da pesare; una risorsa scritta
+    prima che `size_bytes` esistesse non lo dichiara; e un valore che non è un
+    intero non ancorato a zero non è una dimensione. In tutti e tre i casi la
+    voce `from` esce senza il campo, che è esattamente ciò che «additivo»
+    significa: chi legge lo tratta come facoltativo.
+    """
+    raw = _data(node).get("size_bytes")
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        # `bool` è sottotipo di `int` in Python e `True` passerebbe per 1: una
+        # dimensione non è mai un booleano, e lasciarlo passare metterebbe
+        # «1 byte» in un timbro perché qualcuno ha scritto un flag nel campo
+        # sbagliato.
+        return None
+    return raw if raw >= 0 else None
+
+
 def _put(target: Dict[str, Any], key: str, value: Any) -> None:
     """Scrive solo quello che c'è.
 
@@ -251,15 +312,29 @@ def _self_block(resource: Any, warnings: List[str]) -> Dict[str, Any]:
 def _from_block(inputs: Sequence[Any], warnings: List[str]) -> List[Dict[str, Any]]:
     """I genitori: **si nominano e non si aprono**.
 
-    Tre campi e nient'altro. Nessuna ricorsione, nessun percorso, nessuno stato:
-    è la regola che ferma la catena all'anello.
+    Identità, dimensione ed etichetta — e nient'altro. Nessuna ricorsione,
+    nessun percorso, nessuno stato: è la regola che ferma la catena all'anello.
+
+    **`size_bytes` non è ridondanza, è l'indice del recupero.** Riconoscere un
+    file costa poco perché il suo timbro dichiara la dimensione e il filtro
+    scarta i candidati impossibili senza leggere un byte; senza la stessa cifra
+    qui, cercare un genitore smarrito costerebbe hashare tutto — e l'asimmetria
+    rendeva la ricerca di un genitore la strada cara, che è l'opposto di quello
+    che serve quando qualcuno ha riordinato nel Finder.
+
+    Non può contraddire l'identità (stesso digest ⇒ stessa dimensione), quindi è
+    un derivato che non invecchia. **Additivo**: i timbri emessi prima restano
+    validi e chi legge lo tratta come facoltativo — per questo un genitore di cui
+    non si conosce la dimensione non è un errore ed esce senza il campo.
     """
     out: List[Dict[str, Any]] = []
     for node in inputs:
         entry: Dict[str, Any] = {"resource_id": node.node_id}
         digest = _text(_data(node).get("checksum"))
         _put(entry, "digest", digest)
-        _put(entry, "label", _text(getattr(node, "name", None)))
+        _put(entry, "size_bytes", _size_of(node))
+        _put(entry, "label", _courtesy(getattr(node, "name", None),
+                                       node.node_id, digest))
         if digest is None and getattr(node, "node_type", None) == "resource":
             warnings.append(
                 f"the input '{node.node_id}' has no digest: it can be named but "
@@ -299,8 +374,69 @@ def _how_block(process: Optional[Any], warnings: List[str]) -> Dict[str, Any]:
     elif parameters is not None:
         warnings.append("parameters is not a dict and was not emitted")
 
+    _put(block, "acquisition", _acquisition_block(process, data))
+
     _put(block, "software", _software_of(data))
     return block
+
+
+#: I campi che il nodo-evento porta per RAGIONI SUE e che non sono fatti
+#: dell'atto di acquisizione: quelli che il timbro emette già altrove, quelli
+#: del registro editoriale e quelli della presenza CRDT, più la conta dei membri
+#: — che è una cache di un numero, non una circostanza del rilievo.
+#:
+#: Composti dalle costanti che vivono dove quei campi sono definiti, e non
+#: riscritti a mano: un elenco copiato qui invecchierebbe in silenzio il giorno
+#: che `editorial` o `crdt` ne aggiungono uno.
+def _structural_keys() -> frozenset:
+    from ..crdt import FIELD_CLOCKS_KEY, REMOVED_KEY
+    from ..editorial import FIELDS as EDITORIAL_FIELDS
+
+    return frozenset({
+        "dtc_kind", "technique", "parameters", "software", "tool",
+        "declared", "operator", "member_count", "acquisition",
+        *EDITORIAL_FIELDS, FIELD_CLOCKS_KEY, REMOVED_KEY,
+    })
+
+
+def _acquisition_block(process: Any, data: Dict[str, Any]) -> Dict[str, Any]:
+    """I fatti dell'ATTO DI ACQUISIZIONE — apparecchio, obiettivo, campagna.
+
+    **Non vanno in `parameters`**, e non è pedanteria: `parameters` vuol dire
+    «come la tecnica è stata applicata», mentre l'apparecchio e le circostanze
+    sono un'altra cosa — la distinzione che CRM3D fa fra `L12 happened on device`
+    e `L13 used parameters`. Per un rilievo fotogrammetrico è metà di quello che
+    serve sapere fra vent'anni, e finché non aveva una casa ripiegava su
+    `parameters`, cioè si travestiva da parametro.
+
+    **Blocco aperto**, perché ciò che conta cambia col tipo di strumento: una
+    fotocamera ha un obiettivo, uno scanner ha una risoluzione angolare, un
+    georadar ha una frequenza. Un elenco chiuso avrebbe scartato in silenzio il
+    campo che serve al terzo strumento.
+
+    Due strade per leggerlo, e la seconda è per ciò che esiste già:
+
+    * `data["acquisition"]`, quando chi ha scritto l'evento l'ha detto
+      esplicitamente — non ambiguo, e da preferire;
+    * per un nodo `dtc_acquisition`, **ciò che resta** del suo `data` una volta
+      tolti i campi strutturali. È la strada che fa funzionare
+      `bucket_acquisition` così com'è: quella funzione fonde `metadata` nel
+      `data` alla lettera — «i fatti rappresentativi del lotto appartengono
+      all'evento, non ripetuti su quattrocento file», dice il suo docstring — e
+      il posto in cui li mette è giusto; mancava solo la porta per uscirne.
+
+    Una volta sola: se il blocco esce di qui, non esce anche da `parameters`,
+    perché `bucket_acquisition` non scrive mai `parameters`.
+    """
+    explicit = data.get("acquisition")
+    if isinstance(explicit, dict) and explicit:
+        return {k: v for k, v in explicit.items() if v not in (None, "")}
+    if getattr(process, "node_type", None) != "dtc_acquisition":
+        return {}
+    skip = _structural_keys()
+    return {k: v for k, v in data.items()
+            if k not in skip and not str(k).startswith("_")
+            and v not in (None, "")}
 
 
 def _software_of(data: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -381,7 +517,8 @@ def _author_of(graph: Any, node: Any) -> Optional[Dict[str, Any]]:
         orcid = _text(_data(author).get("orcid"))
         entry: Dict[str, Any] = {}
         _put(entry, "id", f"https://orcid.org/{orcid}" if orcid else None)
-        _put(entry, "label", _text(getattr(author, "name", None)))
+        _put(entry, "label", _courtesy(getattr(author, "name", None),
+                                       orcid, author.node_id))
         if entry:
             return entry
     return None
@@ -475,7 +612,8 @@ def _registry_block(graph: Any, revision: Optional[int],
     """
     block: Dict[str, Any] = {}
     _put(block, "graph_id", _text(getattr(graph, "graph_id", None)))
-    _put(block, "label", _text(getattr(graph, "name", None)))
+    _put(block, "label", _courtesy(getattr(graph, "name", None),
+                                   getattr(graph, "graph_id", None)))
     if revision is not None:
         block["revision"] = revision
     _put(block, "room", _text(room))

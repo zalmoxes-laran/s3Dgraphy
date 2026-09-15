@@ -95,6 +95,25 @@ def _sections(document: Any) -> List[Dict[str, Any]]:
             return [g for g in graphs.values() if isinstance(g, dict)]
         if "nodes" in document:
             return [document]
+        # …E IL SINGOLARE, che è una riga e un cancello.
+        #
+        # `container.py` scrive `graphs` (un progetto, N grafi); `build_emjson` /
+        # `export_emjson` scrivono `graph` — UN grafo, ed è la forma di ogni
+        # em.json a grafo singolo, fixture del repo comprese. Senza questo ramo
+        # questa funzione trovava ZERO sezioni su quei documenti e rispondeva
+        # `None` per ogni digest, cioè «di questo asset non so niente».
+        #
+        # E `None` non è inerte: MISURATO sui chiamanti — `iiif.iiif_manifest` e
+        # `contract.consumer` scrivono entrambi `if rights and
+        # rights.get("embargo_active")`, quindi su `None` NON trattengono. Un
+        # embargo fino al 2099, scritto nel grafo e serializzato, usciva in un
+        # manifesto IIIF. Non era un fastidio: era un cancello che si apriva.
+        #
+        # Allargare quello che il lettore VEDE non può rendere una risposta più
+        # permissiva — può solo far trovare un embargo che prima sfuggiva.
+        single = document.get("graph")
+        if isinstance(single, dict):
+            return [single]
         return []
     # a Graph (or a Container) — duck-typed, so this module imports nothing
     graphs = getattr(document, "graphs", None)

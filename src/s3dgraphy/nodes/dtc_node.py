@@ -7,12 +7,23 @@ from EM-paradata (interpretation *on* a document = CRMinf / HDT-O HC17): DTC is
 about how the digital objects came to be.
 
 Both the INPUT and the OUTPUT are **Resources** (the EM ``ResourceNode``, E73/D1 —
-the shared hinge a RepresentationModel and/or a Document may reference), NOT
-dedicated node classes: so :class:`DTCProcessNode` is the ONLY DTC node class.
-The DTC graph = Resources connected by Process events: the process links to its
-input/output Resources via the ``dtc_had_input`` / ``dtc_had_output`` edges (target
-ResourceNode); an output Resource ``dtc_derived_from`` an input Resource. (An earlier
-form had DTCInputNode/DTCOutputNode classes — both retired.)
+the shared hinge a RepresentationModel and/or a Document may reference) and NOT
+dedicated node classes — that is what DTCInputNode and DTCOutputNode were, and
+both are retired. The DTC graph = Resources connected by EVENTS: the event links
+to its input/output Resources via the ``dtc_had_input`` / ``dtc_had_output``
+edges (target ResourceNode); an output Resource ``dtc_derived_from`` an input
+Resource.
+
+**The concrete event classes are TWO**, and this line used to say one:
+:class:`DTCProcessNode` (crmdig:D7, a transformation) and
+:class:`DTCAcquisitionNode` (crmdig:D12, the moment material enters a study).
+The sentence was true the day it was written — it was recording the retirement
+of the two Resource classes above — and then the acquisition arrived and nobody
+came back to it. **It has already produced a wrong specification**: a reader
+building on «the only DTC node class» treats an acquisition as a file without a
+digest, and the ``from`` entry's ``kind: "acquisition"`` exists precisely because
+it is not one. Count the subclasses of :class:`DTCNode` rather than trusting a
+sentence — including this one.
 
 Naming (Option A): EM-native ``...Node`` class; the CIDOC/CRMdig + PROV-O mapping
 lives in ``em_extension`` (no D-numbers in the UI). Gated out of the stratigrapher
