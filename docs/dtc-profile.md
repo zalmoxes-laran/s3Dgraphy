@@ -49,6 +49,23 @@ visual-manager slice):
 - **output**: `pointcloud` (02_pointcloud), `mesh` (03_mesh), `dem` (07_DEM),
   `orthophoto` (08_ortophoto), `points` (04_points), `lines` (05_lines), `polygons` (06_polygons)
 
+And a fifth axis that is **not** part of the flow, added 2026-09-16 (HW1):
+
+- **device**: `camera`, `sensor`, `drone`, `computer`, `scanner`, `total_station`,
+  `gnss` — all on the `11_device_*` glyph family.
+
+The first four axes say what went in, what happened and what came out; `device`
+says what it happened **on** (`DTCDeviceNode`, crmdig:D8, reached by
+`dtc_happened_on_device` / crmdig:L12). It is not a step of the chain and a
+provenance walk does not enter it.
+
+> **`laserscanner` is in the wrong box, and is deliberately left there.** It sits
+> on the `input` axis, and now that `device` exists a scanner is plainly an
+> apparatus rather than an input. Moving it would silently invalidate every stamp
+> already emitted that carries that kind on that axis — the exact failure this
+> substrate is built against. The `device` axis carries its own `scanner` entry
+> instead. Left to E.D.
+
 `dtc_kind` projects as `crm:P2_has_type`.
 
 ## Chain edges (`s3Dgraphy_connections_datamodel.json`)

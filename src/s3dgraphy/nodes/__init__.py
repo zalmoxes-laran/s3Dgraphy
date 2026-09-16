@@ -68,6 +68,10 @@ from .georeferencing_node import (GCPSetNode, RegistrationTransformNode,
 from .dtc_node import DTCNode
 from .dtc_process_node import DTCProcessNode
 from .dtc_acquisition_node import DTCAcquisitionNode
+# …and the APPARATUS the step happened on (crmdig:D8), which is NOT one of those
+# two: a DTC node is a STEP and a device is a thing in the world. It hangs off
+# the event by dtc_happened_on_device (L12), never off the input or the output.
+from .dtc_device_node import DTCDeviceNode
 # EM Narrative (DP-79): the story told over the graph. Chapters and blocks are
 # ordered STRUCTURES carried by the node, not nodes themselves — see the module
 # docstring for why.
@@ -142,4 +146,5 @@ __all__ = [
     "DTCNode",
     "DTCProcessNode",
     "DTCAcquisitionNode",
+    "DTCDeviceNode",
 ]

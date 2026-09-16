@@ -1597,6 +1597,36 @@
     "description": "P3_has_note",
     "dtc_kind": "P2_has_type"
    }
+  },
+  "DTCDeviceNode": {
+   "class": "DTCDeviceNode",
+   "parent": "Node",
+   "abbreviation": "DDV",
+   "label": "DTC Device",
+   "description": "The APPARATUS a DTC step happened on — camera, sensor, drone, computer, scanner, total station, GNSS receiver. Projected as crmdig:D8_Digital_Device and attached to the EVENT by dtc_happened_on_device (crmdig:L12_happened_on_device), never to the input or the output: the three dtc_kinds flow axes are what went in, what happened and what came out, and a device is what it happened ON. Until 2026-09-16 it was a STRING inside how.acquisition, and a string cannot be asked «what did this machine produce» or «that lens was distorted, which models are affected». NOT a DTCNode: a DTC node is a STEP (an event in the chain) and a device is a thing in the world — it has no inputs, no outputs, and a provenance walk has no business entering it; subclassing would have put it in the chain by inheritance and set the class hierarchy arguing with dtc_role. data.dtc_kind comes from the `device` axis of dtc_kinds (em_visual_rules.json), so adding an apparatus is a JSON entry plus a sign. THE ID IS DERIVED FROM THE DESCRIPTOR (make | model | serial) by uuid5 — the same mechanism bucket_acquisition uses for a campaign name, but WITHOUT the graph_id in the key, because a campaign is an event of one study while the same camera in two studies is one camera. WHAT THAT COSTS, DECLARED: without a serial number two identical bodies derive the same id and MERGE, and the graph then cannot say which body took a given file. data.distinguishes records which happened ('serial' = one body, 'make+model' = a model). A declared merge is better than an invented distinction: salting the id with a graph or a timestamp would make two records of the SAME camera look like two cameras, and that failure is silent. Gated out of the stratigrapher palette, like every DTC node.",
+   "s3Dgraphy_file": "dtc_device_node.py",
+   "mapping": {
+    "cidoc": "crmdig:D8_Digital_Device",
+    "cidoc_s3d": null,
+    "alternative": null,
+    "rationale": "crmdig:D8_Digital_Device (CRMdig 5.0) is the class L12_happened_on_device ranges over, so the node and the edge come from one place in one ontology. NO PROV-O co-typing: prov:Agent means 'a thing that bears some form of responsibility for an activity' and a camera bears none, while prov:Entity is what dtc_had_input's targets already are — typing a device as one would put the apparatus among the files. A PROV-only reader sees the step and its files, and no false statement about an agent."
+   },
+   "em_extension": {
+    "uri": "crmdig:D8_Digital_Device",
+    "rdf_type": "owl:Class",
+    "subclass_of": [
+     "crm:E22_Human-Made_Object"
+    ],
+    "extension_status": "profile-DTC-ECHOES"
+   },
+   "properties": {
+    "name": "P1_is_identified_by",
+    "description": "P3_has_note",
+    "dtc_kind": "P2_has_type",
+    "make": "P2_has_type",
+    "model": "P2_has_type",
+    "serial": "P1_is_identified_by"
+   }
   }
  },
  "georeferencing_nodes": {

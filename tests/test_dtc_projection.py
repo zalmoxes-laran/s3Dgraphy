@@ -135,10 +135,24 @@ def test_dtc_input_output_nodes_retired():
     dm = json.loads((cfg / "s3Dgraphy_node_datamodel.json").read_text(encoding="utf-8"))
     reg = json.loads((cfg / "node_registry.generated.json").read_text(encoding="utf-8"))
     dtc_classes = {c for c in dm.get("dtc_nodes", {}) if not c.startswith("_")}
-    assert dtc_classes == {"DTCProcessNode", "DTCAcquisitionNode"}
+    # GLI EVENTI SONO ANCORA DUE, ed è ciò che questa prova ha sempre inteso: il
+    # suo docstring parla di «DTC event classes», mentre l'asserzione guardava la
+    # SEZIONE. Da HW1 (2026-09-16) le due cose non coincidono più, perché la
+    # sezione porta anche DTCDeviceNode — che è nel profilo DTC ma NON è un
+    # evento: è la cosa su cui un evento è avvenuto (crmdig:D8), non un passo
+    # della catena. L'asserzione ora dice la frase per intero invece di
+    # affidarla a una coincidenza.
+    import s3dgraphy.nodes as _n
+    eventi = {c for c in dtc_classes
+              if issubclass(getattr(_n, c), _n.DTCNode)}
+    assert eventi == {"DTCProcessNode", "DTCAcquisitionNode"}
+    assert dtc_classes == eventi | {"DTCDeviceNode"}
+    assert not issubclass(_n.DTCDeviceNode, _n.DTCNode), (
+        "un apparecchio non è un passo: ereditare l'avrebbe messo nella catena")
     for cls in ("DTCInputNode", "DTCOutputNode"):
         assert cls not in reg["node_types"]
     # the DTC event nodes are gated out of the stratigrapher sections
     for sec in ("stratigraphic_nodes", "paradata_nodes", "temporal_nodes"):
         assert "DTCProcessNode" not in dm.get(sec, {})
         assert "DTCAcquisitionNode" not in dm.get(sec, {})
+        assert "DTCDeviceNode" not in dm.get(sec, {})

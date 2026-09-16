@@ -957,6 +957,44 @@
         "glyph": "06_polygons",
         "description": "Vector polygon features."
       }
+    },
+    "device": {
+      "_comment": "THE APPARATUS AXIS — what a step happened ON, not what went in or came out. crmdig:L12_happened_on_device, deliberately NOT L10_had_input: the photographs are the input and the camera is not, and flattening the two makes «which files did this body take» unanswerable, which is the only reason the node exists. One class (DTCDeviceNode, crmdig:D8_Digital_Device) and the genus from here, so adding an apparatus stays a JSON entry plus a sign — the same rule the flow axes follow. | THE GLYPHS ARE ONE FAMILY: 11_device is a rounded box with a connector on one side, the poorest shape that still says «apparatus» and free of any optical cue because a computer has no lens. Two boxes whose connectors touch read as a RIG — a computer with a sensor on it, a camera on a drone — which is how an assembly is said without inventing a second symbol. Every genus keeps that outline IDENTICAL and changes one inner mark, so the family reads from far away and the genus from close up. The SVGs live in JSON_config/src/2D/dtc/ beside 00–10; these names are declared here first and drawn separately. | NOTE FOR WHOEVER EXTENDS THIS: `laserscanner` sits on the `input` axis above, and now that this axis exists it is in the wrong box — a scanner is an apparatus, not an input. It is NOT moved: stamps already emitted carry that kind on that axis, and moving it would invalidate them in silence, which is the defect this whole substrate is built against. Left to E.D.",
+      "camera": {
+        "label": "Camera",
+        "glyph": "11_device_optical",
+        "description": "A photographic or video body. The circle is the GENUS mark and sits inside the family outline: the outline itself stays free of optics so a computer can wear it."
+      },
+      "sensor": {
+        "label": "Sensor",
+        "glyph": "11_device_sensor",
+        "description": "A measuring instrument that is not a camera — multispectral, thermal, a lidar head, a magnetometer. The wave mark says «it records a quantity»."
+      },
+      "drone": {
+        "label": "Drone",
+        "glyph": "11_device_drone",
+        "description": "The airframe that carried the apparatus. Its own device because it is the thing that flew, and a rig is drawn as its connector touching the payload's."
+      },
+      "computer": {
+        "label": "Computer",
+        "glyph": "11_device_computer",
+        "description": "The machine a processing step ran on. Here because «the reconstruction produced different numbers on the two workstations» is a question somebody will ask, and it is the reason the family outline had to stay free of optics."
+      },
+      "scanner": {
+        "label": "Scanner",
+        "glyph": "11_device_scanner",
+        "description": "A range or structured-light scanner — the APPARATUS. Distinct from the `laserscanner` entry on the `input` axis, which is a kind of input and is left where it is on purpose (see the note above)."
+      },
+      "total_station": {
+        "label": "Total station",
+        "glyph": "11_device_station",
+        "description": "A theodolite with a rangefinder — the instrument behind a `topographic` input."
+      },
+      "gnss": {
+        "label": "GNSS receiver",
+        "glyph": "11_device_gnss",
+        "description": "A satellite positioning receiver: the apparatus that produces a how.acquisition.location whose `source` is a measurement and not a person's word."
+      }
     }
   },
   "edge_style": {

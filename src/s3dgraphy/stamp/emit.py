@@ -353,7 +353,13 @@ def _from_block(inputs: Sequence[Any], warnings: List[str]) -> List[Dict[str, An
     return out
 
 
-def _how_block(process: Optional[Any], warnings: List[str]) -> Dict[str, Any]:
+def _how_block(graph: Any, process: Optional[Any],
+               warnings: List[str]) -> Dict[str, Any]:
+    # IL GRAFO ARRIVA FIN QUI da HW1, e serve per una ragione sola:
+    # l'apparecchio non è più un campo del `data` dell'evento ma un NODO
+    # attaccato con `dtc_happened_on_device`, e per leggerlo bisogna poter
+    # guardare gli archi. Tutto il resto di questo blocco continua a leggere
+    # solo `process`.
     if process is None:
         return {}
     data = _data(process)
@@ -379,7 +385,7 @@ def _how_block(process: Optional[Any], warnings: List[str]) -> Dict[str, Any]:
     elif parameters is not None:
         warnings.append("parameters is not a dict and was not emitted")
 
-    _put(block, "acquisition", _acquisition_block(process, data))
+    _put(block, "acquisition", _acquisition_block(graph, process, data))
 
     _put(block, "software", _software_of(data))
     return block
@@ -404,7 +410,8 @@ def _structural_keys() -> frozenset:
     })
 
 
-def _acquisition_block(process: Any, data: Dict[str, Any]) -> Dict[str, Any]:
+def _acquisition_block(graph: Any, process: Any,
+                       data: Dict[str, Any]) -> Dict[str, Any]:
     """I fatti dell'ATTO DI ACQUISIZIONE — apparecchio, obiettivo, campagna.
 
     **Non vanno in `parameters`**, e non è pedanteria: `parameters` vuol dire
@@ -435,13 +442,109 @@ def _acquisition_block(process: Any, data: Dict[str, Any]) -> Dict[str, Any]:
     """
     explicit = data.get("acquisition")
     if isinstance(explicit, dict) and explicit:
-        return {k: v for k, v in explicit.items() if v not in (None, "")}
-    if getattr(process, "node_type", None) != "dtc_acquisition":
+        block = {k: v for k, v in explicit.items() if v not in (None, "")}
+    elif getattr(process, "node_type", None) == "dtc_acquisition":
+        skip = _structural_keys()
+        block = {k: v for k, v in data.items()
+                 if k not in skip and not str(k).startswith("_")
+                 and v not in (None, "")}
+    else:
+        block = {}
+
+    # HW1 · IL CORPO E IL LUOGO, sopra a quello che c'era.
+    #
+    # `device` era una STRINGA, e una stringa non si interroga. Ora è
+    # un'IDENTITÀ letta dal nodo attaccato all'evento — e sovrascrive una
+    # stringa eventualmente rimasta su `data.acquisition.device`, perché fra un
+    # nodo e un testo libero che dicono la stessa cosa il nodo è quello che
+    # qualcuno può seguire.
+    _put(block, "device", _device_block(graph, process))
+    # `location` sono VALORI: numeri più un codice EPSG, e `source` che dice se
+    # li ha letti una macchina o li ha battuti una persona. Nessun tipo, per la
+    # ragione che tiene in piedi l'estrazione di ieri — vedi `_location_block`.
+    _put(block, "location", _location_block(data))
+    return block
+
+
+def _device_block(graph: Any, process: Any) -> Dict[str, Any]:
+    """L'APPARECCHIO su cui il passo è avvenuto — un'identità, non una stringa.
+
+    Esce `{"id": …, "label": …}` più il descrittore che il nodo porta (marca,
+    modello, seriale, genere), e vale la regola delle etichette già in vigore:
+    **una `label` che ripete l'id si omette**.
+
+    Esce anche `distinguishes`, che è la parte onesta: `"serial"` vuol dire che
+    quell'id nomina **un corpo**, `"make+model"` che nomina **un modello** e che
+    due corpi identici lo condividono. Chi legge il timbro fuori di qui deve
+    poter sapere quale delle due, perché è una perdita d'informazione e non un
+    dettaglio di implementazione.
+    """
+    if process is None:
         return {}
-    skip = _structural_keys()
-    return {k: v for k, v in data.items()
-            if k not in skip and not str(k).startswith("_")
-            and v not in (None, "")}
+    from ..dtc.devices import EDGE_HAPPENED_ON_DEVICE, device_facts
+
+    step_id = getattr(process, "node_id", None)
+    for edge in _edges(graph):
+        if getattr(edge, "edge_type", None) != EDGE_HAPPENED_ON_DEVICE:
+            continue
+        if str(getattr(edge, "edge_source", "") or "") != str(step_id):
+            continue
+        node = find_resource(graph, str(getattr(edge, "edge_target", "") or ""))
+        if node is None:
+            node = graph.find_node_by_id(
+                str(getattr(edge, "edge_target", "") or ""))
+        if node is None:
+            continue
+        block: Dict[str, Any] = {"id": node.node_id}
+        _put(block, "label", _courtesy(getattr(node, "name", None), node.node_id))
+        block.update(device_facts(node))
+        return block
+    return {}
+
+
+#: Cosa di una posizione viaggia. Chiuso di proposito, al contrario del blocco
+#: che lo contiene: `acquisition` è aperto perché ciò che conta cambia con lo
+#: strumento, mentre una posizione è una posizione — e un elenco aperto qui
+#: avrebbe lasciato uscire, prima o poi, l'ombra di un nodo (un id, un
+#: riferimento, una relazione), che è esattamente ciò che non deve partire.
+_LOCATION_FIELDS = ("lat", "lon", "alt", "crs", "source", "accuracy_m", "when")
+
+#: Chi l'ha detta. Due risposte e non una: letta da una macchina e dichiarata da
+#: una persona hanno statuto diverso, ed è la stessa disciplina di
+#: `identity_strength` — chi legge deve poter sapere quanto pesa ciò che legge.
+LOCATION_SOURCES = ("exif", "stated")
+
+
+def _location_block(data: Dict[str, Any]) -> Dict[str, Any]:
+    """DOVE il passo è avvenuto — **valori nudi**, mai un tipo.
+
+    Latitudine, longitudine, quota, il CRS, e `source`. Nient'altro, e
+    l'omissione è il punto: `dtcstamp` non deve imparare nessun nome di classe
+    di s3Dgraphy. Delle coordinate sono numeri più un codice EPSG — universali —
+    e chi scrive un plugin per Metashape non deve sapere che cosa sia un nodo di
+    geolocalizzazione per leggere dov'era la macchina fotografica.
+
+    E vale la regola di ammissione del formato: **entra solo ciò che serve a
+    capire il passo quando il grafo non è raggiungibile.** Le coordinate passano
+    — una foto senza le sue coordinate perde ciò che la rende ritrovabile. Un
+    nodo di geolocalizzazione con le sue relazioni no: quello è grafo, e chi lo
+    vuole ha il grafo.
+    """
+    raw = data.get("location")
+    if not isinstance(raw, dict):
+        return {}
+    block = {k: raw[k] for k in _LOCATION_FIELDS
+             if raw.get(k) not in (None, "")}
+    if not block:
+        return {}
+    source = block.get("source")
+    if source is not None and source not in LOCATION_SOURCES:
+        # Non si solleva e non si butta la posizione: un `source` che non
+        # conosciamo è un'affermazione di qualcun altro, e cancellarla
+        # renderebbe la posizione più autorevole di quanto è. Si lascia, e chi
+        # legge trova una parola che non è nel nostro elenco.
+        pass
+    return block
 
 
 def _software_of(data: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -724,7 +827,7 @@ def emit_stamp(graph: Any, resource_ref: str, *,
     #: liste vuote) qui NON si usa apposta: l'assenza del campo direbbe «non lo
     #: so», la lista vuota dice «nessuno».
     stamp["from"] = _from_block(inputs, warnings)
-    _put(stamp, "how", _how_block(process, warnings))
+    _put(stamp, "how", _how_block(graph, process, warnings))
     by = _by_block(graph, process, resource)
     _put(stamp, "by", by)
     if not by.get("operator"):

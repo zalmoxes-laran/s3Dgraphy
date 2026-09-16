@@ -180,6 +180,16 @@ def stamp_to_graph(stamp: Dict[str, Any], *, graph_id: Optional[str] = None):
     fragment.add_node(process)
     fragment.add_edge(f"{process_id}->{resource_id}", process_id, resource_id,
                       EDGE_HAD_OUTPUT)
+    # HW1 · IL CORPO TORNA A ESSERE UN NODO. È qui che si vede il vincolo che
+    # tiene in piedi l'estrazione: `dtcstamp` porta VALORI — un id, un'etichetta,
+    # marca e modello — e non sa e non deve sapere che esista una classe
+    # `DTCDeviceNode`. È questo lato, che il grafo ce l'ha, a trasformarli in un
+    # nodo tipizzato e in un arco.
+    #
+    # DOPO `add_node(process)`, e non prima: `Graph.add_edge` pretende che
+    # entrambi i capi esistano già, e la prima versione di questa riga stava
+    # sopra — l'arco cercava un processo che nel frammento non c'era ancora.
+    _absorb_device(fragment, process, how)
 
     for parent in parents:
         pid = str(parent.get("resource_id") or "").strip()
@@ -265,6 +275,18 @@ def _apply_how(node: Any, how: Dict[str, Any]) -> None:
         value = how.get(key)
         if value not in (None, "", {}):
             data[key] = value
+    # HW1 · LA POSIZIONE torna dov'era: valori sull'evento. NON diventa un nodo,
+    # e la ragione è misurata e non scelta — l'unico E53 di questo datamodel è
+    # `GeoPositionNode`, che il suo stesso docstring dichiara essere l'ANCORA
+    # della scena, UNA PER GRAFO, e «non è dove va il puntino sulla mappa».
+    # Scrivere lì dentro dove è stata scattata una foto sovrascriverebbe lo
+    # shift del grafo con una coordinata di campo. Il tipo per «dove è avvenuto
+    # un passo» non esiste ancora: vedi l'END OF di HW1.
+    acquisition = how.get("acquisition")
+    if isinstance(acquisition, dict):
+        location = acquisition.get("location")
+        if isinstance(location, dict) and location:
+            data["location"] = dict(location)
     software = how.get("software")
     if isinstance(software, list) and software:
         data["software"] = software
@@ -274,6 +296,55 @@ def _apply_how(node: Any, how: Dict[str, Any]) -> None:
         first = software[0]
         if isinstance(first, dict) and first.get("name"):
             data["tool"] = dict(first)
+
+
+def _absorb_device(fragment: Any, process: Any, how: Dict[str, Any]) -> None:
+    """`how.acquisition.device` → un `DTCDeviceNode` e il suo arco.
+
+    **L'id arriva dal timbro e non si ricalcola.** Chi ha emesso l'ha derivato
+    dal descrittore, e rifare il conto qui vorrebbe dire avere due derivazioni
+    per una cosa sola — che è come due copie di una regola smettono di
+    coincidere. Se il timbro porta l'id, quello è l'id; il descrittore che
+    l'accompagna si scrive sul nodo perché è il modo in cui una persona lo
+    riconosce, non perché serva a ricostruirlo.
+
+    Un timbro che porta un `device` come STRINGA — quelli emessi prima di oggi —
+    non produce nessun nodo e non è un errore: era una stringa, resta la stringa
+    che era, e finisce dove finiva prima (`data.acquisition`). Inventare un id
+    per lei vorrebbe dire coniare un apparecchio che nessuno ha dichiarato.
+    """
+    from ..nodes.dtc_device_node import DTCDeviceNode
+    from ..dtc.devices import EDGE_HAPPENED_ON_DEVICE
+
+    acquisition = how.get("acquisition")
+    if not isinstance(acquisition, dict):
+        return
+    device = acquisition.get("device")
+    if not isinstance(device, dict):
+        return
+    device_id = str(device.get("id") or "").strip()
+    if not device_id:
+        return
+
+    data = {k: device[k] for k in ("make", "model", "serial", "distinguishes")
+            if device.get(k) not in (None, "")}
+    kind = str(device.get("dtc_kind") or "").strip() or None
+    try:
+        node = DTCDeviceNode(device_id,
+                             name=str(device.get("label") or device_id),
+                             dtc_kind=kind, data=data)
+    except ValueError:
+        # UN GENERE SCONOSCIUTO NON ALLARGA IL VOCABOLARIO, e non fa nemmeno
+        # cadere il riassorbimento: il nodo nasce senza genere e il resto del
+        # descrittore arriva lo stesso. Un file di qualcun altro non decide
+        # quali apparecchi esistono, e non decide nemmeno se il suo timbro è
+        # leggibile.
+        node = DTCDeviceNode(device_id,
+                             name=str(device.get("label") or device_id),
+                             data=data)
+    fragment.add_node(node)
+    fragment.add_edge(f"edge:device:{process.node_id}:{device_id}",
+                      process.node_id, device_id, EDGE_HAPPENED_ON_DEVICE)
 
 
 def _apply_by(node: Any, by: Dict[str, Any]) -> None:

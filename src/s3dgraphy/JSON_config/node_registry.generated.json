@@ -37,6 +37,11 @@
    "node_type": "dtc_acquisition",
    "description": "DTC acquisition/ingestion event (ECHOES DTC profile, acquisition seam)."
   },
+  "DTCDeviceNode": {
+   "parent": "Node",
+   "node_type": "dtc_device",
+   "description": "The apparatus an acquisition or a processing step happened on."
+  },
   "DTCNode": {
    "parent": "Node",
    "node_type": null,

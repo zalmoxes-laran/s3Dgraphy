@@ -290,9 +290,17 @@ def test_the_edges_group_with_the_datamodels_real_counts():
     `is_in_functional_unit` (DP-72), whose rationale this one cites. That
     mapping says nothing about where `digital representation of` grafts (the
     RM↔thing relation, left open as D3 in the 2026-09-10 spec): this is the
-    group↔member relation, a different question."""
+    group↔member relation, a different question.
+
+    Grew by ONE on 2026-09-16 (HW1): `dtc_happened_on_device`, from a DTC step to
+    the apparatus it ran on, mapped crmdig:L12_happened_on_device — hence CRMdig
+    4 → 5. It has NO PROV-O counterpart and that is why PROV-O stays at 2:
+    prov:used is taken by `dtc_had_input` and reusing it here would collapse in
+    PROV exactly the distinction CRMdig draws between the photographs (the input)
+    and the camera (the device), while prov:Agent ranges over things that bear
+    responsibility, which a camera does not."""
     groups = {g["ontology"]: g["count"] for g in api.mapping_edge_groups()}
-    assert groups == {"CIDOC-CRM": 33, "CRMarchaeo": 8, "CRMdig": 4,
+    assert groups == {"CIDOC-CRM": 33, "CRMarchaeo": 8, "CRMdig": 5,
                       "HDT-O": 6, "PROV-O": 2, "unmapped": 2}, groups
     filtered = {g["ontology"]: [e["edge_type"] for e in g["edges"]]
                 for g in api.mapping_edge_groups("US", "US")}

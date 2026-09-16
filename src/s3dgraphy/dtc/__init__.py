@@ -60,10 +60,24 @@ from .ingest import (
     resource_usages,
     unused_resources,
 )
+# HW1 · l'apparecchio su cui un passo è avvenuto. Sta accanto a `ingest` e non
+# dentro: l'ingestione è un ATTO, un apparecchio è una COSA, e il modulo che le
+# tiene separate è il posto in cui si legge che l'id di una si sala col grafo e
+# quello dell'altra no.
+from .devices import (
+    EDGE_HAPPENED_ON_DEVICE,
+    attach_device,
+    device_facts,
+    device_identity,
+)
 
 __all__ = [
     "DTC_RECORD_VERSION",
     "EDGE_HAD_INPUT",
+    "EDGE_HAPPENED_ON_DEVICE",
+    "attach_device",
+    "device_facts",
+    "device_identity",
     "EDGE_HAD_OUTPUT",
     "EDGE_DERIVED_FROM",
     "detach_dtc",
