@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- 11_device.svg — the DTC apparatus family.
+     THE OUTLINE IS IDENTICAL ACROSS THE FAMILY and only the inner mark changes,
+     so the family reads from far away and the genus from close up. No optical
+     cue anywhere: this glyph must also cover a computer, and a computer has no
+     lens. The stub is not decoration — two bodies whose stubs touch read as a
+     rig, which is how an assembly is said without a second symbol. -->
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1"
+   width="24.587820mm" height="24.587820mm"
+   viewBox="0 0 87.1222 87.1222">
+  <g id="layer1">
+    <circle cx="43.5611" cy="43.5611" r="41.13567" style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:1;stroke-width:1.5" />
+    <rect class="device-body" x="22" y="27.5" width="40" height="32" rx="5" ry="5"
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:1;stroke-width:1.2" />
+    <rect class="device-body" x="62" y="39.5" width="7" height="8" rx="1.6" ry="1.6"
+       style="fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:1;stroke-width:1.2" />
+  </g>
+</svg>

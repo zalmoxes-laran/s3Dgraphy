@@ -115,3 +115,97 @@ def test_the_3D_gap_is_counted_and_named_rather_than_asserted():
     # the two georeferencing types added on 2026-08-29 are in that list, and the
     # test says so rather than letting them hide in a count
     assert {"GCP", "RGT"} <= set(missing) or not ({"GCP", "RGT"} & set(missing))
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# THE OTHER FAMILY — `dtc_kinds[*][*].glyph`, which nothing was checking
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# The tests above walk `node_styles` and its FILE-PATH fields. The DTC kind
+# vocabulary declares its icon differently — a bare `glyph` NAME, resolved by
+# convention to `src/2D/dtc/<glyph>.svg` — and in a different block, so every
+# check in this file and the one EMStudio's `sync-datamodels.sh` prints walked
+# straight past it.
+#
+# It was not caught by a failure. It was caught by COUNTING, on 2026-09-16: the
+# apparatus axis declared seven glyphs (`11_device_optical` … `_gnss`) and the
+# directory stopped at `10_laserscanner.svg`. Seven declared, zero drawn, every
+# suite green and the vendoring script reporting «all declared files present» —
+# true of what it looks at, and that is the whole lesson: a report is only as
+# honest as its scope, and a family nobody walks is a family nobody defends.
+#
+# ENFORCED, like the 2D icons above and unlike the 3D gap, and the reason is the
+# datamodel's own note: these names are «recorded here as data only», wired to a
+# renderer in a later slice. That is exactly the window in which an absence costs
+# nothing to fix and is invisible — and the moment something reads them, the same
+# absence becomes a hole in the canvas that `icons.ts` draws as silence.
+
+DTC_GLYPHS = CONFIG / "src" / "2D" / "dtc"
+
+
+def _kinds():
+    return json.loads((CONFIG / "em_visual_rules.json").read_text(
+        encoding="utf-8")).get("dtc_kinds") or {}
+
+
+def _declared_glyphs(kinds):
+    """(axis, kind, glyph) for every kind that names one. Shared with the
+    counterexample below so the two cannot scan differently — a counterexample
+    that reads the vocabulary its own way proves nothing about the assertion."""
+    for axis, entries in kinds.items():
+        if not isinstance(entries, dict):
+            continue
+        for kind, spec in entries.items():
+            if isinstance(spec, dict) and isinstance(spec.get("glyph"), str):
+                yield axis, kind, spec["glyph"]
+
+
+def test_every_glyph_the_DTC_vocabulary_names_is_drawn():
+    missing = [f"dtc_kinds.{axis}.{kind} → src/2D/dtc/{glyph}.svg"
+               for axis, kind, glyph in _declared_glyphs(_kinds())
+               if not (DTC_GLYPHS / f"{glyph}.svg").is_file()]
+    assert not missing, (
+        "the DTC vocabulary names glyphs that have not been drawn. Adding a kind "
+        "is meant to be a JSON entry PLUS A SIGN, and this is the half that has "
+        "no compiler:\n  " + "\n  ".join(missing))
+
+
+def test_THE_COUNTEREXAMPLE_an_undrawn_glyph_is_seen():
+    """The assertion above passes on an empty walk as happily as on a full one.
+
+    Feed the same collector a kind naming a glyph that certainly does not exist,
+    and it must come back — otherwise the test above is green because it looks at
+    nothing, which is the state it was written to end.
+    """
+    invented = {"device": {"teleporter": {"glyph": "11_device_teleporter"}}}
+    seen = list(_declared_glyphs(invented))
+    assert seen == [("device", "teleporter", "11_device_teleporter")], seen
+    assert not (DTC_GLYPHS / "11_device_teleporter.svg").is_file()
+
+
+def test_the_apparatus_family_keeps_ONE_outline():
+    """The family promise, checked as a fact rather than trusted as a comment.
+
+    Every apparatus glyph is the same body and stub with one inner mark changed,
+    so the family reads from far away and the genus from close up. Redrawing one
+    of them «a bit bigger» is the change that dissolves the family silently, and
+    it is invisible in a diff of eight files that all look like SVG.
+    """
+    # The body DECLARES itself — `class="device-body"` on the rounded box and on
+    # the connector stub. Counting `<rect>` instead was the first version of this
+    # test, and it failed on `computer`, whose inner mark is a rectangle too: a
+    # check that recognises its target by shape rather than by name breaks on the
+    # first drawing it did not foresee.
+    bodies = {}
+    for path in sorted(DTC_GLYPHS.glob("11_device*.svg")):
+        bodies[path.name] = tuple(
+            line.strip() for line in path.read_text(encoding="utf-8").splitlines()
+            if 'class="device-body"' in line)
+    assert len(bodies) >= 8, f"expected the whole family, found {sorted(bodies)}"
+    assert all(len(b) == 2 for b in bodies.values()), (
+        "every apparatus glyph carries exactly two device-body rects — the box "
+        f"and the stub: {[(n, len(b)) for n, b in bodies.items() if len(b) != 2]}")
+    shapes = set(bodies.values())
+    assert len(shapes) == 1, (
+        "the apparatus glyphs no longer share one outline:\n  "
+        + "\n  ".join(f"{name}: {b}" for name, b in sorted(bodies.items())))
