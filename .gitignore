@@ -186,3 +186,5 @@ docs/dev-projects/
 # Development plans / AI-session WIP — never commit
 .claude/
 .vscode/
+# bump_and_push.sh usa `sed -i.bak`: se muore a meta, i .bak restano
+*.bak
