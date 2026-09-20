@@ -68,7 +68,11 @@ def test_online_is_off_by_default_and_guarded():
 
 def test_as_authority_ref_is_compact():
     ref = as_authority_ref(resolve("mosaic", "WHAT")[0])
-    assert set(ref) <= {"uri", "authority", "label", "rank", "match", "broader"}
+    # closed key set on purpose: the ref is persisted on every node, so each
+    # added key costs em.json size forever. `fixture` earns its place because
+    # it is the only way a sample URI can be told apart downstream.
+    assert set(ref) <= {"uri", "authority", "label", "rank", "match", "broader",
+                        "fixture"}
     assert ref["match"] == MATCH_EXACT and ref["rank"] == 1
 
 
@@ -79,3 +83,42 @@ def test_write_authority_refs_sets_node_data():
     refs = write_authority_refs(n, "mosaic", "WHAT")
     assert refs and n.data["authority_refs"] == refs
     assert refs[0]["uri"].startswith("http://vocab.getty.edu/aat/")
+
+
+# ── the sample flag ──────────────────────────────────────────────────────────
+# The bundled snapshots are hand-seeded samples, not real dumps. provenance.json
+# has said so since day one, but a README does not travel: an authority_ref
+# written onto a node outlives this directory, goes into em.json and from there
+# into the RDF projection. So the flag has to ride ON the ref.
+
+def test_a_sample_snapshot_marks_its_candidates():
+    cand = resolve("mosaic", "WHAT")[0]
+    assert cand["provenance"].get("fixture") is True
+    assert cand.get("fixture") is True
+
+
+def test_the_sample_flag_survives_into_the_persisted_ref():
+    # as_authority_ref is the shape that lands in node.data['authority_refs'];
+    # this is the boundary where the warning used to be dropped.
+    ref = as_authority_ref(resolve("mosaic", "WHAT")[0])
+    assert ref["fixture"] is True
+
+
+def test_a_real_snapshot_leaves_no_flag_behind():
+    # counterexample — the flag must mean something, so a candidate that is NOT
+    # from a sample carries no key at all. When real dated dumps replace these
+    # files and `fixture` leaves provenance.json, refs go back to being clean.
+    ref = as_authority_ref(
+        {"uri": "http://vocab.getty.edu/aat/300015342", "authority": "aat",
+         "label": "mosaic", "rank": 1, "match": MATCH_EXACT}
+    )
+    assert "fixture" not in ref
+
+
+def test_written_refs_carry_the_flag_onto_the_node():
+    class _N:
+        pass
+    n = _N()
+    refs = write_authority_refs(n, "mosaic", "WHAT")
+    assert refs and refs[0]["fixture"] is True
+    assert n.data["authority_refs"][0]["fixture"] is True

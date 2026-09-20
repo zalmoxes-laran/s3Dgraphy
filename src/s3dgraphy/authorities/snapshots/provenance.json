@@ -8,7 +8,8 @@
       "scheme": "http://n2t.net/ark:/99152/p0",
       "retrieved_method": "hand-seeded sample (P1-D mechanism proof)",
       "snapshot_date": "2026-07-23",
-      "license_ref": "periodo"
+      "license_ref": "periodo",
+      "fixture": true
     },
     "chronontology": {
       "name": "ChronOntology (DAI iDAI.chronontology)",
@@ -17,7 +18,8 @@
       "scheme": "https://chronontology.dainst.org/period/",
       "retrieved_method": "hand-seeded sample (P1-D mechanism proof)",
       "snapshot_date": "2026-07-23",
-      "license_ref": "chronontology"
+      "license_ref": "chronontology",
+      "fixture": true
     },
     "aat": {
       "name": "Getty Art & Architecture Thesaurus (AAT)",
@@ -26,7 +28,8 @@
       "scheme": "http://vocab.getty.edu/aat/",
       "retrieved_method": "hand-seeded sample (P1-D mechanism proof)",
       "snapshot_date": "2026-07-23",
-      "license_ref": "getty"
+      "license_ref": "getty",
+      "fixture": true
     },
     "tgn": {
       "name": "Getty Thesaurus of Geographic Names (TGN)",
@@ -35,7 +38,8 @@
       "scheme": "http://vocab.getty.edu/tgn/",
       "retrieved_method": "hand-seeded sample (P1-D mechanism proof)",
       "snapshot_date": "2026-07-23",
-      "license_ref": "getty"
+      "license_ref": "getty",
+      "fixture": true
     }
   }
 }

@@ -78,6 +78,7 @@ def _load_snapshots() -> Dict[str, Dict[str, Any]]:
             "concepts": doc.get("@graph", []),
             "provenance": prov,
             "license_ref": prov.get("license_ref"),
+            "fixture": bool(prov.get("fixture")),
         }
     return out
 
@@ -120,7 +121,7 @@ def resolve(
     hits before close within each authority.
 
     Each candidate: ``{uri, authority, label, scheme, rank, match, provenance,
-    license, broader?}``.
+    license, broader?, fixture?}``.
     """
     if online:
         raise NotImplementedError(
@@ -155,6 +156,11 @@ def resolve(
                     "provenance": snap.get("provenance", {}),
                     "license": snap.get("license_ref"),
                 }
+                if snap.get("fixture"):
+                    # the snapshot behind this hit is a hand-seeded sample, not
+                    # a real dump — say so on the candidate, and keep saying it
+                    # on the ref that gets persisted (see as_authority_ref)
+                    cand["fixture"] = True
                 broader = concept.get("broader")
                 if broader:
                     cand["broader"] = broader
@@ -164,7 +170,10 @@ def resolve(
 
 def as_authority_ref(candidate: Dict[str, Any]) -> Dict[str, Any]:
     """The compact ref shape persisted on a node/qualia (``authority_refs``):
-    ``{uri, authority, label, rank, match}`` (+ ``broader`` when present)."""
+    ``{uri, authority, label, rank, match}`` (+ ``broader`` when present, and
+    ``fixture: True`` when the snapshot behind it is a hand-seeded sample rather
+    than a real dump — the flag travels with the ref into em.json so a sample
+    URI is never mistaken for a resolved one downstream)."""
     ref = {
         "uri": candidate.get("uri"),
         "authority": candidate.get("authority"),
@@ -174,6 +183,8 @@ def as_authority_ref(candidate: Dict[str, Any]) -> Dict[str, Any]:
     }
     if candidate.get("broader"):
         ref["broader"] = candidate["broader"]
+    if candidate.get("fixture"):
+        ref["fixture"] = True
     return ref
 
 
