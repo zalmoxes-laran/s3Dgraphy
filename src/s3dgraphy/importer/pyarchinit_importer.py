@@ -285,6 +285,12 @@ class PyArchInitImporter(BaseImporter):
                 # ❌ Enriching mode but node not found → SKIP this row
                 warning_msg = f"Node '{node_name}' not found in existing graph - SKIPPED"
                 self.warnings.append(warning_msg)
+                # …and on the list the report reads, beside the richer `orphans`
+                # below: `unmatched` is the same fact in the shape every importer
+                # answers in, so "which rows found nothing" has ONE answer
+                # whatever the source was (base_importer.__init__).
+                if node_name not in self.unmatched:
+                    self.unmatched.append(node_name)
                 # Record the orphan as neutral data. The EMtools
                 # Hybrid-C adapter promotes these into
                 # graph.attributes['aux_orphans']; other consumers

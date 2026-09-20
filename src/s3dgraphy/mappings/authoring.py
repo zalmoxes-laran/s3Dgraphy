@@ -530,7 +530,15 @@ def target_groups(*, include_direct: bool = True) -> List[Dict[str, Any]]:
 def edge_groups(source_type: Optional[str] = None,
                 target_type: Optional[str] = None) -> List[Dict[str, Any]]:
     """The same grouping for the EDGES — the CIDOC property beside each EM edge,
-    under the ontology that defines it."""
+    under the ontology that defines it.
+
+    Since the reverses joined `allowed_edges`, each group carries TWO counts:
+    `count` (what is in the list) and `canonical_count` (the edges the datamodel
+    declares, reverses excluded). The second is the one a drift guard watches —
+    a reverse is not a new property, it is the same property read backwards, so
+    counting it would make the datamodel look like it grew when only the reading
+    did.
+    """
     versions = ontologies()
     groups: Dict[str, Dict[str, Any]] = {}
     for edge in allowed_edges(source_type, target_type):
@@ -546,6 +554,8 @@ def edge_groups(source_type: Optional[str] = None,
                                                      g["ontology"]))
     for group in ordered:
         group["count"] = len(group["edges"])
+        group["canonical_count"] = sum(1 for e in group["edges"]
+                                       if e.get("is_canonical"))
     return ordered
 
 
@@ -603,12 +613,35 @@ def allowed_edges(source_type: Optional[str] = None,
     what the mapping schema carries: `US` is matched against
     `StratigraphicNode` through the class hierarchy, exactly as the graph's own
     validation resolves it.
+
+    ## The reverses are IN (E.D. 2026-09-19)
+
+    Read through `get_connections_datamodel()` and not out of the raw JSON, so the
+    set is the EXPANDED one: every canonical edge plus the reverse the datamodel
+    declares for it (`overlies` → `is_overlain_by`), with `allowed_connections`
+    inverted. The raw JSON holds canonicals only, so a mapping that declared
+    `is_overlain_by` was refused by `validate_mapping` while `Graph.add_edge`
+    accepted it without a murmur — the validator was stricter than the graph, which
+    is the one direction a validator must never be.
+
+    Two additions to each entry, and nothing removed: `is_canonical` and
+    `canonical` (itself, for a canonical or a symmetric one). An editor can show a
+    reverse AS a reverse instead of as a thirteenth unrelated edge.
+
+    One honest limit: a reverse carries the CIDOC mapping of its canonical,
+    because the datamodel declares the property once, in the canonical direction.
+    So `cidoc`/`extension_mapping` on a reverse entry are to be read as "the
+    property of the canonical", and the CIDOC→edge index (`cidoc_index`) still
+    resolves to canonicals only. Projecting a reverse to RDF means projecting the
+    canonical with the ends swapped, which is what canonicalisation on import is
+    for.
     """
-    conn_dm = _load(_CONNECTIONS_DATAMODEL)
+    dm = _connections_loader()
     src_family = _family_of(source_type)
     tgt_family = _family_of(target_type)
     out: List[Dict[str, Any]] = []
-    for name, entry in (conn_dm.get("edge_types") or {}).items():
+    for name in dm.get_all_edge_names(canonical_only=False):
+        entry = dm.get_edge_definition(name) or {}
         allowed = entry.get("allowed_connections") or {}
         sources = [str(s) for s in (allowed.get("source") or [])]
         targets = [str(t) for t in (allowed.get("target") or [])]
@@ -617,6 +650,7 @@ def allowed_edges(source_type: Optional[str] = None,
         if target_type and not _matches(tgt_family, targets):
             continue
         mapping = entry.get("mapping") or {}
+        is_canonical = bool(entry.get("is_canonical"))
         out.append({
             "edge_type": name,
             "label": str(entry.get("label") or name),
@@ -625,8 +659,23 @@ def allowed_edges(source_type: Optional[str] = None,
             "extension_mapping": str(mapping.get("extension_mapping") or ""),
             "source": sources,
             "target": targets,
+            "is_canonical": is_canonical,
+            "is_symmetric": bool(entry.get("is_symmetric")),
+            "canonical": name if is_canonical else str(entry.get("canonical_name")
+                                                       or name),
         })
     return sorted(out, key=lambda e: e["edge_type"])
+
+
+def _connections_loader():
+    """The connections datamodel THROUGH its loader — canonicals and reverses.
+
+    Lazy, like every other importer-side import in this module: `authoring` must
+    stay importable where the graph package's dependencies are not installed, and
+    the loader is a singleton, so paying for it once here costs nothing.
+    """
+    from ..edges.connections_loader import get_connections_datamodel
+    return get_connections_datamodel()
 
 
 def _family_of(node_type: Optional[str]) -> List[str]:
@@ -924,7 +973,8 @@ _INLINE_IMPORTERS = ("xml", "csv")
 def apply_mapping(mapping: Dict[str, Any], source: str, *,
                   graph: Any = None, mode: str = "volatile",
                   mapping_name: Optional[str] = None,
-                  injector: Optional[str] = None) -> Dict[str, Any]:
+                  injector: Optional[str] = None,
+                  enrich_only: bool = False) -> Dict[str, Any]:
     """Run a mapping over a source. `mode` is ``"volatile"`` or ``"bake"``.
 
     Returns ``{ok, mode, format, rows, nodes_added, edges_added, volatile,
@@ -934,6 +984,21 @@ def apply_mapping(mapping: Dict[str, Any], source: str, *,
 
     The graph is optional: without one a fresh graph is made and returned in
     `graph`, which is what a preview wants.
+
+    `enrich_only` is the other half of "where to write vs whether to create": by
+    default a table importer handed a graph is told to CREATE what it does not
+    find (see the comment below — the opposite made every row vanish). With
+    `enrich_only=True` its own enrich mode is left alone, so rows that match no
+    existing node are skipped instead of created: the pure "add paradata to a
+    graph that already has the units" case, which was unreachable until now.
+
+    …and skipped is not the same as lost. The report carries `unmatched` (the key
+    values that found no node, in reading order, each once) and
+    `unmatched_count`. Without them the mode is DANGEROUS in the other direction:
+    measured, a host graph of 620 nodes enriched from a csv holding one typo
+    (`su = 99999`) gained a 621st unit and said nothing. Creating it was the old
+    bug; hiding the skip would be the new one, and a list is what tells a typo in
+    the key column from a unit still to be drawn.
     """
     if mode not in ("volatile", "bake"):
         raise ValueError(f"mode must be 'volatile' or 'bake', got {mode!r}")
@@ -941,12 +1006,14 @@ def apply_mapping(mapping: Dict[str, Any], source: str, *,
     if not verdict["ok"]:
         return {"ok": False, "mode": mode, "errors": verdict["errors"],
                 "warnings": verdict["warnings"], "rows": 0,
-                "nodes_added": 0, "edges_added": 0}
+                "nodes_added": 0, "edges_added": 0,
+                "unmatched": [], "unmatched_count": 0}
     normalized = normalize_mapping(mapping)
     fmt = format_of(normalized)
     if fmt not in _IMPORTERS:
         return {"ok": False, "mode": mode, "rows": 0, "nodes_added": 0,
-                "edges_added": 0, "warnings": verdict["warnings"],
+                "edges_added": 0, "unmatched": [], "unmatched_count": 0,
+                "warnings": verdict["warnings"],
                 "errors": [f"no importer for format {fmt!r} "
                            f"(have: {', '.join(sorted(_IMPORTERS))})"]}
 
@@ -965,14 +1032,16 @@ def apply_mapping(mapping: Dict[str, Any], source: str, *,
     try:
         if fmt in _INLINE_IMPORTERS:
             importer = importer_class(source, mapping=normalized,
-                                      existing_graph=target)
+                                      existing_graph=target,
+                                      enrich_only=enrich_only)
         else:
             # the table importers load their mapping BY NAME from the registry;
             # an inline mapping is set on the instance after construction, which
             # is the seam they already have (`self.mapping`)
             if not mapping_name:
                 return {"ok": False, "mode": mode, "rows": 0, "nodes_added": 0,
-                        "edges_added": 0, "warnings": warnings,
+                        "edges_added": 0, "unmatched": [], "unmatched_count": 0,
+                        "warnings": warnings,
                         "errors": [f"a {fmt} source needs mapping_name (the "
                                    f"table importers load their mapping from the "
                                    f"registry) — save the mapping first, then apply"]}
@@ -985,13 +1054,15 @@ def apply_mapping(mapping: Dict[str, Any], source: str, *,
             # was skipped as "not found in existing graph" and the apply reported
             # ok with an EMPTY graph. Measured by the csv↔xlsx parity test, which
             # is exactly the failure a parity test exists to catch.
-            importer._use_existing_graph = False
+            importer._use_existing_graph = bool(enrich_only)
         importer.parse()
         warnings.extend(getattr(importer, "warnings", []) or [])
     except Exception as exc:                       # noqa: BLE001 — surfaced, not raised
         return {"ok": False, "mode": mode, "rows": 0, "nodes_added": 0,
-                "edges_added": 0, "warnings": warnings,
+                "edges_added": 0, "unmatched": [], "unmatched_count": 0,
+                "warnings": warnings,
                 "errors": [f"{type(exc).__name__}: {exc}"]}
+    unmatched = [str(k) for k in (getattr(importer, "unmatched", []) or [])]
 
     added_nodes = [n for n in target.nodes if n.node_id not in before_nodes]
     added_edges = [e for e in target.edges if e.edge_id not in before_edges]
@@ -1016,6 +1087,12 @@ def apply_mapping(mapping: Dict[str, Any], source: str, *,
                     or len(getattr(importer, "_stored_rows", []) or [])),
         "nodes_added": len(added_nodes),
         "edges_added": len(added_edges),
+        # The rows that matched nothing — empty unless `enrich_only`, where a row
+        # is ALLOWED to find nothing. Every importer answers on the same
+        # attribute (`BaseImporter.unmatched`), so the key means one thing
+        # whatever the source was.
+        "unmatched": unmatched,
+        "unmatched_count": len(unmatched),
         "volatile": mode == "volatile",
         "injector": stamp if mode == "volatile" else None,
         "graph": target,

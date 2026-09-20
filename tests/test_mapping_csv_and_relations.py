@@ -298,14 +298,31 @@ def test_the_edges_group_with_the_datamodels_real_counts():
     prov:used is taken by `dtc_had_input` and reusing it here would collapse in
     PROV exactly the distinction CRMdig draws between the photographs (the input)
     and the camera (the device), while prov:Agent ranges over things that bear
-    responsibility, which a camera does not."""
-    groups = {g["ontology"]: g["count"] for g in api.mapping_edge_groups()}
-    assert groups == {"CIDOC-CRM": 33, "CRMarchaeo": 8, "CRMdig": 5,
-                      "HDT-O": 6, "PROV-O": 2, "unmapped": 2}, groups
+    responsibility, which a camera does not.
+
+    Counted on `canonical_count` since 2026-09-19: `allowed_edges` now also
+    returns the reverse of every non-symmetric edge (`overlies` ⇄
+    `is_overlain_by`), which the graph has always accepted and this layer used to
+    refuse. A reverse is the same property read backwards, not a new one, so it
+    must not move these numbers — that is exactly what this test now pins, while
+    `count` (the list's length) is checked beside it so the two cannot silently
+    part company."""
+    groups = api.mapping_edge_groups()
+    canonical = {g["ontology"]: g["canonical_count"] for g in groups}
+    assert canonical == {"CIDOC-CRM": 33, "CRMarchaeo": 8, "CRMdig": 5,
+                         "HDT-O": 6, "PROV-O": 2, "unmapped": 2}, canonical
+    assert sum(canonical.values()) == 56, "the datamodel's own edge count"
+    listed = {g["ontology"]: g["count"] for g in groups}
+    assert listed == {"CIDOC-CRM": 63, "CRMarchaeo": 12, "CRMdig": 10,
+                      "HDT-O": 12, "PROV-O": 4, "unmapped": 4}, listed
+    assert sum(listed.values()) == 105, "56 canonical + 49 reverses (7 are "\
+                                        "symmetric and have none)"
     filtered = {g["ontology"]: [e["edge_type"] for e in g["edges"]]
                 for g in api.mapping_edge_groups("US", "US")}
     assert "is_after" in filtered["CIDOC-CRM"]
     assert "cuts" in filtered["CRMarchaeo"]
+    assert "is_overlain_by" in filtered["CRMarchaeo"], \
+        "the reverse is offered where the canonical is"
 
 
 def test_a_node_class_gets_its_ontology_from_the_identifier_and_says_so():

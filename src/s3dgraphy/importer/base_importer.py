@@ -15,17 +15,87 @@ from typing import Dict, Any, Optional
 # Configurazione logging opzionale per debug
 logger = logging.getLogger(__name__)
 
+#: The four directed physical relations plus the two symmetric ones — the SEED
+#: of the set below, and the only part still written by hand. Their reverses are
+#: not listed: the datamodel declares them and repeating them here is how the two
+#: lists come to disagree.
+#:
+#: `bonded_to` and `equals` are AP11 physical relations too and are deliberately
+#: NOT seeded: they are aliases of `is_bonded_to` / `is_physically_equal_to`, and
+#: adding them would widen what the importer treats as edge-only for mappings
+#: that name them today — a silent change of behaviour that belongs in its own
+#: round, not in this one.
+_STRATIGRAPHIC_SEED = (
+    "overlies", "cuts", "fills", "abuts",
+    "is_bonded_to", "is_physically_equal_to",
+)
+
+
+def _stratigraphic_edge_types() -> frozenset:
+    """The seed CLOSED under the datamodel's `reverse` — the truth table is the
+    datamodel, never a second dictionary of inverses in this repo.
+
+    Falls back to the historical literal if the datamodel cannot be read, because
+    an importer that suddenly stopped recognising `is_overlain_by` would fail by
+    making properties out of relations, which looks like a mapping mistake.
+    """
+    names = set(_STRATIGRAPHIC_SEED)
+    try:
+        from ..edges.connections_loader import get_connections_datamodel
+
+        datamodel = get_connections_datamodel()
+        for name in _STRATIGRAPHIC_SEED:
+            reverse = datamodel.get_reverse_name(name)
+            if reverse:
+                names.add(reverse)
+    except Exception:                                  # noqa: BLE001
+        names.update({"is_overlain_by", "is_cut_by", "is_filled_by",
+                      "is_abutted_by"})
+    return frozenset(names)
+
+
 #: The edges whose target column is ALREADY an edge and must not also become a
 #: PropertyNode. Ten stratigraphic relations, and until now the list lived twice
 #: inside this file (once in `_process_properties`, once in
 #: `_process_stratigraphic_relations`) plus a mirrored copy in
 #: `mappings/authoring.py`. One name, imported by all three: two copies of a rule
-#: are two rules waiting to disagree.
-STRATIGRAPHIC_EDGE_TYPES = frozenset({
-    "overlies", "is_overlain_by", "cuts", "is_cut_by",
-    "fills", "is_filled_by", "abuts", "is_abutted_by",
-    "is_bonded_to", "is_physically_equal_to",
-})
+#: are two rules waiting to disagree — and since REV1 (2026-09-19) the reverse
+#: half is not written down at all, it is derived.
+STRATIGRAPHIC_EDGE_TYPES = _stratigraphic_edge_types()
+
+
+def _canonical_relation(source_id: str, target_id: str, edge_type: str):
+    """One relation, brought to the direction the datamodel calls canonical.
+
+    Returns `(source_id, target_id, edge_type, is_symmetric)`.
+
+    A US card records the same physical fact from both sides — row 1 says
+    "copre 2", row 2 says "coperto da 1" — and until now that made TWO edges for
+    one fact, `1 -overlies-> 2` and `2 -is_overlain_by-> 1`. Swapping the ends of
+    the reverse makes the second edge BE the first, and the deterministic
+    `{source}_{type}_{target}` id collapses them without a dedup pass.
+
+    A symmetric relation (`reverse: null` in the datamodel — `is_bonded_to`,
+    `equals`, `has_same_time`, …) is NOT swapped: there is no canonical direction
+    to bring it to, so the pair is deduplicated unordered instead, by the caller.
+
+    An unknown edge type is returned untouched: this function canonicalises, it
+    does not validate — `Graph.add_edge` is still the one that refuses.
+    """
+    try:
+        from ..edges.connections_loader import get_connections_datamodel
+
+        entry = get_connections_datamodel().get_edge_definition(edge_type)
+    except Exception:                                  # noqa: BLE001
+        entry = None
+    if not entry:
+        return source_id, target_id, edge_type, False
+    if entry.get("is_symmetric"):
+        return source_id, target_id, edge_type, True
+    if entry.get("is_canonical"):
+        return source_id, target_id, edge_type, False
+    canonical = str(entry.get("canonical_name") or edge_type)
+    return target_id, source_id, canonical, False
 
 
 def _as_integer_text(value) -> str:
@@ -132,6 +202,18 @@ class BaseImporter(ABC):
         # XLSX importer never did, so parse() raised `no attribute 'graph'`.
         self.graph = graph if graph is not None else Graph(graph_id="imported_graph")
         self.warnings = []
+        #: The key values of the rows that matched NO node in the host graph,
+        #: in the order they were read, each once.
+        #:
+        #: Only enrich-only mode fills it (`_use_existing_graph`), because only
+        #: there is a row allowed to find nothing: everywhere else an unknown key
+        #: CREATES its node, and "unmatched" would name every row of the file.
+        #:
+        #: It exists because the alternative was measured and is the worse one: a
+        #: graph attached to a spreadsheet whose key column has a typo used to
+        #: gain a unit nobody excavated, in silence. A list the caller can show is
+        #: how "US 99999 is not in this graph" reaches the person who typed it.
+        self.unmatched: list = []
 
     def _load_mapping(self, mapping_name: str) -> Dict[str, Any]:
         """Load the JSON mapping file using the mapping registry."""
@@ -384,7 +466,11 @@ class BaseImporter(ABC):
             return existing_node
             
         elif is_enriching_existing:
-            # We're enriching existing graph but node not found - SKIP this row
+            # We're enriching existing graph but node not found - SKIP this row.
+            # Skipping is right; skipping SILENTLY is not, and the warning alone
+            # is prose the UI cannot count. The key goes on a list of its own.
+            if target_name not in self.unmatched:
+                self.unmatched.append(target_name)
             self.warnings.append(f"Node '{target_name}' not found in existing graph - SKIPPED")
             #print(f"SKIPPED: Node '{target_name}' not found in existing graph")
             return None
@@ -661,6 +747,18 @@ class BaseImporter(ABC):
         }
         return stats
 
+    def _source_settings(self) -> Dict[str, Any]:
+        """The mapping's source block — `source_settings`, or the older
+        `table_settings`. Read here rather than imported from
+        `mappings.authoring` so the importer keeps no import back into the
+        authoring layer (which imports THIS module for
+        `STRATIGRAPHIC_EDGE_TYPES`)."""
+        mapping = self.mapping or {}
+        settings = mapping.get("source_settings")
+        if not isinstance(settings, dict) or not settings:
+            settings = mapping.get("table_settings")
+        return settings if isinstance(settings, dict) else {}
+
     def _find_node_by_name(self, target_name: str):
         """
         Find existing node by name in current graph.
@@ -683,6 +781,11 @@ class BaseImporter(ABC):
         Called after all nodes are created (two-pass approach), so target nodes exist.
         Uses the 'relations' array from the mapping JSON to identify
         which columns contain stratigraphic relationships and their edge types.
+
+        This is the ONE place a relation read from a legacy table enters the
+        graph, which is why the reverse-canonicalisation lives here and not in
+        `Graph.add_edge`: everything else that writes edges (import_graphml,
+        merge, contract, the crdt ops) stays bit-identical.
         """
         if not self.mapping:
             return
@@ -718,6 +821,13 @@ class BaseImporter(ABC):
         if not rel_columns:
             return
 
+        # OPT-IN, and it stays opt-in until EMStudio and Heriverse are aligned:
+        # `source_settings.canonicalize_reverse: true`. Off, this loop writes
+        # exactly the edges it wrote yesterday, so no mapping on disk changes
+        # behaviour by being upgraded. On, a reverse relation is stored as its
+        # canonical with the ends swapped — see `_canonical_relation`.
+        canonicalize = bool(self._source_settings().get("canonicalize_reverse"))
+
         edges_created = 0
         for row_data in self._stored_rows:
             source_name = self._clean_value_for_ui(row_data.get(self._get_id_column(), ''))
@@ -748,11 +858,25 @@ class BaseImporter(ABC):
                         target_node = self._find_node_by_name(
                             _as_integer_text(target_id))
                     if target_node:
-                        edge_id = f"{source_node.node_id}_{edge_type}_{target_node.node_id}"
-                        if not self.graph.find_edge_by_id(edge_id):
+                        src_id = source_node.node_id
+                        tgt_id = target_node.node_id
+                        stored_type = edge_type
+                        symmetric = False
+                        if canonicalize:
+                            src_id, tgt_id, stored_type, symmetric = (
+                                _canonical_relation(src_id, tgt_id, edge_type))
+                        edge_id = f"{src_id}_{stored_type}_{tgt_id}"
+                        # a symmetric relation has no canonical direction, so the
+                        # two ways it can be written are deduplicated as an
+                        # UNORDERED pair — the only case the deterministic id
+                        # cannot collapse on its own
+                        mirror_id = f"{tgt_id}_{stored_type}_{src_id}"
+                        already = self.graph.find_edge_by_id(edge_id) or (
+                            symmetric and self.graph.find_edge_by_id(mirror_id))
+                        if not already:
                             try:
-                                self.graph.add_edge(edge_id, source_node.node_id,
-                                                  target_node.node_id, edge_type)
+                                self.graph.add_edge(edge_id, src_id, tgt_id,
+                                                    stored_type)
                                 edges_created += 1
                             except ValueError as e:
                                 self.warnings.append(f"Edge warning: {e}")

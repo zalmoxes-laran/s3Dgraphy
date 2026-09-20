@@ -4,6 +4,97 @@ All notable changes to **s3dgraphy** are documented here.
 
 ## [Unreleased]
 
+### Added (2026-09-19 — IMPMAP, attaching a table to a graph that is already right)
+Loading a legacy dataset has **two modes**, and only one of them was reachable
+from `mapping_apply`: the table brings the stratigraphy (relations in the
+columns, the graph born out of the dataset), or **the graph brings the
+stratigraphy and the table brings the rest** — no relation columns anywhere, a
+sequence drawn by hand, and a spreadsheet that goes on being edited elsewhere and
+re-read. The second is by far the more common, and it was the dangerous one.
+
+- **`unmatched` / `unmatched_count` in the `apply_mapping` report.** In
+  `enrich_only` a row whose key matches no node is SKIPPED — right — but it was
+  skipped into a per-row warning and nothing else. Measured before this round: a
+  host graph of 620 nodes enriched from a csv holding one typo (`su = 99999`) →
+  **624 nodes, `99999` created, zero warnings**; with `enrich_only` reachable but
+  silent, the damage simply moves from "a typo invents a unit" to "a typo loses a
+  row", which is harder to see. `BaseImporter.unmatched` collects the keys that
+  found nothing, in reading order, each once — one attribute, filled by the same
+  branch in `base_importer` that all four importers reach, plus the
+  pyArchInit importer's own copy of that branch (which keeps its richer
+  `orphans` beside it). Empty unless `enrich_only`: everywhere else an unknown
+  key legitimately creates its node, and "unmatched" would name every row.
+- The not-ok returns carry the two keys as well, so a caller reads the report's
+  shape once.
+- Stated because the second mode rests on it, and verified rather than assumed: a
+  descriptor with **no `relations` at all** is a valid mapping.
+  `mapping_validate` asks for an `is_id` — the join key — and nothing more. No
+  schema change was needed.
+
+### Fixed (2026-09-19 — REV1, the reverse of a relation is the same relation)
+The connections datamodel has declared the inverses since 1.5.3 (`overlies` ⇄
+`is_overlain_by`, `cuts` ⇄ `is_cut_by`, `fills`, `abuts`, `is_after` ⇄
+`is_before`, ~45 more) and `connections_loader` expands them correctly. **Two
+places did not read that expansion**, independently, and neither is a new
+feature: both are the library disagreeing with itself.
+
+- **`mappings/authoring.allowed_edges()` read the RAW json**, which holds
+  canonicals only — so `mapping_validate` **refused** a relation declaring
+  `is_overlain_by` while `Graph.add_edge` accepted that very edge without a
+  warning. A validator stricter than the graph sends an author to fix something
+  that was never wrong. It now reads `get_connections_datamodel()`, so the set is
+  canonicals **+ reverses** (20 edges US→US where there were 13). The entry shape
+  is unchanged and **grew** two keys: `is_canonical` and `canonical` (plus
+  `is_symmetric`), so an editor can show a reverse AS a reverse. Honest limit,
+  stated: a reverse carries its canonical's CIDOC mapping, because the datamodel
+  declares the property once, in the canonical direction — and `cidoc_index()`
+  still resolves CIDOC → canonical only.
+- **`mapping_edge_groups()`** therefore lists both directions and each group now
+  carries **`canonical_count`** beside `count`. The drift guard that watches the
+  datamodel's size counts the canonical one: a reverse is the same property read
+  backwards, not a 57th edge.
+
+### Added (2026-09-19 — REV1, canonicalisation on import, OPT-IN)
+- **`source_settings.canonicalize_reverse: true`** (default `false`) in
+  `importer/base_importer._process_stratigraphic_relations`. On, a relation whose
+  `edge_type` is a reverse is stored as its **canonical with source and target
+  swapped**; a **symmetric** edge (`reverse: null` in the datamodel —
+  `is_bonded_to`, `equals`, `has_same_time`, …) is **not** swapped and is
+  deduplicated on the **unordered** pair. Everything else collapses by itself:
+  the `{source}_{type}_{target}` id is already deterministic, so after the swap
+  the two registrations of one fact ARE one id.
+  - **Why it was needed**: a US card records the same physical relation from both
+    sides — "1 copre 2" on one row, "2 coperto da 1" on the next — and that made
+    **two edges for one fact**, with nothing downstream able to tell.
+  - **Why only here**: this method is the single point where a relation read from
+    a legacy table enters the graph. `Graph.add_edge` is untouched, so
+    `import_graphml`, merge, contract and the crdt ops are **bit-identical**.
+  - **Why opt-in**: EMStudio and Heriverse have not been re-vendored (Heriverse
+    still ships datamodel 1.6.2 and has materials for edges that no longer
+    exist). **It will become the default once they are aligned**, and removing
+    the flag is when `Graph.add_edge` gets looked at again.
+  - The truth table is **the datamodel**, read through
+    `get_connections_datamodel()`. No second dictionary of inverses was written
+    into this repo — a test asserts the four reverse names appear as literals
+    exactly once, in the fallback branch. (pyarchinit-mini keeps its own
+    `REVERSE_TO_FORWARD`, which maps `is_after` → `overlies` and so confuses the
+    temporal plane with the physical one; that copy is the one to delete, not to
+    copy.)
+- **`STRATIGRAPHIC_EDGE_TYPES` is now derived**: a hand-written seed of six
+  (`overlies`, `cuts`, `fills`, `abuts`, `is_bonded_to`,
+  `is_physically_equal_to`) closed under the datamodel's `reverse`. It resolves
+  to **the same ten names** it has always held — deriving changed nothing, which
+  is the measure. `bonded_to` and `equals` are deliberately NOT seeded: widening
+  what counts as edge-only would silently change mappings that name them.
+- **`api.mapping_apply` reaches what the module function already accepted**:
+  `injector` (who is answerable for what a call added) and the new `enrich_only`.
+- **`enrich_only`** on `apply_mapping` / `api.mapping_apply`: the table importers'
+  `_use_existing_graph` was forced to `False` unconditionally (rightly — passing a
+  graph used to make every row vanish), which left pure enrich-only unreachable.
+  It is now a parameter, default `False`, and it is forwarded to the inline
+  importers too, which already had it in their constructors.
+
+
 ### Added (2026-08-24 — Shelf, Traccia A: role · URI-only · modes · EM Data table)
 Four **additive** things on the shelf substrate that already exists. Nothing was
 rebuilt and `LinkNode` was NOT renamed (breaking, coordinated, still deferred).

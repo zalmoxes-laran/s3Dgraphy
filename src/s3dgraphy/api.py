@@ -2526,7 +2526,11 @@ def mapping_allowed_edges(source_type: Optional[str] = None,
                           ) -> List[Dict[str, Any]]:
     """The edges the datamodel allows between two node types, with their CIDOC
     property. THE SAME `allowed_connections` the canvas's edge picker reads, so a
-    relation authored in a mapping cannot be one the graph would refuse."""
+    relation authored in a mapping cannot be one the graph would refuse.
+
+    Canonicals AND reverses (`overlies` and `is_overlain_by`), each entry marked
+    `is_canonical` / `canonical`, because the graph accepts both and a picker that
+    offered only one direction made the other look illegal."""
     from .mappings.authoring import allowed_edges
     return allowed_edges(source_type, target_type)
 
@@ -2548,7 +2552,8 @@ def mapping_normalize(mapping: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def mapping_apply(mapping: Dict[str, Any], source: str, *, graph: Any = None,
-                  mode: str = "volatile", mapping_name: Optional[str] = None
+                  mode: str = "volatile", mapping_name: Optional[str] = None,
+                  injector: Optional[str] = None, enrich_only: bool = False
                   ) -> Dict[str, Any]:
     """Run a mapping over a source: `mode="volatile"` (an auxiliary in the graph,
     out of the saved document until a bake) or `mode="bake"` (written in).
@@ -2556,10 +2561,21 @@ def mapping_apply(mapping: Dict[str, Any], source: str, *, graph: Any = None,
     Named `mapping_apply` and not `apply_mapping` on purpose: this surface
     already has `apply_acquisition_mapping`, and two different acts sharing one
     verb is how somebody ends up calling the wrong one. The module-level function
-    IS `apply_mapping` (`mappings.authoring`), where there is no ambiguity."""
+    IS `apply_mapping` (`mappings.authoring`), where there is no ambiguity.
+
+    `injector` (who is answerable for what this call added — it lands on the
+    volatile nodes) and `enrich_only` (skip rows that match no existing node,
+    instead of creating them) were accepted by the module function and missing
+    here: the api surface was the narrower of the two for no reason.
+
+    With `enrich_only` the report carries `unmatched` / `unmatched_count` — the
+    keys that found nothing. Skipping them is the point of the mode; skipping
+    them without saying so would only move the damage from "a typo invents a
+    unit" to "a typo loses a row"."""
     from .mappings.authoring import apply_mapping
     return apply_mapping(mapping, source, graph=graph, mode=mode,
-                         mapping_name=mapping_name)
+                         mapping_name=mapping_name, injector=injector,
+                         enrich_only=enrich_only)
 
 
 def mapping_target_groups(*, include_direct: bool = True
