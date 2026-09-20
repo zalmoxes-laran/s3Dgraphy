@@ -157,6 +157,15 @@ def _resolve_prefixed(name: Optional[str]) -> Optional[URIRef]:
     full = name.replace(" ", "_")
     code = full.split("_")[0]
 
+    # CRMarchaeo PROPERTIES are AP<n>, not A<n> — A<n> are its classes. The
+    # heuristic below reads two characters and requires the second to be a
+    # digit, so every AP code fell through to None and the extension predicate
+    # was silently never emitted: 26 of the 47 declared extension_mappings,
+    # AP28/AP4/AP22/AP12 among them. Verified against the CRMarchaeo v2.1.1
+    # declaration (AP1–AP32).
+    if len(code) >= 3 and code[:2] == "AP" and code[2].isdigit():
+        return CRMARCHAEO[full]
+
     head = code[:2]
     if len(head) >= 2 and head[1].isdigit():
         first = head[0]
@@ -166,6 +175,16 @@ def _resolve_prefixed(name: Optional[str]) -> Optional[URIRef]:
             return CRMINF[full]
         if first == "D":
             return CRMDIG[full]
+        # NOT resolved here, deliberately: CRMdig L<n> and CRMinf J<n> — the
+        # property letters of those two extensions, as against their class
+        # letters D<n> and I<n>. They exist (CRMdig v5.0, CRMinf v1.0) and the
+        # datamodel declares four of them, but J7 is already claimed by the
+        # inference apparatus: the importer lists it in ARTEFACT_PREDICATES as
+        # part of the belief skeleton. Emitting it as `extracted_from`'s
+        # signature makes the importer discard the triple and the edge is lost
+        # on the return leg — measured, 11 round-trip tests. The collision is
+        # real and needs a decision about which reading of J7 wins, not a
+        # widened heuristic.
         if first in ("E", "P"):
             return CRM[full]
     if code[:2] in ("SP", "OA") or code[:1] == "Q":
@@ -209,6 +228,18 @@ class _Datamodel:
 
         self._qualia_class_index: Dict[str, str] = {}
         self._build_qualia_index(self.qualia_types)
+
+        #: reverse edge name → canonical edge name. The connections datamodel
+        #: declares `reverse` on every non-symmetric canonical but keys the
+        #: dictionary by the CANONICAL name only, so a graph holding an
+        #: `is_before` edge finds nothing here unless we index the other
+        #: direction ourselves. See resolve_edge_direction().
+        self._reverse_of: Dict[str, str] = {}
+        for _canon, _entry in (self.connections_datamodel.get("edge_types") or {}).items():
+            _rev = (_entry or {}).get("reverse") or {}
+            _rev_name = _rev.get("name")
+            if _rev_name:
+                self._reverse_of[_rev_name] = _canon
 
     def _load_json(self, name: str) -> Dict[str, Any]:
         path = self.config_dir / name
@@ -266,6 +297,24 @@ class _Datamodel:
                 result.append(iri)
         return result
 
+    def resolve_edge_direction(self, edge_type: str) -> Tuple[str, bool]:
+        """``edge_type`` → ``(canonical_name, inverted)``.
+
+        RDF has no reading direction: `A is_after B` and `B is_before A` state
+        the same fact, and a triple store should not be able to tell which way
+        the author happened to draw it. So a reverse edge resolves to its
+        canonical name with ``inverted=True``, and the caller swaps subject and
+        object. Every stratigraphic relation then leaves in one shape, and a
+        SPARQL query written against the canonical predicate finds all of them.
+
+        An unknown or already-canonical name comes back unchanged with
+        ``inverted=False``.
+        """
+        canon = self._reverse_of.get(edge_type)
+        if canon is not None:
+            return canon, True
+        return edge_type, False
+
     def get_edge_mapping(self, edge_type: str) -> Tuple[Optional[URIRef], Optional[URIRef], Optional[str], bool]:
         """
         Returns (predicate_iri, extension_iri, type_tag, deprecated).
@@ -282,7 +331,8 @@ class _Datamodel:
         write (already canonicalised aliases like has_timebranch).
         """
         edges = self.connections_datamodel.get("edge_types", {})
-        entry = edges.get(edge_type) or {}
+        canonical, _inverted = self.resolve_edge_direction(edge_type)
+        entry = edges.get(canonical) or {}
         if not entry:
             return None, None, None, False
         deprecated = bool(entry.get("deprecated"))
@@ -1354,8 +1404,19 @@ class RDFExporter:
             self.stats["edges_skipped_deprecated"] += 1
             return
 
-        source_iri = self._node_iri(g.graph_id, edge.edge_source)
-        target_iri = self._node_iri(g.graph_id, edge.edge_target)
+        # A reverse edge carries the same fact as its canonical, written the
+        # other way round. RDF keeps no record of which way the author drew it,
+        # so the canonical predicate goes out with subject and object swapped
+        # and the graph reads uniformly. Written as-is, `is_before` would find
+        # no entry in the datamodel and fall through to the generic
+        # P130_shows_features_of below — which does not merely lose the
+        # relation, it states a different one.
+        edge_type, inverted = self.datamodel.resolve_edge_direction(edge_type)
+        if inverted:
+            self.stats["edges_canonicalised"] = self.stats.get("edges_canonicalised", 0) + 1
+
+        source_iri = self._node_iri(g.graph_id, edge.edge_target if inverted else edge.edge_source)
+        target_iri = self._node_iri(g.graph_id, edge.edge_source if inverted else edge.edge_target)
 
         if type_tag and type_tag in AP11_SUBPROPS:
             specific = AP11_SUBPROPS[type_tag]
@@ -1387,7 +1448,8 @@ class RDFExporter:
         # something false about a class, which a reasoner then propagates.
         # Activity → activity is prov:wasInformedBy, and that is what goes out.
         if edge_type == "dtc_had_input":
-            target = g.find_node_by_id(edge.edge_target)
+            # the LOGICAL target, which is the drawn source when inverted
+            target = g.find_node_by_id(edge.edge_source if inverted else edge.edge_target)
             if getattr(target, "node_type", "").startswith("dtc_"):
                 ctx.add((source_iri, PROV.wasInformedBy, target_iri))
                 self.stats["edges_emitted"] += 1
