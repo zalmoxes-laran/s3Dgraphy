@@ -3,7 +3,8 @@
     "version": "2.0",
     "last_updated": "2025-01-29",
     "maintainers": ["Emanuel Demetrescu"],
-    "license": "CC-BY-4.0",
+    "license": "CC-BY-SA-4.0",
+    "license_note": "Share-alike per allinearsi agli strumenti terminologici da cui questo datamodel prende gli ancoraggi (ICCD CC BY-SA 3.0 IT) e perche' una derivazione resti aperta. Gli identificatori AAT/CIDOC citati nei `mappings` sono RIFERIMENTI, non contenuto incorporato: lo share-alike non si propaga ai vocabolari altrui, che mantengono i propri termini.",
     "description": "Extractors for deriving qualia from source documents"
   },
   "vocabulary_versions": {
