@@ -147,6 +147,72 @@ and :class:`~s3dgraphy.importer.xlsx_importer.XLSXImporter`.
      "start_row": 1
    }
 
+FileMaker (``format_type: "fmpxml"``)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Used by :class:`~s3dgraphy.importer.fmpxml_importer.FMPXMLImporter`, for a
+FileMaker ``FMPXMLRESULT`` export — the shape DANA (Israel Antiquities
+Authority) and many other excavation databases produce.
+
+It has an XML syntax and a TABLE shape, and the two disagree where it counts:
+the field names are declared once in a ``METADATA`` block, and the values
+follow in ``RESULTSET/ROW/COL/DATA`` **with no names**, matched to their field
+by POSITION.
+
+.. code-block:: xml
+
+   <METADATA><FIELD NAME="d_locus_no"/><FIELD NAME="d_description"/></METADATA>
+   <RESULTSET FOUND="173">
+     <ROW><COL><DATA>35001</DATA></COL><COL><DATA>pit fill</DATA></COL></ROW>
+
+This is why it is a format of its own rather than a flavour of ``xml``. The
+plain XML reader does not fail on one of these files: it finds
+``/FMPXMLRESULT/RESULTSET/ROW/COL/DATA`` repeated N times per record, cannot
+tell one field from another, and produces rows whose columns collide. Silent,
+and it looks like data.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 12 68
+
+   * - Key
+     - Required
+     - Meaning
+   * - ``format_type``
+     - yes
+     - Must be the literal string ``"fmpxml"``.
+   * - ``record_path``
+     - no
+     - **Not read.** A FileMaker export is one table per file, so there is
+       nothing to select inside it. Declaring it produces a warning.
+   * - ``table_name``
+     - no
+     - **Not read**, for the same reason.
+
+Column names in ``column_mappings`` are the ``NAME`` attributes from
+``METADATA``. ``source_path`` is still honoured when a descriptor sets one, so
+a mapping authored against the XML shape keeps working.
+
+.. code-block:: json
+
+   "source_settings": { "format_type": "fmpxml" }
+
+Two things worth knowing when authoring against one of these exports.
+
+**The declared row count.** ``RESULTSET/@FOUND`` says how many rows the file
+claims to hold, and :func:`~s3dgraphy.api.mapping_source_fields` returns it as
+``declared_rows`` beside ``read_rows``. They differ only on a truncated file —
+and a truncated import that reports success is the kind of thing nobody
+notices until much later.
+
+**The same column name can mean different things in different files of one
+export.** Measured on the Yavneh DANA export, 2026-09-20: ``d_locus_no`` in
+``loci.xml`` is always numeric (``35005``), while the column of that name in
+``stratigraphy.xml`` carries the prefixed form (``W35005``, ``#35009``). Taking
+the numeric one as identity loses 47 of the 161 loci the relations refer to;
+taking ``d_locus_no_canonical`` loses none. Read the VALUES of a column, never
+only its name.
+
 column_mappings
 ---------------
 

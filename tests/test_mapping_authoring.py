@@ -95,8 +95,11 @@ def test_a_mapping_with_no_settings_at_all_defaults_to_the_old_assumption():
     assert A.format_of({"column_mappings": {}}) == "xlsx"
 
 
-def test_the_formats_are_the_four_declared():
-    assert api.mapping_formats() == ("sqlite", "xlsx", "csv", "xml")
+def test_the_declared_formats_are_a_closed_list():
+    """Closed on purpose: a format is a reader somebody wrote, not a string.
+    `fmpxml` (FileMaker FMPXMLRESULT) joined on 2026-09-20 — an ADDITION, which
+    is why SCHEMA_VERSION did not move."""
+    assert api.mapping_formats() == ("sqlite", "xlsx", "csv", "xml", "fmpxml")
 
 
 # ── A2 · the CIDOC inverse index, on real pairs ─────────────────────────────

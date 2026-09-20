@@ -4,6 +4,45 @@ All notable changes to **s3dgraphy** are documented here.
 
 ## [Unreleased]
 
+### Added (2026-09-20 — FMPXML, a FileMaker export read as the table it is)
+`format_type: "fmpxml"` joins `sqlite`/`xlsx`/`csv`/`xml`, for the
+`FMPXMLRESULT` shape DANA (Israel Antiquities Authority) and many other
+excavation databases produce. XML syntax, table shape: field names declared
+once in `METADATA`, values matched to them BY POSITION in `RESULTSET/ROW/COL/
+DATA`.
+
+A format of its own and not a flavour of `xml`, because the plain XML reader
+does **not fail** on one of these — it finds the same path repeated N times per
+record, cannot tell one field from another, and produces rows whose columns
+collide. Silent, and it looks like data.
+
+- `FMPXMLImporter` inherits from `XMLImporter` and overrides one thing: how a
+  record becomes a dict. Everything downstream — `column_mappings`, relations,
+  filters, the base importer — is unchanged, so a FileMaker source behaves like
+  any other table.
+- `sniff_format(path)` reads the root element of an existing `.xml` and returns
+  `fmpxml` when it is one. `detect_format` still goes by extension alone and
+  opens nothing.
+- `mapping_source_fields` returns `declared_rows` (`RESULTSET/@FOUND`) beside
+  `read_rows`. They differ only on a truncated file, and a truncated import that
+  reports success is the failure nobody notices until much later.
+- Declaring `record_path` or `table_name` on a `fmpxml` source is a warning:
+  one table per file, nothing to select inside it.
+
+**Chosen over a converter on purpose.** A script writing CSVs beside the source
+would work and would leave a second copy of every dataset on disk — the wrong
+default for an excavation database under a partner's licence. A mapping that
+reads the export where it lies copies nothing.
+
+**Measured on the Yavneh Area M4 export** (Israel Antiquities Authority, DANA):
+173 loci in, 976 nodes, 803 edges, no warnings. And one thing found only by
+looking at the values: `d_locus_no` in `loci.xml` is always numeric (`35005`)
+while the column of that NAME in `stratigraphy.xml` carries the prefixed form
+(`W35005`, `#35009`, `W35050 [W35011]`). Same name, two files, two contents.
+Using the numeric form as identity loses 47 of the 161 loci the relations refer
+to; `d_locus_no_canonical` loses none. It is now in the schema documentation,
+because it is a trap any FileMaker export can set.
+
 ### Added (2026-09-19 — IMPMAP, attaching a table to a graph that is already right)
 Loading a legacy dataset has **two modes**, and only one of them was reachable
 from `mapping_apply`: the table brings the stratigraphy (relations in the

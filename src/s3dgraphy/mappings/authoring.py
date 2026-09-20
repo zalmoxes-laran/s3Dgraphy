@@ -73,7 +73,11 @@ SCHEMA_VERSION = "1"
 
 #: The sources a mapping can describe. `xml` is the new one and it is why
 #: `table_settings` had to become `source_settings`: an XML has no table.
-FORMATS = ("sqlite", "xlsx", "csv", "xml")
+#: `fmpxml` is a FileMaker export: XML syntax, table shape, field names in a
+#: METADATA block and values matched to them BY POSITION. It is its own format
+#: rather than a flavour of `xml` because the plain XML reader does not fail on
+#: one — it produces rows whose columns all collide, which looks like data.
+FORMATS = ("sqlite", "xlsx", "csv", "xml", "fmpxml")
 
 #: How many example values a field carries. Three is enough to recognise a column
 #: and few enough that a 200-column source stays one screen.
@@ -211,6 +215,10 @@ def validate_mapping(mapping: Dict[str, Any]) -> Dict[str, Any]:
             settings.get("table_name") or settings.get("sheet_name") is not None):
         warnings.append(f"a {fmt} source usually names its table/sheet "
                         f"(source_settings.table_name / sheet_name)")
+    if fmt == "fmpxml" and (settings.get("record_path")
+                            or settings.get("table_name")):
+        warnings.append("a fmpxml source is one table per file: `record_path` "
+                        "and `table_name` are not read")
     if fmt == "xml" and not settings.get("record_path"):
         warnings.append("an XML source needs source_settings.record_path — the "
                         "element that is one RECORD; without it every field would "
@@ -728,6 +736,9 @@ SOURCE_EXTENSIONS = {
     "xlsx": "xlsx", "xlsm": "xlsx",
     "csv": "csv", "tsv": "csv",
     "xml": "xml", "rdf": "xml", "xsd": "xml",
+    # NB no extension maps to `fmpxml`: a FileMaker export is a .xml like any
+    # other, so the format is DECLARED in the mapping. `sniff_format` reads the
+    # root element when the file is at hand.
 }
 
 
@@ -736,6 +747,25 @@ def detect_format(path: str) -> str:
     one this library has always assumed."""
     ext = str(path).rsplit(".", 1)[-1].lower() if "." in str(path) else ""
     return SOURCE_EXTENSIONS.get(ext, "xlsx")
+
+
+def sniff_format(path: str) -> str:
+    """The format of a source that EXISTS, reading it when the extension is not
+    enough.
+
+    Only `.xml` is ambiguous, and only in one direction: a FileMaker export is
+    a perfectly ordinary .xml file whose root says `FMPXMLRESULT`. Everything
+    else falls back to `detect_format`, which never opens anything.
+    """
+    fmt = detect_format(path)
+    if fmt == "xml":
+        try:
+            from ..importer.fmpxml_importer import looks_like_fmpxml
+            if looks_like_fmpxml(path):
+                return "fmpxml"
+        except Exception:
+            pass
+    return fmt
 
 
 def source_extensions() -> Dict[str, str]:
@@ -761,6 +791,8 @@ def source_fields(path: str, *, format_type: Optional[str] = None,
         return _fields_sqlite(path, table, samples)
     if fmt == "csv":
         return _fields_csv(path, samples)
+    if fmt == "fmpxml":
+        return _fields_fmpxml(path, samples)
     if fmt == "xml":
         return _fields_xml(path, record_path, samples)
     return _fields_xlsx(path, table, samples)
@@ -778,6 +810,27 @@ def _field(name: str, values: List[Any], *, source_path: Optional[str] = None
     if source_path:
         out["source_path"] = source_path
     return out
+
+
+def _fields_fmpxml(path: str, samples: int) -> Dict[str, Any]:
+    """The fields a FileMaker export declares, with examples from its rows.
+
+    `declared` is what the file says it holds; `read` is what was there. They
+    differ only on a truncated file, and saying both is cheaper than finding out
+    later."""
+    from ..importer.fmpxml_importer import (field_names, declared_row_count,
+                                            FMPXMLImporter)
+    names = field_names(path)
+    reader = FMPXMLImporter.__new__(FMPXMLImporter)
+    reader.filepath = path
+    rows = reader.records()
+    return {
+        "format": "fmpxml",
+        "source": path,
+        "declared_rows": declared_row_count(path),
+        "read_rows": len(rows),
+        "fields": [_field(n, [r.get(n) for r in rows[:samples]]) for n in names],
+    }
 
 
 def _fields_sqlite(path: str, table: Optional[str], samples: int) -> Dict[str, Any]:
@@ -963,12 +1016,13 @@ _IMPORTERS = {
     "csv": ("..importer.csv_importer", "CSVImporter"),
     "xlsx": ("..importer.mapped_xlsx_importer", "MappedXLSXImporter"),
     "sqlite": ("..importer.pyarchinit_importer", "PyArchInitImporter"),
+    "fmpxml": ("..importer.fmpxml_importer", "FMPXMLImporter"),
 }
 
 #: The importers that take a mapping DICT (`mapping=`) rather than a registered
 #: name. They are the ones written for the editor, where the mapping is what is
 #: on screen and has not been filed yet.
-_INLINE_IMPORTERS = ("xml", "csv")
+_INLINE_IMPORTERS = ("xml", "csv", "fmpxml")
 
 
 def apply_mapping(mapping: Dict[str, Any], source: str, *,

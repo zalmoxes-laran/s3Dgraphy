@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FMPXMLRESULT xmlns="http://www.filemaker.com/fmpxmlresult">
+  <ERRORCODE>0</ERRORCODE>
+  <PRODUCT BUILD="" NAME="FileMaker" VERSION=""/>
+  <DATABASE DATEFORMAT="" LAYOUT="" NAME="excavation" RECORDS="3" TIMEFORMAT=""/>
+  <METADATA>
+    <FIELD EMPTYOK="YES" MAXREPEAT="1" NAME="locus_no" TYPE="TEXT"/>
+    <FIELD EMPTYOK="YES" MAXREPEAT="1" NAME="description" TYPE="TEXT"/>
+    <FIELD EMPTYOK="YES" MAXREPEAT="1" NAME="material" TYPE="TEXT"/>
+  </METADATA>
+  <RESULTSET FOUND="3">
+    <ROW MODID="1" RECORDID="1">
+      <COL><DATA>W100</DATA></COL>
+      <COL><DATA>muro perimetrale</DATA></COL>
+      <COL><DATA>calcare</DATA></COL>
+    </ROW>
+    <ROW MODID="1" RECORDID="2">
+      <COL><DATA>101</DATA></COL>
+      <COL><DATA>riempimento</DATA></COL>
+      <COL><DATA></DATA></COL>
+    </ROW>
+    <ROW MODID="1" RECORDID="3">
+      <COL><DATA>#102</DATA></COL>
+      <COL><DATA>taglio</DATA></COL>
+      <COL><DATA></DATA></COL>
+    </ROW>
+  </RESULTSET>
+</FMPXMLRESULT>
