@@ -1,60 +1,55 @@
 {
-    "name": "Generic Special Finds Format",
-    "description": "Generic Mapping format for Special Finds",
-    "version": "1.5",
-    "table_settings": {
-        "format_type": "xlsx",
-        "sheet_name": "Special_Finds"
+  "name": "Generic Special Finds Format",
+  "description": "Generic Mapping format for Special Finds. Rimossa (2026-09-20) la relazione STATO_CONSERVAZIONE --extracted_from--> MATERIALE: `extracted_from` va da un ExtractorNode a un documento, e l'affermazione che lo stato di conservazione sia estratto dal materiale non e' una cosa che qualcuno intendeva dire. Residuo copiato da un altro mapping.",
+  "version": "1.6.0",
+  "table_settings": {
+    "format_type": "xlsx",
+    "sheet_name": "Special_Finds"
+  },
+  "column_mappings": {
+    "ID_Reperto": {
+      "node_type": "SpecialFindUnit",
+      "is_id": true
     },
-    "column_mappings": {
-        "ID_Reperto": {
-            "node_type": "SpecialFindUnit",
-            "is_id": true
-        },
-        "DEFINIZIONE": {
-            "node_type": "SpecialFindUnit",
-            "is_description": true,
-            "target_id_column": "ID_Reperto"
-        },
-        "DIMENSIONI": {
-            "node_type": "PropertyNode",
-            "property_name": "Dimensions",
-            "display_name": "Dimensions",
-            "description": "Dimensions of the special find"
-        },
-        "STATO_CONSERVAZIONE": {
-            "node_type": "PropertyNode",
-            "property_name": "Conservation",
-            "display_name": "Conservation State",
-            "description": "Conservation state of the special find"
-        },
-        "MATERIALE": {
-            "node_type": "PropertyNode",
-            "property_name": "Material",
-            "display_name": "Material",
-            "description": "Material of the special find"
-        }
+    "DEFINIZIONE": {
+      "node_type": "SpecialFindUnit",
+      "is_description": true,
+      "target_id_column": "ID_Reperto"
     },
-    "relations": [
-        {
-            "source_column": "ID_Reperto",
-            "target_column": "DIMENSIONI",
-            "edge_type": "has_property"
-        },
-        {
-            "source_column": "ID_Reperto",
-            "target_column": "STATO_CONSERVAZIONE",
-            "edge_type": "has_property"
-        },
-        {
-            "source_column": "ID_Reperto",
-            "target_column": "MATERIALE",
-            "edge_type": "has_property"
-        },
-        {
-            "source_column": "STATO_CONSERVAZIONE",
-            "target_column": "MATERIALE",
-            "edge_type": "extracted_from"
-        }
-    ]
+    "DIMENSIONI": {
+      "node_type": "PropertyNode",
+      "property_name": "Dimensions",
+      "display_name": "Dimensions",
+      "description": "Dimensions of the special find"
+    },
+    "STATO_CONSERVAZIONE": {
+      "node_type": "PropertyNode",
+      "property_name": "Conservation",
+      "display_name": "Conservation State",
+      "description": "Conservation state of the special find"
+    },
+    "MATERIALE": {
+      "node_type": "PropertyNode",
+      "property_name": "Material",
+      "display_name": "Material",
+      "description": "Material of the special find"
+    }
+  },
+  "relations": [
+    {
+      "source_column": "ID_Reperto",
+      "target_column": "DIMENSIONI",
+      "edge_type": "has_property"
+    },
+    {
+      "source_column": "ID_Reperto",
+      "target_column": "STATO_CONSERVAZIONE",
+      "edge_type": "has_property"
+    },
+    {
+      "source_column": "ID_Reperto",
+      "target_column": "MATERIALE",
+      "edge_type": "has_property"
+    }
+  ]
 }
