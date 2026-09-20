@@ -65,5 +65,12 @@
     "pdf",
     "doc",
     "txt"
-  ]
+  ],
+  "_validated_against": {
+    "s3dgraphy": "1.6.0.dev18",
+    "schema_version": "1",
+    "node_datamodel": "1.6.5",
+    "connections_datamodel": "1.6.16",
+    "on": "2026-09-20"
+  }
 }

@@ -62,6 +62,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import date as _date
 from functools import lru_cache
 from importlib.resources import files
 from typing import Any, Dict, List, Optional, Tuple
@@ -1099,3 +1100,86 @@ def apply_mapping(mapping: Dict[str, Any], source: str, *,
         "warnings": warnings,
         "errors": [],
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# The validation stamp
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# A descriptor outlives the session that wrote it and travels away from this
+# repository: the partner mappings live in the project's shared drive, not
+# here. So the only place a record of "this was checked, against what, when"
+# can survive is inside the file itself.
+#
+# Two versions, because two different things can go wrong and they need
+# different answers. SCHEMA_VERSION is the GRAMMAR — the shape of the
+# descriptor. The datamodel versions are the VOCABULARY — whether the node
+# classes and edge names it uses still mean what they meant. A descriptor can
+# be perfectly well-formed and name an edge that has since been deprecated;
+# that is not a parse error and should not be reported as one.
+#
+# The stamp records, it does not gate. A mapping whose vocabulary has moved on
+# still loads, with a warning that says which version it was last checked
+# against — because refusing to load a partner's descriptor because our
+# datamodel advanced would make every one of our releases their problem.
+
+STAMP_KEY = "_validated_against"
+
+
+def validation_stamp() -> Dict[str, str]:
+    """What this build would stamp a mapping with, right now."""
+    from .. import __version__ as _s3d_version
+    node_dm = _load(_NODE_DATAMODEL)
+    conn_dm = _load(_CONNECTIONS_DATAMODEL)
+    return {
+        "s3dgraphy": str(_s3d_version),
+        "schema_version": SCHEMA_VERSION,
+        "node_datamodel": str(node_dm.get("s3Dgraphy_data_model_version", "?")),
+        "connections_datamodel": str(
+            conn_dm.get("s3Dgraphy_connections_model_version", "?")),
+        "on": _date.today().isoformat(),
+    }
+
+
+def stamp_mapping(mapping: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate, and on success return a COPY carrying the stamp.
+
+    A failing mapping is returned unchanged and unstamped: the stamp means
+    "this passed", and a stamp on a broken descriptor would be worse than no
+    stamp at all. Callers read `validate_mapping` for the reason.
+    """
+    report = validate_mapping(mapping)
+    if not report["ok"]:
+        return mapping
+    stamped = dict(mapping)
+    stamped[STAMP_KEY] = validation_stamp()
+    return stamped
+
+
+def check_stamp(mapping: Dict[str, Any]) -> List[str]:
+    """Warnings about the stamp: missing, or older than this build.
+
+    Never an error. The list is empty when the mapping was last checked against
+    exactly this vocabulary.
+    """
+    stamp = mapping.get(STAMP_KEY)
+    if not isinstance(stamp, dict):
+        return ["this mapping carries no validation stamp: there is no record "
+                "of which s3Dgraphy it was checked against. Re-validate it to "
+                "add one"]
+    now = validation_stamp()
+    out: List[str] = []
+    if stamp.get("schema_version") != now["schema_version"]:
+        out.append(
+            f"mapping grammar {stamp.get('schema_version')!r} vs "
+            f"{now['schema_version']!r}: the SHAPE of the descriptor changed, "
+            f"which is the kind of difference that breaks reading it")
+    for field, label in (("node_datamodel", "node"),
+                         ("connections_datamodel", "connections")):
+        if stamp.get(field) != now[field]:
+            out.append(
+                f"{label} datamodel {stamp.get(field)!r} at validation, "
+                f"{now[field]!r} now: the descriptor still loads, but its node "
+                f"classes and edge names were last checked against the older "
+                f"one (stamped {stamp.get('on','?')})")
+    return out

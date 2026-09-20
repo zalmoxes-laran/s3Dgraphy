@@ -2541,7 +2541,35 @@ def mapping_validate(mapping: Dict[str, Any]) -> Dict[str, Any]:
     ERROR here rather than a failure at import time, long after the person who
     authored it left the screen."""
     from .mappings.authoring import validate_mapping
+    # Deliberately three keys and no more. Adding the stamp here was tempting —
+    # an editor could print "checked against 1.6.16" beside the green tick
+    # without a second call — but it widens a public contract for sugar, and a
+    # test that asserted this report is EMPTY on a good mapping was right to
+    # object. `mapping_stamp` is one call away.
     return validate_mapping(mapping)
+
+
+def mapping_stamp(mapping: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate and return a COPY carrying `_validated_against`.
+
+    A descriptor travels: the partner mappings live in the project's shared
+    drive, not in this repository, and no test here will ever see them. The
+    stamp is the only record of which s3Dgraphy and which datamodels a mapping
+    was checked against that survives the trip. A mapping that fails validation
+    comes back unstamped — the stamp means "this passed"."""
+    from .mappings.authoring import stamp_mapping
+    return stamp_mapping(mapping)
+
+
+def mapping_stamp_check(mapping: Dict[str, Any]) -> List[str]:
+    """Warnings about a mapping's stamp: absent, or older than this build.
+
+    Never an error, and never a refusal to load: our datamodel advancing must
+    not become the partner's problem. It says which vocabulary the descriptor
+    was last checked against, so a surprise at import has an explanation
+    waiting."""
+    from .mappings.authoring import check_stamp
+    return check_stamp(mapping)
 
 
 def mapping_normalize(mapping: Dict[str, Any]) -> Dict[str, Any]:
@@ -2572,10 +2600,17 @@ def mapping_apply(mapping: Dict[str, Any], source: str, *, graph: Any = None,
     keys that found nothing. Skipping them is the point of the mode; skipping
     them without saying so would only move the damage from "a typo invents a
     unit" to "a typo loses a row"."""
-    from .mappings.authoring import apply_mapping
-    return apply_mapping(mapping, source, graph=graph, mode=mode,
-                         mapping_name=mapping_name, injector=injector,
-                         enrich_only=enrich_only)
+    from .mappings.authoring import apply_mapping, check_stamp
+    result = apply_mapping(mapping, source, graph=graph, mode=mode,
+                           mapping_name=mapping_name, injector=injector,
+                           enrich_only=enrich_only)
+    # The stamp is read at LOAD, not at validation: this is the moment someone
+    # runs a descriptor written months ago against a library that has moved.
+    # A warning, never a refusal — see mapping_stamp_check.
+    stale = check_stamp(mapping)
+    if stale and isinstance(result, dict):
+        result.setdefault("warnings", []).extend(stale)
+    return result
 
 
 def mapping_target_groups(*, include_direct: bool = True

@@ -105,3 +105,77 @@ def test_the_epoch_carries_its_dates():
     epochs = [n for n in g.nodes if type(n).__name__ == "EpochNode"]
     assert len(epochs) == 1 and epochs[0].name == "Romano"
     assert (epochs[0].start_time, epochs[0].end_time) == (-100.0, 100.0)
+
+
+# ── the validation stamp ─────────────────────────────────────────────────────
+# A descriptor travels. The partner mappings live in the project's shared
+# drive, and no test in this repository will ever see them — which is why the
+# Basilica mappings sat invalid from February to September without anyone
+# knowing. The answer is not to copy their files in here; it is that a
+# descriptor carries the record of its own last check.
+#
+# Two versions, two different failures. The SCHEMA version is the grammar: the
+# shape of the descriptor, which is what breaks reading it. The datamodel
+# versions are the vocabulary: whether its node classes and edge names still
+# mean what they meant. A mapping can be perfectly well-formed and name an edge
+# that has since been deprecated, and that is not a parse error.
+
+def test_a_validated_mapping_can_be_stamped():
+    mapping = json.loads(GENERIC.read_text(encoding="utf-8"))
+    mapping.pop("_validated_against", None)
+    stamped = api.mapping_stamp(mapping)
+    stamp = stamped["_validated_against"]
+    assert set(stamp) == {"s3dgraphy", "schema_version", "node_datamodel",
+                          "connections_datamodel", "on"}
+    assert api.mapping_stamp_check(stamped) == []
+
+
+def test_a_broken_mapping_is_never_stamped():
+    """The stamp means "this passed". On a failing descriptor it would be a lie
+    that outlives the session, and the next person would trust it."""
+    broken = {"column_mappings": {}}
+    assert "_validated_against" not in api.mapping_stamp(broken)
+    # and mapping_validate stays a three-key report: ok, errors, warnings
+    assert set(api.mapping_validate(broken)) == {"ok", "errors", "warnings"}
+
+
+def test_an_unstamped_mapping_says_so():
+    # the shipped ones are stamped, so strip it: this is the state a partner's
+    # freshly written descriptor is in
+    mapping = json.loads(GENERIC.read_text(encoding="utf-8"))
+    mapping.pop("_validated_against", None)
+    warnings = api.mapping_stamp_check(mapping)
+    assert len(warnings) == 1 and "no validation stamp" in warnings[0]
+
+
+def test_an_older_vocabulary_warns_and_still_loads():
+    """The whole point. Our datamodel moving must not become the partner's
+    problem: a descriptor stamped against an older connections model loads
+    normally and explains itself."""
+    mapping = json.loads(GENERIC.read_text(encoding="utf-8"))
+    mapping["table_settings"]["format_type"] = "csv"
+    mapping["table_settings"].pop("sheet_name", None)
+    mapping["table_settings"]["start_row"] = 1
+    stale = api.mapping_stamp(mapping)
+    stale["_validated_against"]["connections_datamodel"] = "1.5.4"
+    stale["_validated_against"]["on"] = "2026-02-21"
+
+    res = api.mapping_apply(stale, str(FIXTURE), mode="volatile")
+    assert res["ok"] and res["rows"] == 3      # it loads, in full
+    assert any("1.5.4" in w and "1.6.16" in w for w in res["warnings"])
+    assert any("2026-02-21" in w for w in res["warnings"])
+
+
+def test_a_changed_grammar_is_reported_apart_from_a_changed_vocabulary():
+    mapping = api.mapping_stamp(json.loads(GENERIC.read_text(encoding="utf-8")))
+    mapping["_validated_against"]["schema_version"] = "0"
+    warnings = api.mapping_stamp_check(mapping)
+    assert len(warnings) == 1
+    assert "SHAPE" in warnings[0]      # the grammar, not the vocabulary
+
+
+@pytest.mark.parametrize("path", _shipped(), ids=lambda p: os.path.basename(p))
+def test_every_shipped_mapping_carries_a_current_stamp(path):
+    mapping = json.loads(Path(path).read_text(encoding="utf-8"))
+    assert api.mapping_stamp_check(mapping) == [], (
+        f"{os.path.basename(path)}: re-stamp it with api.mapping_stamp")

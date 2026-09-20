@@ -1,17 +1,14 @@
 {
   "_comment": "TEMPLATE — copy to mappings/pyarchinit/ and adapt to your table structure. This file lives in the mappings root and is NOT auto-loaded by the MappingRegistry (the registry only scans the pyarchinit/, emdb/, and generic/ subdirectories). It exists as a reference/starting point.",
   "_description": "Template for SQLite-based PyArchInit-like tables. Demonstrates: id_column, description column, attribute mapping, filter columns (with the new is_filter / filter_required flags introduced in s3dgraphy 1.6), composite node names via node_name_template (1.6+), and stratigraphic relations.",
-
   "name": "Template — pyArchInit-style SQLite table",
   "description": "Replace this description with one specific to your table.",
   "version": "1.6.0",
-
   "table_settings": {
     "format_type": "sqlite",
     "table_name": "your_table_here",
     "_comment_format_type": "format_type must be 'sqlite' for the PyArchInitImporter.",
     "_comment_table_name": "table_name is the SQLite table to read with SELECT * FROM <table_name>. The importer guards this against a [A-Za-z_][A-Za-z0-9_]* whitelist.",
-
     "node_name_template": "{area_id}.{stratigraphic_type}.{unit_number}",
     "_comment_node_name_template": [
       "OPTIONAL (1.6+). When set, the importer composes the human-readable",
@@ -47,7 +44,6 @@
       "rename the existing labels."
     ]
   },
-
   "column_mappings": {
     "site_name": {
       "is_filter": true,
@@ -56,7 +52,6 @@
       "description": "Archaeological site name.",
       "_comment": "FILTER COLUMN. A consumer application (CLI, GUI, web form, ...) can call importer.get_filter_columns() to discover this entry, then call importer.get_distinct_values('site_name') to fetch the list of available sites and present a dropdown to the user. Because filter_required=true, the consumer is expected to force the user to pick a value (no 'All values' option). Use this for the natural top-level partition of the table (site, project, season, dataset_id, ...)."
     },
-
     "area_id": {
       "is_filter": true,
       "filter_required": false,
@@ -64,25 +59,21 @@
       "description": "Excavation area / sector.",
       "_comment": "Optional secondary filter, combined with other filters via AND. With filter_required=false the consumer can let the user choose 'All values' to skip this filter. Use for additional partitions inside a site (area, trench, square, ...)."
     },
-
     "unit_number": {
       "is_id": true,
       "node_type": "US",
       "display_name": "Unit Number",
       "_comment": "is_id=true marks the row identifier. The cell value is the row's stable primary key, used by cross-row relations and (when no node_name_template is set in table_settings) as the StratigraphicNode.name. Exactly ONE column must be marked is_id. node_type selects the StratigraphicNode subclass (US / USV / USD / SF / TSU / ... — see s3dgraphy.utils.utils.get_stratigraphic_node_class)."
     },
-
     "description": {
       "is_description": true,
       "_comment": "is_description=true: this column's value becomes the StratigraphicNode.description. Optional but recommended for human-readable graphs."
     },
-
     "stratigraphic_type": {
       "is_attribute": true,
       "property_name": "usType",
       "_comment": "is_attribute=true: this column's value is stored as an attribute on the stratigraphic node itself (not as a separate PropertyNode). property_name overrides the default attribute name. Multiple is_attribute columns are allowed. This column is ALSO referenced by the node_name_template above — that's fine, the template only reads row values, it doesn't care which other role the column plays."
     },
-
     "interpretation": {
       "node_type": "PropertyNode",
       "property_name": "Interpretation",
@@ -91,7 +82,6 @@
       "_comment": "Regular property column: creates a PropertyNode for each row, linked to the stratigraphic node via a 'has_property' edge."
     }
   },
-
   "relations": [
     {
       "_comment": "Property edge: hooks a PropertyNode column to its parent stratigraphic node. The 'has_property' edge_type is special — it does NOT create cross-row edges, it just links a row's properties to the row's main node.",
@@ -99,5 +89,12 @@
       "target_column": "interpretation",
       "edge_type": "has_property"
     }
-  ]
+  ],
+  "_validated_against": {
+    "s3dgraphy": "1.6.0.dev18",
+    "schema_version": "1",
+    "node_datamodel": "1.6.5",
+    "connections_datamodel": "1.6.16",
+    "on": "2026-09-20"
+  }
 }
