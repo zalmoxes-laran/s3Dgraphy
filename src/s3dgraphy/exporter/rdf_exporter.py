@@ -311,9 +311,23 @@ class _Datamodel:
         ``inverted=False``.
         """
         canon = self._reverse_of.get(edge_type)
-        if canon is not None:
-            return canon, True
-        return edge_type, False
+        drawn_reversed = canon is not None
+        canonical = canon if drawn_reversed else edge_type
+
+        # A mapping may itself run against the edge. `is_after` points from the
+        # more recent unit to the more ancient one, while P120/AP28 put the
+        # EARLIER entity in the subject position — so emitting source-first
+        # states the sequence backwards. The datamodel declares this with
+        # `mapping.rdf_subject: "target"` rather than the exporter knowing it
+        # about one edge by name, because the next mapping with the same shape
+        # should be a data change, not a code change.
+        entry = (self.connections_datamodel.get("edge_types") or {}).get(canonical) or {}
+        mapping_inverts = ((entry.get("mapping") or {}).get("rdf_subject") == "target")
+
+        # The two inversions compose: an edge drawn the reverse way, under a
+        # mapping that itself inverts, comes out the right way round. So
+        # `A is_after B` and `B is_before A` land on the same correct triple.
+        return canonical, (drawn_reversed != mapping_inverts)
 
     def get_edge_mapping(self, edge_type: str) -> Tuple[Optional[URIRef], Optional[URIRef], Optional[str], bool]:
         """

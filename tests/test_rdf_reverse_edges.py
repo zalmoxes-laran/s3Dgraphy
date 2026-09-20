@@ -39,7 +39,7 @@ def _unit_triples(graph, path):
     return {
         (str(s).rsplit("/", 1)[-1], str(p), str(o).rsplit("/", 1)[-1])
         for s, p, o in g
-        if "/node/US" in str(s) and "/node/US" in str(o)
+        if "/node/" in str(s) and "/node/" in str(o)
     }
 
 
@@ -50,7 +50,7 @@ def test_the_two_directions_produce_the_same_triple(tmp_path):
     assert canonical == reverse
     # subject and object are the canonical pair in both cases, whichever way
     # the edge was drawn
-    assert {(s, o) for s, _, o in canonical} == {("US1", "US2")}
+    assert {(s, o) for s, _, o in canonical} == {("US2", "US1")}
     assert CRM + "P120_occurs_before" in {p for _, p, _ in canonical}
 
 
@@ -76,8 +76,10 @@ def test_the_fallback_still_catches_an_unrecognised_edge(tmp_path):
 def test_direction_resolution_is_reported_and_bounded():
     from s3dgraphy.exporter.rdf_exporter import _Datamodel
     dm = _Datamodel()
-    assert dm.resolve_edge_direction("is_before") == ("is_after", True)
-    assert dm.resolve_edge_direction("is_after") == ("is_after", False)
+    # `is_before` is the reverse of `is_after`, and `is_after`'s mapping
+    # itself inverts — see test_the_inversion_is_declared_in_the_datamodel
+    assert dm.resolve_edge_direction("is_before") == ("is_after", False)
+    assert dm.resolve_edge_direction("is_after") == ("is_after", True)
     # an unknown name passes through untouched rather than guessing
     assert dm.resolve_edge_direction("not_an_edge_type") == ("not_an_edge_type", False)
     # every declared reverse is indexed, and none collides with a canonical
@@ -142,3 +144,69 @@ def test_a_stratigraphic_edge_now_carries_its_crmarchaeo_predicate(tmp_path):
     predicates = {p for _, p, _ in triples}
     assert CRM + "P120_occurs_before" in predicates
     assert CRMARCHAEO_NS + "AP28_occurs_before" in predicates
+
+
+# ── the direction of the sequence ────────────────────────────────────────────
+# Two conventions that read the opposite way, and nothing was comparing them.
+#
+#   EM:    the `is_after` arrow runs from the MORE RECENT unit to the more
+#          ancient one — confirmed by the author, by the datamodel's own
+#          description, and by the data (Aiano: of 204 is_after edges, the 81
+#          with different epochs at their ends ALL have the recent unit as
+#          source, none the reverse).
+#   CIDOC: `A P120 occurs before B` puts the EARLIER entity in the subject —
+#          "a temporal gap exists between the end of A and the start of B".
+#          CRMarchaeo AP28 follows P120.
+#
+# Emitting source-first therefore told the triple store that the recent unit
+# came first. Every test was green, because none of them asked which unit the
+# projection called older. This one does, in the only terms that cannot drift:
+# a stratigraphic fact.
+
+def test_the_older_unit_is_the_subject_of_the_sequence(tmp_path):
+    # Physical reality: a floor laid over a fill. The fill is older.
+    # In EM the arrow goes from the later unit to the earlier one.
+    g = _graph("seq", "floor", "is_after", "fill")
+    triples = _unit_triples(g, tmp_path / "seq.ttl")
+    assert triples, "the sequence produced no triple at all"
+    for subject, predicate, obj in triples:
+        assert (subject, obj) == ("fill", "floor"), (
+            f"{predicate} asserted '{subject} before {obj}' — the projection "
+            f"has the sequence the wrong way round")
+
+
+def test_both_spellings_agree_on_which_unit_is_older(tmp_path):
+    later = _unit_triples(_graph("s1", "floor", "is_after", "fill"), tmp_path / "s1.ttl")
+    earlier = _unit_triples(_graph("s2", "fill", "is_before", "floor"), tmp_path / "s2.ttl")
+    assert later == earlier
+    assert {(s, o) for s, _, o in later} == {("fill", "floor")}
+
+
+def test_the_sequence_survives_a_round_trip_pointing_the_same_way(tmp_path):
+    # the fault the export fix alone would have left: the reader has to undo
+    # the swap, or the stratigraphy comes home reversed.
+    from s3dgraphy.exporter.rdf_exporter import RDFExporter
+    from s3dgraphy.importer.rdf_importer import import_rdf
+    path = tmp_path / "rt.ttl"
+    RDFExporter(str(path), format="turtle").export_single_graph(
+        _graph("rt", "floor", "is_after", "fill"))
+    graphs, _report = import_rdf(str(path))
+    edges = [(e.edge_source, e.edge_type, e.edge_target)
+             for g in graphs for e in g.edges]
+    assert edges == [("floor", "is_after", "fill")]
+
+
+def test_the_inversion_is_declared_in_the_datamodel_not_in_the_code():
+    # `rdf_subject` is data, so the next mapping with this shape is a JSON
+    # change. Pinned so nobody moves it into the exporter as a special case.
+    from s3dgraphy.exporter.rdf_exporter import _Datamodel
+    dm = _Datamodel()
+    edges = dm.connections_datamodel["edge_types"]
+    assert edges["is_after"]["mapping"]["rdf_subject"] == "target"
+    # and it is the exception, not the rule
+    inverting = [name for name, e in edges.items()
+                 if (e.get("mapping") or {}).get("rdf_subject") == "target"]
+    assert inverting == ["is_after"]
+    # the two inversions compose: drawn-reversed XOR mapping-inverts
+    assert dm.resolve_edge_direction("is_after") == ("is_after", True)
+    assert dm.resolve_edge_direction("is_before") == ("is_after", False)

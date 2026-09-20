@@ -433,6 +433,19 @@ class _InverseDatamodel:
         # the canonical spelling: no directional prefix, shortest wins the tie
         return sorted(candidates, key=lambda n: (n.startswith("is_"), len(n), n))[0]
 
+    def emits_inverted(self, edge_type: str) -> bool:
+        """Does this edge type's mapping put the edge TARGET in the subject?
+
+        `is_after` does: the EM arrow runs from the more recent unit to the
+        more ancient one, while P120/AP28 name the earlier entity first. The
+        exporter swaps the ends on the way out, so the reader has to swap them
+        back or the sequence comes home reversed — which is exactly what the
+        round-trip caught.
+        """
+        edges = self.dm.connections_datamodel.get("edge_types") or {}
+        mapping = (edges.get(edge_type) or {}).get("mapping") or {}
+        return mapping.get("rdf_subject") == "target"
+
     def candidates_for_predicate(self, pred: str) -> List[str]:
         """Edge types whose most specific emitted predicate is `pred`."""
         return list(self.edges_by_signature.get(pred, []))
@@ -1183,7 +1196,11 @@ class RDFImporter:
 
             for edge_type in dict.fromkeys(resolved):
                 counter += 1
-                g.add_edge(f"rdf_e{counter}", src_id, tgt_id, edge_type)
+                if self.inverse.emits_inverted(edge_type):
+                    a, b = tgt_id, src_id
+                else:
+                    a, b = src_id, tgt_id
+                g.add_edge(f"rdf_e{counter}", a, b, edge_type)
                 self.stats["edges"] += 1
 
     def _rebuild_has_property_from_i17(self, store: ConjunctiveGraph,
