@@ -27,9 +27,11 @@ Public API:
 from __future__ import annotations
 
 import json
+import os
 import re
 from functools import lru_cache
 from importlib.resources import files
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # ── facets & ordered consumption lists ───────────────────────────────────────
@@ -52,24 +54,57 @@ def _norm(s: Any) -> str:
     return re.sub(r"\s+", " ", str(s or "").strip().lower())
 
 
-@lru_cache(maxsize=1)
-def _load_snapshots() -> Dict[str, Dict[str, Any]]:
-    """Load every ``*.jsonld`` snapshot → {authority: {scheme, facet, concepts,
-    provenance, license_ref}}. Cached (the snapshots are immutable data)."""
-    root = files("s3dgraphy.authorities").joinpath("snapshots")
+#: Environment variable naming the LOCAL authority directory.
+LOCAL_DIR_ENV = "S3DGRAPHY_AUTHORITIES_DIR"
+
+#: Where it lives when the variable is unset.
+LOCAL_DIR_DEFAULT = "~/.s3dgraphy/authorities"
+
+
+def local_authorities_dir() -> Path:
+    """The local authority directory — snapshots that are NOT published.
+
+    The reason this exists is a licence, not a preference. A snapshot bundled
+    in ``authorities/snapshots/`` ships with the package: putting a vocabulary
+    there is REDISTRIBUTING it, and several of the ones we most want offline
+    have no statement that permits this (the IAA period thesaurus among them,
+    asked 2026-09-20). Holding a copy for our own work and handing copies to
+    everyone who installs the library are different acts, and until now the
+    code could not tell them apart — anything dropped in the package directory
+    was published by the act of dropping it there.
+
+    So: the packaged directory is for what may be redistributed, this one is
+    for everything else. Both are read; only one is shipped. A snapshot found
+    here is marked ``local: True`` on every candidate it produces, so a
+    consumer can tell that a resolution depended on something its own install
+    may not have.
+    """
+    return Path(os.environ.get(LOCAL_DIR_ENV, LOCAL_DIR_DEFAULT)).expanduser()
+
+
+def _read_snapshot_dir(root: Any, *, local: bool) -> Dict[str, Dict[str, Any]]:
+    """One directory of ``*.jsonld`` snapshots → {authority: {...}}."""
     provenance: Dict[str, Any] = {}
     try:
         provenance = json.loads(
             root.joinpath("provenance.json").read_text(encoding="utf-8")
         ).get("authorities", {})
-    except FileNotFoundError:
+    except (FileNotFoundError, NotADirectoryError, json.JSONDecodeError):
         provenance = {}
 
     out: Dict[str, Dict[str, Any]] = {}
-    for entry in root.iterdir():
+    try:
+        entries = list(root.iterdir())
+    except (FileNotFoundError, NotADirectoryError):
+        return out
+
+    for entry in entries:
         if not entry.name.endswith(".jsonld"):
             continue
-        doc = json.loads(entry.read_text(encoding="utf-8"))
+        try:
+            doc = json.loads(entry.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
         authority = doc.get("authority") or entry.name[:-7]
         prov = provenance.get(authority, {})
         out[authority] = {
@@ -79,7 +114,22 @@ def _load_snapshots() -> Dict[str, Dict[str, Any]]:
             "provenance": prov,
             "license_ref": prov.get("license_ref"),
             "fixture": bool(prov.get("fixture")),
+            "local": local,
+            "redistributable": prov.get("redistributable", "unknown"),
         }
+    return out
+
+
+@lru_cache(maxsize=1)
+def _load_snapshots() -> Dict[str, Dict[str, Any]]:
+    """Every snapshot, packaged and local → {authority: {...}}.
+
+    The local directory is read SECOND and wins on a name collision: a local
+    copy is there because somebody deliberately put it there, and the packaged
+    one is a default."""
+    out = _read_snapshot_dir(
+        files("s3dgraphy.authorities").joinpath("snapshots"), local=False)
+    out.update(_read_snapshot_dir(local_authorities_dir(), local=True))
     return out
 
 
@@ -156,6 +206,10 @@ def resolve(
                     "provenance": snap.get("provenance", {}),
                     "license": snap.get("license_ref"),
                 }
+                if snap.get("local"):
+                    # resolved from a snapshot this install holds privately:
+                    # another install of the same library may not have it
+                    cand["local"] = True
                 if snap.get("fixture"):
                     # the snapshot behind this hit is a hand-seeded sample, not
                     # a real dump — say so on the candidate, and keep saying it
@@ -185,6 +239,8 @@ def as_authority_ref(candidate: Dict[str, Any]) -> Dict[str, Any]:
         ref["broader"] = candidate["broader"]
     if candidate.get("fixture"):
         ref["fixture"] = True
+    if candidate.get("local"):
+        ref["local"] = True
     return ref
 
 
