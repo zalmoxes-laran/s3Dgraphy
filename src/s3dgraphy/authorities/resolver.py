@@ -116,8 +116,46 @@ def _read_snapshot_dir(root: Any, *, local: bool) -> Dict[str, Dict[str, Any]]:
             "fixture": bool(prov.get("fixture")),
             "local": local,
             "redistributable": prov.get("redistributable", "unknown"),
+            "aggregates": prov.get("aggregates") or {},
         }
     return out
+
+
+def effective_terms(snap: Dict[str, Any], concept: Dict[str, Any]) -> Dict[str, Any]:
+    """The licence terms that actually govern ONE record.
+
+    An authority's own terms do not cover what it republishes. ChronOntology is
+    CC BY 4.0 and carries a lot of Getty data that is ODC-By 1.0 (B. Ducke,
+    DAI, 2026-09-21): an aggregator's licence answers for the records it made,
+    not for the ones it passed on. So a record may name its origin with
+    ``source``, and when it does the terms come from the matching entry in the
+    authority's ``aggregates``.
+
+    An UNDECLARED ``source`` is deliberately not treated as the authority's
+    own. It resolves to ``redistributable: "unknown"``, which the package
+    guardrail refuses — because a record inherited from an unreviewed upstream
+    looks exactly like one the authority wrote itself, and nothing else in the
+    file will make the difference visible.
+
+    Returns ``{license, redistributable, license_source}``; ``license_source``
+    is ``None`` for a record that is the authority's own.
+    """
+    source = concept.get("source")
+    if not source:
+        return {
+            "license": snap.get("license_ref"),
+            "redistributable": snap.get("redistributable", "unknown"),
+            "license_source": None,
+        }
+    upstream = (snap.get("aggregates") or {}).get(source)
+    if upstream is None:
+        return {"license": None, "redistributable": "unknown",
+                "license_source": source}
+    return {
+        "license": upstream.get("license_ref"),
+        "redistributable": upstream.get("redistributable", "unknown"),
+        "license_source": source,
+    }
 
 
 @lru_cache(maxsize=1)
@@ -171,7 +209,10 @@ def resolve(
     hits before close within each authority.
 
     Each candidate: ``{uri, authority, label, scheme, rank, match, provenance,
-    license, broader?, fixture?}``.
+    license, redistributable, broader?, fixture?, local?, license_source?}``.
+    ``license``/``redistributable`` are the EFFECTIVE terms of that record, which
+    are the upstream's when the record was republished — see
+    :func:`effective_terms`.
     """
     if online:
         raise NotImplementedError(
@@ -196,6 +237,7 @@ def resolve(
                 if _match_strength(term_n, concept) != want:
                     continue
                 rank += 1
+                terms = effective_terms(snap, concept)
                 cand: Dict[str, Any] = {
                     "uri": concept.get("@id"),
                     "authority": authority,
@@ -204,8 +246,13 @@ def resolve(
                     "rank": rank,
                     "match": want,
                     "provenance": snap.get("provenance", {}),
-                    "license": snap.get("license_ref"),
+                    "license": terms["license"],
+                    "redistributable": terms["redistributable"],
                 }
+                if terms["license_source"]:
+                    # this record was passed on, not written here: the
+                    # attribution owed is the upstream's
+                    cand["license_source"] = terms["license_source"]
                 if snap.get("local"):
                     # resolved from a snapshot this install holds privately:
                     # another install of the same library may not have it
@@ -224,10 +271,12 @@ def resolve(
 
 def as_authority_ref(candidate: Dict[str, Any]) -> Dict[str, Any]:
     """The compact ref shape persisted on a node/qualia (``authority_refs``):
-    ``{uri, authority, label, rank, match}`` (+ ``broader`` when present, and
+    ``{uri, authority, label, rank, match}`` (+ ``broader`` when present,
     ``fixture: True`` when the snapshot behind it is a hand-seeded sample rather
     than a real dump — the flag travels with the ref into em.json so a sample
-    URI is never mistaken for a resolved one downstream)."""
+    URI is never mistaken for a resolved one downstream — and ``license_source``
+    when the record was republished by an aggregating authority, naming whose
+    terms and attribution actually apply)."""
     ref = {
         "uri": candidate.get("uri"),
         "authority": candidate.get("authority"),
@@ -241,6 +290,11 @@ def as_authority_ref(candidate: Dict[str, Any]) -> Dict[str, Any]:
         ref["fixture"] = True
     if candidate.get("local"):
         ref["local"] = True
+    if candidate.get("license_source"):
+        # an aggregating authority's own licence is not the one owed here (see
+        # effective_terms): the ref must say whose attribution travels with it,
+        # or a downstream consumer credits the wrong body
+        ref["license_source"] = candidate["license_source"]
     return ref
 
 

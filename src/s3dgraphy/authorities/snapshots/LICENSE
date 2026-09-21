@@ -11,12 +11,44 @@ record them here per authority and honour them in any redistribution:
 
 - periodo (PeriodO)        — data released under CC0 1.0 (Public Domain).
                              https://perio.do/
-- chronontology            — iDAI.chronontology / DAI; check current terms of use
-                             before redistributing period definitions.
+- chronontology            — iDAI.chronontology / DAI, CC BY 4.0. Cleared for
+                             offline snapshots and redistribution by B. Ducke
+                             (DAI) on 21 September 2026: "the term 'redistribute'
+                             does not exclude snapshots and offline
+                             distribution".
+                             Attribution: iDAI.chronontology, Deutsches
+                             Archäologisches Institut (DAI), CC BY 4.0.
                              https://chronontology.dainst.org/
 - getty (AAT/TGN/ULAN)     — Getty Vocabularies published as Linked Open Data
                              under ODC-BY 1.0 (attribution required).
                              https://www.getty.edu/research/tools/vocabularies/
 
-The resolver attaches the per-authority `license_ref` (see provenance.json) to
-every candidate it returns, so downstream consumers can honour these terms.
+AN AUTHORITY'S OWN LICENCE DOES NOT COVER WHAT IT REPUBLISHES
+-------------------------------------------------------------
+
+Added 21 September 2026, on Ducke's caveat in the same message that cleared
+ChronOntology: ChronOntology contains a great deal of data sourced from other
+services, Getty above all, and that data keeps ITS terms. Two authorities can
+therefore be present in one snapshot file, and the licence written at the top of
+it answers for only one of them.
+
+So the mechanism, rather than a footnote:
+
+  * An aggregating authority declares its upstreams in `provenance.json` under
+    `aggregates`, each with its own `license_ref`, `redistributable` and
+    `attribution`.
+  * A republished record in the snapshot names its origin with `source`.
+  * `resolver.effective_terms()` resolves a record to the upstream's terms when
+    `source` is present, and the resolved `authority_ref` carries
+    `license_source` so a downstream consumer credits the right body.
+  * A record whose `source` is NOT declared in `aggregates` resolves to
+    `redistributable: "unknown"` and the package guardrail refuses to ship it.
+
+That last rule is the load-bearing one. A record inherited from an unreviewed
+upstream looks exactly like one the authority wrote itself, and nothing else in
+the file distinguishes them — so the omission has to fail loudly or it will not
+be noticed at all. Ducke gave two options, review each third-party licence or
+strip that content from the snapshot, and there is no third.
+
+The resolver attaches the per-record effective `license` (see provenance.json)
+to every candidate it returns, so downstream consumers can honour these terms.

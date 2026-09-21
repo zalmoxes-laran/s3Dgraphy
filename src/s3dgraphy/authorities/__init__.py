@@ -14,6 +14,7 @@ from .resolver import (
     MATCH_EXACT,
     MATCH_SAMEAS,
     as_authority_ref,
+    effective_terms,
     resolve,
     write_authority_refs,
 )
@@ -25,5 +26,6 @@ __all__ = [
     "MATCH_SAMEAS",
     "resolve",
     "as_authority_ref",
+    "effective_terms",
     "write_authority_refs",
 ]

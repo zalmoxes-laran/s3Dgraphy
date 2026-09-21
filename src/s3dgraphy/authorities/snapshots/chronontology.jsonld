@@ -1,5 +1,5 @@
 {
-  "_note": "Hand-seeded MINIMAL sample for the P1-D authority mechanism — NOT an official ChronOntology dump. Verify IRIs and replace with real snapshots before production (see provenance.json).",
+  "_note": "Hand-seeded MINIMAL sample for the P1-D authority mechanism — NOT an official ChronOntology dump. Verify IRIs and replace with real snapshots before production (see provenance.json). NOTE the `source` key on the third record: ChronOntology republishes data from other services, and a record that came from one of them is governed by THAT service's terms, not by ChronOntology's CC BY 4.0 (B. Ducke, DAI, 2026-09-21). A real dump must carry `source` on every republished record; one whose source is not declared in the authority's `aggregates` will not ship.",
   "@context": {
     "skos": "http://www.w3.org/2004/02/skos/core#",
     "prefLabel": "skos:prefLabel",
@@ -12,12 +12,26 @@
     {
       "@id": "https://chronontology.dainst.org/period/rj5F4YIcRTQR",
       "prefLabel": "Roman Imperial period",
-      "altLabel": ["Roman Empire", "Imperial period"]
+      "altLabel": [
+        "Roman Empire",
+        "Imperial period"
+      ]
     },
     {
       "@id": "https://chronontology.dainst.org/period/X3zX9m2q7Kd1",
       "prefLabel": "Roman period",
-      "altLabel": ["Roman"]
+      "altLabel": [
+        "Roman"
+      ]
+    },
+    {
+      "@id": "https://chronontology.dainst.org/period/SAMPLEgetty01",
+      "prefLabel": "Hellenistic",
+      "altLabel": [
+        "Hellenistic period"
+      ],
+      "source": "getty",
+      "_note": "Illustrative sample of a REPUBLISHED record: ChronOntology holds it, Getty's ODC-By 1.0 governs it, and the attribution owed downstream is Getty's. Exists so the effective-terms path is exercised by real data and not only by a test fixture."
     }
   ]
 }

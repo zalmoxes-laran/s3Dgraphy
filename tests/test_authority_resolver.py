@@ -228,3 +228,128 @@ def test_a_packaged_snapshot_is_not_marked_local():
     resolver._load_snapshots.cache_clear()
     cand = resolver.resolve("mosaic", "WHAT")[0]
     assert "local" not in resolver.as_authority_ref(cand)
+
+
+# ── an authority's licence does not cover what it republishes (2026-09-21) ────
+# Ducke cleared ChronOntology under CC BY 4.0 and in the same breath said the
+# thing that mattered more: it carries a lot of Getty data, and that data keeps
+# ODC-By. Two licences in one file, and the one written at the top answers for
+# only one of them.
+
+def _snap(**kw):
+    base = {"scheme": "s", "facet": "WHEN", "concepts": [], "provenance": {},
+            "license_ref": "cc-by-4.0", "fixture": False, "local": False,
+            "redistributable": "yes", "aggregates": {}}
+    base.update(kw)
+    return base
+
+
+def test_a_record_the_authority_wrote_keeps_the_authority_terms():
+    from s3dgraphy.authorities.resolver import effective_terms
+    terms = effective_terms(_snap(), {"@id": "x", "prefLabel": "Roman"})
+    assert terms["license"] == "cc-by-4.0"
+    assert terms["redistributable"] == "yes"
+    assert terms["license_source"] is None
+
+
+def test_a_republished_record_takes_the_upstream_terms():
+    """The whole point: same file, same authority, different licence."""
+    from s3dgraphy.authorities.resolver import effective_terms
+    snap = _snap(aggregates={"getty": {"license_ref": "getty",
+                                       "redistributable": "yes"}})
+    terms = effective_terms(snap, {"@id": "x", "prefLabel": "Hellenistic",
+                                   "source": "getty"})
+    assert terms["license"] == "getty", (
+        "a record ChronOntology passed on from Getty is governed by Getty's "
+        "terms; inheriting the aggregator's CC BY would credit the wrong body")
+    assert terms["license_source"] == "getty"
+
+
+def test_an_undeclared_upstream_is_unknown_and_not_silently_inherited():
+    """The load-bearing rule.
+
+    A record inherited from an unreviewed upstream looks exactly like one the
+    authority wrote itself. If we resolved it to the authority's own terms it
+    would ship, and nothing anywhere would say it should not have. So an
+    undeclared `source` fails closed.
+    """
+    from s3dgraphy.authorities.resolver import effective_terms
+    terms = effective_terms(_snap(), {"@id": "x", "prefLabel": "?",
+                                      "source": "some_service"})
+    assert terms["redistributable"] == "unknown"
+    assert terms["license"] is None
+    assert terms["license_source"] == "some_service"
+
+
+def test_the_attribution_owed_travels_onto_the_persisted_ref():
+    """`license_source` has to survive into em.json, or the obligation is lost.
+
+    The compact ref is what a consumer actually reads. Without this the ref
+    says `authority: chronontology` and the consumer credits the DAI for a
+    record it only passed on.
+    """
+    from s3dgraphy.authorities.resolver import as_authority_ref
+    ref = as_authority_ref({"uri": "u", "authority": "chronontology",
+                            "label": "Hellenistic", "rank": 1, "match": "exact",
+                            "license_source": "getty"})
+    assert ref["license_source"] == "getty"
+    plain = as_authority_ref({"uri": "u", "authority": "periodo", "label": "x",
+                              "rank": 1, "match": "exact"})
+    assert "license_source" not in plain, (
+        "a record the authority wrote itself must not carry a source it does "
+        "not have")
+
+
+def test_no_packaged_record_ships_on_an_unreviewed_upstream():
+    """The guardrail, at record level this time.
+
+    The older guardrail asks whether an AUTHORITY may be redistributed. That is
+    no longer enough: one file can hold records under two licences, and the
+    question has to be asked of each record.
+    """
+    from importlib.resources import files
+    import json
+    from s3dgraphy.authorities.resolver import effective_terms
+    root = files("s3dgraphy.authorities").joinpath("snapshots")
+    prov = json.loads(root.joinpath("provenance.json")
+                      .read_text(encoding="utf-8"))["authorities"]
+    offenders = []
+    for entry in root.iterdir():
+        if not entry.name.endswith(".jsonld"):
+            continue
+        doc = json.loads(entry.read_text(encoding="utf-8"))
+        authority = doc.get("authority") or entry.name[:-7]
+        p = prov.get(authority, {})
+        snap = {"license_ref": p.get("license_ref"),
+                "redistributable": p.get("redistributable", "unknown"),
+                "aggregates": p.get("aggregates") or {}}
+        for concept in doc.get("@graph", []):
+            terms = effective_terms(snap, concept)
+            if terms["redistributable"] == "yes":
+                continue
+            if p.get("fixture") and not concept.get("source"):
+                continue      # our own sample, not their data — for now
+            offenders.append((authority, concept.get("@id"),
+                              concept.get("source"),
+                              terms["redistributable"]))
+    assert not offenders, (
+        "these packaged records come from an upstream that is not declared in "
+        f"the authority's `aggregates`, or may not be redistributed: {offenders}. "
+        "Declare the upstream with its own terms, or strip those records from "
+        "the snapshot.")
+
+
+def test_the_chronontology_clearance_is_recorded_with_its_caveat():
+    """Ben's answer is a decision the project now depends on; it has to be
+    findable in the repository and not only in a mailbox."""
+    from importlib.resources import files
+    import json
+    root = files("s3dgraphy.authorities").joinpath("snapshots")
+    ch = json.loads(root.joinpath("provenance.json")
+                    .read_text(encoding="utf-8"))["authorities"]["chronontology"]
+    assert ch["redistributable"] == "yes"
+    assert ch["license_ref"] == "cc-by-4.0"
+    assert "Ducke" in ch["redistributable_note"]
+    assert "getty" in (ch.get("aggregates") or {}), (
+        "the clearance came with a caveat about third-party data; recording "
+        "the yes without the caveat is worse than recording neither")

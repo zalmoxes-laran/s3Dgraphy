@@ -1,5 +1,5 @@
 {
-  "_note": "Per-authority provenance for the offline snapshots in this directory. These are hand-seeded MINIMAL samples proving the P1-D mechanism, NOT official dumps — retrieved_method reflects that. Replace with real, dated exports before production; keep this file in step. EVERY entry must declare `redistributable`: only `yes` may live in this directory, which ships inside the package. Anything else belongs in the LOCAL authority directory, which is never published — see resolver.local_authorities_dir().",
+  "_note": "Per-authority provenance for the offline snapshots in this directory. These are hand-seeded MINIMAL samples proving the P1-D mechanism, NOT official dumps — retrieved_method reflects that. Replace with real, dated exports before production; keep this file in step. EVERY entry must declare `redistributable`: only `yes` may live in this directory, which ships inside the package. Anything else belongs in the LOCAL authority directory, which is never published — see resolver.local_authorities_dir(). AN AUTHORITY'S OWN TERMS DO NOT COVER WHAT IT REPUBLISHES (2026-09-21): an authority that aggregates other vocabularies declares them in `aggregates`, and a record in the snapshot names its origin with `source`. The EFFECTIVE terms of a record are the upstream's, not the aggregator's. A record whose `source` is not declared in `aggregates` resolves to `unknown` and the guardrail refuses to ship it — which is the point: the omission has to be loud, because nothing else about the record looks wrong.",
   "authorities": {
     "periodo": {
       "name": "PeriodO",
@@ -20,10 +20,20 @@
       "scheme": "https://chronontology.dainst.org/period/",
       "retrieved_method": "hand-seeded sample (P1-D mechanism proof)",
       "snapshot_date": "2026-07-23",
-      "license_ref": "chronontology",
+      "license_ref": "cc-by-4.0",
       "fixture": true,
-      "redistributable": "unknown",
-      "redistributable_note": "The site links CC BY 4.0 but no statement covers the DATA. Asked to B. Ducke (DAI), 2026-09-20; until an answer arrives this may not be shipped."
+      "redistributable": "yes",
+      "redistributable_note": "CLEARED by B. Ducke (DAI), 21 Sep 2026, answering the question asked the same day: CC BY 4.0 as published at https://creativecommons.org/licenses/by/4.0/, and \"the term 'redistribute' does not exclude snapshots and offline distribution\". ⚠ HIS CAVEAT, and it is the reason `aggregates` exists: ChronOntology republishes data sourced from other services — Getty above all — under THEIR terms, not CC BY. Each upstream must be reviewed and declared below before its records may ship.",
+      "attribution": "iDAI.chronontology, Deutsches Archäologisches Institut (DAI), CC BY 4.0",
+      "aggregates": {
+        "getty": {
+          "license_ref": "getty",
+          "redistributable": "yes",
+          "attribution": "Getty Vocabularies, J. Paul Getty Trust, ODC-By 1.0",
+          "note": "Named by B. Ducke as the largest third-party component. Getty publishes its vocabularies as Linked Open Data under ODC-By 1.0, which permits redistribution with attribution — so these records may ship, but the attribution owed is Getty's, not the DAI's."
+        }
+      },
+      "_aggregates_note": "Only the upstreams listed above are cleared. Any other source found in a real dump must be reviewed and added here, or its records stripped from the snapshot before it is packaged — those were Ducke's two options and there is no third."
     },
     "aat": {
       "name": "Getty Art & Architecture Thesaurus (AAT)",
