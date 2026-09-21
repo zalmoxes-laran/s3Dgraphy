@@ -1,6 +1,6 @@
 {
- "s3Dgraphy_data_model_version": "1.6.5",
- "description": "v1.6.5 (EM16-RMNG, 2026-09-10): adds RepresentationModelNodeGroup, the RM container as a first-class group of the graph — sixth subtype of GroupNode, keeping the parent's E78 Collection because a container IS a curatorial set. Paired with connections datamodel 1.6.14, which adds the is_in_representation_model_group membership edge and widens has_representation_model.target to accept the group. Additive only: no existing entry changed. s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings. v1.6.4 adds the ADDITIVE georeferencing_nodes section (GCPSetNode = em:GCPSet, RegistrationTransformNode = em:RegistrationTransform, both subclasses of crm:E73_Information_Object with their own extension URIs so the RDF projection stays bijective): the CONTROL and the SOLUTION that place a produced model in the world, introduced with the photogrammetry processing connector. The two modes of that connector are the SHAPE of the graph (a transform with a CRS that has_gcp_set points at = absolute; a transform with crs=null and no control set = a site-local frame; no transform at all = nobody placed it), never a flag. No existing family changed. v1.6.3 re-reads SemanticShapeNode as a PAYLOAD carrier: the proxy of a unit is now a PropertyNode of qualia type 'geometry' that points at the shape (has_semantic_shape), so the proxy inherits the paradata chain it never had. Breaking for consumers that read the proxy as a standalone SemanticShape. v1.6.2 adds AnnotationRegionNode (em:AnnotationRegion, subclass of crm:E36_Visual_Item): the geometry of a 2D annotation in NORMALISED image space, distinct from SemanticShapeNode (3D scene geometry, crmgeo:SP5) - the semantics of the 2D annotator, defined before any canvas exists. v1.6.0 inaugurates a systematic CIDOC-CRM mapping revision: complete audit of all node types against CIDOC-CRM, CRMarchaeo, CRMinf, CRMdig, CRMsci, CRMgeo; replacement of legacy 'cidoc_s3d' pseudo-class names (invented strings without IRI or superclass declaration) with formal em:/s3d: IRIs declared as proper subclasses of CRM classes; introduction of CRMinf as primary (not alternative) for the paradata chain (ParadataNode, PropertyNode interpretive case, ExtractorNode, CombinerNode); introduction of PROV-O for AuthorNode to cover both human and AI agents; alignment with the Heritage Digital Twin Ontology (HDT-O) for containment / granularity properties; LocationNodeGroup (v1.5.3) adopted as the reference pattern (CIDOC-native composition via P2_has_type → E55 Type instances, with explicit extension_status and rationale). Companion deliverables: em.ttl (formal EM extension ontology, dereferenceable via w3id.org/em/) and hdto_extension.ttl (HDT-O granularity properties: contains_HDT, contains_SU, isPrimary). v1.5.4 added RSF (Reused Special Find — spolia) as a stratigraphic subtype, octagon with red border, family=real, is_series=false. Originating DP: DP-26 (spolia project, last DP before the EM 1.5 cut). v1.5.3 added LocationNodeGroup (E53 Place + E55 Type) for spatial / locational membership orthogonal to ActivityNodeGroup (intention) and EpochNode (time). v1.5.2 added family + is_series classification metadata on stratigraphic subtypes.",
+ "s3Dgraphy_data_model_version": "1.6.6",
+ "description": "v1.6.6 (CIDOC REPAIR, 2026-09-21): classes that pointed at IRIs nobody declares. Checked by parsing the official releases, not from memory. crm:E78_Collection is gone from CIDOC CRM 7.1.3 — renamed E78_Curated_Holding — and E.D. decided NOT to follow the rename, because E78_Curated_Holding is a subclass of E24 Physical Human-Made Thing and a group of nodes is not a physical thing. The three classes that carried it therefore split, each to the class it actually is: GroupNode and RepresentationModelNodeGroup to crm:E73_Information_Object (a conceptual set, and an E90 Symbolic Object, which is what the P106i membership edge needs at both ends), ParadataNodeGroup to crm:E89_Propositional_Object — which is what a gathered body of reasoning IS and what the range of crm:P129i_is_subject_of demands, that being the predicate has_paradata_nodegroup takes in connections 1.6.17 the same day; it stays an E90 through em:NodeGroup, so the membership edge does not break. SemanticShapeNode leaves crmgeo:SP5_Geometric_Place_Expression for crm:E73_Information_Object, PROVVISORIAMENTE: SP5 is not declared at the crmgeo namespace this datamodel emits, crmgeo:SP6_Declarative_Place is the better candidate, and the decision is rinviata da E.D. — E73 commits to nothing meanwhile. crm:P131_is_identified_by, deprecated in CRM 7.x together with E82 Actor Appellation, becomes crm:P1_is_identified_by on AuthorNode (name, surname) and AuthorAINode (name). «CRMs3D» is renamed «CRMem», in components and in referenced_ontology_versions alike: the companion ontology is em.ttl and its namespace is em:, so the old name pointed at nothing anyone could look up. CRMsci moves 3.1 -> 3.2 (latest release). The eight em: terms this file and the connections datamodel cite but em.ttl never defined are now declared there (em:FunctionalUnit, em:GCPSet, em:Narrative, em:NeutralSU, em:RegistrationTransform, em:RepresentationModelNodeGroup, em:hasSubEpoch, em:validatedBy), with domain, range and superclass read off these datamodels and nothing invented. NOT TOUCHED: the `alternative` and legacy `cidoc_s3d` prose fields, which still discuss E78 as an option — prose, not a projection, and rewording them is modelling rather than repair. v1.6.5 (EM16-RMNG, 2026-09-10): adds RepresentationModelNodeGroup, the RM container as a first-class group of the graph — sixth subtype of GroupNode, keeping the parent's E78 Collection because a container IS a curatorial set. Paired with connections datamodel 1.6.14, which adds the is_in_representation_model_group membership edge and widens has_representation_model.target to accept the group. Additive only: no existing entry changed. s3Dgraphy nodes datamodel including node types with CIDOC-CRM mappings. v1.6.4 adds the ADDITIVE georeferencing_nodes section (GCPSetNode = em:GCPSet, RegistrationTransformNode = em:RegistrationTransform, both subclasses of crm:E73_Information_Object with their own extension URIs so the RDF projection stays bijective): the CONTROL and the SOLUTION that place a produced model in the world, introduced with the photogrammetry processing connector. The two modes of that connector are the SHAPE of the graph (a transform with a CRS that has_gcp_set points at = absolute; a transform with crs=null and no control set = a site-local frame; no transform at all = nobody placed it), never a flag. No existing family changed. v1.6.3 re-reads SemanticShapeNode as a PAYLOAD carrier: the proxy of a unit is now a PropertyNode of qualia type 'geometry' that points at the shape (has_semantic_shape), so the proxy inherits the paradata chain it never had. Breaking for consumers that read the proxy as a standalone SemanticShape. v1.6.2 adds AnnotationRegionNode (em:AnnotationRegion, subclass of crm:E36_Visual_Item): the geometry of a 2D annotation in NORMALISED image space, distinct from SemanticShapeNode (3D scene geometry, crmgeo:SP5) - the semantics of the 2D annotator, defined before any canvas exists. v1.6.0 inaugurates a systematic CIDOC-CRM mapping revision: complete audit of all node types against CIDOC-CRM, CRMarchaeo, CRMinf, CRMdig, CRMsci, CRMgeo; replacement of legacy 'cidoc_s3d' pseudo-class names (invented strings without IRI or superclass declaration) with formal em:/s3d: IRIs declared as proper subclasses of CRM classes; introduction of CRMinf as primary (not alternative) for the paradata chain (ParadataNode, PropertyNode interpretive case, ExtractorNode, CombinerNode); introduction of PROV-O for AuthorNode to cover both human and AI agents; alignment with the Heritage Digital Twin Ontology (HDT-O) for containment / granularity properties; LocationNodeGroup (v1.5.3) adopted as the reference pattern (CIDOC-native composition via P2_has_type → E55 Type instances, with explicit extension_status and rationale). Companion deliverables: em.ttl (formal EM extension ontology, dereferenceable via w3id.org/em/) and hdto_extension.ttl (HDT-O granularity properties: contains_HDT, contains_SU, isPrimary). v1.5.4 added RSF (Reused Special Find — spolia) as a stratigraphic subtype, octagon with red border, family=real, is_series=false. Originating DP: DP-26 (spolia project, last DP before the EM 1.5 cut). v1.5.3 added LocationNodeGroup (E53 Place + E55 Type) for spatial / locational membership orthogonal to ActivityNodeGroup (intention) and EpochNode (time). v1.5.2 added family + is_series classification metadata on stratigraphic subtypes.",
  "components": [
   "CIDOC-CRM",
   "CRMarchaeo",
@@ -10,7 +10,7 @@
   "CRMinf",
   "HDT-O",
   "PROV-O",
-  "CRMs3D"
+  "CRMem"
  ],
  "referenced_ontology_versions": {
   "_comment": "Versions of the reference ontologies this datamodel's mappings are audited against. Update via the mapping-update procedure (see docs: 'Updating the CIDOC mapping') whenever a new official release is adopted.",
@@ -24,7 +24,7 @@
    "note": "official OWL is internally aligned to CIDOC-CRM 7.1.2 and CRMsci 2.0"
   },
   "CRMsci": {
-   "version": "3.1",
+   "version": "3.2",
    "source": "https://cidoc-crm.org/crmsci/"
   },
   "CRMdig": {
@@ -47,8 +47,8 @@
    "version": "W3C Recommendation 2013-04-30",
    "source": "https://www.w3.org/TR/prov-o/"
   },
-  "CRMs3D": {
-   "version": "1.6.0",
+  "CRMem": {
+   "version": "1.6.2",
    "source": "internal em.ttl / hdto_extension.ttl companion ontologies"
   }
  },
@@ -623,7 +623,7 @@
    "description": "Node that represents a group of nodes. These groups can be of various types: see subclasses below.",
    "s3Dgraphy_file": "group_node.py",
    "mapping": {
-    "cidoc": "E78 Collection",
+    "cidoc": "E73 Information Object",
     "cidoc_s3d": null,
     "alternative": "E89 Propositional Object"
    },
@@ -631,10 +631,10 @@
     "uri": "em:NodeGroup",
     "rdf_type": "owl:Class",
     "subclass_of": [
-     "crm:E78_Collection"
+     "crm:E73_Information_Object"
     ],
     "extension_status": "proposed",
-    "rationale": "Superclass of the EM grouping axes (activity, paradata, timebranch, location, functional unit). It shared E78 with ParadataNodeGroup, so a generic group and a paradata group projected identically."
+    "rationale": "Superclass of the EM grouping axes (activity, paradata, timebranch, location, functional unit). It shared E78 with ParadataNodeGroup, so a generic group and a paradata group projected identically. REPAIR 2026-09-21: crm:E78_Collection is not declared in CIDOC CRM 7.1.3 — the class was renamed E78_Curated_Holding, so the IRI emitted here was inert. E.D. decided NOT to follow the rename: E78_Curated_Holding is a subclass of E24 Physical Human-Made Thing, and a group of nodes is not a physical thing. E73 Information Object is the conceptual set: it is an E90 Symbolic Object, which is what P106i_forms_part_of (the membership edge is_in_paradata_nodegroup) requires at both ends."
    },
    "properties": {
     "name": "P1_is_identified_by",
@@ -666,7 +666,7 @@
      "description": "Group node for paradata. This group brings together all paradata related to a stratigraphic unit: typically named '[US_name]_PD' (ParaData).",
      "s3Dgraphy_file": "group_node.py",
      "mapping": {
-      "cidoc": "E78 Collection",
+      "cidoc": "E89 Propositional Object",
       "cidoc_s3d": "ParadataCollection",
       "alternative": "I4 Proposition Set + E78 Collection"
      },
@@ -675,10 +675,10 @@
       "rdf_type": "owl:Class",
       "subclass_of": [
        "em:NodeGroup",
-       "crm:E78_Collection"
+       "crm:E89_Propositional_Object"
       ],
       "extension_status": "proposed",
-      "rationale": "The paradata of one stratigraphic unit gathered as a unit ('[US]_PD'). A distinct uri makes 'give me the paradata groups' a type query rather than a naming convention; still an E78 for CRM-only readers."
+      "rationale": "The paradata of one stratigraphic unit gathered as a unit ('[US]_PD'). A distinct uri makes 'give me the paradata groups' a type query rather than a naming convention. REPAIR 2026-09-21: crm:E78_Collection is not declared in CIDOC CRM 7.1.3 — the class was renamed E78_Curated_Holding, so the IRI emitted here was inert. E.D. decided NOT to follow the rename: E78_Curated_Holding is a subclass of E24 Physical Human-Made Thing, and a group of nodes is not a physical thing. E89 Propositional Object is what a gathered body of reasoning IS, and it is what the range of crm:P129i_is_subject_of demands — the predicate has_paradata_nodegroup now carries (repaired the same day). It stays an E90 Symbolic Object through em:NodeGroup (E73), so the P106i membership edge keeps its range."
      },
      "properties": {
       "name": "P1_is_identified_by",
@@ -834,17 +834,17 @@
      "description": "Typed aggregation of the representation models that form ONE named set published under a single Document — «Survey 2015» under D.01, «Reconstruction» under D.09 (EM16-RMNG, meeting of 2026-09-10). Until then the RM container lived only as EM Tools' `scene.rm_containers` PropertyGroup, so the grouping that gives the set its meaning was invisible to anyone reading the graph. IT SITS BESIDE, IT DOES NOT REPLACE: every member keeps its own epoch edges (has_first_epoch / survive_in_epoch) and the Document keeps its DIRECT has_representation_model edges to each model — the group is added on top and never put in between, so a consumer that ignores it reads exactly what it read before. Membership is the TAG axis 'is_in_representation_model_group', like is_in_functional_unit and is_in_location, but 1:1 and not m:n: a mesh belongs to exactly one container, the rule already in force on the Blender side where `mesh_names` is authoritative. A group may legally be EMPTY and may legally have NO Document: both are states the RM Manager UI already shows. NOT a FunctionalUnitNodeGroup (that aggregates stratigraphic units into a building component; these members are models, not units); NOT an ActivityNodeGroup (nothing happened here and the set has no formation event of its own); NOT the Document, which stays the documentary anchor — deleting the container removes the group and not the Document.",
      "s3Dgraphy_file": "group_node.py",
      "mapping": {
-      "cidoc": "E78 Collection",
+      "cidoc": "E73 Information Object",
       "cidoc_s3d": null,
       "alternative": "E78 Collection + P46_is_composed_of (its member models)",
-      "rationale": "The E78 Collection its GroupNode parent defaults to is the RIGHT class here, and this is the one group subtype that does not override it: an RM container IS a curatorial set — what somebody gathered and published under one document — which is exactly what E78 says. That is the difference from FunctionalUnitNodeGroup, which overrides to E24 because a component is a made thing composed of parts rather than a set somebody assembled, and from TimeBranchNodeGroup, which overrides to E4 Period. NOTE: this says nothing about where `digital representation of` grafts (the model↔thing relation, P138i / CIDOC-S3D:has3DRepresentation and the CRMdig neighbourhood) — that is left open as D3 in the 2026-09-10 spec and reserved for E.D."
+      "rationale": "REPAIR 2026-09-21: reads E73 Information Object, inherited from GroupNode, because crm:E78_Collection is not declared in CIDOC CRM 7.1.3 (renamed E78_Curated_Holding, which is physical — see GroupNode). The argument below is kept because it is still the reason this subtype does NOT override its parent; only the class the parent carries has changed. — The E78 Collection its GroupNode parent defaults to is the RIGHT class here, and this is the one group subtype that does not override it: an RM container IS a curatorial set — what somebody gathered and published under one document — which is exactly what E78 says. That is the difference from FunctionalUnitNodeGroup, which overrides to E24 because a component is a made thing composed of parts rather than a set somebody assembled, and from TimeBranchNodeGroup, which overrides to E4 Period. NOTE: this says nothing about where `digital representation of` grafts (the model↔thing relation, P138i / CIDOC-S3D:has3DRepresentation and the CRMdig neighbourhood) — that is left open as D3 in the 2026-09-10 spec and reserved for E.D."
      },
      "em_extension": {
       "uri": "em:RepresentationModelNodeGroup",
       "rdf_type": "owl:Class",
       "subclass_of": [
        "em:NodeGroup",
-       "crm:E78_Collection"
+       "crm:E73_Information_Object"
       ],
       "extension_status": "proposed"
      },
@@ -1011,7 +1011,7 @@
    },
    "properties": {
     "name": "P1_is_identified_by",
-    "epsg": "P168_place_is_located_at",
+    "epsg": "P168_place_is_defined_by",
     "shift_x": "Q9_is_expressed_in_terms_of",
     "shift_y": "Q9_is_expressed_in_terms_of",
     "shift_z": "Q9_is_expressed_in_terms_of",
@@ -1220,16 +1220,16 @@
    "description": "3D proxy geometry (convex shapes or spheres) representing the spatial extent of a node. Used as a semantic proxy distinct from a full RepresentationModel: lighter weight, intended for spatial indexing and rough containment, not for visual rendering. Linked via crm:P138_represents to any Node.",
    "s3Dgraphy_file": "semantic_shape_node.py",
    "mapping": {
-    "cidoc": "SP5 Geometric Place Expression",
+    "cidoc": "E73 Information Object",
     "cidoc_s3d": null,
     "alternative": "SP5 Geometric Place Expression + E36 Visual Item (legacy)",
-    "rationale": "SP5 (CRMgeo) is the canonical class for geometric expressions of places — exactly what a proxy convex/sphere is. The legacy 'E36 Visual Item' was too generic (E36 is the appearance of any object). v1.6.0 promotes SP5 to primary."
+    "rationale": "PROVVISORIO (2026-09-21) — crmgeo:SP6_Declarative_Place è il candidato migliore, decisione rinviata da E.D. REPAIR: crmgeo:SP5_Geometric_Place_Expression is NOT declared in the document served at http://www.cidoc-crm.org/extensions/crmgeo/ — the namespace this datamodel emits — which carries CRMgeo 2.0 (draft) declaring SP1,2,3,4,6,7,10,11,12,13,14,15; SP5 survives only inside the scope note of SP6. (It IS declared in the CRMgeo 1.2 release, but under the FORTH namespace http://www.ics.forth.gr/isl/CRMgeo/, which is not the one written here.) crm:E73_Information_Object is the safe move that commits to nothing. The argument below is the one to re-read when the decision is taken: SP5 (CRMgeo) is the canonical class for geometric expressions of places — exactly what a proxy convex/sphere is. The legacy 'E36 Visual Item' was too generic (E36 is the appearance of any object). v1.6.0 promotes SP5 to primary."
    },
    "em_extension": {
     "uri": "em:SemanticShape",
     "rdf_type": "owl:Class",
     "subclass_of": [
-     "crmgeo:SP5_Geometric_Place_Expression"
+     "crm:E73_Information_Object"
     ],
     "extension_status": "proposed"
    },
@@ -1310,9 +1310,9 @@
     "extension_status": "proposed"
    },
    "properties": {
-    "name": "P131_is_identified_by",
+    "name": "P1_is_identified_by",
     "orcid": "P48_has_preferred_identifier",
-    "surname": "P131_is_identified_by"
+    "surname": "P1_is_identified_by"
    }
   },
   "AuthorAINode": {
@@ -1339,7 +1339,7 @@
     "extension_status": "proposed"
    },
    "properties": {
-    "name": "P131_is_identified_by",
+    "name": "P1_is_identified_by",
     "model": "P3_has_note",
     "prompt_reference": "P3_has_note"
    }

@@ -13,7 +13,7 @@
 @prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
 
 # ============================================================================
-# Extended Matrix (EM) Ontology — v1.6.0
+# Extended Matrix (EM) Ontology — v1.6.2
 # ============================================================================
 # Formal extension of the CIDOC-CRM family + HDT-O for the Extended Matrix
 # stratigraphic + paradata + virtual-reconstruction modeling. Companion to
@@ -31,7 +31,7 @@
 #     Python inheritance (e.g. AuthorAINode → AuthorNode) is for code reuse.
 #   * "Maps to: Python ClassName" comments anchor each class to its
 #     s3dgraphy Python counterpart for round-trip verification.
-#   * AP11_has_physical_relation discrimination uses subproperties (em:abuts,
+#   * AP11_has_physical_relation_to discrimination uses subproperties (em:abuts,
 #     em:cuts, em:fills, em:overlies, em:bondedTo, em:physicallyEquals)
 #     rather than reified relations with E55_Type tags — this is the
 #     SPARQL-friendly pattern.
@@ -44,8 +44,8 @@
     dcterms:creator "Emanuele Demetrescu" ;
     dcterms:license <https://creativecommons.org/licenses/by/4.0/> ;
     dcterms:issued "2026-05-23"^^xsd:date ;
-    owl:versionInfo "1.6.0" ;
-    rdfs:comment "Formal ontology for Extended Matrix (EM): a human-readable layout for knowledge graphs of archaeological stratigraphy and virtual reconstruction. Extends CIDOC-CRM, CRMarchaeo, CRMinf, CRMdig, CRMgeo, with PROV-O for agent provenance and HDT-O for digital-twin granularity. This file declares the em: classes and properties introduced in s3dgraphy v1.6.0."@en ;
+    owl:versionInfo "1.6.2" ;
+    rdfs:comment "Formal ontology for Extended Matrix (EM): a human-readable layout for knowledge graphs of archaeological stratigraphy and virtual reconstruction. Extends CIDOC-CRM, CRMarchaeo, CRMinf, CRMdig, CRMgeo, with PROV-O for agent provenance and HDT-O for digital-twin granularity. This file declares the em: classes and properties introduced in s3dgraphy v1.6.0. v1.6.2 (2026-09-21, CIDOC repair pass): the eight terms the datamodels cited and this file never defined are declared in section 12; em:NodeGroup and em:ParadataNodeGroup leave the undeclared crm:E78_Collection for crm:E73_Information_Object and crm:E89_Propositional_Object; em:SemanticShape leaves crmgeo:SP5 for crm:E73_Information_Object, provisionally; crmarchaeo:AP11_has_physical_relation becomes AP11_has_physical_relation_to, the name CRMarchaeo has used since 2.0; and em:RepresentationModel says what a representation model IS."@en ;
     owl:imports <http://www.cidoc-crm.org/cidoc-crm/> ,
                 <http://www.cidoc-crm.org/extensions/crminf/> ,
                 <http://www.cidoc-crm.org/extensions/crmarchaeo/> ,
@@ -305,7 +305,7 @@ em:RepresentationModel
     a owl:Class ;
     rdfs:label "Representation Model"@en ;
     rdfs:subClassOf crmdig:D1_Digital_Object ;
-    rdfs:comment "A 3D model or spatialized image representing some node in the graph. Abstract base. Specialized into em:StratigraphicRepresentation, em:DocumentaryRepresentation, em:SpecialFindRepresentation. Always linked to what it represents via crm:P138_represents."@en .
+    rdfs:comment "A 3D model or spatialized image representing some node in the graph. Abstract base. Specialized into em:StratigraphicRepresentation, em:DocumentaryRepresentation, em:SpecialFindRepresentation. Always linked to what it represents via crm:P138_represents. WHAT IT IS (E.D., 21 September 2026). A representation model is a DOCUMENT WITH A DATE: it was made on a day, by somebody, from something, and it is naturally anchored to an EPOCH rather than to a unit. It is also potentially PARTIAL — a photogrammetric survey can come back with an incomplete mesh, a facade recorded from one side only, a room whose ceiling nobody could reach. Both of those together have one consequence worth stating so nobody reasons past it: the ABSENCE of a link between a model and a stratigraphic unit IS NOT INFORMATIVE. It does not mean the unit was not represented, and it does not mean the unit is not there; it means this document does not reach that far. Queries must not read a missing link as a negative claim. The PROXY has a different statute and is not the same kind of thing: em:SemanticShape is CUMULATIVE and ARGUED — a quale synthesised from several sources, inheriting the extractor/combiner chain, so it can be more COMPLETE than any single model while being far less detailed. A model is one look at the thing; a proxy is what we have concluded the thing occupies. DATING AND PROVENANCE HAVE NO FIELD OF THEIR OWN ON THIS CLASS, and that is deliberate: they travel through has_linked_resource to a ResourceNode and back up through dtc_had_output to the DTC event that produced it, where the date, the device and the author already live and are already paradata. A `date` field MUST NOT be added to RepresentationModelNode: it would duplicate the DTC chain, drift from it, and turn a documented provenance into a typed-in string."@en .
 
 em:StratigraphicRepresentation
     a owl:Class ;
@@ -328,7 +328,12 @@ em:SpecialFindRepresentation
 em:SemanticShape
     a owl:Class ;
     rdfs:label "Semantic Shape (proxy geometry)"@en ;
-    rdfs:subClassOf crmgeo:SP5_Geometric_Place_Expression ;
+    # PROVVISORIO — crmgeo:SP6_Declarative_Place è il candidato migliore,
+    # decisione rinviata da E.D. (21 set 2026). Era crmgeo:SP5_Geometric_Place_Expression,
+    # che NON è dichiarata nel documento servito a http://www.cidoc-crm.org/extensions/crmgeo/
+    # (CRMgeo 2.0 draft: SP1,2,3,4,6,7,10,11,12,13,14,15 — SP5 sopravvive solo nella scope
+    # note di SP6). crm:E73_Information_Object è la mossa sicura che non impegna.
+    rdfs:subClassOf crm:E73_Information_Object ;
     rdfs:comment "3D proxy geometry (convex shapes or spheres, or a .glb via rdfs:seeAlso) representing the spatial extent of a node. Lighter weight than a full RepresentationModel: intended for spatial indexing and rough containment, not for visual rendering. SINCE 2026-08-11 IT IS A PAYLOAD: the proxy of a unit is a quale — a property of type 'geometry' — and this class is what that property points at through P138i (has_semantic_shape). The reason is paradata: a lone shape cannot say where it came from, while a property inherits the extractor/combiner chain, so one proxy can be synthesised from several sources (a photogrammetric mesh and a historical photograph). The class itself did not change; who points at it did. Maps to: Python SemanticShapeNode (node_type='semantic_shape')."@en .
 
 em:convexShape
@@ -483,7 +488,7 @@ em:confidenceLevel
 # ============================================================================
 # 11. STRATIGRAPHIC PHYSICAL RELATIONS (AP11 subproperties)
 # ============================================================================
-# CRMarchaeo's AP11_has_physical_relation is the generic relation between
+# CRMarchaeo's AP11_has_physical_relation_to is the generic relation between
 # two stratigraphic units. We discriminate the specific type with named
 # subproperties — the SPARQL-friendly pattern (queries can be specific
 # OR fall back to the generic AP11 via subproperty inference).
@@ -491,7 +496,7 @@ em:confidenceLevel
 em:abuts
     a owl:ObjectProperty ;
     rdfs:label "abuts"@en ;
-    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation ;
+    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation_to ;
     rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
     rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
     rdfs:comment "Source stratigraphic unit abuts against the target. Non-symmetric: A abuts B does NOT imply B abuts A (B is_abutted_by A). Maps to: connections_datamodel edge 'abuts'."@en .
@@ -499,7 +504,7 @@ em:abuts
 em:cuts
     a owl:ObjectProperty ;
     rdfs:label "cuts"@en ;
-    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation ;
+    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation_to ;
     rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
     rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
     rdfs:comment "Source stratigraphic unit cuts (is incised into) the target. Non-symmetric. Maps to: connections_datamodel edge 'cuts'."@en .
@@ -507,7 +512,7 @@ em:cuts
 em:fills
     a owl:ObjectProperty ;
     rdfs:label "fills"@en ;
-    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation ;
+    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation_to ;
     rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
     rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
     rdfs:comment "Source stratigraphic unit fills the target (typically a deposit filling a cut). Non-symmetric. Maps to: connections_datamodel edge 'fills'."@en .
@@ -515,7 +520,7 @@ em:fills
 em:overlies
     a owl:ObjectProperty ;
     rdfs:label "overlies"@en ;
-    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation ;
+    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation_to ;
     rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
     rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
     rdfs:comment "Source stratigraphic unit overlies (covers) the target. Non-symmetric. Maps to: connections_datamodel edge 'overlies'."@en .
@@ -523,7 +528,7 @@ em:overlies
 em:bondedTo
     a owl:ObjectProperty , owl:SymmetricProperty ;
     rdfs:label "bonded to"@en ;
-    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation ;
+    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation_to ;
     rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
     rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
     rdfs:comment "Two stratigraphic units are physically bonded (e.g. masonry bonding). Symmetric. Maps to: connections_datamodel edges 'bonded_to' / 'is_bonded_to'."@en .
@@ -531,7 +536,7 @@ em:bondedTo
 em:physicallyEquals
     a owl:ObjectProperty , owl:SymmetricProperty ;
     rdfs:label "physically equals"@en ;
-    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation ;
+    rdfs:subPropertyOf crmarchaeo:AP11_has_physical_relation_to ;
     rdfs:domain crmarchaeo:A8_Stratigraphic_Unit ;
     rdfs:range crmarchaeo:A8_Stratigraphic_Unit ;
     rdfs:comment "Two distinct stratigraphic-unit ids refer to the same physical entity (e.g. across campaigns or archives). Symmetric. Maps to: connections_datamodel edges 'equals' / 'is_physically_equal_to'."@en .
@@ -612,13 +617,13 @@ em:UnknownNode
 em:NodeGroup
     a owl:Class ;
     rdfs:label "Node Group (abstract)"@en ;
-    rdfs:subClassOf crm:E78_Collection ;
+    rdfs:subClassOf crm:E73_Information_Object ;
     rdfs:comment "Abstract superclass of the EM grouping axes — activity (intention), paradata (justification), timebranch (alternative time), location (place), functional unit (architectural composition). A group is a Collection of nodes and never changes what its members ARE. Maps to: Python GroupNode (node_type='Group')."@en .
 
 em:ParadataNodeGroup
     a owl:Class ;
     rdfs:label "Paradata Node Group"@en ;
-    rdfs:subClassOf em:NodeGroup , crm:E78_Collection ;
+    rdfs:subClassOf em:NodeGroup , crm:E89_Propositional_Object ;
     rdfs:comment "All the paradata of one stratigraphic unit gathered as a unit, by EM convention named '[US_name]_PD'. Distinct class so the paradata groups are findable by type rather than by naming convention. Maps to: Python ParadataNodeGroup (node_type='ParadataNodeGroup')."@en .
 
 em:LocationNodeGroup
@@ -635,5 +640,71 @@ em:GeoPositionNode
 
 
 # ============================================================================
-# End of em.ttl v1.6.1
+# 12. TERMS THE DATAMODELS CITE — declared here for the first time
+#     (added 2026-09-21, repair pass on the CIDOC mapping)
+# ============================================================================
+#
+# These eight em: terms were named by s3Dgraphy_node_datamodel.json and
+# s3Dgraphy_connections_datamodel.json and never defined here. An undefined
+# term is not an error anywhere: it serialises as a perfectly well-formed IRI
+# that no reasoner can place and no query can reach through its superclass.
+# Domain, range and superclass below are READ OFF the datamodels
+# (em_extension.subclass_of, mapping.cidoc, allowed_connections) — nothing is
+# invented. Where the datamodel did not say, the field is absent and the
+# comment says so.
+
+em:FunctionalUnit
+    a owl:Class ;
+    rdfs:label "Functional Unit"@en ;
+    rdfs:subClassOf crm:E24_Physical_Human-Made_Thing ;
+    rdfs:comment "The stratigraphic units that together make up one recognisable functional or architectural component — the column made of its US, the wall made of its US (DP-72). Physical, not curatorial: it takes E24 rather than the collection class its em:NodeGroup parent carries, because a component is a whole made of parts and not a set somebody assembled. It is likewise not an em:WorkingUnit (an activity axis: why something was done) — this answers what a set of units IS. Since 2026-09-21 it is also a bearer of the temporal index: has_first_epoch and survive_in_epoch both accept it, and the asymmetry with ActivityNodeGroup (which takes has_first_epoch and never survive_in_epoch) is the point — an activity is an event and does not survive, a thing persists. Maps to: Python FunctionalUnitNodeGroup (node_type=\'FunctionalUnitNodeGroup\')."@en .
+
+em:RepresentationModelNodeGroup
+    a owl:Class ;
+    rdfs:label "Representation Model Container"@en ;
+    rdfs:subClassOf em:NodeGroup , crm:E73_Information_Object ;
+    rdfs:comment "The representation models that form ONE named set published under a single Document — «Survey 2015» under D.01, «Reconstruction» under D.09 (EM16-RMNG, 2026-09-10). The one group subtype that does not override its parent class: a container of models is a conceptual set, not a physical thing and not an event. Membership is 1:1 — a mesh belongs to exactly one container — and the container sits BESIDE the direct Document→model edges, never in between. Maps to: Python RepresentationModelNodeGroup (node_type=\'RepresentationModelNodeGroup\')."@en .
+
+em:GCPSet
+    a owl:Class ;
+    rdfs:label "Ground Control Point Set"@en ;
+    rdfs:subClassOf crm:E73_Information_Object ;
+    rdfs:comment "The set of ground control points a registration was (or will be) solved from: a documented list of measured places and, for each, where it was observed. An information object that CARRIES places and measurements without being either — it is not an E53 Place and not a crmsci:S21 Measurement. Named in the EM extension because «the control points behind this registration» is the unit archaeologists actually hand each other, and CIDOC has nothing above E73 for it. The individual observations stay payload literals in this version; exploding each point into an S21 Measurement of an E53 Place is declared as a refinement, not implied. Maps to: Python GCPSetNode (node_type=\'gcp_set\')."@en .
+
+em:RegistrationTransform
+    a owl:Class ;
+    rdfs:label "Registration Transform"@en ;
+    rdfs:subClassOf crm:E73_Information_Object ;
+    rdfs:comment "The 7-parameter similarity (rotation, translation, positive scale) that places a produced model in a frame, carrying its own error bar (rms, residuals) beside the claim rather than in a log nobody keeps. It DESCRIBES a mapping between two crmgeo:SP4 spatial coordinate reference systems, which CIDOC and CRMgeo model individually but never as a parameterised map between two of them — hence E73 as the honest superclass. Deliberately NOT an event: the alternative, leaving the parameters as literals on the D7 acquisition, loses the ability to point at «the placement» as a thing that gets superseded, and being superseded is the whole reason the transform is a node. The three modes are the SHAPE of the graph, never a flag: a transform with a CRS that has_gcp_set points at = absolute; a transform with crs=null and no control set = a site-local frame; no transform at all = nobody placed it. Maps to: Python RegistrationTransformNode (node_type=\'registration_transform\')."@en .
+
+em:Narrative
+    a owl:Class ;
+    rdfs:label "Narrative"@en ;
+    rdfs:subClassOf crm:E33_Linguistic_Object ;
+    rdfs:comment "A narrative over the EM graph: an ordered sequence of chapters, each anchored to a lane (epoch, activity, area) or standing outside the stratigraphy (introduction, geographic placement), composed of prose blocks and embed blocks. E33 because the narrative IS linguistic content about the heritage entity — and an E33 is already an E73 Information Object in CRM, so it is versionable, licensable and embargoable like the graph itself without a second assertion. The embeds are not content but references, and project as P67_refers_to. Endorsement is a separate act and a separate edge: see em:validatedBy. Maps to: Python NarrativeNode (node_type=\'narrative\')."@en .
+
+em:NeutralSU
+    a owl:Class ;
+    rdfs:label "Neutral Stratigraphic Unit (USNt)"@en ;
+    rdfs:subClassOf crmarchaeo:A3_Stratigraphic_Interface ;
+    rdfs:comment "PROVISIONAL (datamodel extension_status: proposed_provisional — the class is declared so the IRI stops being undefined, NOT because the CIDOC placement is settled). A void that is part of the DESIGN and not the product of a destruction: the risparmi of masonry, a window or door opening, a niche, the empty volume of a room. The wall was built around it, so nothing was ever removed — which is what separates it from the negative unit, whose void is what a destructive act left behind. A3 Stratigraphic Interface is the better-informed placeholder; the genesis it wants is CONSTRUCTIVE (A4-flavoured), not the A5 destructive modification the negative unit takes. Consequence already enforced in the connections datamodel: USNt takes is_after / is_before and nothing else — a void cannot cut, fill, abut or bond. Maps to: Python NeutralStratigraphicUnit (stratigraphic subtype token \'USNt\' since POL6, 2026-08-04)."@en .
+
+em:hasSubEpoch
+    a owl:ObjectProperty ;
+    rdfs:label "has sub-epoch"@en ;
+    rdfs:domain crm:E4_Period ;
+    rdfs:range crm:E4_Period ;
+    rdfs:comment "Splits an epoch into ordered sub-epochs (phases): the SUBJECT is the parent epoch, the OBJECT a phase, which is itself an epoch. Direction taken from the connections datamodel, which states it in words — «Source is the parent epoch, target a phase» — and from the edge\'s own name; the reverse edge is is_in_epoch. Phases partition the parent\'s time-span: when hidden the parent holds all the units, when shown the units are distributed across the phases. NO rdfs:subPropertyOf IS ASSERTED, deliberately. The edge\'s mapping.cidoc is crm:P10_falls_within, whose containment runs the other way (a phase falls within its parent, as that mapping\'s own _comment says) — so the CRM projection of this edge is currently written source-first on the wrong end, and the superproperty here would bake that in. crm:P10i_contains is the candidate; the decision is E.D.\'s and is recorded in the repair report of 2026-09-21. Maps to: connections_datamodel edge \'has_sub_epoch\'."@en .
+
+em:validatedBy
+    a owl:ObjectProperty ;
+    rdfs:label "validated by"@en ;
+    rdfs:subPropertyOf prov:wasInfluencedBy ;
+    rdfs:domain em:Narrative ;
+    rdfs:range em:HumanAuthor ;
+    rdfs:comment "A HUMAN author endorses a piece of content: they have read it and put their name to it (EM Narrative N4, «Who Made This?»). Distinct from em:hasAuthor, and the distinction is the point: hasAuthor says who WROTE it, human or AI; validatedBy says who accepted RESPONSIBILITY for it. The range is em:HumanAuthor and never em:AIAuthor — a model endorsing a model would be a signature with nobody behind it. It is not a quality judgement and not a peer review. The absence of the property IS the unendorsed state, so a machine draft cannot claim an endorsement it never received. Superproperty and domain/range read off the connections datamodel (mapping.cidoc prov:wasInfluencedBy; source NarrativeNode, target AuthorNode). prov:wasInfluencedBy is the domain-neutral anchor because it is true and claims nothing more: endorsement has no exact term in CIDOC-CRM or PROV-O, and the datamodel records that an E13 Attribute Assignment reification is where this would change. Maps to: connections_datamodel edge \'validated_by\'."@en .
+
+
+# ============================================================================
+# End of em.ttl v1.6.2
 # ============================================================================

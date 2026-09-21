@@ -8,7 +8,7 @@ are organised around the four ways it could quietly lie:
   pyarchinit mapping would stop working and nothing here would notice;
 * **the retro-map is asserted instead of read.** The bridge CIDOC↔EM is the
   `mapping.cidoc` field the datamodels already declare, inverted. So the tests
-  check REAL pairs (A2→US, E31→DocumentNode, P120_occurs_before→is_after) rather
+  check REAL pairs (A2→US, E31→DocumentNode, crmarchaeo:AP28_occurs_before→is_after) rather
   than that a dict has keys — the pairs are the contract with the ontology table;
 * **a mapping validates and then fails at import.** An edge resolved from a CIDOC
   property says nothing about whether the datamodel allows it between those two
@@ -61,7 +61,7 @@ def xml_mapping(**extra):
             {"source_column": "id", "target_column": "interpretazione",
              "edge_type": "has_property"},
             {"source_column": "id", "target_column": "copre",
-             "cidoc": "P120_occurs_before"},
+             "cidoc": "crmarchaeo:AP28_occurs_before"},
         ],
     }
     mapping.update(extra)
@@ -112,8 +112,8 @@ def test_the_inverse_index_is_read_from_the_datamodel_not_written_here():
     assert "DocumentNode" in [c["em_type"] for c in classes["E31 Document"]]
     assert "AuthorNode" in [c["em_type"] for c in classes["E21 Person"]]
     assert {"SF", "RSF"} <= {c["em_type"] for c in classes["E19 Physical Object"]}
-    assert [p["edge_type"] for p in properties["P120_occurs_before"]] == ["is_after"]
-    assert [p["edge_type"] for p in properties["P123_resulted_from"]] \
+    assert [p["edge_type"] for p in properties["crmarchaeo:AP28_occurs_before"]] == ["is_after"]
+    assert [p["edge_type"] for p in properties["P123i_resulted_from"]] \
         == ["changed_from"]
 
 
@@ -234,7 +234,7 @@ def test_csv_fields_sniff_the_delimiter():
 def test_allowed_edges_are_the_datamodels_and_carry_their_cidoc():
     edges = {e["edge_type"]: e for e in api.mapping_allowed_edges("US", "US")}
     assert "is_after" in edges
-    assert edges["is_after"]["cidoc"] == "P120_occurs_before"
+    assert edges["is_after"]["cidoc"] == "crmarchaeo:AP28_occurs_before"
     assert "has_property" not in edges, "a US does not have a property US"
     to_property = {e["edge_type"] for e in
                    api.mapping_allowed_edges("US", "PropertyNode")}
@@ -316,7 +316,7 @@ def test_normalising_resolves_the_cidoc_choice_and_says_where_it_came_from():
     assert column["cidoc_resolved_from"] == "A2 Stratigraphic Volume Unit"
     relation = normalized["relations"][1]
     assert relation["edge_type"] == "is_after"
-    assert relation["cidoc_resolved_from"] == "P120_occurs_before"
+    assert relation["cidoc_resolved_from"] == "crmarchaeo:AP28_occurs_before"
     # …and the original is untouched: normalising is a copy
     assert "node_type" not in xml_mapping()["column_mappings"]["id"]
 

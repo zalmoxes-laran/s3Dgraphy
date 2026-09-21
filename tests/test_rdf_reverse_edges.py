@@ -51,7 +51,7 @@ def test_the_two_directions_produce_the_same_triple(tmp_path):
     # subject and object are the canonical pair in both cases, whichever way
     # the edge was drawn
     assert {(s, o) for s, _, o in canonical} == {("US2", "US1")}
-    assert CRM + "P120_occurs_before" in {p for _, p, _ in canonical}
+    assert CRMARCHAEO_NS + "AP28_occurs_before" in {p for _, p, _ in canonical}
 
 
 def test_a_reverse_edge_no_longer_falls_through_to_the_generic_predicate(tmp_path):
@@ -139,11 +139,17 @@ def test_class_codes_still_resolve_to_their_own_namespaces():
 
 
 def test_a_stratigraphic_edge_now_carries_its_crmarchaeo_predicate(tmp_path):
-    # the point of the repair, end to end: AP28 travels beside P120.
+    # the point of the repair, end to end: AP28 travels ALONE.
+    #
+    # It used to travel beside crm:P120_occurs_before. Measured on 21 set 2026
+    # against the official CIDOC CRM 7.1.3 declaration, P120 is not there — the
+    # dual emission was writing the same fact twice, once on a live IRI and
+    # once on one no reasoner can place. AP28 was already the extension
+    # mapping, so it was promoted and the duplicate dropped.
     triples = _unit_triples(_graph("ge", "US1", "is_after", "US2"), tmp_path / "e.ttl")
     predicates = {p for _, p, _ in triples}
-    assert CRM + "P120_occurs_before" in predicates
     assert CRMARCHAEO_NS + "AP28_occurs_before" in predicates
+    assert CRM + "P120_occurs_before" not in predicates
 
 
 # ── the direction of the sequence ────────────────────────────────────────────

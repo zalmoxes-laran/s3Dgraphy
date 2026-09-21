@@ -386,13 +386,25 @@ def test_templumare_round_trip_keeps_every_node(tmp_path):
     edges_after = {(e.edge_source, e.edge_target, e.edge_type)
                    for e in rebuilt.edges}
     assert not edges_after - edges_before, sorted(edges_after - edges_before)[:10]
-    assert not edges_before - edges_after, sorted(edges_before - edges_after)[:10]
+
+    # ONE KIND OF EDGE DOES NOT COME BACK, and it is named rather than absorbed
+    # into a loose assertion: `is_in_activity`. Since 21 set 2026 its
+    # `mapping.cidoc` is deliberately empty — P9_consists_of stated the relation
+    # backwards AND violated its domain, and neither candidate replacement holds
+    # (P9i needs an E4 Period as subject, P129i an E89 Propositional Object as
+    # object, and an ActivityNodeGroup is an E7 Activity). Nothing was invented
+    # in the gap, so the exporter emits nothing for it: the P130 fallback would
+    # only be a different false claim. Until E.D. decides the predicate, an
+    # activity membership does not survive the RDF projection. It is untouched
+    # in em.json, which is where it lives.
+    lost = edges_before - edges_after
+    assert {t for _, _, t in lost} == {"is_in_activity"}, sorted(lost)[:10]
 
     # ONE declared difference in the counts: this graph carries a DUPLICATE
     # `is_after` edge (the same source, target and type twice). RDF is a set of
     # triples, so a duplicate cannot survive a projection — 527 authored edges,
     # 526 distinct ones. Stated here rather than absorbed into a >= assertion.
-    assert len(original.edges) - len(rebuilt.edges) == 1
+    assert len(original.edges) - len(rebuilt.edges) == 1 + len(lost)
     assert len(rebuilt.edges) == len(edges_after)
 
 
@@ -566,7 +578,7 @@ def test_geoposition_without_a_transform_still_reads_as_a_geoposition(tmp_path):
 
 
 def test_crm_superclasses_are_still_emitted_for_crm_only_readers(tmp_path):
-    """Nothing was taken away: the E1/E78/E53 statements are still there.
+    """Nothing was taken away: the E1/E73/E89/E53 statements are still there.
 
     The new em: classes are declared `rdfs:subClassOf` their former CIDOC class
     and the exporter emits both, so a consumer that knows only CIDOC reads the
@@ -578,8 +590,11 @@ def test_crm_superclasses_are_still_emitted_for_crm_only_readers(tmp_path):
     base = f"{DEFAULT_BASE_URI}graph/structural/node/"
     expected = {
         "loc1": (f"{CRM_NS}E53_Place", "LocationNodeGroup"),
-        "pd1": (f"{CRM_NS}E78_Collection", "ParadataNodeGroup"),
-        "grp1": (f"{CRM_NS}E78_Collection", "NodeGroup"),
+        # 21 set 2026: E78_Collection non è dichiarata in CIDOC CRM 7.1.3
+        # (rinominata E78_Curated_Holding, sottoclasse di E24 — fisica). I due
+        # gruppi non la seguono e prendono ciascuno la classe che sono.
+        "pd1": (f"{CRM_NS}E89_Propositional_Object", "ParadataNodeGroup"),
+        "grp1": (f"{CRM_NS}E73_Information_Object", "NodeGroup"),
         "unk1": (f"{CRM_NS}E1_CRM_Entity", "UnknownNode"),
     }
     for node_id, (crm_class, em_local) in expected.items():

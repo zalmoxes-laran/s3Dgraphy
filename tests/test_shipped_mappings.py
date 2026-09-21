@@ -157,12 +157,16 @@ def test_an_older_vocabulary_warns_and_still_loads():
     mapping["table_settings"].pop("sheet_name", None)
     mapping["table_settings"]["start_row"] = 1
     stale = api.mapping_stamp(mapping)
+    #: the version the build is actually at, asked rather than typed — a
+    #: hard-coded number here turns every datamodel bump into a red test that
+    #: says nothing about the behaviour under examination.
+    current = stale["_validated_against"]["connections_datamodel"]
     stale["_validated_against"]["connections_datamodel"] = "1.5.4"
     stale["_validated_against"]["on"] = "2026-02-21"
 
     res = api.mapping_apply(stale, str(FIXTURE), mode="volatile")
     assert res["ok"] and res["rows"] == 3      # it loads, in full
-    assert any("1.5.4" in w and "1.6.16" in w for w in res["warnings"])
+    assert any("1.5.4" in w and current in w for w in res["warnings"])
     assert any("2026-02-21" in w for w in res["warnings"])
 
 

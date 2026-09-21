@@ -17,7 +17,7 @@ source of truth — no class/edge/qualia type is hard-coded here:
 
   * s3Dgraphy_connections_datamodel.json
       → edge_type → predicate IRI.
-        AP11_has_physical_relation discrimination via type_tag → em:abuts /
+        AP11_has_physical_relation_to discrimination via type_tag → em:abuts /
         em:cuts / em:fills / em:overlies / em:bondedTo / em:physicallyEquals
         subproperties (SPARQL-friendly: queries can be specific or fall
         back to AP11 via subproperty inference).
@@ -354,7 +354,7 @@ class _Datamodel:
         type_tag = mapping.get("type_tag")
         cidoc = mapping.get("cidoc")
         # extension_mapping may carry a legacy parenthesised reverse label,
-        # e.g. "AP13_has_stratigraphic_relation (is_stratigraphic_relation_of)"
+        # e.g. "AP13_has_stratigraphic_relation_to (is_stratigraphic_relation_of)"
         # — strip it before resolution.
         ext_raw = mapping.get("extension_mapping")
         if isinstance(ext_raw, str) and "(" in ext_raw:
@@ -362,8 +362,27 @@ class _Datamodel:
         ext_iri = _resolve_prefixed(ext_raw)
         # AP11 family: prefer the generic AP11 predicate; caller adds subproperty.
         if type_tag:
-            return CRMARCHAEO.AP11_has_physical_relation, None, type_tag, deprecated
+            return CRMARCHAEO.AP11_has_physical_relation_to, None, type_tag, deprecated
         return _resolve_prefixed(cidoc), ext_iri, None, deprecated
+
+    def edge_predicate_declared_absent(self, edge_type: str) -> bool:
+        """True when the datamodel says, in so many words, that this edge has
+        no CRM predicate — `mapping.cidoc` present and empty.
+
+        The distinction matters because the two silences are different. An edge
+        type the datamodel does not know at all is an accident, and the caller's
+        P130 fallback keeps it from vanishing. An edge whose `cidoc` was emptied
+        DELIBERATELY (is_in_activity, 2026-09-21: neither P9i nor P129i holds
+        its domain, and nothing was invented in the gap) must not be given a
+        predicate by a fallback — P130_shows_features_of is a live IRI making a
+        claim about shared features, which is a different false statement from
+        the one that was removed.
+        """
+        edges = self.connections_datamodel.get("edge_types", {})
+        canonical, _inv = self.resolve_edge_direction(edge_type)
+        entry = edges.get(canonical) or {}
+        mapping = entry.get("mapping") or {}
+        return "cidoc" in mapping and not (mapping.get("cidoc") or "").strip()
 
     def get_qualia_crm_iri(self, property_type: Optional[str]) -> Optional[URIRef]:
         """Resolve a property_type string to its CIDOC class IRI.
@@ -1187,7 +1206,10 @@ class RDFExporter:
                 self._emit_orcid_verification(node_iri, data, ctx)
             surname = data.get("surname")
             if surname and surname != "nosurname":
-                ctx.add((node_iri, CRM.P131_is_identified_by, Literal(surname)))
+                # P1_is_identified_by, not P131: P131 was deprecated in CRM 7.x
+                # along with E82 Actor Appellation and is not declared in 7.1.3,
+                # so the triple went out on a dead IRI (repaired 2026-09-21).
+                ctx.add((node_iri, CRM.P1_is_identified_by, Literal(surname)))
 
         elif node_type == "author_ai":
             orcid = data.get("orcid")
@@ -1437,7 +1459,7 @@ class RDFExporter:
             ctx.add((source_iri, specific, target_iri))
             # Also assert the generic AP11 (so SPARQL on AP11 still works
             # for readers that don't know our subproperties).
-            ctx.add((source_iri, CRMARCHAEO.AP11_has_physical_relation, target_iri))
+            ctx.add((source_iri, CRMARCHAEO.AP11_has_physical_relation_to, target_iri))
             self.stats["edges_emitted"] += 1
             return
 
@@ -1478,6 +1500,15 @@ class RDFExporter:
             if ext_iri is not None and ext_iri != predicate:
                 ctx.add((source_iri, ext_iri, target_iri))
             self.stats["edges_emitted"] += 1
+        elif self.datamodel.edge_predicate_declared_absent(edge_type):
+            # The datamodel states there is no predicate for this edge. Say
+            # nothing: the fallback below would put P130_shows_features_of on
+            # it, which is not a weaker claim than the wrong one it replaced —
+            # it is another wrong one, and a live IRI carries it further than a
+            # dead one ever did. The edge is simply not projected until the
+            # predicate is decided.
+            self.stats["edges_skipped_unmappable"] = (
+                self.stats.get("edges_skipped_unmappable", 0) + 1)
         else:
             # Fallback: emit as generic P130_shows_features_of so the
             # connection survives the round-trip even if unmapped.

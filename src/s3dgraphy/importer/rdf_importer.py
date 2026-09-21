@@ -177,7 +177,7 @@ ARTEFACT_PREDICATES: Set[URIRef] = {
 #: Predicates the exporter emits as the GENERIC companion of a more specific
 #: one, so they can never identify an edge on their own.
 #:
-#: ``AP11_has_physical_relation`` is written beside every ``em:cuts`` /
+#: ``AP11_has_physical_relation_to`` is written beside every ``em:cuts`` /
 #: ``em:abuts`` / … triple, for readers that do not know the subproperties. But
 #: ``generic_connection`` declares AP11 as its own ``extension_mapping`` in the
 #: datamodel, so without this a physical relation came back as BOTH its real
@@ -185,7 +185,7 @@ ARTEFACT_PREDICATES: Set[URIRef] = {
 #: were a signature. Excluded here, ``generic_connection`` falls back to its core
 #: ``P130_shows_features_of``, which belongs to it alone.
 GENERIC_COMPANION_PREDICATES: Set[URIRef] = {
-    CRMARCHAEO.AP11_has_physical_relation,
+    CRMARCHAEO.AP11_has_physical_relation_to,
 }
 
 #: LEGACY FALLBACK ONLY (2026-08-11).
@@ -354,10 +354,25 @@ class _InverseDatamodel:
         if not candidates:
             return None, None
 
-        # a type that is ONLY a declared superclass is the redundant CRM one
+        # A type that ANOTHER CANDIDATE declares as its superclass is the
+        # redundant CRM one the exporter adds for CRM-only readers.
+        #
+        # The test is scoped to this node's own candidates, not to the datamodel
+        # as a whole. It used to ask «is this IRI anybody's superclass?», which
+        # held while every shared CIDOC class had been vacated in favour of an
+        # em: URI. Since 2026-09-21 it no longer does: crm:E73_Information_Object
+        # is the superclass em:NodeGroup, em:GCPSet and em:RegistrationTransform
+        # declare AND still ResourceNode's own primary IRI, so the global test
+        # dropped every candidate, fell through to `or candidates`, and returned
+        # whichever came first — a GroupNode came back as a ResourceNode.
+        redundant = {
+            str(sc)
+            for n in candidates
+            for sc in self.dm.get_node_superclasses(n)
+        }
         specific = [
             n for n in candidates
-            if str(self.dm.get_node_primary_iri(n)) not in self.superclass_iris
+            if str(self.dm.get_node_primary_iri(n)) not in redundant
         ] or candidates
 
         # Evidence — LEGACY path only. With the distinct URIs of 2026-08-11 a
@@ -927,7 +942,12 @@ class RDFImporter:
             orcid = self._one_literal(store, ref, CRM.P48_has_preferred_identifier)
             if orcid:
                 data["orcid"] = orcid
-            surname = self._one_literal(store, ref, CRM.P131_is_identified_by)
+            # P1_is_identified_by since 2026-09-21; P131 is read as a fallback
+            # so TTL written before the repair still comes back whole (P131 was
+            # deprecated in CRM 7.x with E82 Actor Appellation and is not
+            # declared in 7.1.3, so nothing new is ever written on it).
+            surname = (self._one_literal(store, ref, CRM.P1_is_identified_by)
+                       or self._one_literal(store, ref, CRM.P131_is_identified_by))
             if surname:
                 data["surname"] = surname
             model = self._one_literal(store, ref, EM.modelIdentifier)
@@ -1173,7 +1193,7 @@ class RDFImporter:
                     covered_cores.add(core)
                 # the AP11 family also emits the generic AP11 triple; a
                 # specific em: subproperty therefore accounts for it too
-                covered_cores.add(str(CRMARCHAEO.AP11_has_physical_relation))
+                covered_cores.add(str(CRMARCHAEO.AP11_has_physical_relation_to))
 
             # 2) leftover core predicates — a triple the specific pass did not
             #    already account for

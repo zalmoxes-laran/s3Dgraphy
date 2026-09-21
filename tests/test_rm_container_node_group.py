@@ -476,21 +476,31 @@ def test_LA_VOCE_NEL_NODE_DATAMODEL_c_e():
     assert voce["parent"] == "GroupNode"
     assert voce["class"] == "RepresentationModelNodeGroup"
     #: …e la versione è stata bumpata
-    assert d["s3Dgraphy_data_model_version"] == "1.6.5"
+    assert d["s3Dgraphy_data_model_version"] == "1.6.6"
 
 
-def test_E_IL_MAPPING_TIENE_l_E78_del_genitore_con_la_sua_ragione():
-    """L'unico sottotipo di gruppo che NON sovrascrive E78 Collection, e la
-    ragione è scritta: un container RM È un insieme curatoriale — ciò che
-    qualcuno ha raccolto e pubblicato sotto un documento."""
+def test_E_IL_MAPPING_TIENE_la_classe_del_genitore_con_la_sua_ragione():
+    """L'unico sottotipo di gruppo che NON sovrascrive la classe del genitore,
+    e la ragione è scritta: un container RM È un insieme curatoriale — ciò che
+    qualcuno ha raccolto e pubblicato sotto un documento.
+
+    Dal 21 set 2026 quella classe non è più E78 Collection, che CIDOC CRM 7.1.3
+    non dichiara più (rinominata E78_Curated_Holding, e fisica): il genitore
+    porta E73 Information Object. Ciò che questo test difende non è il nome
+    della classe ma l'invariante — il container NON sovrascrive il genitore —
+    quindi si asserisce l'uguaglianza fra i due, non una costante.
+    """
     import pathlib
     import s3dgraphy
     d = json.loads((pathlib.Path(s3dgraphy.__file__).parent / "JSON_config"
                     / "s3Dgraphy_node_datamodel.json").read_text())
     sub = d["group_nodes"]["GroupNode"]["subtypes"]
     voce = sub["RepresentationModelNodeGroup"]
-    assert voce["mapping"]["cidoc"] == "E78 Collection"
-    assert d["group_nodes"]["GroupNode"]["mapping"]["cidoc"] == "E78 Collection"
+    genitore = d["group_nodes"]["GroupNode"]
+    assert voce["mapping"]["cidoc"] == genitore["mapping"]["cidoc"]
+    #: …e non è più la classe morta: E78 Collection non esiste in CRM 7.1.3
+    assert "E78" not in voce["mapping"]["cidoc"]
+    assert genitore["mapping"]["cidoc"] == "E73 Information Object"
     #: …e la ragione nomina il caso da cui si distingue
     r = voce["mapping"]["rationale"]
     assert "FunctionalUnitNodeGroup" in r and "E24" in r

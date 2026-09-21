@@ -35,7 +35,7 @@ ROWS = [
 ]
 
 
-def mapping(*, fmt: str, is_relation: bool, edge: str = "P120_occurs_before"):
+def mapping(*, fmt: str, is_relation: bool, edge: str = "crmarchaeo:AP28_occurs_before"):
     """The same mapping in two formats and two flag states — one function, so a
     difference in the result cannot come from a difference in the mapping."""
     settings = {"format_type": fmt}
@@ -173,7 +173,7 @@ def test_a_csv_mapping_is_not_asked_for_a_sheet_name():
 
 # ── C2 · is_relation in the tables: opt-in, and it means EDGE-ONLY ──────────
 
-def apply_csv(is_relation: bool, edge: str = "P120_occurs_before"):
+def apply_csv(is_relation: bool, edge: str = "crmarchaeo:AP28_occurs_before"):
     with tempfile.TemporaryDirectory() as tmp:
         graph = Graph(graph_id="scavo")
         report = api.mapping_apply(mapping(fmt="csv", is_relation=is_relation,
@@ -309,17 +309,26 @@ def test_the_edges_group_with_the_datamodels_real_counts():
     part company."""
     groups = api.mapping_edge_groups()
     canonical = {g["ontology"]: g["canonical_count"] for g in groups}
-    assert canonical == {"CIDOC-CRM": 33, "CRMarchaeo": 8, "CRMdig": 5,
-                         "HDT-O": 6, "PROV-O": 2, "unmapped": 2}, canonical
+    # 21 set 2026, CIDOC repair: three edges left the CIDOC-CRM bucket and the
+    # totals did not move, which is the point — nothing was added or dropped,
+    # three mappings were corrected. is_after and has_same_time went to
+    # CRMarchaeo (crm:P120_occurs_before and crm:P114_is_equal_in_time_to are
+    # not declared in CRM 7.1.3; AP28 and AP22, already their extension
+    # mappings, were promoted), and is_in_activity went to `unmapped` because
+    # its predicate was emptied deliberately and nothing was invented to replace
+    # it. So: CIDOC-CRM 33 -> 30, CRMarchaeo 8 -> 10, unmapped 2 -> 3.
+    assert canonical == {"CIDOC-CRM": 30, "CRMarchaeo": 10, "CRMdig": 5,
+                         "HDT-O": 6, "PROV-O": 2, "unmapped": 3}, canonical
     assert sum(canonical.values()) == 56, "the datamodel's own edge count"
     listed = {g["ontology"]: g["count"] for g in groups}
-    assert listed == {"CIDOC-CRM": 63, "CRMarchaeo": 12, "CRMdig": 10,
-                      "HDT-O": 12, "PROV-O": 4, "unmapped": 4}, listed
+    assert listed == {"CIDOC-CRM": 58, "CRMarchaeo": 15, "CRMdig": 10,
+                      "HDT-O": 12, "PROV-O": 4, "unmapped": 6}, listed
     assert sum(listed.values()) == 105, "56 canonical + 49 reverses (7 are "\
                                         "symmetric and have none)"
     filtered = {g["ontology"]: [e["edge_type"] for e in g["edges"]]
                 for g in api.mapping_edge_groups("US", "US")}
-    assert "is_after" in filtered["CIDOC-CRM"]
+    assert "is_after" in filtered["CRMarchaeo"], \
+        "since the 21 set 2026 repair is_after carries crmarchaeo:AP28, not P120"
     assert "cuts" in filtered["CRMarchaeo"]
     assert "is_overlain_by" in filtered["CRMarchaeo"], \
         "the reverse is offered where the canonical is"
@@ -337,8 +346,8 @@ def test_a_node_class_gets_its_ontology_from_the_identifier_and_says_so():
     dig = index["classes"]["crmdig:D12_Data_Transfer_Event"][0]
     assert dig["extension"] == "CRMdig"
     # …while an EDGE declares it, so nothing is inferred there
-    edge = index["properties"]["P120_occurs_before"][0]
-    assert edge["extension"] == "CIDOC-CRM"
+    edge = index["properties"]["crmarchaeo:AP28_occurs_before"][0]
+    assert edge["extension"] == "CRMarchaeo"
 
 
 def test_no_owl_file_is_ever_opened():
