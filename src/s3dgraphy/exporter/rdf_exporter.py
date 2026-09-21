@@ -1507,8 +1507,20 @@ class RDFExporter:
             # it is another wrong one, and a live IRI carries it further than a
             # dead one ever did. The edge is simply not projected until the
             # predicate is decided.
-            self.stats["edges_skipped_unmappable"] = (
-                self.stats.get("edges_skipped_unmappable", 0) + 1)
+            if ext_iri is not None:
+                # ...unless the extension DOES have something true to say. A
+                # declared-absent `cidoc` means no CRM-core predicate holds the
+                # domain, not that the edge carries no meaning: is_in_activity
+                # (CRMem, 2026-09-21) is exactly that case, and em:isInActivity
+                # states it precisely. Emitting the extension alone is not a
+                # weaker dual emission, it is the whole claim — a CRM-only
+                # reader correctly sees nothing rather than something false.
+                ctx.add((source_iri, ext_iri, target_iri))
+                self.stats["edges_emitted_extension_only"] = (
+                    self.stats.get("edges_emitted_extension_only", 0) + 1)
+            else:
+                self.stats["edges_skipped_unmappable"] = (
+                    self.stats.get("edges_skipped_unmappable", 0) + 1)
         else:
             # Fallback: emit as generic P130_shows_features_of so the
             # connection survives the round-trip even if unmapped.

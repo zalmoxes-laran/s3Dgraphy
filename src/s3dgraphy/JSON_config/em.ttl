@@ -706,5 +706,17 @@ em:validatedBy
 
 
 # ============================================================================
-# End of em.ttl v1.6.2
+# CRMem v1.6.3 (2026-09-21) — the first of the four surviving CRMem properties
+# Decided by E.D. in the CIDOC-EM branch chat, 21 September 2026.
+# ============================================================================
+
+em:isInActivity
+    a owl:ObjectProperty ;
+    rdfs:label "is in activity"@en ;
+    rdfs:domain crm:E1_CRM_Entity ;
+    rdfs:range crm:E7_Activity ;
+    rdfs:comment "An entity of any kind — a stratigraphic unit, a quale, a document, an extractor, a whole paradata group — is CLASSIFIED UNDER an activity-shaped grouping. This is the axis of INTENTION in the Extended Matrix, orthogonal to space (is_in_location) and to time (the epoch edges), and it is a curatorial grouping and not an event anyone attended. NO SUPERPROPERTY, deliberately, and the reason is the whole justification for the term: CIDOC can say that an actor PARTICIPATED in an event (P11i), that a thing WAS PRESENT (P12i), that an object WAS USED (P16i) — but it cannot say that an arbitrary entity is classified under an activity. P12i would even pass the type check, because E28 Conceptual Object reaches E77 through E71/E70, but it would be false: a PropertyNode attended nothing. P9i needs an E4 Period in the subject and the sources here are not periods; P129i needs an E89 in the object and E7 Activity is not one. Verified against CIDOC CRM 7.1.3 and CRMarchaeo 2.1.1: CRMarchaeo has specific archaeological activities (A9, A1, A6) but no generic activity class and none of its 32 AP properties expresses membership in one. The CLASS is not ours — crm:E7_Activity is CIDOC core and ActivityNodeGroup stays mapped to it — only the property is. NAMED isInActivity and NOT participatedInActivity (the dead CIDOC-S3D desideratum it replaces), because participation is a claim this model does not make. Maps to: connections_datamodel edge 'is_in_activity' (sources StratigraphicNode/ParadataNode/ParadataNodeGroup/DocumentNode/ExtractorNode/CombinerNode/PropertyNode, target ActivityNodeGroup); mapping.cidoc stays EMPTY on purpose, and the exporter emits this property on its own."@en .
+
+# ============================================================================
+# End of em.ttl v1.6.3
 # ============================================================================

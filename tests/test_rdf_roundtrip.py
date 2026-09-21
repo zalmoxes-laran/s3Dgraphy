@@ -387,18 +387,21 @@ def test_templumare_round_trip_keeps_every_node(tmp_path):
                    for e in rebuilt.edges}
     assert not edges_after - edges_before, sorted(edges_after - edges_before)[:10]
 
-    # ONE KIND OF EDGE DOES NOT COME BACK, and it is named rather than absorbed
-    # into a loose assertion: `is_in_activity`. Since 21 set 2026 its
-    # `mapping.cidoc` is deliberately empty — P9_consists_of stated the relation
-    # backwards AND violated its domain, and neither candidate replacement holds
+    # NOTHING IS LOST ANY MORE, and this assertion is kept strict on purpose.
+    # Until 21 set 2026 ONE kind of edge did not come back — `is_in_activity` —
+    # because its `mapping.cidoc` was deliberately empty: P9_consists_of stated
+    # the relation backwards AND violated its domain, and no replacement held
     # (P9i needs an E4 Period as subject, P129i an E89 Propositional Object as
     # object, and an ActivityNodeGroup is an E7 Activity). Nothing was invented
-    # in the gap, so the exporter emits nothing for it: the P130 fallback would
-    # only be a different false claim. Until E.D. decides the predicate, an
-    # activity membership does not survive the RDF projection. It is untouched
-    # in em.json, which is where it lives.
+    # in the gap, so the exporter stayed silent and 76 memberships fell out of
+    # the projection.
+    # E.D. closed it the same day: the connector lives in CRMem as
+    # `em:isInActivity` (domain E1, range E7_Activity, NO superproperty — the
+    # class is CIDOC core, only the property is ours), and _serialize_edge now
+    # emits a declared-absent edge on its extension predicate alone. The silence
+    # was right only while there was nothing true to say.
     lost = edges_before - edges_after
-    assert {t for _, _, t in lost} == {"is_in_activity"}, sorted(lost)[:10]
+    assert not lost, sorted(lost)[:10]
 
     # ONE declared difference in the counts: this graph carries a DUPLICATE
     # `is_after` edge (the same source, target and type twice). RDF is a set of
