@@ -20,7 +20,7 @@ Node Data Model
 
 File: ``s3Dgraphy_node_datamodel.json``
 
-Version: 1.5.1
+Version: see :doc:`generated-report`, which reads it off the file at build time.
 
 This file defines all node types available in the Extended Matrix, organized into categories.
 
@@ -261,7 +261,7 @@ Connections Data Model
 
 File: ``s3Dgraphy_connections_datamodel.json``
 
-Version: 1.5.4
+Version: see :doc:`generated-report`, which reads it off the file at build time.
 
 This file defines all edge types (connections) with CIDOC-CRM mappings.
 

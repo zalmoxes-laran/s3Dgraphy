@@ -1,3 +1,7 @@
+---
+orphan: true
+---
+
 # Il timbro — la specifica sta altrove
 
 Il formato è specificato nella libreria che lo implementa: **`dtcstamp`**,

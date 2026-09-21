@@ -1,17 +1,19 @@
 s3dgraphy Documentation
 ========================
 
-.. image:: https://img.shields.io/badge/version-1.6.0-blue.svg
-   :target: https://pypi.org/project/s3dgraphy/
-   :alt: Version
+.. only:: html
 
-.. image:: https://img.shields.io/badge/python-3.9+-brightgreen.svg
-   :target: https://python.org
-   :alt: Python
+   .. image:: https://img.shields.io/badge/version-1.6.0-blue.svg
+      :target: https://pypi.org/project/s3dgraphy/
+      :alt: Version
 
-.. image:: https://img.shields.io/badge/license-GPL--3.0-orange.svg
-   :target: https://github.com/zalmoxes-laran/s3dgraphy/blob/main/LICENSE
-   :alt: License
+   .. image:: https://img.shields.io/badge/python-3.9+-brightgreen.svg
+      :target: https://python.org
+      :alt: Python
+
+   .. image:: https://img.shields.io/badge/license-GPL--3.0-orange.svg
+      :target: https://github.com/zalmoxes-laran/s3dgraphy/blob/main/LICENSE
+      :alt: License
 
 **s3dgraphy** is a Python library that implements the `Extended Matrix <https://www.extendedmatrix.org>`_ formal language
 for archaeological stratigraphic documentation and virtual reconstruction processes.
@@ -259,13 +261,13 @@ JSON Configuration Files
 
 s3dgraphy uses three core JSON configuration files:
 
-1. **s3Dgraphy_node_datamodel.json** (v1.6.0)
+1. **s3Dgraphy_node_datamodel.json**
 
    - Defines all node types and properties
    - CIDOC-CRM mappings for each node type
    - Node hierarchy and inheritance
 
-2. **s3Dgraphy_connections_datamodel.json** (v1.5.5)
+2. **s3Dgraphy_connections_datamodel.json**
 
    - Defines all edge types
    - CIDOC-CRM mappings for relationships
@@ -276,7 +278,17 @@ s3dgraphy uses three core JSON configuration files:
    - Visual representation rules for Blender
    - 3D models, 2D icons, colors, styles
 
-See :doc:`s3dgraphy_json_config` for detailed documentation.
+See :doc:`s3dgraphy_json_config` for detailed documentation,
+:doc:`ontology-mapping-system` for how these three files drive the RDF
+projection, and :doc:`generated-report` for the version each of them currently
+carries.
+
+.. note::
+
+   Datamodel version numbers are deliberately **not** written out on this page.
+   They move independently of the library version and a hand-copied one goes
+   stale in a week; :doc:`generated-report` reads them off the files at build
+   time.
 
 Use Cases
 ---------
@@ -411,7 +423,7 @@ Current Status
 
 **Version**: 1.6.0 (development series ``1.6.0.devN``)
 
-**Datamodel**: nodes v1.6.0, connections v1.5.5
+**Datamodel**: see :doc:`generated-report` (derived at build time)
 
 **Status**: Active development (Beta)
 
@@ -482,6 +494,26 @@ Table of Contents
    exporters/unified_xlsx_exporter
    s3dgraphy_json_config
    s3dgraphy_integration_emtools
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Ontology alignment
+
+   ontology-mapping-system
+   crmem
+   dtc-profile
+   mapping-descriptors
+   mapping-update-procedure
+   hdto-coverage
+   asset-dtc-protocol
+   generated-report
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Quality and contribution
+
+   data-quality
+   development
 
 .. toctree::
    :maxdepth: 2

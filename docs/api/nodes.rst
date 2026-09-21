@@ -122,9 +122,10 @@ Node type reference
    * - ``GeoPositionNode``
      - ``geo_position``
      - Identitary geographic position (``epsg`` + shifts).
-   * - ``LinkNode``
-     - ``link``
-     - External resource link (auto-typed by extension).
+   * - ``ResourceNode``
+     - ``resource``
+     - The resource-layer hinge to an external file or URL (auto-typed by
+       extension). Named ``LinkNode`` before 1.6.
    * - ``LicenseNode``
      - ``license``
      - Licence metadata.
@@ -255,7 +256,7 @@ and is distinct from the *geometric* representation models.
 Reference, rights & link nodes
 ------------------------------
 
-.. automodule:: s3dgraphy.nodes.link_node
+.. automodule:: s3dgraphy.nodes.resource_node
    :members:
    :undoc-members:
    :show-inheritance:

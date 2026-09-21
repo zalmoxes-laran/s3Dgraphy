@@ -96,6 +96,58 @@ html_css_files = [
     'custom.css',
 ]
 
+# -- Options for LaTeX / PDF output ------------------------------------------
+#
+# The PDF is not a convenience format: it is what gets deposited in a repository
+# and cited by version DOI, so a change that breaks it breaks a citation path.
+# Two things had to be settled for it to build at all.
+#
+# 1. XeLaTeX rather than pdfLaTeX. This documentation legitimately contains
+#    characters pdfLaTeX's 8-bit fonts cannot encode — mathematical symbols
+#    (∈ ≤ ⊂ ≈), arrows, box drawing in ASCII diagrams, and Greek and Arabic in
+#    the internationalisation examples. Under pdfLaTeX each one is a FATAL
+#    error (197 of them, before this change); under XeLaTeX an unmapped glyph
+#    is a warning and the build completes. Emoji still have no glyph in the
+#    chosen font and are simply dropped from the PDF; they carry no meaning
+#    the surrounding prose does not.
+# 2. DejaVu rather than Sphinx's XeLaTeX default (FreeSerif/FreeSans/FreeMono).
+#    DejaVu covers everything above, and it is present in both the Read the
+#    Docs build image and an ordinary texlive-fonts-recommended install, which
+#    the Free fonts are not everywhere.
+latex_engine = 'xelatex'
+
+# Sphinx defaults to `xindy` for the index under XeLaTeX. `makeindex` is enough
+# for an English, Latin-script index and ships with every texlive base install,
+# while `xindy` does not — and a PDF that is cited by DOI should not be able to
+# fail over an optional indexing binary.
+latex_use_xindy = False
+
+latex_elements = {
+    'papersize': 'a4paper',
+    'pointsize': '10pt',
+    'figure_align': 'htbp',
+    'fontpkg': r"""
+\setmainfont{DejaVu Serif}
+\setsansfont{DejaVu Sans}
+\setmonofont{DejaVu Sans Mono}[Scale=MatchLowercase]
+""",
+    'preamble': r"""
+% Long identifiers (IRIs, dotted module paths) must be allowed to break, or
+% they overflow the text block in a two-column table.
+\usepackage{seqsplit}
+\sloppy
+""",
+}
+
+latex_documents = [
+    ('index', 's3dgraphy.tex', 's3dgraphy Documentation',
+     'Emanuel Demetrescu', 'manual'),
+]
+
+# Show URLs of external links as footnotes: a printed page cannot be clicked.
+latex_show_urls = 'footnote'
+
+
 # -- Extension configuration -------------------------------------------------
 
 # -- Options for autodoc ----------------------------------------------------
@@ -218,6 +270,34 @@ html_context = {
 # Show last updated timestamp
 html_last_updated_fmt = '%b %d, %Y'
 
+def _regenerate_report(app=None):
+    """Refresh docs/generated-report.md from the datamodels before the build.
+
+    Every count and version in this documentation is derived, never typed. This
+    hook runs the generator on ``builder-inited`` so the published page cannot be
+    older than the datamodels it describes. It is best-effort: a checkout where
+    the package is not importable still builds, and the previously committed
+    report is used as-is.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    target = os.path.join(here, 'generated-report.md')
+    try:
+        from s3dgraphy.tools import deliverable_report
+    except Exception as exc:  # noqa: BLE001
+        print(f'[s3dgraphy] generated-report.md NOT regenerated ({exc}); '
+              f'using the committed copy.')
+        return
+    try:
+        text = deliverable_report.render(deliverable_report.collect())
+        with open(target, 'w', encoding='utf-8') as fh:
+            fh.write(text + '\n')
+        print('[s3dgraphy] generated-report.md regenerated from the datamodels.')
+    except Exception as exc:  # noqa: BLE001
+        print(f'[s3dgraphy] generated-report.md NOT regenerated ({exc}); '
+              f'using the committed copy.')
+
+
 def setup(app):
     """Custom setup function for additional configuration."""
     app.add_css_file('custom.css')
+    app.connect('builder-inited', _regenerate_report)

@@ -228,8 +228,9 @@ Why the schema change matters:
   ``is_abutted_by``) all map back to the canonical via the JSON
   datamodel.
 
-The canonical set ships **37 canonical edge types** in datamodel v1.5.5
-with **30 distinct reverse names** (67 names total). See
+The number of canonical edge types and of distinct reverse names is not
+written out here: it moves with the datamodel and a copied figure goes
+stale. See :doc:`generated-report` for the current counts, and
 :ref:`canonical-reverse-edges` in the edges reference for the full
 per-edge listing.
 
