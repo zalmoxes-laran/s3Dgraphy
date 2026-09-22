@@ -15,7 +15,7 @@ authors:
     affiliation: "CNR-ISPC — Institute of Heritage Science, National Research Council of Italy"
 license: GPL-3.0-or-later
 version: 1.6.0.dev18
-repository-code: "https://github.com/zalmoxes-laran/s3Dgraphy"
+repository-code: "https://github.com/ExtendedMatrix/s3Dgraphy"
 keywords:
   - Extended Matrix
   - archaeology
