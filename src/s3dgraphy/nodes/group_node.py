@@ -134,7 +134,7 @@ class LocationNodeGroup(GroupNode):
         ``propagation``, ``kind`` enum value)   →  ``s3d:`` extension URIs
 
     Originating discussion:
-        https://github.com/zalmoxes-laran/s3Dgraphy/issues/5
+        https://github.com/ExtendedMatrix/s3Dgraphy/issues/5
     """
 
     node_type = "LocationNodeGroup"

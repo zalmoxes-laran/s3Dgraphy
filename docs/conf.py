@@ -259,10 +259,16 @@ source_suffix = ['.rst', '.md']
 language = 'en'
 
 # HTML context for templates
+# Il proprietario e il nome del repository: sono ciò con cui Sphinx costruisce
+# i link «edit on GitHub» di ogni pagina. Il 22 settembre 2026 s3Dgraphy è
+# passato in `github.com/ExtendedMatrix` e questi due valori sono rimasti
+# indietro — funzionavano per il redirect di GitHub, che è una cortesia e non
+# un contratto: smette il giorno in cui qualcuno riusa il nome vecchio, e da
+# quel giorno «edit on GitHub» porta al repository di un altro.
 html_context = {
     'display_github': True,
-    'github_user': 'zalmoxes-laran',
-    'github_repo': 's3dgraphy',
+    'github_user': 'ExtendedMatrix',
+    'github_repo': 's3Dgraphy',
     'github_version': 'main',
     'conf_py_path': '/docs/',
 }

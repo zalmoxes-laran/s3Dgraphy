@@ -707,7 +707,7 @@ crm:E1_CRM_Entity).
 
 A new group-node type closing the structural gap between activity-based and
 location-based grouping in the EM formalism. Originating discussion:
-[issue #5](https://github.com/zalmoxes-laran/s3Dgraphy/issues/5) by
+[issue #5](https://github.com/ExtendedMatrix/s3Dgraphy/issues/5) by
 [@enzococca](https://github.com/enzococca) — the PyArchInit integration
 exposed cases (toponyms, study sectors, functional rooms — and walls between
 two rooms) where activity grouping alone was not enough. Many thanks to Enzo

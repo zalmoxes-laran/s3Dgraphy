@@ -26,7 +26,7 @@ For development or to get the latest features:
 .. code-block:: bash
 
    # Clone the repository
-   git clone https://github.com/zalmoxes-laran/s3dgraphy.git
+   git clone https://github.com/ExtendedMatrix/s3Dgraphy.git
    cd s3dgraphy
    
    # Install in development mode

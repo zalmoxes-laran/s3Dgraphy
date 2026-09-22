@@ -640,9 +640,9 @@ See the two annotated templates in the source tree. They are the
 canonical companions to this reference page:
 
 - `template_pyarchinit_mapping.json
-  <https://github.com/zalmoxes-laran/s3dgraphy/blob/main/src/s3dgraphy/mappings/template_pyarchinit_mapping.json>`_
+  <https://github.com/ExtendedMatrix/s3Dgraphy/blob/main/src/s3dgraphy/mappings/template_pyarchinit_mapping.json>`_
 - `template_emdb_mapping.json
-  <https://github.com/zalmoxes-laran/s3dgraphy/blob/main/src/s3dgraphy/mappings/template_emdb_mapping.json>`_
+  <https://github.com/ExtendedMatrix/s3Dgraphy/blob/main/src/s3dgraphy/mappings/template_emdb_mapping.json>`_
 
 For a runnable end-to-end example, see
 ``tests/test_filtered_import.py`` in the repository, which builds a

@@ -7,7 +7,7 @@ s3dgraphy Graph objects and the host application's relational tables.
 Originally lived inside pyArchInit at
 ``modules/s3dgraphy/sync/``. Moved into the s3dgraphy package proper
 in 1.6.0 after a Qt/QGIS decoupling pass — see
-zalmoxes-laran/s3Dgraphy#10 for the design discussion.
+ExtendedMatrix/s3Dgraphy#10 for the design discussion.
 
 Public surface
 ==============

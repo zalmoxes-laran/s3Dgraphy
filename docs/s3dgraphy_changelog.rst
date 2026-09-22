@@ -100,7 +100,7 @@ multiple platforms and applications.
 Links
 -----
 
-| [0.1.32]: https://github.com/zalmoxes-laran/s3dgraphy/compare/v0.1.31...v0.1.32
-| [0.1.31]: https://github.com/zalmoxes-laran/s3dgraphy/compare/v0.1.13...v0.1.31
-| [0.1.13]: https://github.com/zalmoxes-laran/s3dgraphy/compare/v0.1.0...v0.1.13
-| [0.1.0]: https://github.com/zalmoxes-laran/s3dgraphy/releases/tag/v0.1.0
+| [0.1.32]: https://github.com/ExtendedMatrix/s3Dgraphy/compare/v0.1.31...v0.1.32
+| [0.1.31]: https://github.com/ExtendedMatrix/s3Dgraphy/compare/v0.1.13...v0.1.31
+| [0.1.13]: https://github.com/ExtendedMatrix/s3Dgraphy/compare/v0.1.0...v0.1.13
+| [0.1.0]: https://github.com/ExtendedMatrix/s3Dgraphy/releases/tag/v0.1.0

@@ -2,6 +2,41 @@ name: Publish to PyPI
 
 # Pubblicazione SOLO manuale: Actions > "Publish to PyPI" > Run workflow.
 # (Nessun trigger automatico su release: il publish su PyPI lo si fa a mano.)
+#
+# ══ NIENTE TOKEN: TRUSTED PUBLISHER ═══════════════════════════════════════════
+#
+# Qui c'erano due `password: ${{ secrets.*_PYPI_API_TOKEN }}`: token API di
+# lunga vita, legati a un account personale, dentro i segreti del repository.
+# Due cose insieme, ed entrambe pesano:
+#
+#   · è una chiave di UNA PERSONA che tiene in ostaggio un artefatto del
+#     progetto — la stessa forma del registry privato che stiamo smontando
+#     altrove. Se quella persona non c'è, la libreria non si pubblica;
+#   · un token non dice da DOVE viene la wheel. Misurato il 22 settembre 2026:
+#
+#       curl https://pypi.org/integrity/s3dgraphy/1.6.0.dev18/\
+#            s3dgraphy-1.6.0.dev18-py3-none-any.whl/provenance
+#       → 404  {"message":"No provenance available for …"}
+#
+#     cioè nessuno può dimostrare da quale commit quella wheel è nata. Per una
+#     libreria che tre servizi installano, e che finisce dentro le immagini che
+#     consegniamo a un partner, è l'anello debole della catena: chi specchia
+#     un'immagine può risalire al Dockerfile, al commit, al tag — e poi arriva
+#     alla wheel e la catena si interrompe.
+#
+# Il Trusted Publisher toglie il token E dà la provenance, perché sono la stessa
+# cosa vista dai due lati: PyPI si fida di un'IDENTITÀ (questo repository,
+# questo workflow) invece che di un segreto, e quell'identità è precisamente ciò
+# che l'attestazione afferma.
+#
+# Il prezzo è `id-token: write` sul job, che è il permesso di chiedere a GitHub
+# un token OIDC di breve vita per QUESTO run. Non è una credenziale che si
+# possa rubare da un segreto: non esiste prima del run e non vale dopo.
+#
+# ── COSA DEVE FARE E.D. SU PyPI, UNA VOLTA ─────────────────────────────────────
+# I campi esatti sono nel README, sezione «Pubblicare su PyPI». Finché non li ha
+# messi, questo workflow FALLISCE al passo di publish con un errore di PyPI che
+# dice che il publisher non è configurato — che è il modo giusto di fallire.
 
 on:
   workflow_dispatch:
@@ -23,6 +58,15 @@ jobs:
   manual-publish:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+
+    # `id-token: write` è ciò che permette all'action di chiedere a GitHub il
+    # token OIDC con cui PyPI riconosce questo workflow. `contents: read`
+    # scritto per esteso e non lasciato al default: dichiarare i permessi a
+    # mano li RESTRINGE, e un job che pubblica non ha motivo di poter scrivere
+    # nel repository.
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
     - name: Checkout specific tag
@@ -49,20 +93,51 @@ jobs:
       run: |
         python -m build
 
+    # Il NUMERO di versione, letto dal pacchetto appena costruito e non dal
+    # tag: sono due scritture della stessa cosa, e il giorno in cui divergono
+    # è il giorno in cui si interroga l'indice per la versione sbagliata e si
+    # riceve un 404 che sembra «niente provenance».
+    - name: Che versione è stata costruita
+      id: versione
+      run: |
+        set -euo pipefail
+        #: `find` e non `ls`, che shellcheck ha ragione a segnalare: un nome
+        #: con uno spazio spezzerebbe la riga, e qui il nome lo sceglie il
+        #: pacchetto, non noi.
+        w="$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
+        [ -n "$w" ] || { echo "::error::nessuna wheel in dist/"; exit 1; }
+        n="$(basename "$w" | cut -d- -f2)"
+        echo "numero=$n" >> "$GITHUB_OUTPUT"
+        echo "wheel: $(basename "$w") — versione $n" >> "$GITHUB_STEP_SUMMARY"
+
     - name: Check package
       run: |
         python -m twine check dist/*
 
+    # Nessun `password:` in nessuno dei due, e nessun `attestations: false`:
+    # l'action firma per default quando pubblica via Trusted Publisher, e
+    # l'attestazione è metà della ragione per cui siamo qui.
     - name: Publish to TestPyPI
       if: github.event.inputs.target == 'testpypi'
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         repository-url: https://test.pypi.org/legacy/
-        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
         skip-existing: true
 
     - name: Publish to PyPI (PRODUCTION)
       if: github.event.inputs.target == 'pypi'
       uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        password: ${{ secrets.PYPI_API_TOKEN }}
+
+    # ── E IL CANCELLO, CHE È IL PUNTO ───────────────────────────────────────
+    #
+    # Un publish riuscito senza provenance è un publish che ha fatto metà del
+    # lavoro e lo dichiara riuscito. È esattamente lo stato in cui la libreria
+    # si trova oggi, e non se n'era accorto nessuno perché nessuno l'aveva
+    # chiesto all'indice.
+    #
+    # Quindi si chiede. Se l'attestazione non c'è, il job è ROSSO anche se la
+    # wheel è su PyPI: il pacchetto resta pubblicato — non si può disfare, ed è
+    # giusto così — ma nessuno legge «verde» e va a dormire.
+    - name: La provenance esiste (o il job è rosso)
+      if: github.event.inputs.target == 'pypi'
+      run: ./scripts/verifica-provenance.sh "${{ steps.versione.outputs.numero }}"

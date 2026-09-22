@@ -60,13 +60,13 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/zalmoxes-laran/s3dgraphy"
+Homepage = "https://github.com/ExtendedMatrix/s3Dgraphy"
 Documentation = "https://docs.extendedmatrix.org/projects/s3dgraphy/"
-Repository = "https://github.com/zalmoxes-laran/s3dgraphy.git"
-"Bug Reports" = "https://github.com/zalmoxes-laran/s3dgraphy/issues"
-"Source Code" = "https://github.com/zalmoxes-laran/s3dgraphy"
+Repository = "https://github.com/ExtendedMatrix/s3Dgraphy.git"
+"Bug Reports" = "https://github.com/ExtendedMatrix/s3Dgraphy/issues"
+"Source Code" = "https://github.com/ExtendedMatrix/s3Dgraphy"
 "Extended Matrix" = "https://www.extendedmatrix.org"
-Changelog = "https://github.com/zalmoxes-laran/s3dgraphy/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/ExtendedMatrix/s3Dgraphy/blob/main/CHANGELOG.md"
 
 # ─────────────────────────────────────────────────────────────────────────
 # Optional features — pip install s3dgraphy[<extra>]
@@ -104,12 +104,12 @@ sync = [
     # ingestion + projection between a Graph and the host application's
     # SQL tables. SQLite works out of the box; add the [postgres] extra
     # for the PostgreSQL backend. Moved from pyArchInit in 1.6.0
-    # (zalmoxes-laran/s3Dgraphy#10).
+    # (ExtendedMatrix/s3Dgraphy#10).
     "sqlalchemy>=2.0",
 ]
 postgres = [
     # PostgreSQL backend driver. Combine with [sync] for the SQL bridge
-    # (zalmoxes-laran/s3Dgraphy#9 + #10). Standalone, it also enables
+    # (ExtendedMatrix/s3Dgraphy#9 + #10). Standalone, it also enables
     # the PG path of PyArchInitImporter when that lands.
     "psycopg2-binary>=2.9",
 ]

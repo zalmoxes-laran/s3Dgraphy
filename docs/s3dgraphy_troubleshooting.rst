@@ -668,7 +668,7 @@ Getting Help
 Community Support
 ~~~~~~~~~~~~~~~~~
 
-* **GitHub Issues**: https://github.com/zalmoxes-laran/s3dgraphy/issues
+* **GitHub Issues**: https://github.com/ExtendedMatrix/s3Dgraphy/issues
 * **Telegram Group**: https://t.me/UserGroupEM
 * **Facebook Group**: https://www.facebook.com/groups/extendedmatrix
 

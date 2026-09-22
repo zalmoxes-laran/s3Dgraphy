@@ -218,6 +218,6 @@ Current Status
 
 For the most current development status, see:
 
-- `GitHub Issues <https://github.com/zalmoxes-laran/s3dgraphy/issues>`_
-- `Project Milestones <https://github.com/zalmoxes-laran/s3dgraphy/milestones>`_
+- `GitHub Issues <https://github.com/ExtendedMatrix/s3Dgraphy/issues>`_
+- `Project Milestones <https://github.com/ExtendedMatrix/s3Dgraphy/milestones>`_
 - `EM-tools Changelog <https://github.com/zalmoxes-laran/EM-blender-tools/blob/main/changelog.md>`_

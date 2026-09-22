@@ -4,7 +4,7 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/s3dgraphy.svg)](https://pypi.org/project/s3dgraphy/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Downloads](https://pepy.tech/badge/s3dgraphy)](https://pepy.tech/project/s3dgraphy)
-[![Publish to PyPI](https://github.com/zalmoxes-laran/s3dgraphy/actions/workflows/publish.yml/badge.svg)](https://github.com/zalmoxes-laran/s3dgraphy/actions/workflows/publish.yml)
+[![Publish to PyPI](https://github.com/ExtendedMatrix/s3Dgraphy/actions/workflows/publish.yml/badge.svg)](https://github.com/ExtendedMatrix/s3Dgraphy/actions/workflows/publish.yml)
 
 ## 3D Stratigraphic Graph Management Library
 
@@ -183,7 +183,7 @@ match exactly and case-sensitively. The same flow applies to
 
 - **[User Guide](https://docs.extendedmatrix.org/projects/s3dgraphy/)** - Complete documentation
 - **[API Reference](https://docs.extendedmatrix.org/projects/s3dgraphy/api.html)** - Detailed API docs
-- **[Examples](https://github.com/zalmoxes-laran/s3dgraphy/tree/main/examples)** - Code examples and tutorials
+- **[Examples](https://github.com/ExtendedMatrix/s3Dgraphy/tree/main/examples)** - Code examples and tutorials
 - **[Extended Matrix](https://www.extendedmatrix.org)** - Framework overview
 
 ## Where this sits
@@ -207,7 +207,7 @@ framework and no socket on purpose — what it does can be proved on a table.
 ### Setting up Development Environment
 
 ```bash
-git clone https://github.com/zalmoxes-laran/s3dgraphy.git
+git clone https://github.com/ExtendedMatrix/s3Dgraphy.git
 cd s3dgraphy
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
@@ -262,7 +262,7 @@ git push --follow-tags
 ## 🤝 Contributing
 
 We welcome contributions. Open an issue or a pull request on
-[GitHub](https://github.com/zalmoxes-laran/s3dgraphy) — and see the
+[GitHub](https://github.com/ExtendedMatrix/s3Dgraphy) — and see the
 [Development](#-development) section above for how to run the suite and read its
 known baseline.
 
@@ -295,7 +295,7 @@ s3Dgraphy — referencing records live or baking them into the graph.
 
 The PyArchInit integration drove the design of the LocationNodeGroup in
 s3Dgraphy 0.1.41 (insight from
-[issue #5](https://github.com/zalmoxes-laran/s3Dgraphy/issues/5) by
+[issue #5](https://github.com/ExtendedMatrix/s3Dgraphy/issues/5) by
 [Enzo Cocca](https://github.com/enzococca)).
 
 To request inclusion in this list, see the [Ecosystem page](https://docs.extendedmatrix.org/en/latest/ecosystem.html) of the Extended Matrix manual.
@@ -307,8 +307,78 @@ s3Dgraphy is designed to be consumed by independent tools. **Revit**,
 domain-specific tools are natural candidates for similar bridges into the
 Extended Matrix ecosystem. If you maintain such a project and want to
 explore an integration, open a discussion at
-[github.com/zalmoxes-laran/s3Dgraphy/discussions](https://github.com/zalmoxes-laran/s3Dgraphy/discussions)
+[github.com/ExtendedMatrix/s3Dgraphy/discussions](https://github.com/ExtendedMatrix/s3Dgraphy/discussions)
 or look at the PyArchInit integration as a worked example.
+
+## Pubblicare su PyPI
+
+Il rilascio è **manuale** — Actions → *Publish to PyPI* → *Run workflow*, con il
+tag e il bersaglio (`testpypi` o `pypi`) — e **non usa nessun token**.
+
+### Perché non un token
+
+Un token API di lunga vita nei segreti del repository è una chiave di una
+persona che tiene in ostaggio un artefatto del progetto, e non dice **da dove**
+viene la wheel. Misurato il 22 settembre 2026 sulla versione che i servizi
+installano davvero:
+
+```
+curl https://pypi.org/integrity/s3dgraphy/1.6.0.dev18/\
+     s3dgraphy-1.6.0.dev18-py3-none-any.whl/provenance
+→ 404  {"message":"No provenance available for …"}
+```
+
+Tre servizi installano questa libreria e finisce dentro le immagini Docker che
+consegniamo a un partner: chi le specchia può risalire al Dockerfile, al commit
+e al tag — e poi arriva alla wheel, e la catena si interrompe lì.
+
+Il **Trusted Publisher** toglie il token e dà l'attestazione, perché sono la
+stessa cosa vista dai due lati: PyPI si fida di un'identità — questo
+repository, questo workflow — invece che di un segreto, e quell'identità è
+esattamente ciò che l'attestazione afferma.
+
+### I campi da mettere su PyPI (una volta, e li mette E.D.)
+
+PyPI → *Your projects* → **s3dgraphy** → *Settings* → **Publishing** → *Add a
+new publisher* → **GitHub**. Quattro campi, e questi sono i valori esatti:
+
+| campo | valore |
+|---|---|
+| **Owner** | `ExtendedMatrix` |
+| **Repository name** | `s3Dgraphy` |
+| **Workflow name** | `publish.yml` |
+| **Environment name** | *(vuoto)* |
+
+`Environment name` resta vuoto perché il workflow non dichiara nessun
+`environment:`. Se un giorno gliene si dà uno — è il modo di chiedere
+un'approvazione umana prima del push su PyPI — quel campo va compilato con lo
+stesso nome, e i due devono restare d'accordo.
+
+Su **TestPyPI** la procedura è identica, sul sito `test.pypi.org`, con gli
+stessi quattro valori: sono due indici diversi e ciascuno tiene la sua lista.
+
+Finché quei campi non ci sono, il workflow **fallisce** al passo di publish con
+un errore di PyPI che dice che il publisher non è configurato — che è il modo
+giusto di fallire.
+
+### Il cancello
+
+Dopo ogni rilascio in produzione il workflow interroga l'indice:
+
+```bash
+./scripts/verifica-provenance.sh 1.6.0.dev19
+```
+
+Un publish riuscito senza provenance è un publish che ha fatto metà del lavoro
+e lo dichiara riuscito. Lo script distingue i due guasti — l'attestazione che
+**manca** e quella che nomina un **altro repository**, che è il più grave dei
+due perché sembra una garanzia — e si può lanciare a mano su qualunque versione
+già pubblicata, inclusa una di un altro progetto:
+
+```bash
+PACCHETTO=sigstore GITHUB_REPOSITORY=sigstore/sigstore-python \
+  ./scripts/verifica-provenance.sh 4.5.0
+```
 
 ## 📄 License
 
@@ -325,7 +395,7 @@ If you use s3dgraphy in your research, please cite:
   title={s3dgraphy: 3D Stratigraphic Graph Management Library},
   author={Demetrescu, Emanuel},
   year={2026},
-  url={https://github.com/zalmoxes-laran/s3dgraphy},
+  url={https://github.com/ExtendedMatrix/s3Dgraphy},
   version={1.6.0},
   institution={CNR-ISPC (National Research Council - Institute of Heritage Science)}
 }
@@ -341,11 +411,11 @@ If you use s3dgraphy in your research, please cite:
 
 ## 🔗 Links
 
-- **GitHub Repository**: https://github.com/zalmoxes-laran/s3dgraphy
+- **GitHub Repository**: https://github.com/ExtendedMatrix/s3Dgraphy
 - **PyPI Package**: https://pypi.org/project/s3dgraphy/
 - **Documentation**: https://docs.extendedmatrix.org/projects/s3dgraphy/
 - **Extended Matrix Website**: https://www.extendedmatrix.org
-- **Bug Reports**: https://github.com/zalmoxes-laran/s3dgraphy/issues
+- **Bug Reports**: https://github.com/ExtendedMatrix/s3Dgraphy/issues
 
 ---
 

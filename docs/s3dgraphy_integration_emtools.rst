@@ -716,4 +716,4 @@ See Also
 - :doc:`s3dgraphy_json_config` - JSON configuration files
 - :doc:`api/s3dgraphy_classes_reference` - Complete API reference
 - `EM-tools Repository <https://github.com/zalmoxes-laran/EM-blender-tools>`_
-- `s3dgraphy Repository <https://github.com/zalmoxes-laran/s3dgraphy>`_
+- `s3dgraphy Repository <https://github.com/ExtendedMatrix/s3Dgraphy>`_

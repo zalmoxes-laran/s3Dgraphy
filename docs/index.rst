@@ -12,7 +12,7 @@ s3dgraphy Documentation
       :alt: Python
 
    .. image:: https://img.shields.io/badge/license-GPL--3.0-orange.svg
-      :target: https://github.com/zalmoxes-laran/s3dgraphy/blob/main/LICENSE
+      :target: https://github.com/ExtendedMatrix/s3Dgraphy/blob/main/LICENSE
       :alt: License
 
 **s3dgraphy** is a Python library that implements the `Extended Matrix <https://www.extendedmatrix.org>`_ formal language
@@ -127,7 +127,7 @@ Or from source:
 
 .. code-block:: bash
 
-   git clone https://github.com/zalmoxes-laran/s3dgraphy.git
+   git clone https://github.com/ExtendedMatrix/s3Dgraphy.git
    cd s3dgraphy
    pip install -e .
 
@@ -392,7 +392,7 @@ Repository and Resources
 ------------------------
 
 **GitHub Repository**
-   https://github.com/zalmoxes-laran/s3dgraphy
+   https://github.com/ExtendedMatrix/s3Dgraphy
 
 **PyPI Package**
    https://pypi.org/project/s3dgraphy/
@@ -404,7 +404,7 @@ Repository and Resources
    https://www.extendedmatrix.org
 
 **Issue Tracker**
-   https://github.com/zalmoxes-laran/s3dgraphy/issues
+   https://github.com/ExtendedMatrix/s3Dgraphy/issues
 
 Community & Support
 -------------------
@@ -584,7 +584,7 @@ If you use s3dgraphy in your research, please cite:
      title = {s3dgraphy: Core Graph Library for Extended Matrix},
      author = {Demetrescu, Emanuel},
      year = {2026},
-     url = {https://github.com/zalmoxes-laran/s3dgraphy},
+     url = {https://github.com/ExtendedMatrix/s3Dgraphy},
      version = {1.6.0}
    }
 

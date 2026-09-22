@@ -107,7 +107,7 @@ Running it locally
 
 .. code-block:: bash
 
-   git clone https://github.com/zalmoxes-laran/s3dgraphy.git
+   git clone https://github.com/ExtendedMatrix/s3Dgraphy.git
    cd s3dgraphy
    python -m venv .venv && source .venv/bin/activate
 
