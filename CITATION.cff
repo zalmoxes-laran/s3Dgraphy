@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: s3Dgraphy
+abstract: >-
+  3D Stratigraphic Graph Management Library for archaeological and heritage
+  applications. The reference implementation of the Extended Matrix data
+  model: stratigraphic units, their physical and temporal relations, the
+  documentary apparatus, and export to CIDOC-CRM.
+type: software
+authors:
+  - family-names: Demetrescu
+    given-names: Emanuel
+    email: emanuel.demetrescu@cnr.it
+    orcid: "https://orcid.org/0000-0002-5065-7970"
+    affiliation: "CNR-ISPC — Institute of Heritage Science, National Research Council of Italy"
+license: GPL-3.0-or-later
+version: 1.6.0.dev18
+repository-code: "https://github.com/zalmoxes-laran/s3Dgraphy"
+keywords:
+  - Extended Matrix
+  - archaeology
+  - stratigraphy
+  - knowledge graph
+  - cultural heritage
+  - CIDOC-CRM
