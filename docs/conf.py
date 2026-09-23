@@ -126,15 +126,25 @@ latex_elements = {
     'papersize': 'a4paper',
     'pointsize': '10pt',
     'figure_align': 'htbp',
+    # Guarded: a missing font must not be able to fail the build. If DejaVu is
+    # absent, the Free fonts are tried, and failing those fontspec's own default
+    # stands — more glyphs go missing in the PDF, and it still builds.
     'fontpkg': r"""
-\setmainfont{DejaVu Serif}
-\setsansfont{DejaVu Sans}
-\setmonofont{DejaVu Sans Mono}[Scale=MatchLowercase]
+\IfFontExistsTF{DejaVu Serif}
+  {\setmainfont{DejaVu Serif}}
+  {\IfFontExistsTF{FreeSerif}{\setmainfont{FreeSerif}}{}}
+\IfFontExistsTF{DejaVu Sans}
+  {\setsansfont{DejaVu Sans}}
+  {\IfFontExistsTF{FreeSans}{\setsansfont{FreeSans}}{}}
+\IfFontExistsTF{DejaVu Sans Mono}
+  {\setmonofont{DejaVu Sans Mono}[Scale=MatchLowercase]}
+  {\IfFontExistsTF{FreeMono}{\setmonofont{FreeMono}[Scale=MatchLowercase]}{}}
 """,
+    # No extra packages here on purpose: every \usepackage is one more thing
+    # that can be absent from a build image and take the PDF down with it.
     'preamble': r"""
 % Long identifiers (IRIs, dotted module paths) must be allowed to break, or
 % they overflow the text block in a two-column table.
-\usepackage{seqsplit}
 \sloppy
 """,
 }

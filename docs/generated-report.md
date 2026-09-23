@@ -10,7 +10,7 @@ Every figure on this page is read off the datamodels and the installed package a
 
 | Component | Version |
 | --- | --- |
-| s3dgraphy (library) | 1.6.0.dev18 |
+| s3dgraphy (library) | 1.6.0.dev19 |
 | nodes datamodel | 1.6.6 |
 | connections datamodel | 1.6.17 |
 | qualia datamodel | 1.6.1 |
@@ -65,7 +65,7 @@ Classes present in the registry with no entry in the node datamodel, and therefo
 | What | Count |
 | --- | --- |
 | public API callables | 166 |
-| test modules in tests/ | 89 |
+| test modules in tests/ | 90 |
 | test modules in tests/*/ | 66 |
 
 ## Alignment by ontology
