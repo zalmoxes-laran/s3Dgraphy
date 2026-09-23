@@ -1,17 +1,19 @@
 s3dgraphy Documentation
 ========================
 
-.. image:: https://img.shields.io/badge/version-1.5.1-blue.svg
-   :target: https://pypi.org/project/s3dgraphy/
-   :alt: Version
+.. only:: html
 
-.. image:: https://img.shields.io/badge/python-3.8+-brightgreen.svg
-   :target: https://python.org
-   :alt: Python
+   .. image:: https://img.shields.io/badge/version-1.5.1-blue.svg
+      :target: https://pypi.org/project/s3dgraphy/
+      :alt: Version
 
-.. image:: https://img.shields.io/badge/license-GPL--3.0-orange.svg
-   :target: https://github.com/zalmoxes-laran/s3dgraphy/blob/main/LICENSE
-   :alt: License
+   .. image:: https://img.shields.io/badge/python-3.8+-brightgreen.svg
+      :target: https://python.org
+      :alt: Python
+
+   .. image:: https://img.shields.io/badge/license-GPL--3.0-orange.svg
+      :target: https://github.com/zalmoxes-laran/s3dgraphy/blob/main/LICENSE
+      :alt: License
 
 **s3dgraphy** is a Python library that implements the `Extended Matrix <https://www.extendedmatrix.org>`_ formal language
 for archaeological stratigraphic documentation and virtual reconstruction processes.

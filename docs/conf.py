@@ -96,6 +96,56 @@ html_css_files = [
     'custom.css',
 ]
 
+# -- Options for LaTeX / PDF output ------------------------------------------
+#
+# Read the Docs builds a PDF for this version too, and under pdfLaTeX it could
+# not: this documentation contains characters pdfLaTeX's 8-bit fonts cannot
+# encode, and each one is a FATAL error rather than a missing glyph. Two
+# settings fix it, and both are deliberately undemanding of the build image.
+#
+# 1. XeLaTeX. An unmapped character becomes a warning and the build completes.
+#    The `-pdf` that Read the Docs hardcodes stays harmless: with this setting
+#    Sphinx writes $pdflatex = 'xelatex ...' into latexmkrc, so the flag picks
+#    XeTeX anyway.
+# 2. makeindex rather than xindy, which Sphinx would otherwise prefer under
+#    XeLaTeX. makeindex is enough for an English index and ships everywhere.
+#
+# The fonts are guarded: a missing family costs glyphs in the PDF, never the
+# build. No extra \usepackage is added, for the same reason.
+latex_engine = 'xelatex'
+latex_use_xindy = False
+
+latex_elements = {
+    'papersize': 'a4paper',
+    'pointsize': '10pt',
+    'figure_align': 'htbp',
+    'fontpkg': r"""
+\IfFontExistsTF{DejaVu Serif}
+  {\setmainfont{DejaVu Serif}}
+  {\IfFontExistsTF{FreeSerif}{\setmainfont{FreeSerif}}{}}
+\IfFontExistsTF{DejaVu Sans}
+  {\setsansfont{DejaVu Sans}}
+  {\IfFontExistsTF{FreeSans}{\setsansfont{FreeSans}}{}}
+\IfFontExistsTF{DejaVu Sans Mono}
+  {\setmonofont{DejaVu Sans Mono}[Scale=MatchLowercase]}
+  {\IfFontExistsTF{FreeMono}{\setmonofont{FreeMono}[Scale=MatchLowercase]}{}}
+""",
+    'preamble': r"""
+% Long identifiers (IRIs, dotted module paths) must be allowed to break, or
+% they overflow the text block in a two-column table.
+\sloppy
+""",
+}
+
+latex_documents = [
+    ('index', 's3dgraphy.tex', 's3dgraphy Documentation',
+     'Emanuel Demetrescu', 'manual'),
+]
+
+# Show URLs of external links as footnotes: a printed page cannot be clicked.
+latex_show_urls = 'footnote'
+
+
 # -- Extension configuration -------------------------------------------------
 
 # -- Options for autodoc ----------------------------------------------------
