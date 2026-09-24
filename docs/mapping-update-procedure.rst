@@ -72,11 +72,11 @@ State in one sentence what is wrong or missing, and classify it:
   extension;
 * **something the family cannot say** — a candidate for coining.
 
-The third is the expensive one and the most often claimed. Three of the seven
-extension terms reviewed in 2026 were claimed as gaps in CIDOC and were in fact a
-co-typing we had not done, a class we had got wrong, and a direction we were
-emitting backwards. **Assume category three is category one until the measuring
-says otherwise.**
+The third is the expensive one and the most often claimed. In the 2026 review,
+three relations claimed as gaps in CIDOC turned out to be a missing co-typing, a
+wrongly chosen class and a reversed direction — each resolvable against an
+existing property once the target was typed correctly (see :doc:`crmem`).
+**Assume category three is category one until the measuring says otherwise.**
 
 2. Measure the current state on the code, never on the documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

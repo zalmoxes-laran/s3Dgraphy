@@ -46,59 +46,11 @@ entirely onto CRMdig with a parallel PROV-O projection and introduces not one
 term of its own. See :doc:`dtc-profile`.
 
 
-Four properties, not seven
---------------------------
+The four properties
+-------------------
 
-Until September 2026 the connections datamodel declared an extension prefix
-``CIDOC-S3D:`` on ten edges, carrying seven distinct property names. **None of
-the seven existed** — not in ``em.ttl``, not in ``hdto_extension.ttl`` — and the
-prefix itself was not registered in the exporter's prefix table, so every one of
-them resolved to nothing and was never emitted. They were desiderata written in a
-mapping field.
-
-A case-by-case review against the official declarations reduced seven to four.
-That is a better result than seven: an extension of four terms, each with a
-nameable gap behind it, is defensible; one of seven, half of which duplicate
-CIDOC, is not.
-
-The three that fell — our faults, not CIDOC's gaps
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-This is the part worth stating without softening, because it is the part a
-reviewer will test. Three of the seven were not gaps in CIDOC at all. They were a
-co-typing we had not done, a class we had got wrong, and a direction we had
-emitted backwards — each of which looked like a missing predicate from the
-inside.
-
-.. list-table::
-   :header-rows: 1
-   :widths: 24 30 46
-
-   * - Desideratum
-     - What CIDOC already offers
-     - What was actually wrong
-   * - ``has3DRepresentation``
-     - ``crm:P138i_has_representation``
-     - **A co-typing we had not done.** "3D" belongs in the ``rdf:type`` of the
-       target, not in the predicate. Co-typing the model as
-       ``E36_Visual_Item`` says it — ``D1`` and ``E36`` are both under ``E73``
-       and are not disjoint, and the same remedy was already in use for
-       ``has_visual_reference``.
-   * - ``isPartOfParadataGroup``
-     - ``crm:P106i_forms_part_of``
-     - **A wrong class, and a reversed direction.** The group had been typed
-       ``E78 Collection`` — a class CIDOC 7.1 renamed, and whose successor
-       ``E78_Curated_Holding`` is a subclass of ``E24 Physical Human-Made
-       Thing``, which a set of nodes is not. Re-typed, the membership predicate
-       exists; emitted through the inverse, it reads the right way round.
-   * - ``hasParadataDocumentation``
-     - ``crm:P129i_is_subject_of``
-     - **A distinction already carried elsewhere.** "The paradata container"
-       versus "everything that mentions this unit" is a difference in the *type
-       of the target*, not a difference of predicate.
-
-The four that survive
-~~~~~~~~~~~~~~~~~~~~~
+CRMem declares four properties and no class. Each is listed with the ceiling it
+hangs under, where an honest one exists, and the gap it names.
 
 .. list-table::
    :header-rows: 1
@@ -134,13 +86,51 @@ The four that survive
    Of the four, ``em:isInActivity`` is declared in ``em.ttl`` *and* wired in the
    connections datamodel. ``em:contrastsWith`` is declared in ``em.ttl`` —
    as an ``owl:SymmetricProperty`` with domain and range ``em:TimeBranch`` — but
-   is **not yet wired**: the ``contrasts_with`` edge still carries the dead
+   is **not yet wired**: the ``contrasts_with`` edge still carries the unresolved
    ``CIDOC-S3D:incompatibleWith``. ``em:belongsToAlternative`` and
    ``em:hasSemanticShape`` are decided but **not yet declared**. Six distinct
-   dead ``CIDOC-S3D:`` names remain on nine edge types, one of which
+   unresolved ``CIDOC-S3D:`` names remain on nine edge types, one of which
    (``has_timebranch``) is deprecated and never serialised. Connecting them is a
    string change in the datamodel plus, for two of them, an axiom in ``em.ttl``
    — the work item described in :doc:`mapping-update-procedure`.
+
+
+Relations that resolve inside CIDOC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Three relations of the Extended Matrix read, from inside the model, as though
+they needed a predicate of their own. They do not: each resolves against an
+existing CIDOC property once the target is typed correctly. They are recorded
+here because the question recurs, and because the remedy is in each case a
+modelling decision a reader may want to check.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 30 46
+
+   * - Relation
+     - What CIDOC provides
+     - Why no new term is needed
+   * - 3D representation of a unit
+     - ``crm:P138i_has_representation``
+     - **A matter of co-typing, not of predicate.** “3D” belongs in the
+       ``rdf:type`` of the target, not in the relation. Co-typing the model as
+       ``E36_Visual_Item`` says it — ``D1`` and ``E36`` are both under ``E73``
+       and are not disjoint — and the same pattern already serves
+       ``has_visual_reference``.
+   * - Membership in a paradata group
+     - ``crm:P106i_forms_part_of``
+     - **A matter of class and of direction.** The group must not be typed
+       ``E78 Collection`` — a class CIDOC 7.1 renamed, and whose successor
+       ``E78_Curated_Holding`` is a subclass of ``E24 Physical Human-Made
+       Thing``, which a set of nodes is not. Typed correctly the membership
+       predicate already exists, and emitted through the inverse it reads the
+       right way round.
+   * - Documentation attached to a unit
+     - ``crm:P129i_is_subject_of``
+     - **A distinction carried by the target’s type.** “The paradata
+       container” versus “everything that mentions this unit” is a
+       difference in the *type of the target*, not a difference of predicate.
 
 
 ``em:isInActivity`` in full
