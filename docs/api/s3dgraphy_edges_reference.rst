@@ -610,7 +610,6 @@ Representation Models
 :Description: Connects ExtractorNode / DocumentNode / CombinerNode to
    their representation model in 3D space.
 :CIDOC-CRM: P138i_has_representation
-:CIDOC-S3D: has3DRepresentation
 :Reverse: ``is_doc_representation_model_of``
 :Allowed Connections: ExtractorNode / DocumentNode / CombinerNode →
    RepresentationModelDocNode / RepresentationModelSpecialFindNode
@@ -622,7 +621,6 @@ Representation Models
 :Description: Connects SpecialFindUnit nodes to their representation
    model in 3D space.
 :CIDOC-CRM: P138i_has_representation
-:CIDOC-S3D: has3DRepresentation
 :Reverse: ``is_sf_representation_model_of``
 :Allowed Connections: SpecialFindUnit → RepresentationModelSpecialFindNode
 
@@ -649,7 +647,6 @@ Paradata Group Reverses
 :Description: Membership of a node inside a ParadataNodeGroup. Canonical
    form (source → group) with reverse ``contains_paradata_node``.
 :CIDOC-CRM: P106_is_composed_of
-:CIDOC-S3D: isPartOfParadataGroup
 :Reverse: ``contains_paradata_node`` ("Contains paradata node")
 :Allowed Connections: PropertyNode / DocumentNode / ExtractorNode /
    CombinerNode / ParadataNode → ParadataNodeGroup
@@ -689,7 +686,7 @@ Time-branch reverses
 :Description: Connects a node to a specific TimeBranchNodeGroup
    (alternative temporal interpretation).
 :CIDOC-CRM: P67_refers_to
-:CIDOC-S3D: belongsToAlternative
+:CRMem: em:belongsToAlternative
 :Reverse: ``is_timebranch_of`` ("Is timebranch of")
 :Allowed Connections: StratigraphicNode → TimeBranchNodeGroup
 

@@ -54,34 +54,41 @@ Physical and virtual archaeological units:
 **StratigraphicUnit (US)**
    Physical stratigraphic units (walls, floors, fills, etc.)
    
-   - CIDOC-CRM: ``E18 Physical Thing``
+   - CIDOC-CRM: ``A2 Stratigraphic Volume Unit``
    - CRMarchaeo: ``A1 Excavation Process Unit``
    - Abbreviation: ``US``
 
-**VirtualStratigraphicUnit (USV)**
-   Virtual reconstruction units
+.. sync: manual
+
+**Virtual stratigraphic units (USVs · USVn · USD)**
+   Units that are *not* physically observed and are argued to have been there.
+   There is no single ``USV`` type: the datamodel declares the three kinds
+   separately, and the abstract parent lives in the ontology.
    
-   - Subtypes: ``USVs`` (structural), ``USVn`` (non-structural)
-   - CIDOC-CRM: ``E24 Physical Man-Made Thing``
-   - CRMarchaeo: ``A8 Stratigraphic Unit``
-   - Abbreviation: ``USV``
+   - Types: ``USVs`` (structural), ``USVn`` (non-structural), ``USD`` (documentary)
+   - CRMem: ``em:StructuralVirtualSU``, ``em:NonStructuralVirtualSU``,
+     ``em:DocumentaryVirtualSU``, all beneath ``em:VirtualSU``
+   - CIDOC-CRM: ``crmarchaeo:A8_Stratigraphic_Unit`` **and**
+     ``crminf:I4_Proposition_Set`` — both, which is the point: see :doc:`crmem`
+   - Not ``A2_Stratigraphic_Volume_Unit``: A2 is a physical volume and a virtual
+     unit has none
 
 **SpecialFindUnit (SF)**
    Physical special finds (artifacts, samples)
    
-   - CIDOC-CRM: ``E22 Man-Made Object``
+   - CIDOC-CRM: ``E19 Physical Object``
    - Abbreviation: ``SF``
 
 **VirtualSpecialFindUnit (VSF)**
    Virtual special finds (reconstructed artifacts)
    
-   - CIDOC-CRM: ``E22 Man-Made Object + E73 Information Object``
+   - CIDOC-CRM: ``E89 Propositional Object``
    - Abbreviation: ``VSF``
 
 **DocumentaryStratigraphicUnit (USD)**
    Units known only from historical documents
    
-   - CIDOC-CRM: ``E73 Information Object``
+   - CIDOC-CRM: ``A8 Stratigraphic Unit``
    - Abbreviation: ``USD``
 
 Paradata Nodes
@@ -92,14 +99,12 @@ Documentation and data provenance nodes:
 **ParadataNode** (Base class)
    Base for all documentation nodes
    
-   - CIDOC-CRM: ``E31 Document``
-   - CIDOC-S3D: ``ParadataEntity``
+   - CIDOC-CRM: ``A8 Stratigraphic Unit``
 
 **PropertyNode (PROP)**
    Properties associated with stratigraphic nodes
    
-   - CIDOC-CRM: ``E54 Dimension``
-   - CIDOC-S3D: ``StratigraphicProperty``
+   - CIDOC-CRM: ``E1 CRM Entity``
    - Attributes: ``value``, ``property_type``
 
 **DocumentNode (DOC)**
@@ -111,15 +116,13 @@ Documentation and data provenance nodes:
 **ExtractorNode (EXT)**
    Information extraction processes
    
-   - CIDOC-CRM: ``E7 Activity``
-   - CIDOC-S3D: ``InformationExtraction``
+   - CIDOC-CRM: ``crminf:I7_Belief_Adoption``
    - Attributes: ``source``, ``method``
 
 **CombinerNode (COMB)**
    Information combination/reasoning processes
    
-   - CIDOC-CRM: ``E7 Activity``
-   - CIDOC-S3D: ``InformationCombination``
+   - CIDOC-CRM: ``crminf:I5_Inference_Making``
    - Attributes: ``sources``
 
 Group Nodes
@@ -130,13 +133,12 @@ Organizational grouping nodes:
 **ParadataNodeGroup**
    Groups paradata nodes together
    
-   - CIDOC-CRM: ``E73 Information Object``
+   - CIDOC-CRM: ``E89 Propositional Object``
 
 **TimeBranchNodeGroup**
    Alternative temporal sequences
    
-   - CIDOC-CRM: ``E2 Temporal Entity``
-   - CIDOC-S3D: ``TemporalBranch``
+   - CIDOC-CRM: ``E4 Period``
 
 **ActivityNodeGroup**
    Archaeological activities/events
@@ -152,25 +154,23 @@ Representation Nodes
 **RepresentationModelNode**
    3D models of stratigraphic units
    
-   - CIDOC-CRM: ``E36 Visual Item``
-   - CIDOC-S3D: ``3DRepresentation``
+   - CIDOC-CRM: ``D1 Digital Object``
    - Formats: glTF, OBJ, PLY
 
 **RepresentationModelDocNode**
    3D models of documentation (photogrammetry, etc.)
    
-   - CIDOC-CRM: ``E36 Visual Item``
+   - CIDOC-CRM: ``D1 Digital Object``
 
 **RepresentationModelSpecialFindNode**
    3D models of special finds
    
-   - CIDOC-CRM: ``E36 Visual Item``
+   - CIDOC-CRM: ``D1 Digital Object``
 
 **SemanticShapeNode**
    Symbolic 3D shapes (proxies, annotations)
    
-   - CIDOC-CRM: ``E36 Visual Item``
-   - CIDOC-S3D: ``SymbolicSpatialRepresentation``
+   - CIDOC-CRM: ``E73 Information Object``
    - Supports: Convex shapes, spheres
 
 Reference Nodes
@@ -184,12 +184,6 @@ Geographic and linking nodes:
    - CIDOC-CRM: ``E53 Place``
    - CRMgeo: ``SP5 Geometric Place Expression``
    - Attributes: ``epsg``, ``shift_x``, ``shift_y``, ``shift_z``
-
-**LinkNode (LINK)**
-   External resource links
-   
-   - CIDOC-CRM: ``E73 Information Object``
-   - Attributes: ``url``, ``url_type``
 
 **EpochNode (EP)**
    Temporal periods/phases
@@ -205,7 +199,7 @@ Author and licensing nodes:
 **AuthorNode (AUTH)**
    Author/creator information
    
-   - CIDOC-CRM: ``E39 Actor`` or ``E21 Person``
+   - CIDOC-CRM: ``E21 Person``
    - Attributes: ``name``, ``surname``, ``orcid``
 
 **LicenseNode**
@@ -216,7 +210,7 @@ Author and licensing nodes:
 **EmbargoNode**
    Temporal embargo on data
    
-   - CIDOC-CRM: ``E4 Period``
+   - CIDOC-CRM: ``E30 Right``
 
 Fallback Nodes
 ^^^^^^^^^^^^^^
@@ -285,29 +279,32 @@ Temporal Relations
 ^^^^^^^^^^^^^^^^^^
 
 **is_before**
-   Chronological sequence (A before B)
+   Chronological sequence (A before B). Not a type of its own: it is the
+   **declared reverse** of ``is_after``, and since September 2026
+   ``allowed_edges`` returns the reverse of every non-symmetric edge. A reverse
+   is the same property read backwards, so it carries no mapping of its own.
    
-   - CIDOC-CRM: ``P120_occurs_before``
-   - CRMarchaeo: ``AP28_occurs_before``
+   - See: ``is_after`` below
    - Source: StratigraphicNode
    - Target: StratigraphicNode
 
 **is_after**
    Chronological sequence (A after B)
    
-   - CIDOC-CRM: ``P120_occurs_after``
+   - CIDOC-CRM: ``crmarchaeo:AP28_occurs_before``
    - CRMarchaeo: ``AP28_occurs_after``
 
 **has_same_time**
    Contemporaneous elements
    
-   - CIDOC-CRM: ``P114_is_equal_in_time_to``
+   - CIDOC-CRM: ``crmarchaeo:AP22_is_equal_in_time_to``
    - CRMarchaeo: ``AP22_is_equal_in_time_to``
 
 **changed_from**
    Temporal transformation (one unit becoming another)
    
-   - CIDOC-CRM: ``P123_resulted_from``
+   - CIDOC-CRM: ``P123i_resulted_from``
+   - Extension: ``AP4_produced_surface (was_surface_produced_by)``
    - CRMarchaeo: ``AP4_produced_surface``
 
 Physical Relations
@@ -316,7 +313,8 @@ Physical Relations
 **abuts**
    Physical contact relationship
    
-   - CIDOC-CRM: ``P130_shows_features_of``
+   - CIDOC-CRM: *none holds — declared absent, see* :doc:`crmem`
+   - Extension: ``AP11_has_physical_relation_to``
    - CRMarchaeo: ``AP11_has_physical_relation``
 
 **fills**
@@ -355,7 +353,7 @@ Documentation Relations
 **has_documentation**
    Links stratigraphic unit to documentation
    
-   - CIDOC-CRM: ``P70_documents``
+   - CIDOC-CRM: ``P70i_is_documented_in``
    - Source: StratigraphicNode, SpecialFindUnit
    - Target: DocumentNode
 
@@ -363,6 +361,7 @@ Documentation Relations
    Information extracted from source
    
    - CIDOC-CRM: ``P67_refers_to``
+   - Extension: ``J7_is_based_on_evidence_from (is_evidence_for)``
    - CRMinf: ``J7_is_based_on_evidence_from``
    - Source: ExtractorNode
    - Target: DocumentNode
@@ -371,6 +370,7 @@ Documentation Relations
    Combining information from sources
    
    - CIDOC-CRM: ``P16_used_specific_object``
+   - Extension: ``J1_used_as_premise (was_premise_for)``
    - CRMinf: ``J1_used_as_premise``
    - Source: CombinerNode
    - Target: ExtractorNode
@@ -382,6 +382,7 @@ Property Relations
    Associates property with node
    
    - CIDOC-CRM: ``P43_has_dimension``
+   - CRMem: ``em:hasQualia``
    - CRMarchaeo: ``AP9_took_matter_from``
    - Source: StratigraphicNode
    - Target: PropertyNode
@@ -392,16 +393,14 @@ Paradata Relations
 **is_in_paradata_nodegroup**
    Node belongs to paradata group
    
-   - CIDOC-CRM: ``P106_is_composed_of``
-   - CIDOC-S3D: ``isPartOfParadataGroup``
+   - CIDOC-CRM: ``P106i_forms_part_of``
    - Source: DocumentNode, ExtractorNode, CombinerNode
    - Target: ParadataNodeGroup
 
 **has_paradata_nodegroup**
    Node has associated paradata group
    
-   - CIDOC-CRM: ``P70_documents``
-   - CIDOC-S3D: ``hasParadataDocumentation``
+   - CIDOC-CRM: ``P129i_is_subject_of``
    - Source: StratigraphicNode
    - Target: ParadataNodeGroup
 
@@ -411,8 +410,8 @@ Group Relations
 **is_in_activity**
    Part of archaeological activity
    
-   - CIDOC-CRM: ``P9_consists_of``
-   - CIDOC-S3D: ``participatedInActivity``
+   - CIDOC-CRM: *none holds — declared absent, see* :doc:`crmem`
+   - CRMem: ``em:isInActivity``
    - Source: Various node types
    - Target: ActivityNodeGroup
 
@@ -420,15 +419,20 @@ Group Relations
    Alternative temporal sequences
    
    - CIDOC-CRM: ``P67_refers_to``
-   - CIDOC-S3D: ``belongsToAlternative``
+   - CRMem: ``em:belongsToAlternative``
    - Source: StratigraphicNode
    - Target: TimeBranchNodeGroup
 
-**incompatible_with**
-   Mutually exclusive time branches
+.. sync: manual
+
+**contrasts_with**
+   Mutually exclusive time branches. Symmetric, so it has no reverse. Renamed
+   from ``incompatible_with``.
    
-   - CIDOC-CRM: ``P15_was_influenced_by``
-   - CIDOC-S3D: ``incompatibleWith``
+   - CIDOC-CRM: *none holds — declared absent.* ``P15_was_influenced_by`` has
+     ``E7_Activity`` as its domain while a time branch is an ``E4_Period``, and
+     it states influence rather than mutual exclusion
+   - CRMem: ``em:contrastsWith``
    - Source/Target: TimeBranchNodeGroup
 
 Epoch Relations
@@ -437,7 +441,8 @@ Epoch Relations
 **has_first_epoch**
    Initial appearance epoch
    
-   - CIDOC-CRM: ``P82a_begin_of_the_begin``
+   - CIDOC-CRM: ``P10_falls_within``
+   - CRMem: ``em:firstAttestedInEpoch``
    - CRMarchaeo: ``AP13_has_stratigraphic_relation``
    - Source: StratigraphicNode, RepresentationModelNode
    - Target: EpochNode
@@ -445,7 +450,8 @@ Epoch Relations
 **survive_in_epoch**
    Continues to exist in epoch
    
-   - CIDOC-CRM: ``P10_falls_within``
+   - CIDOC-CRM: ``P132_spatiotemporally_overlaps_with``
+   - CRMem: ``em:survivesInEpoch``
    - CRMarchaeo: ``AP13_has_stratigraphic_relation``
 
 Representation Relations
@@ -455,7 +461,6 @@ Representation Relations
    3D model of stratigraphic unit
    
    - CIDOC-CRM: ``P138i_has_representation``
-   - CIDOC-S3D: ``has3DRepresentation``
    - Source: StratigraphicNode, EpochNode
    - Target: RepresentationModelNode
 
@@ -475,7 +480,7 @@ Representation Relations
    Symbolic shape representation
    
    - CIDOC-CRM: ``P138i_has_representation``
-   - CIDOC-S3D: ``hasSymbolicSpatialRepresentation``
+   - CRMem: ``em:hasSemanticShape``
    - Source: Any Node
    - Target: SemanticShapeNode
 
@@ -494,6 +499,7 @@ Reference Relations
    External resource link
    
    - CIDOC-CRM: ``P67_refers_to``
+   - Extension: ``L19_stores (is_stored_on)``
    - CRMdig: ``L19_stores``
    - Source: Various nodes
    - Target: LinkNode
@@ -501,7 +507,8 @@ Reference Relations
 **has_author**
    Author/creator
    
-   - CIDOC-CRM: ``P94_has_created``
+   - CIDOC-CRM: ``prov:wasAttributedTo``
+   - CRMem: ``em:hasAuthor``
    - CRMdig: ``L10_had_input``
    - Source: Most node types
    - Target: AuthorNode
@@ -527,6 +534,7 @@ Generic Relations
    Non-specific connection
    
    - CIDOC-CRM: ``P130_shows_features_of``
+   - Extension: ``AP11_has_physical_relation_to (is_physical_relation_from)``
    - CRMarchaeo: ``AP11_has_physical_relation``
    - Source/Target: Any Node
 
@@ -536,14 +544,17 @@ Containment Relations
 **is_part_of**
    Physical containment: child is part of container
 
-   - CIDOC-CRM: ``P46_is_composed_of``
+   - CIDOC-CRM: ``P46i_forms_part_of``
+   - Extension: ``P46_is_composed_of``
    - Source: SpecialFindUnit, VirtualSpecialFindUnit
    - Target: StratigraphicUnit, DocumentaryStratigraphicUnit, VirtualSpecialFindUnit
 
 **has_part**
-   Reverse of is_part_of (auto-generated)
+   Declared reverse of ``is_part_of``. A reverse carries no mapping of its own:
+   ``is_part_of`` emits ``P46i_forms_part_of`` with ``P46_is_composed_of`` as its
+   extension, and reading it backwards is the same property, not a second one.
 
-   - CIDOC-CRM: ``P46i_forms_part_of``
+   - See: ``is_part_of`` above
 
 Visual Reference Relations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -552,6 +563,7 @@ Visual Reference Relations
    Links a node to a visual reference (added in v1.5.4)
 
    - CIDOC-CRM: ``P138i_has_representation``
+   - CRMem: ``em:hasVisualReference``
    - Source: Various node types
    - Target: DocumentNode
 

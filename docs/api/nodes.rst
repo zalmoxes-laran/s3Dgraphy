@@ -289,7 +289,9 @@ Graph & Heritage Digital Twin nodes
 Geometry: the proxy is a property, the shape is its payload
 -----------------------------------------------------------
 
-**Datamodel versions: nodes 1.6.3 · connections 1.6.10 · qualia 1.6.1.**
+**Introduced at nodes datamodel 1.6.3 · connections 1.6.10.** These are the
+versions in which the change below landed, not the current ones: for the
+declared coherence horizon see :doc:`../generated-report`.
 
 A *proxy* is the geometry-without-material of a unit: the shape US101 has,
 without asserting what it is made of. Until 1.6.3 it was a

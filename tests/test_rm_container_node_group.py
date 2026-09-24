@@ -476,7 +476,7 @@ def test_LA_VOCE_NEL_NODE_DATAMODEL_c_e():
     assert voce["parent"] == "GroupNode"
     assert voce["class"] == "RepresentationModelNodeGroup"
     #: …e la versione è stata bumpata
-    assert d["s3Dgraphy_data_model_version"] == "1.6.6"
+    assert d["s3Dgraphy_data_model_version"] == "1.6.7"
 
 
 def test_E_IL_MAPPING_TIENE_la_classe_del_genitore_con_la_sua_ragione():

@@ -13,7 +13,7 @@
 @prefix xsd:       <http://www.w3.org/2001/XMLSchema#> .
 
 # ============================================================================
-# Extended Matrix (EM) Ontology — v1.6.2
+# Extended Matrix (EM) Ontology — v1.6.4
 # ============================================================================
 # Formal extension of the CIDOC-CRM family + HDT-O for the Extended Matrix
 # stratigraphic + paradata + virtual-reconstruction modeling. Companion to
@@ -717,6 +717,21 @@ em:isInActivity
     rdfs:range crm:E7_Activity ;
     rdfs:comment "An entity of any kind — a stratigraphic unit, a quale, a document, an extractor, a whole paradata group — is CLASSIFIED UNDER an activity-shaped grouping. This is the axis of INTENTION in the Extended Matrix, orthogonal to space (is_in_location) and to time (the epoch edges), and it is a curatorial grouping and not an event anyone attended. NO SUPERPROPERTY, deliberately, and the reason is the whole justification for the term: CIDOC can say that an actor PARTICIPATED in an event (P11i), that a thing WAS PRESENT (P12i), that an object WAS USED (P16i) — but it cannot say that an arbitrary entity is classified under an activity. P12i would even pass the type check, because E28 Conceptual Object reaches E77 through E71/E70, but it would be false: a PropertyNode attended nothing. P9i needs an E4 Period in the subject and the sources here are not periods; P129i needs an E89 in the object and E7 Activity is not one. Verified against CIDOC CRM 7.1.3 and CRMarchaeo 2.1.1: CRMarchaeo has specific archaeological activities (A9, A1, A6) but no generic activity class and none of its 32 AP properties expresses membership in one. The CLASS is not ours — crm:E7_Activity is CIDOC core and ActivityNodeGroup stays mapped to it — only the property is. NAMED isInActivity and NOT participatedInActivity (the dead CIDOC-S3D desideratum it replaces), because participation is a claim this model does not make. Maps to: connections_datamodel edge 'is_in_activity' (sources StratigraphicNode/ParadataNode/ParadataNodeGroup/DocumentNode/ExtractorNode/CombinerNode/PropertyNode, target ActivityNodeGroup); mapping.cidoc stays EMPTY on purpose, and the exporter emits this property on its own."@en .
 
+em:belongsToAlternative
+    a owl:ObjectProperty ;
+    rdfs:label "belongs to alternative"@en ;
+    rdfs:domain crm:E1_CRM_Entity ;
+    rdfs:range em:TimeBranch ;
+    rdfs:subPropertyOf crminf:J28i_is_referred_to_in ;
+    rdfs:comment "An entity belongs to one alternative reconstruction scenario rather than another. UNLIKE em:contrastsWith and em:isInActivity this term HAS an honest ceiling: CRMinf does cover membership in a set of propositions (J28/J28i, and since 1.2 the I17 pattern with J30/J31/J32), so the extension NARROWS here instead of widening. What it adds beneath that ceiling is the identity of the scenario as an addressable thing, which the bare membership property does not carry: a reader must be able to ask which units belong to scenario B, not merely that they are referred to somewhere. Maps to: connections_datamodel edges is_in_timebranch (source StratigraphicNode, target TimeBranchNodeGroup) and the deprecated has_timebranch. Replaces the dead desideratum CIDOC-S3D:belongsToAlternative, which named the same thing under a prefix that resolved to nothing."@en .
+
+em:hasSemanticShape
+    a owl:ObjectProperty ;
+    rdfs:label "has semantic shape"@en ;
+    rdfs:domain crm:E1_CRM_Entity ;
+    rdfs:range em:SemanticShape ;
+    rdfs:comment "An entity is represented, for the purpose of spatial reasoning, by a simplified geometry that STANDS FOR it — a convex hull, a sphere, a proximity volume — as distinct from a geometry that measures it. The two answer different questions: a measured geometry says where the unit was found, a semantic shape says how it is to be reasoned about spatially when its true shape is unknown, irrelevant, or argued. NO SUPERPROPERTY: crmgeo places (SP5 and its neighbourhood) express a place expression, not a schematic stand-in, and since the proxy-as-property change of v1.6.10 the source of this relation includes a PropertyNode — a quale does not occupy a place, so a place-valued property would be false as well as imprecise. The CLASS is ours (em:SemanticShape, itself declared beneath crm:E73_Information_Object) because the stand-in is an information object and not a physical extent. Maps to: connections_datamodel edge has_semantic_shape (source Node, target SemanticShapeNode). Replaces the dead desideratum CIDOC-S3D:hasSymbolicSpatialRepresentation."@en .
+
 # ============================================================================
-# End of em.ttl v1.6.3
+# End of em.ttl v1.6.4
 # ============================================================================

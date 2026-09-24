@@ -11,8 +11,8 @@ Every figure on this page is read off the datamodels and the installed package a
 | Component | Version |
 | --- | --- |
 | s3dgraphy (library) | 1.6.0.dev20 |
-| nodes datamodel | 1.6.6 |
-| connections datamodel | 1.6.17 |
+| nodes datamodel | 1.6.7 |
+| connections datamodel | 1.6.18 |
 | qualia datamodel | 1.6.1 |
 | CIDOC-CRM | 7.1.3 |
 | CRMarchaeo | 2.1.1 |
@@ -22,9 +22,9 @@ Every figure on this page is read off the datamodels and the installed package a
 | CRMinf | 1.2.1 |
 | HDT-O | 1.0 |
 | PROV-O | W3C Recommendation 2013-04-30 |
-| CRMem | 1.6.2 |
+| CRMem | 1.6.4 |
 
-> ⚠ The generated node registry declares node datamodel version `1.6.5` while the node datamodel itself is at `1.6.6`. The registry's `--check` mode compares class entries only, so a version drift like this one passes unnoticed. Regenerate with `python -m s3dgraphy.tools.sync_node_datamodel`.
+> ⚠ The generated node registry declares node datamodel version `1.6.5` while the node datamodel itself is at `1.6.7`. The registry's `--check` mode compares class entries only, so a version drift like this one passes unnoticed. Regenerate with `python -m s3dgraphy.tools.sync_node_datamodel`.
 
 ## Node types
 
@@ -86,8 +86,8 @@ Edge types, by the ontology of the CIDOC predicate they emit. An edge with no CI
 
 | Ontology | Edge types |
 | --- | --- |
-| crm | 32 |
-| (none declared) | 9 |
+| crm | 31 |
+| (none declared) | 10 |
 | hdto | 6 |
 | crmdig | 5 |
 | crmarchaeo | 2 |
@@ -97,15 +97,12 @@ Edge types carrying a second, extension predicate beside (or instead of) the CID
 
 | Ontology | Edge types |
 | --- | --- |
+| em | 13 |
 | CRMarchaeo | 10 |
-| CIDOC-S3D | 9 |
-| em | 9 |
 | CIDOC-CRM | 8 |
 | prov | 4 |
 | CRMdig | 2 |
 | CRMinf | 2 |
 
-> ⚠ **Extension prefixes the RDF exporter cannot resolve.** A predicate declared under a prefix that is not in the exporter's prefix table resolves to nothing and is never emitted — no error is raised anywhere. These declarations are inert:
-
-> * `CIDOC-S3D:` — on 9 edge types: `contrasts_with`, `has_paradata_nodegroup`, `has_representation_model`, `has_representation_model_doc`, `has_representation_model_sf`, `has_semantic_shape`, `has_timebranch`, `is_in_paradata_nodegroup`, `is_in_timebranch`
+Every extension prefix declared above resolves in the RDF exporter's prefix table.
 

@@ -202,7 +202,12 @@ may declare an extension predicate under a prefix that table does not contain;
 nothing refuses it, and the term simply resolves to nothing and is never emitted.
 That is what happened to the ``CIDOC-S3D:`` declarations documented in
 :doc:`crmem`: they sat in the datamodels for two minor versions, looking like
-mappings, resolving to ``None`` every time.
+mappings, resolving to ``None`` every time. They were removed on 24 September
+2026 — three became the corresponding ``em:`` property, three were dropped
+because an existing CIDOC property already said what was meant — so the prefix
+is now gone from every live field of both datamodels. The lesson survives the
+repair: a declaration that resolves to nothing fails **silently**, which is why
+step 3 of the procedure exists.
 
 **Registering a new prefix is therefore the one alignment change that does
 require a code change**, and it is a single line. The procedure in

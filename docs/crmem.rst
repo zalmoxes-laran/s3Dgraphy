@@ -46,11 +46,117 @@ entirely onto CRMdig with a parallel PROV-O projection and introduces not one
 term of its own. See :doc:`dtc-profile`.
 
 
-The four properties
--------------------
+The classes
+-----------
 
-CRMem declares four properties and no class. Each is listed with the ceiling it
-hangs under, where an honest one exists, and the gap it names.
+CRMem declares **45 classes and 41 properties** (26 object, 15 datatype),
+measured by parsing ``em.ttl``. The classes are the constructs of the Extended
+Matrix itself — what a stratigraphic record made in this language *contains* —
+and they are the larger half of the extension. The properties, four of them, are
+the relations between those constructs that the family cannot express.
+
+One rule governs the whole class inventory, and it is what to check it against:
+
+.. admonition:: The rule
+
+   **Every class declared in CRMem is a subclass of at least one class of the
+   reference family. None stands free.** What the extension adds is never a new
+   top-level kind of thing, but a distinction the family does not draw at the
+   granularity the discipline needs. The superclass is what keeps the addition
+   legible to a consumer that reads CIDOC and has never heard of the Extended
+   Matrix.
+
+The virtual family
+~~~~~~~~~~~~~~~~~~
+
+This is the semantic heart of the model and the clearest case of the rule:
+
+.. code-block:: turtle
+
+   em:VirtualSU
+       a owl:Class ;
+       rdfs:subClassOf crminf:I4_Proposition_Set , crmarchaeo:A8_Stratigraphic_Unit .
+
+Two parents at once, and that is the whole point. A hypothesised unit **is** a
+proposition set — it is argued, and its argumentation chain is in the graph —
+and it **is** a stratigraphic unit, taking its place in the sequence exactly as
+an observed one does. That double parentage is the two-tier structure of the
+Extended Matrix written as one axiom. ``crmarchaeo:A2_Stratigraphic_Volume_Unit``
+would have been wrong: A2 is a physical volume, and a virtual unit has none.
+
+Beneath it sit the three kinds the method distinguishes — ``em:StructuralVirtualSU``
+(USVs), ``em:NonStructuralVirtualSU`` (USVn), ``em:DocumentaryVirtualSU`` (USD) —
+which differ by *what sustains them*, not by their standing in the sequence.
+``em:VirtualSpecialFind`` repeats the pattern one level down, at once
+``crm:E89_Propositional_Object`` and ``crm:E19_Physical_Object``, and names the
+argued reassembly of a fragmented artefact.
+
+The units that are not volumes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``em:NegativeSU`` (USN) and ``em:NeutralSU`` (USNt) are declared beneath
+``crmarchaeo:A3_Stratigraphic_Interface``, not beneath the unit. What they record
+is an **absence that is nevertheless a stratigraphic fact** — a cut, a void, a
+surface of separation — and modelling them as thin volumes is the error that
+makes a sequence unreasonable.
+
+Beside them, ``em:DisplacedSpecialFind`` and ``em:ReusedSpecialFind`` are
+physical objects, the second also ``crmarchaeo:A2``, which is what lets a
+*spolium* be at once an object with a history of its own and a unit in the
+sequence that received it.
+
+The rest, briefly
+~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 40 26
+
+   * - CRMem class
+     - Declared beneath
+     - What it records
+   * - ``em:StratigraphicEvent``, ``em:TransformationSU``
+     - ``crmarchaeo:A5_Stratigraphic_Modification``
+     - a change, not a thing
+   * - ``em:WorkingUnit``
+     - ``crm:E25_Human-Made_Feature``
+     - an operational unit of the excavation
+   * - ``em:ContinuityNode``
+     - ``crm:E64_End_of_Existence``
+     - how the model says something stops
+   * - ``em:Paradata``, ``em:Extractor``, ``em:Combiner``
+     - ``crminf:I1_Argumentation``, ``I7_Belief_Adoption``, ``I5_Inference_Making``
+     - the argumentation triad, adding nothing to CRMinf
+   * - ``em:TimeBranch``
+     - ``crm:E4_Period``
+     - an alternative temporal scenario
+   * - ``em:RepresentationModel`` (+3 subclasses)
+     - ``crmdig:D1_Digital_Object``
+     - what stands for a unit in three dimensions
+   * - ``em:SemanticShape``, ``em:AnnotationRegion``
+     - ``crm:E73_Information_Object``, ``crm:E36_Visual_Item``
+     - schematic stand-in; region of an image
+   * - ``em:FunctionalUnit``
+     - ``crm:E24_Physical_Human-Made_Thing``
+     - a cut and its fill, a wall and its foundation
+
+The paradata triad is why **CRMinf is a formal dependency of CRMem** and not
+merely a neighbour: three CRMem classes are declared directly beneath three
+CRMinf classes and add nothing to them.
+
+Every class in the inventory is cited by the node datamodel shipped with the
+library, so the ontology and the operational type system are **one declaration,
+not two**.
+
+
+The properties
+--------------
+
+CRMem declares four properties, and **none of them introduces a class of its
+own**: each hangs on classes that already exist, whether CIDOC core or, for the
+time branch, one the language declares for its own constructs (above). Each is
+listed with the ceiling it hangs under, where an honest one exists, and the gap
+it names.
 
 .. list-table::
    :header-rows: 1
@@ -82,17 +188,19 @@ hangs under, where an honest one exists, and the gap it names.
 
 .. note::
 
-   **Implementation state, measured on the working tree, September 2026.**
-   Of the four, ``em:isInActivity`` is declared in ``em.ttl`` *and* wired in the
-   connections datamodel. ``em:contrastsWith`` is declared in ``em.ttl`` —
-   as an ``owl:SymmetricProperty`` with domain and range ``em:TimeBranch`` — but
-   is **not yet wired**: the ``contrasts_with`` edge still carries the unresolved
-   ``CIDOC-S3D:incompatibleWith``. ``em:belongsToAlternative`` and
-   ``em:hasSemanticShape`` are decided but **not yet declared**. Six distinct
-   unresolved ``CIDOC-S3D:`` names remain on nine edge types, one of which
-   (``has_timebranch``) is deprecated and never serialised. Connecting them is a
-   string change in the datamodel plus, for two of them, an axiom in ``em.ttl``
-   — the work item described in :doc:`mapping-update-procedure`.
+   **Implementation state, measured on the working tree, 24 September 2026.**
+   All four properties are declared in ``em.ttl`` (v1.6.4) and wired in the
+   connections datamodel (v1.6.18): ``em:isInActivity``, ``em:contrastsWith``,
+   ``em:belongsToAlternative`` and ``em:hasSemanticShape``. The unregistered
+   ``CIDOC-S3D:`` prefix is **gone from every live field** of both datamodels —
+   three of its names became the corresponding ``em:`` property, and three were
+   removed outright because ``crm:P106i_forms_part_of``,
+   ``crm:P129i_is_subject_of`` and ``crm:P138i_has_representation`` already say
+   what was meant once the target is typed correctly. It survives only in the
+   historical notes of the datamodel descriptions, which is the record of what
+   changed. Bumping the two datamodels made the eight shipped mapping
+   descriptors report a stale ``_validated_against`` stamp on the next check,
+   unprompted; they were re-stamped. See :doc:`mapping-update-procedure`.
 
 
 Relations that resolve inside CIDOC
@@ -147,9 +255,10 @@ the others, so it is given in full.
        rdfs:domain crm:E1_CRM_Entity ;
        rdfs:range  crm:E7_Activity .
 
-**No class is introduced.** ``crm:E7_Activity`` is CIDOC core — a subclass of
-``E5_Event``, declared in CRM 7.1.3 — and the EM activity group stays mapped to
-it. Only the property is ours.
+**No class is introduced for this property.** ``crm:E7_Activity`` is CIDOC core
+— a subclass of ``E5_Event``, declared in CRM 7.1.3 — and the EM activity group
+stays mapped to it. Only the property is ours. (CRMem does declare classes, for
+the constructs of the language itself: see `The classes`_ above.)
 
 The scope note
 ~~~~~~~~~~~~~~
@@ -224,9 +333,13 @@ arrives at* a belief, not the logical relations *between* beliefs. That sentence
 belongs in the scope note of ``em:contrastsWith``, because it is the objection
 that will arrive.
 
-**CRMinf must be declared a formal dependency of CRMem.** It is listed among the
-components of the datamodels, but no CRMinf IRI is currently emitted from the
-connections datamodel, so the dependency is asserted and not yet exercised.
+**CRMinf is a formal dependency of CRMem**, and since 24 September 2026 it is
+exercised rather than merely asserted: three CRMem classes are declared directly
+beneath ``I1_Argumentation``, ``I7_Belief_Adoption`` and ``I5_Inference_Making``,
+``em:VirtualSU`` beneath ``I4_Proposition_Set``, and ``em:belongsToAlternative``
+beneath ``J28i_is_referred_to_in``. The dependency lives in the ontology file;
+no CRMinf IRI is emitted directly from the connections datamodel, which is a
+different statement and remains true.
 Typing ``em:TimeBranch`` also as ``crminf:I4_Proposition_Set`` is the open
 modelling decision attached to it: what is incompatible are propositions, not
 periods.
@@ -237,8 +350,9 @@ Namespace
 
 The prefix is ``em:``. CRMem follows the family's naming convention — CRMarchaeo,
 CRMsci, CRMdig, CRMgeo, CRMinf — and replaces two earlier names that pointed at
-nothing anyone could look up: ``CIDOC-S3D`` (a prefix on ten edges, never
-registered) and ``CRMs3D`` (a metadata label).
+nothing anyone could look up: ``CIDOC-S3D`` (a prefix written on nine edges and
+never registered, removed from both datamodels on 24 September 2026) and
+``CRMs3D`` (a metadata label).
 
 .. warning::
 

@@ -317,12 +317,18 @@ def test_the_edges_group_with_the_datamodels_real_counts():
     # mappings, were promoted), and is_in_activity went to `unmapped` because
     # its predicate was emptied deliberately and nothing was invented to replace
     # it. So: CIDOC-CRM 33 -> 30, CRMarchaeo 8 -> 10, unmapped 2 -> 3.
-    assert canonical == {"CIDOC-CRM": 30, "CRMarchaeo": 10, "CRMdig": 5,
-                         "HDT-O": 6, "PROV-O": 2, "unmapped": 3}, canonical
+    # 24 set 2026, CRMem wiring: contrasts_with lascia il bucket CIDOC-CRM e
+    # passa a `unmapped` perche' crm:P15_was_influenced_by e' stato tolto -- ha
+    # dominio E7_Activity e un TimeBranch e' un E4_Period, quindi non reggeva il
+    # dominio, e diceva comunque un'altra cosa (influenza, non mutua esclusione).
+    # L'arco esce sulla sola em:contrastsWith, come is_in_activity prima di lui.
+    # I totali non si muovono: CIDOC-CRM 30 -> 29, unmapped 3 -> 4.
+    assert canonical == {"CIDOC-CRM": 29, "CRMarchaeo": 10, "CRMdig": 5,
+                         "HDT-O": 6, "PROV-O": 2, "unmapped": 4}, canonical
     assert sum(canonical.values()) == 56, "the datamodel's own edge count"
     listed = {g["ontology"]: g["count"] for g in groups}
-    assert listed == {"CIDOC-CRM": 58, "CRMarchaeo": 15, "CRMdig": 10,
-                      "HDT-O": 12, "PROV-O": 4, "unmapped": 6}, listed
+    assert listed == {"CIDOC-CRM": 57, "CRMarchaeo": 15, "CRMdig": 10,
+                      "HDT-O": 12, "PROV-O": 4, "unmapped": 7}, listed
     assert sum(listed.values()) == 105, "56 canonical + 49 reverses (7 are "\
                                         "symmetric and have none)"
     filtered = {g["ontology"]: [e["edge_type"] for e in g["edges"]]
