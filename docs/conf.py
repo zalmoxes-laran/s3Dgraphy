@@ -44,6 +44,16 @@ def _read_version():
 version = _read_version()
 release = version
 
+# Il badge di versione non si scrive a mano: si compone dalla versione che
+# _read_version() ha appena risolto, cosi' non puo' restare indietro rispetto
+# al pacchetto. Shields.io vuole i trattini raddoppiati.
+_badge_version = version.replace("-", "--")
+rst_prolog = """
+.. |version_badge| image:: https://img.shields.io/badge/version-%s-blue.svg
+   :target: https://pypi.org/project/s3dgraphy/
+   :alt: Version %s
+""" % (_badge_version, version)
+
 # -- General configuration ---------------------------------------------------
 extensions = [
     # Core Sphinx extensions

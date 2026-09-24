@@ -3,9 +3,7 @@ s3dgraphy Documentation
 
 .. only:: html
 
-   .. image:: https://img.shields.io/badge/version-1.6.0-blue.svg
-      :target: https://pypi.org/project/s3dgraphy/
-      :alt: Version
+   |version_badge|
 
    .. image:: https://img.shields.io/badge/python-3.9+-brightgreen.svg
       :target: https://python.org
