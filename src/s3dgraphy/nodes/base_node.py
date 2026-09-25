@@ -37,8 +37,20 @@ class Node:
     node_type_map = {}  # Mappatura tra node_type e classi
 
     def __init_subclass__(cls, **kwargs):
+        """Register only classes that DECLARE a node_type of their own.
+
+        ``getattr`` also sees the attribute a subclass inherits, so an
+        abstract intermediate class that deliberately declares none used to
+        register itself under its parent's name and silently replace the
+        parent in the map. ``VirtualStratigraphicUnit`` did exactly that:
+        every node serialised as ``StratigraphicNode`` came back as a
+        virtual unit, whose class name the node datamodel does not know, so
+        the RDF exporter found no mapping and emitted the node with no
+        rdf:type at all. Reading ``cls.__dict__`` keeps an abstract parent
+        abstract and leaves the base class in the map where it belongs.
+        """
         super().__init_subclass__(**kwargs)
-        node_type = getattr(cls, 'node_type', None)
+        node_type = cls.__dict__.get('node_type')
         if node_type:
             Node.node_type_map[node_type] = cls
 

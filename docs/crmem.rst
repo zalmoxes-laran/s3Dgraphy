@@ -105,6 +105,26 @@ physical objects, the second also ``crmarchaeo:A2``, which is what lets a
 *spolium* be at once an object with a history of its own and a unit in the
 sequence that received it.
 
+The division mirrors CRMarchaeo's own rather than departing from it. Verified
+against the 2.1.1 declarations: ``A2_Stratigraphic_Volume_Unit`` and
+``A3_Stratigraphic_Interface`` are **both declared subclasses of**
+``A8_Stratigraphic_Unit``, which is itself a subclass of
+``crmsci:S20_Rigid_Physical_Feature``. So the abstract EM stratigraphic node
+sits on A8, an observed unit on A2, a negative or neutral one on A3 — three
+levels of the operational model against three levels of the reference
+ontology, agreeing without being forced to.
+
+.. note::
+
+   **One cell of that table is empty, in CRMarchaeo as well as here.** A2 is the
+   positive volume and A3 the interface; a **negative volume** — a void that has
+   extent, an emptied pit, a cavity — is neither, and the archaeological
+   extension declares no third sibling under A8 for it. The Extended Matrix does
+   not model it either. It is named here because a gap that can be stated is
+   scheduled work, and because this one is a candidate either for CRMem under the
+   criterion above or for a proposal to the CRMarchaeo SIG — which of the two is
+   an open question, not an oversight.
+
 The rest, briefly
 ~~~~~~~~~~~~~~~~~
 
@@ -144,9 +164,24 @@ The paradata triad is why **CRMinf is a formal dependency of CRMem** and not
 merely a neighbour: three CRMem classes are declared directly beneath three
 CRMinf classes and add nothing to them.
 
-Every class in the inventory is cited by the node datamodel shipped with the
-library, so the ontology and the operational type system are **one declaration,
-not two**.
+Forty-two of the forty-five classes are cited by the node datamodel shipped with
+the library, in the ``em_extension`` block of the node type that instantiates
+them; the remaining three (``em:Author``, ``em:VirtualSU``,
+``em:RepresentationModel``) are abstract parents that no concrete type
+instantiates. The intent is that the ontology and the operational type system be
+**one declaration**, and the two are currently consistent on every class name.
+
+.. warning::
+
+   They are **not** yet consistent on every axiom, and nothing checks them.
+   ``em.ttl`` is hand-authored and sits outside the generation chain that guards
+   the rest: five ``em_extension.subclass_of`` declarations in the node datamodel
+   assert a parent the ontology does not carry — ``em:AIAuthor`` also
+   ``crm:E39_Actor``; ``em:Paradata`` also ``hdto:HC17_Observation_with_Inference``;
+   and the three representation models also ``hdto:HC5_Digital_Representation``.
+   Whether those parents belong in the ontology is a modelling decision, not a
+   transcription error. A check that compares the two is a small tool and does
+   not exist.
 
 
 The properties
@@ -356,12 +391,16 @@ never registered, removed from both datamodels on 24 September 2026) and
 
 .. warning::
 
-   The canonical namespace is being moved to ``w3id.org/extendedmatrix``. At the
-   time of writing ``w3id.org/extendedmatrix/`` and ``/vocab/`` resolve, while
-   ``/extendedmatrix/ontology`` does not yet serve content, and ``w3id.org/em``
-   — which is what the shipped RDF currently emits — is not yet registered. The
-   IRIs in delivered RDF are therefore stable as identifiers but not yet
-   dereferenceable. This is a deployment item outside this repository.
+   The canonical namespace is ``w3id.org/extendedmatrix``. ``w3id.org/em`` was
+   **deliberately not registered**: two letters are too weak an identifier to
+   carry a permanent namespace, and ``em`` collides with a dozen other uses.
+   ``w3id.org/extendedmatrix/`` and ``/vocab/`` resolve today;
+   ``/extendedmatrix/ontology`` does not yet serve content.
+
+   ⚠ The shipped RDF still emits ``w3id.org/em/ontology#``. That is the real
+   misalignment — not a missing registration, but code emitting an address the
+   project decided against. Until it is changed, the IRIs in delivered RDF are
+   stable as identifiers and are not the canonical ones.
 
 
 A lesson worth carrying

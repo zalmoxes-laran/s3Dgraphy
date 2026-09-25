@@ -14,7 +14,14 @@ class RepresentationNode(Node):
         transform (dict): Transformation data for positioning in 3D space
     """
     
-    node_type = "representation_node"
+    # No node_type: this is the abstract family base, and the three concrete
+    # subclasses declare their own. It used to declare "representation_node",
+    # which made an abstract class authorable: a node serialised under that
+    # name was built here, and since the node datamodel declares no entry for
+    # RepresentationNode the RDF exporter found no mapping and emitted it with
+    # no rdf:type. Nothing in the corpus ever used the name (checked
+    # 2026-09-25), so removing it costs nothing and an unknown type now warns
+    # on import instead of passing silently.
     
     def __init__(self, 
                  node_id: str,
