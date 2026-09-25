@@ -42,8 +42,8 @@
   "_validated_against": {
     "s3dgraphy": "1.6.0.dev20",
     "schema_version": "1",
-    "node_datamodel": "1.6.7",
-    "connections_datamodel": "1.6.18",
-    "on": "2026-09-24"
+    "node_datamodel": "1.6.8",
+    "connections_datamodel": "1.6.19",
+    "on": "2026-09-25"
   }
 }

@@ -365,6 +365,30 @@ class _Datamodel:
             return CRMARCHAEO.AP11_has_physical_relation_to, None, type_tag, deprecated
         return _resolve_prefixed(cidoc), ext_iri, None, deprecated
 
+    def get_extension_guard(self, edge_type: str) -> Optional[List[str]]:
+        """Target node classes the declared extension predicate is valid for.
+
+        An extension predicate can be NARROWER than the core one it sits
+        beside. `is_part_of` projects to P46i for every containment, but
+        CRMarchaeo's AP21i ranges strictly over A2 Stratigraphic Volume Unit —
+        which here is only `StratigraphicUnit`: USD and the virtual units map
+        to A8, VSF to E89/E19, a FunctionalUnit to E24. Emitted at those
+        targets, AP21i would be range-inconsistent, so the datamodel declares
+        `mapping.extension_when.target_node_class` and the exporter honours it.
+
+        The guard lives in the data, not in a name this function knows, because
+        the next narrower extension should be a datamodel change and not a code
+        change — the same reason `mapping.rdf_subject` exists.
+
+        Returns None when no guard is declared, meaning no restriction.
+        """
+        edges = self.connections_datamodel.get("edge_types", {})
+        canonical, _inv = self.resolve_edge_direction(edge_type)
+        entry = edges.get(canonical) or {}
+        when = (entry.get("mapping") or {}).get("extension_when") or {}
+        classes = when.get("target_node_class")
+        return list(classes) if classes else None
+
     def edge_predicate_declared_absent(self, edge_type: str) -> bool:
         """True when the datamodel says, in so many words, that this edge has
         no CRM predicate — `mapping.cidoc` present and empty.
@@ -1432,6 +1456,20 @@ class RDFExporter:
 
     # ── edge serialization ──────────────────────────────────────────────────
 
+    def _logical_target_class(self, g: S3DGraph, edge: Any, inverted: bool) -> str:
+        """Class name of the node the edge points AT once direction is resolved.
+
+        The datamodel names node classes (`StratigraphicUnit`), not node_types:
+        `Node.node_type_map` is keyed by node_type and `StratigraphicNode`
+        happens to be the node_type of VirtualStratigraphicUnit, so the class
+        name is the only discriminator that matches `allowed_connections` and
+        `extension_when`. Returns "" when the node cannot be resolved, which
+        fails the guard closed — an extension predicate is never emitted on a
+        target we could not check.
+        """
+        node = g.find_node_by_id(edge.edge_source if inverted else edge.edge_target)
+        return type(node).__name__ if node is not None else ""
+
     def _serialize_edge(self, g: S3DGraph, edge: Any, ctx) -> None:
         edge_type = edge.edge_type
         predicate, ext_iri, type_tag, deprecated = self.datamodel.get_edge_mapping(edge_type)
@@ -1498,7 +1536,12 @@ class RDFExporter:
             # resolvable, so expressive SPARQL works without inference
             # while CRM-only readers still see the core predicate.
             if ext_iri is not None and ext_iri != predicate:
-                ctx.add((source_iri, ext_iri, target_iri))
+                guard = self.datamodel.get_extension_guard(edge_type)
+                if guard is None or self._logical_target_class(g, edge, inverted) in guard:
+                    ctx.add((source_iri, ext_iri, target_iri))
+                else:
+                    self.stats["edges_extension_skipped_guard"] = (
+                        self.stats.get("edges_extension_skipped_guard", 0) + 1)
             self.stats["edges_emitted"] += 1
         elif self.datamodel.edge_predicate_declared_absent(edge_type):
             # The datamodel states there is no predicate for this edge. Say

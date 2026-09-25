@@ -11,8 +11,8 @@ Every figure on this page is read off the datamodels and the installed package a
 | Component | Version |
 | --- | --- |
 | s3dgraphy (library) | 1.6.0.dev20 |
-| nodes datamodel | 1.6.7 |
-| connections datamodel | 1.6.18 |
+| nodes datamodel | 1.6.8 |
+| connections datamodel | 1.6.19 |
 | qualia datamodel | 1.6.1 |
 | CIDOC-CRM | 7.1.3 |
 | CRMarchaeo | 2.1.1 |
@@ -23,8 +23,6 @@ Every figure on this page is read off the datamodels and the installed package a
 | HDT-O | 1.0 |
 | PROV-O | W3C Recommendation 2013-04-30 |
 | CRMem | 1.6.4 |
-
-> ⚠ The generated node registry declares node datamodel version `1.6.5` while the node datamodel itself is at `1.6.7`. The registry's `--check` mode compares class entries only, so a version drift like this one passes unnoticed. Regenerate with `python -m s3dgraphy.tools.sync_node_datamodel`.
 
 ## Node types
 
@@ -53,10 +51,10 @@ Abstract family bases: `GroupNode`, `Node`, `ParadataNode`, `StratigraphicNode`.
 | What | Count |
 | --- | --- |
 | Python node classes in the generated registry | 58 |
-| — of which abstract (no own node_type) | 2 |
+| — of which abstract (no own node_type) | 3 |
 | present in the registry, absent from the datamodel | 3 |
 
-Abstract classes (no own `node_type`): `DTCNode`, `VirtualStratigraphicUnit`.
+Abstract classes (no own `node_type`): `DTCNode`, `RepresentationNode`, `VirtualStratigraphicUnit`.
 
 Classes present in the registry with no entry in the node datamodel, and therefore with no declared CIDOC projection: `DTCNode`, `RepresentationNode`, `VirtualStratigraphicUnit`.
 
@@ -65,7 +63,7 @@ Classes present in the registry with no entry in the node datamodel, and therefo
 | What | Count |
 | --- | --- |
 | public API callables | 166 |
-| test modules in tests/ | 90 |
+| test modules in tests/ | 92 |
 | test modules in tests/*/ | 66 |
 
 ## Alignment by ontology
@@ -98,8 +96,8 @@ Edge types carrying a second, extension predicate beside (or instead of) the CID
 | Ontology | Edge types |
 | --- | --- |
 | em | 13 |
-| CRMarchaeo | 10 |
-| CIDOC-CRM | 8 |
+| CRMarchaeo | 11 |
+| CIDOC-CRM | 5 |
 | prov | 4 |
 | CRMdig | 2 |
 | CRMinf | 2 |

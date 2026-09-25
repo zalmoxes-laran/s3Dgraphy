@@ -316,6 +316,20 @@ class _InverseDatamodel:
                 sig = pred
             if sig is not None and sig not in GENERIC_COMPANION_PREDICATES:
                 self.edges_by_signature.setdefault(str(sig), []).append(edge_type)
+            # A CONDITIONAL extension is not always emitted, so the core
+            # predicate is the most specific thing on the wire whenever the
+            # condition does not hold — i.e. the core is ALSO a signature for
+            # this edge. `is_part_of` (2026-09-25) is the first such case:
+            # AP21i goes out only when the container is a US, because that is
+            # the only target class that maps to A2. Without this, every other
+            # containment — a fragment inside a VSF, a unit inside a USD —
+            # would leave on P46i alone, find `is_part_of` missing from the
+            # signature index, and be declined by the strict pass. Measured:
+            # the Templumare round trip lost its is_part_of edges.
+            if (self.dm.get_extension_guard(edge_type) is not None
+                    and pred is not None
+                    and str(pred) not in GENERIC_COMPANION_PREDICATES):
+                self.edges_by_signature.setdefault(str(pred), []).append(edge_type)
             if pred is not None:
                 self.edges_by_core.setdefault(str(pred), []).append(edge_type)
                 self.core_of_edge[edge_type] = str(pred)

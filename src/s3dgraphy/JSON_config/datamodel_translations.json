@@ -842,7 +842,7 @@
   },
   "SpecialFindUnit": {
    "description": {
-    "en": "Movable physical object whose ORIGINAL position is unknown (and sometimes whose pertinence to the site is uncertain). Distinct from in-situ artefacts — known to exist(ed) but displaced. Architectural artefacts, coins, fragments without findspot. Provenance / pertinence uncertainty is captured via paradata edges, not by class.",
+    "en": "Movable physical object whose ORIGINAL position is unknown (and sometimes whose pertinence to the site is uncertain). Distinct from in-situ artefacts — known to exist(ed) but displaced. Architectural artefacts, coins, fragments without findspot. This is also the unit for a REDEPOSITED object: a block in secondary deposition found inside a layer, which is observed where it lies but not where it was made to lie. Provenance / pertinence uncertainty is captured via paradata edges, not by class.",
     "validated_it": false,
     "validated_el": false,
     "validated_he": false,

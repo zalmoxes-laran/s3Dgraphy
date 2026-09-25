@@ -475,8 +475,12 @@ def test_LA_VOCE_NEL_NODE_DATAMODEL_c_e():
         assert chiave in voce, f"manca {chiave}, che {sorella['class']} ha"
     assert voce["parent"] == "GroupNode"
     assert voce["class"] == "RepresentationModelNodeGroup"
-    #: …e la versione è stata bumpata
-    assert d["s3Dgraphy_data_model_version"] == "1.6.7"
+    #: …e la versione è stata bumpata. Confronto >=, non ==: questa voce è
+    #: entrata in 1.6.7 e ci resta, mentre il numero si muove per ogni altra
+    #: ragione (1.6.8: SF/RSF, redeposited vs repositioned). Un == qui fa
+    #: fallire un test sul nodo per un motivo che col nodo non c'entra.
+    _ver = tuple(int(x) for x in d["s3Dgraphy_data_model_version"].split("."))
+    assert _ver >= (1, 6, 7), d["s3Dgraphy_data_model_version"]
 
 
 def test_E_IL_MAPPING_TIENE_la_classe_del_genitore_con_la_sua_ragione():

@@ -542,17 +542,26 @@ Containment Relations
 ^^^^^^^^^^^^^^^^^^^^^
 
 **is_part_of**
-   Physical containment: child is part of container
+   Physical containment: child is part of container. A redeposited find inside a
+   layer is written this way; the layer stays a US, because containment is a
+   relation and not a node type.
 
    - CIDOC-CRM: ``P46i_forms_part_of``
-   - Extension: ``P46_is_composed_of``
-   - Source: SpecialFindUnit, VirtualSpecialFindUnit
+   - Extension: ``AP21i_is_contained_in`` (CRMarchaeo), emitted only when the
+     container is a ``StratigraphicUnit`` — the one class that maps to
+     ``A2 Stratigraphic Volume Unit``, which is ``AP21i``'s range. Until
+     2026-09-25 this slot held ``P46_is_composed_of``, the inverse of the core
+     predicate, which the exporter emitted with the same subject and object.
+   - Source: SpecialFindUnit, VirtualSpecialFindUnit, ReusedSpecialFind,
+     StratigraphicUnit, DocumentaryStratigraphicUnit, VirtualStratigraphicUnit,
+     FunctionalUnitNodeGroup
    - Target: StratigraphicUnit, DocumentaryStratigraphicUnit, VirtualSpecialFindUnit
 
 **has_part**
    Declared reverse of ``is_part_of``. A reverse carries no mapping of its own:
-   ``is_part_of`` emits ``P46i_forms_part_of`` with ``P46_is_composed_of`` as its
-   extension, and reading it backwards is the same property, not a second one.
+   ``is_part_of`` emits ``P46i_forms_part_of`` — with ``AP21i_is_contained_in``
+   beside it when the container is a US — and reading it backwards is the same
+   property, not a second one.
 
    - See: ``is_part_of`` above
 
