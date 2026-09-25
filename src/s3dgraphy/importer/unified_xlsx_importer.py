@@ -46,7 +46,11 @@ Each Claims row is one of:
 
 * **Stratigraphic relation** (``PROPERTY_TYPE`` ∈ ``_RELATION_TYPES``):
   creates a directed edge from ``TARGET_ID`` to ``TARGET2_ID`` with
-  that edge_type.
+  that edge_type. ``is_part_of`` goes the same way (child → container)
+  but is containment, not order.
+
+An Epochs row with an empty ``START`` or ``END`` gets ``None`` for that
+bound — unknown, never 0.
 
 Attribution
 -----------
@@ -95,9 +99,18 @@ from ..nodes.property_node import PropertyNode
 from ..utils.utils import get_stratigraphic_node_class
 
 
-# Stratigraphic edge types that a Claims row may declare as a relation.
-# Kept in sync with Graph._SOURCE_IS_MORE_RECENT / _TARGET_IS_MORE_RECENT
-# and the yEd palette conventions.
+# Edge types that a Claims row may declare as a relation (TARGET_ID →
+# TARGET2_ID). The ORDER relations are kept in sync with
+# Graph._SOURCE_IS_MORE_RECENT / _TARGET_IS_MORE_RECENT and the yEd palette
+# conventions.
+#
+# ``is_part_of`` is here too but is NOT an order relation: it is the nesting
+# axis (Graph.CONTAINMENT_EDGE — a hearth inside a layer, a reused block walled
+# into a channel), child → container, the same verso the GraphML importer gives
+# a node drawn inside a group. It must never be added to the MORE_RECENT sets.
+# Before it was listed, an ``is_part_of`` row fell through to the qualia branch
+# and became a PropertyNode with an empty VALUE: the containment vanished
+# without a warning.
 _RELATION_TYPES = frozenset({
     "is_after", "is_before",
     "overlies", "is_overlain_by",
@@ -106,6 +119,7 @@ _RELATION_TYPES = frozenset({
     "abuts", "is_abutted_by",
     "bonded_to", "equals",
     "has_same_time", "contrasts_with", "changed_from",
+    "is_part_of",
 })
 
 # Property types that mean "temporal seed for chronology resolver"
@@ -457,11 +471,17 @@ class UnifiedXLSXImporter:
             end = _num(row.get("END"))
             color = _str(row.get("COLOR"))
 
+            # An empty START/END is an UNKNOWN bound and stays None. It used to
+            # become 0, which is not "unknown" but "the year 0": an undated
+            # «pre-Roman» epoch read as 0–0, and the chronology resolver (which
+            # skips None but takes min/max over numbers) propagated that year to
+            # every unit in the lane. None is the contract the GraphML importer
+            # already uses for undated swimlanes; the em.json exporter omits it.
             epoch = EpochNode(
                 node_id=self._mint("epoch", eid),
                 name=name,
-                start_time=start if start is not None else 0,
-                end_time=end if end is not None else 0,
+                start_time=start,
+                end_time=end,
             )
             if color:
                 if hasattr(epoch, "color"):

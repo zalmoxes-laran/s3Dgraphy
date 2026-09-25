@@ -32,7 +32,13 @@ SUPPORTED_MAJOR = 1
 #: schema version written by files that predate the field (S2a)
 LEGACY_SCHEMA_VERSION = 0
 
-_NEUTRAL_DEFAULTS: Dict[str, Any] = {"start_time": 0, "end_time": 0}
+#: Constructor arguments with no default that a payload may legitimately omit.
+#: EpochNode's ``start_time`` / ``end_time`` are NOT here any more: the exporter
+#: omits a bound that is None (unknown), so an absent key must come back as
+#: None — refilling it with 0 turned every undated epoch into «year 0» on the
+#: first save/load (GraphML undated swimlanes, xlsx epochs without START/END).
+#: With the table empty, a missing required argument falls through to None.
+_NEUTRAL_DEFAULTS: Dict[str, Any] = {}
 
 
 class EmJsonImportError(ValueError):

@@ -47,6 +47,9 @@ _CANONICAL_RELATIONS = frozenset({
     "bonded_to", "equals",
     "is_after", "is_before",
     "has_same_time", "contrasts_with", "changed_from",
+    # Containment (child → container), not order; the importer reads it back
+    # as the same edge. Its reverse ``has_part`` is never materialised.
+    "is_part_of",
 })
 
 _REVERSE_RELATIONS = frozenset({
